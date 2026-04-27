@@ -28,3 +28,6 @@ desktop.ini
 # Local machine overrides
 /local.properties
 /gradle-local.properties
+
+# Local dependency jars are resolved from Maven/Modrinth in Gradle.
+/libs/
