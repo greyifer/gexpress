@@ -220,6 +220,33 @@ public final class SnitchManager {
 		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(player);
 	}
 
+	public static TimeState snapshotForTimeRewind() {
+		Map<UUID, Set<UUID>> glows = new HashMap<>();
+		for (Map.Entry<UUID, Set<UUID>> entry : glowViewersBySnitch.entrySet()) {
+			glows.put(entry.getKey(), new HashSet<>(entry.getValue()));
+		}
+		return new TimeState(
+			new HashMap<>(lastTaskCounts),
+			new HashMap<>(completedTasks),
+			new HashSet<>(revealedSnitches),
+			new HashSet<>(warnedSnitches),
+			glows
+		);
+	}
+
+	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
+		if (world != null) clearWorld(world);
+		clear();
+		if (state == null) return;
+		lastTaskCounts.putAll(state.lastTaskCounts());
+		completedTasks.putAll(state.completedTasks());
+		revealedSnitches.addAll(state.revealedSnitches());
+		warnedSnitches.addAll(state.warnedSnitches());
+		for (Map.Entry<UUID, Set<UUID>> entry : state.glowViewersBySnitch().entrySet()) {
+			glowViewersBySnitch.put(entry.getKey(), new HashSet<>(entry.getValue()));
+		}
+	}
+
 	private static void clear() {
 		lastTaskCounts.clear();
 		completedTasks.clear();
@@ -227,4 +254,7 @@ public final class SnitchManager {
 		warnedSnitches.clear();
 		glowViewersBySnitch.clear();
 	}
+
+	public record TimeState(Map<UUID, Integer> lastTaskCounts, Map<UUID, Integer> completedTasks,
+			Set<UUID> revealedSnitches, Set<UUID> warnedSnitches, Map<UUID, Set<UUID>> glowViewersBySnitch) {}
 }

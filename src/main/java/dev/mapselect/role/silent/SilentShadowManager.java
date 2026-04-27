@@ -6,6 +6,7 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.ShadowMarchUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -35,6 +36,7 @@ public final class SilentShadowManager {
 
 	private static void tryActivate(ServerPlayerEntity player) {
 		if (player == null || player.getWorld().isClient) return;
+		if (VultureManager.isStashed(player)) return;
 		if (!canUseSilentHere(player.getWorld(), player) || !isSilent(player)) return;
 		if (!isPlayableForSilent(player)) return;
 
@@ -86,7 +88,8 @@ public final class SilentShadowManager {
 				comp.remove(playerId);
 				continue;
 			}
-			if (!canUseSilentHere(world, player) || !isPlayableForSilent(player) || !isSilent(player)) {
+			if (VultureManager.isStashed(player) || !canUseSilentHere(world, player)
+					|| !isPlayableForSilent(player) || !isSilent(player)) {
 				comp.end(player, false);
 				continue;
 			}

@@ -1,3 +1,34 @@
+# Grey's Express 1.1.0
+
+## Added
+
+- New civilian role: Time Master.
+- Time Master rewind ability with configurable rewind time, cooldown, and max uses.
+- Visible Time Master rewind effect with a light blue screen overlay and rewind playback.
+- Dev-tab role description overrides for G'Express roles.
+- C4 placement preset list in the dev tab.
+- Surface-stuck C4 support for thrown C4.
+- Pliers can now defuse C4 stuck to blocks.
+- Pliers defuse now takes 3 seconds with visual/audio feedback.
+
+## Changed
+
+- C4 detonator now detonates one C4 at a time, starting with the most recently placed.
+- C4 block placement now uses the first collided surface and keeps the back against the surface.
+- Puppetmaster now takes over target pronouns and modifiers while controlling them.
+- Players controlled by Puppetmaster can no longer move their camera/arm weirdly.
+- Players inside the Pelican body can no longer use G'Express abilities.
+
+## Fixed
+
+- C4 not attaching correctly to players from right-click or thrown hits.
+- Thrown C4 not attaching/sticking correctly to blocks.
+- C4 floating with air gaps on ceiling/block surfaces.
+- C4 side-sticking visually instead of back-sticking.
+- Detonator saying there was no C4 when thrown C4 existed.
+- Dev tab crash from list options.
+- C4 detonator model issues from the earlier broken export path.
+
 # Grey's Express 1.0.0
 
 Welcome aboard the first release of **Grey's Express**, a Fabric 1.21.1 addon for **Wathe** and **Wathe Extended**, built for **The Harpy Express: Extended**.

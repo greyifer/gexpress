@@ -1,6 +1,7 @@
 package dev.mapselect.client.screen;
 
 import dev.isxander.yacl3.api.ConfigCategory;
+import dev.isxander.yacl3.api.ListOption;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.OptionGroup;
@@ -10,6 +11,7 @@ import dev.mapselect.config.GexpressConfig;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -22,6 +24,8 @@ public final class GexpressDevCategory {
 			.name(Text.translatable("gui.gexpress.config.category.dev"))
 			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
 			.group(c4BackModelGroup())
+			.group(c4PlacementPresetsOption())
+			.group(roleDescriptionsGroup())
 			.group(shortSightedGroup())
 			.group(medicShieldVisualsGroup())
 			.group(silentShadowVisualsGroup())
@@ -49,6 +53,45 @@ public final class GexpressDevCategory {
 				v -> GexpressConfig.c4BackSlant = v, GexpressConfig.C4_BACK_ROTATION_MIN, GexpressConfig.C4_BACK_ROTATION_MAX))
 			.option(floatOption("c4_back_scale", 0.42F, GexpressConfig::getC4BackScale,
 				v -> GexpressConfig.c4BackScale = v, GexpressConfig.C4_BACK_SCALE_MIN, GexpressConfig.C4_BACK_SCALE_MAX))
+			.build();
+	}
+
+	private static ListOption<String> c4PlacementPresetsOption() {
+		return ListOption.<String>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.dev.c4_placement_presets"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.c4_placement_presets.tooltip")))
+			.binding(List.of(), GexpressConfig::getC4PlacementPresetStrings, values -> {
+				GexpressConfig.setC4PlacementPresetStrings(values);
+				GexpressOptionsScreen.pushGexpressConfigToServer();
+			})
+			.controller(StringControllerBuilder::create)
+			.initial(GexpressConfig::getCurrentC4PlacementPresetString)
+			.collapsed(false)
+			.build();
+	}
+
+	private static OptionGroup roleDescriptionsGroup() {
+		OptionGroup.Builder group = OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.role_descriptions"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.role_descriptions.tooltip")))
+			.collapsed(true);
+		for (String role : List.of("bomb_specialist", "medic", "snitch", "seer", "time_master",
+				"the_silent", "warlock", "juggernaut", "trickster", "puppetmaster", "pelican")) {
+			group.option(roleDescriptionOption(role));
+		}
+		return group.build();
+	}
+
+	private static Option<String> roleDescriptionOption(String rolePath) {
+		return Option.<String>createBuilder()
+			.name(Text.translatable("announcement.role.gexpress." + rolePath))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.role_description.tooltip")))
+			.binding("", () -> GexpressConfig.getRoleDescriptionOverride(rolePath),
+				value -> {
+					GexpressConfig.setRoleDescriptionOverride(rolePath, value);
+					GexpressOptionsScreen.pushGexpressConfigToServer();
+				})
+			.controller(StringControllerBuilder::create)
 			.build();
 	}
 

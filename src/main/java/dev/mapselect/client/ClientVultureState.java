@@ -61,7 +61,7 @@ public final class ClientVultureState {
 			}
 		}
 
-		if (!isLocalVulture(client) || client.currentScreen != null) {
+		if (isLocalStashed(client) || !isLocalVulture(client) || client.currentScreen != null) {
 			wasEatDown = false;
 			wasReleaseDown = false;
 			return;
@@ -90,7 +90,7 @@ public final class ClientVultureState {
 		context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), color);
 	}
 
-	private static boolean isLocalStashed(MinecraftClient client) {
+	public static boolean isLocalStashed(MinecraftClient client) {
 		return client != null && client.player != null && vultureId != null;
 	}
 

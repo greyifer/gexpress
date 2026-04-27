@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import dev.mapselect.MapSelect;
+import dev.mapselect.role.bombspecialist.C4PlacementPreset;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
@@ -11,6 +12,11 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Mod-wide config persisted as JSON at config/gexpress.json. In multiplayer, the server is
@@ -63,6 +69,12 @@ public final class GexpressConfig {
 	public static int pelicanEatCooldownSeconds = 20;
 	/** Number of task completions before a Snitch learns the killer roster. */
 	public static int snitchTasksRequired = 3;
+	/** Seconds a Time Master rewinds the active round. */
+	public static int timeMasterRewindSeconds = 10;
+	/** Seconds before a Time Master can rewind again. */
+	public static int timeMasterCooldownSeconds = 120;
+	/** Total number of rewinds each Time Master can use in a round. */
+	public static int timeMasterMaxUses = 1;
 	/** Maximum number of normal killer-team players assigned by G'Express role assignment. */
 	public static int maxKillerAmount = 64;
 	/** Synced C4 backpack model tuning. */
@@ -74,6 +86,9 @@ public final class GexpressConfig {
 	public static float c4BackRotationZ = 0.0F;
 	public static float c4BackSlant = 0.0F;
 	public static float c4BackScale = 0.42F;
+	public static List<String> c4PlacementPresets = new ArrayList<>();
+	/** Per-role guidebook description overrides, keyed by role path (for example bomb_specialist). */
+	public static Map<String, String> roleDescriptionOverrides = new LinkedHashMap<>();
 	/** Synced Short-sighted entity visibility tuning. Stored under the old JSON name for config compatibility. */
 	public static float shortSightedFogRange = 5.0F;
 	/** Synced Medic shield flash tuning. */
@@ -126,6 +141,12 @@ public final class GexpressConfig {
 	public static final int PELICAN_EAT_COOLDOWN_MAX = 600;
 	public static final int SNITCH_TASKS_REQUIRED_MIN = 1;
 	public static final int SNITCH_TASKS_REQUIRED_MAX = 25;
+	public static final int TIME_MASTER_REWIND_SECONDS_MIN = 1;
+	public static final int TIME_MASTER_REWIND_SECONDS_MAX = 60;
+	public static final int TIME_MASTER_COOLDOWN_SECONDS_MIN = 0;
+	public static final int TIME_MASTER_COOLDOWN_SECONDS_MAX = 900;
+	public static final int TIME_MASTER_MAX_USES_MIN = 0;
+	public static final int TIME_MASTER_MAX_USES_MAX = 10;
 	public static final int MAX_KILLER_AMOUNT_MIN = 0;
 	public static final int MAX_KILLER_AMOUNT_MAX = 64;
 	public static final float C4_BACK_OFFSET_MIN = -1.0F;
@@ -246,6 +267,21 @@ public final class GexpressConfig {
 			Math.min(SNITCH_TASKS_REQUIRED_MAX, snitchTasksRequired));
 	}
 
+	public static int getTimeMasterRewindSeconds() {
+		return Math.max(TIME_MASTER_REWIND_SECONDS_MIN,
+			Math.min(TIME_MASTER_REWIND_SECONDS_MAX, timeMasterRewindSeconds));
+	}
+
+	public static int getTimeMasterCooldownSeconds() {
+		return Math.max(TIME_MASTER_COOLDOWN_SECONDS_MIN,
+			Math.min(TIME_MASTER_COOLDOWN_SECONDS_MAX, timeMasterCooldownSeconds));
+	}
+
+	public static int getTimeMasterMaxUses() {
+		return Math.max(TIME_MASTER_MAX_USES_MIN,
+			Math.min(TIME_MASTER_MAX_USES_MAX, timeMasterMaxUses));
+	}
+
 	public static int getMaxKillerAmount() {
 		return Math.max(MAX_KILLER_AMOUNT_MIN, Math.min(MAX_KILLER_AMOUNT_MAX, maxKillerAmount));
 	}
@@ -280,6 +316,89 @@ public final class GexpressConfig {
 
 	public static float getC4BackScale() {
 		return clampFloat(c4BackScale, C4_BACK_SCALE_MIN, C4_BACK_SCALE_MAX, 0.42F);
+	}
+
+	public static String getCurrentC4PlacementPresetString() {
+		return currentC4PlacementPreset().toConfigString();
+	}
+
+	public static List<String> getC4PlacementPresetStrings() {
+		return normalizeC4PresetStrings(c4PlacementPresets, true);
+	}
+
+	public static void setC4PlacementPresetStrings(List<String> values) {
+		c4PlacementPresets = normalizeC4PresetStrings(values, false);
+	}
+
+	public static String getC4PlacementPresetsSyncString() {
+		return String.join(";", normalizeC4PresetStrings(c4PlacementPresets, false));
+	}
+
+	public static void setC4PlacementPresetsSyncString(String raw) {
+		if (raw == null || raw.isBlank()) {
+			c4PlacementPresets = new ArrayList<>();
+			return;
+		}
+		List<String> values = new ArrayList<>();
+		for (String part : raw.split(";")) {
+			values.add(part);
+		}
+		setC4PlacementPresetStrings(values);
+	}
+
+	public static int getC4PlacementPresetCount() {
+		return getC4PlacementPresets().size();
+	}
+
+	public static C4PlacementPreset getC4PlacementPreset(int index) {
+		List<C4PlacementPreset> presets = getC4PlacementPresets();
+		if (presets.isEmpty()) return currentC4PlacementPreset();
+		return presets.get(Math.floorMod(index, presets.size()));
+	}
+
+	public static List<C4PlacementPreset> getC4PlacementPresets() {
+		List<String> strings = normalizeC4PresetStrings(c4PlacementPresets, true);
+		List<C4PlacementPreset> presets = new ArrayList<>();
+		for (String value : strings) {
+			C4PlacementPreset preset = C4PlacementPreset.parse(value);
+			if (preset != null) presets.add(preset);
+		}
+		if (presets.isEmpty()) presets.add(currentC4PlacementPreset());
+		return presets;
+	}
+
+	public static String getRoleDescriptionOverride(String rolePath) {
+		if (rolePath == null || rolePath.isBlank()) return "";
+		return roleDescriptionOverrides.getOrDefault(rolePath, "");
+	}
+
+	public static void setRoleDescriptionOverride(String rolePath, String value) {
+		if (rolePath == null || rolePath.isBlank()) return;
+		String cleaned = value == null ? "" : value.strip();
+		if (cleaned.isEmpty()) {
+			roleDescriptionOverrides.remove(rolePath);
+		} else {
+			roleDescriptionOverrides.put(rolePath, cleaned);
+		}
+	}
+
+	public static String getRoleDescriptionOverridesSyncString() {
+		String json = GSON.toJson(normalizeRoleDescriptionOverrides(roleDescriptionOverrides));
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+	}
+
+	public static void setRoleDescriptionOverridesSyncString(String raw) {
+		if (raw == null || raw.isBlank()) {
+			roleDescriptionOverrides = new LinkedHashMap<>();
+			return;
+		}
+		try {
+			byte[] bytes = Base64.getUrlDecoder().decode(raw);
+			Map<?, ?> decoded = GSON.fromJson(new String(bytes, java.nio.charset.StandardCharsets.UTF_8), Map.class);
+			roleDescriptionOverrides = normalizeRoleDescriptionOverrides(decoded);
+		} catch (IllegalArgumentException | JsonSyntaxException ignored) {
+			roleDescriptionOverrides = new LinkedHashMap<>();
+		}
 	}
 
 	public static float getShortSightedFogRange() {
@@ -356,6 +475,9 @@ public final class GexpressConfig {
 			puppetmasterCanKillOwnBody = snap.puppetmasterCanKillOwnBody;
 			pelicanEatCooldownSeconds = snap.pelicanEatCooldownSeconds;
 			snitchTasksRequired = snap.snitchTasksRequired;
+			timeMasterRewindSeconds = snap.timeMasterRewindSeconds;
+			timeMasterCooldownSeconds = snap.timeMasterCooldownSeconds;
+			timeMasterMaxUses = snap.timeMasterMaxUses;
 			maxKillerAmount = snap.maxKillerAmount;
 			c4BackOffsetX = snap.c4BackOffsetX;
 			c4BackOffsetY = snap.c4BackOffsetY;
@@ -365,6 +487,8 @@ public final class GexpressConfig {
 			c4BackRotationZ = snap.c4BackRotationZ;
 			c4BackSlant = snap.c4BackSlant;
 			c4BackScale = snap.c4BackScale;
+			c4PlacementPresets = normalizeC4PresetStrings(snap.c4PlacementPresets, false);
+			roleDescriptionOverrides = normalizeRoleDescriptionOverrides(snap.roleDescriptionOverrides);
 			shortSightedFogRange = snap.shortSightedFogRange;
 			medicShieldBlockFlashTicks = snap.medicShieldBlockFlashTicks;
 			medicShieldBreakFlashTicks = snap.medicShieldBreakFlashTicks;
@@ -406,6 +530,9 @@ public final class GexpressConfig {
 			snap.puppetmasterCanKillOwnBody = puppetmasterCanKillOwnBody;
 			snap.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
 			snap.snitchTasksRequired = snitchTasksRequired;
+			snap.timeMasterRewindSeconds = timeMasterRewindSeconds;
+			snap.timeMasterCooldownSeconds = timeMasterCooldownSeconds;
+			snap.timeMasterMaxUses = timeMasterMaxUses;
 			snap.maxKillerAmount = maxKillerAmount;
 			snap.c4BackOffsetX = c4BackOffsetX;
 			snap.c4BackOffsetY = c4BackOffsetY;
@@ -415,6 +542,8 @@ public final class GexpressConfig {
 			snap.c4BackRotationZ = c4BackRotationZ;
 			snap.c4BackSlant = c4BackSlant;
 			snap.c4BackScale = c4BackScale;
+			snap.c4PlacementPresets = normalizeC4PresetStrings(c4PlacementPresets, false);
+			snap.roleDescriptionOverrides = normalizeRoleDescriptionOverrides(roleDescriptionOverrides);
 			snap.shortSightedFogRange = shortSightedFogRange;
 			snap.medicShieldBlockFlashTicks = medicShieldBlockFlashTicks;
 			snap.medicShieldBreakFlashTicks = medicShieldBreakFlashTicks;
@@ -437,10 +566,12 @@ public final class GexpressConfig {
 			int juggernautInitialCooldownSeconds, int juggernautCooldownReductionSeconds,
 			int juggernautMinimumCooldownSeconds, int tricksterSwapDurationSeconds,
 			int puppetmasterControlDurationSeconds, int puppetmasterControlCooldownSeconds,
-			boolean puppetmasterRandomTarget, int pelicanEatCooldownSeconds, int snitchTasksRequired, int maxKillerAmount,
+			boolean puppetmasterRandomTarget, int pelicanEatCooldownSeconds, int snitchTasksRequired,
+			int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses, int maxKillerAmount,
 			float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 			float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
-			float c4BackSlant, float c4BackScale,
+			float c4BackSlant, float c4BackScale, String c4PlacementPresets,
+			String roleDescriptionOverrides,
 			float shortSightedFogRange,
 			int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
 			int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
@@ -465,6 +596,9 @@ public final class GexpressConfig {
 		GexpressConfig.puppetmasterRandomTarget = puppetmasterRandomTarget;
 		GexpressConfig.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
 		GexpressConfig.snitchTasksRequired = snitchTasksRequired;
+		GexpressConfig.timeMasterRewindSeconds = timeMasterRewindSeconds;
+		GexpressConfig.timeMasterCooldownSeconds = timeMasterCooldownSeconds;
+		GexpressConfig.timeMasterMaxUses = timeMasterMaxUses;
 		GexpressConfig.maxKillerAmount = maxKillerAmount;
 		GexpressConfig.c4BackOffsetX = c4BackOffsetX;
 		GexpressConfig.c4BackOffsetY = c4BackOffsetY;
@@ -474,6 +608,8 @@ public final class GexpressConfig {
 		GexpressConfig.c4BackRotationZ = c4BackRotationZ;
 		GexpressConfig.c4BackSlant = c4BackSlant;
 		GexpressConfig.c4BackScale = c4BackScale;
+		GexpressConfig.setC4PlacementPresetsSyncString(c4PlacementPresets);
+		GexpressConfig.setRoleDescriptionOverridesSyncString(roleDescriptionOverrides);
 		GexpressConfig.shortSightedFogRange = shortSightedFogRange;
 		GexpressConfig.medicShieldBlockFlashTicks = medicShieldBlockFlashTicks;
 		GexpressConfig.medicShieldBreakFlashTicks = medicShieldBreakFlashTicks;
@@ -502,6 +638,9 @@ public final class GexpressConfig {
 		puppetmasterControlCooldownSeconds = getPuppetmasterControlCooldownSeconds();
 		pelicanEatCooldownSeconds = getPelicanEatCooldownSeconds();
 		snitchTasksRequired = getSnitchTasksRequired();
+		timeMasterRewindSeconds = getTimeMasterRewindSeconds();
+		timeMasterCooldownSeconds = getTimeMasterCooldownSeconds();
+		timeMasterMaxUses = getTimeMasterMaxUses();
 		maxKillerAmount = getMaxKillerAmount();
 		c4BackOffsetX = getC4BackOffsetX();
 		c4BackOffsetY = getC4BackOffsetY();
@@ -520,6 +659,45 @@ public final class GexpressConfig {
 		abilityHudScalePercent = getAbilityHudScalePercent();
 		abilityHudOffsetX = getAbilityHudOffsetX();
 		abilityHudOffsetY = getAbilityHudOffsetY();
+	}
+
+	private static C4PlacementPreset currentC4PlacementPreset() {
+		return new C4PlacementPreset(
+			getC4BackOffsetX(),
+			getC4BackOffsetY(),
+			getC4BackOffsetZ(),
+			getC4BackRotationX(),
+			getC4BackRotationY(),
+			getC4BackRotationZ(),
+			getC4BackSlant(),
+			getC4BackScale()
+		);
+	}
+
+	private static List<String> normalizeC4PresetStrings(List<String> values, boolean fallbackToCurrent) {
+		List<String> out = new ArrayList<>();
+		if (values != null) {
+			for (String raw : values) {
+				C4PlacementPreset preset = C4PlacementPreset.parse(raw);
+				if (preset != null) out.add(preset.toConfigString());
+			}
+		}
+		if (out.isEmpty() && fallbackToCurrent) {
+			out.add(currentC4PlacementPreset().toConfigString());
+		}
+		return out;
+	}
+
+	private static Map<String, String> normalizeRoleDescriptionOverrides(Map<?, ?> values) {
+		Map<String, String> out = new LinkedHashMap<>();
+		if (values != null) {
+			for (Map.Entry<?, ?> entry : values.entrySet()) {
+				String key = entry.getKey() instanceof String s ? s.strip() : "";
+				String value = entry.getValue() instanceof String s ? s.strip() : "";
+				if (!key.isEmpty() && !value.isEmpty()) out.put(key, value);
+			}
+		}
+		return out;
 	}
 
 	private static float clampFloat(float value, float min, float max, float fallback) {
@@ -563,6 +741,9 @@ public final class GexpressConfig {
 		boolean puppetmasterCanKillOwnBody = false;
 		int pelicanEatCooldownSeconds = 20;
 		int snitchTasksRequired = 3;
+		int timeMasterRewindSeconds = 10;
+		int timeMasterCooldownSeconds = 120;
+		int timeMasterMaxUses = 1;
 		int maxKillerAmount = 64;
 		float c4BackOffsetX = 0.0F;
 		float c4BackOffsetY = 0.24F;
@@ -572,6 +753,8 @@ public final class GexpressConfig {
 		float c4BackRotationZ = 0.0F;
 		float c4BackSlant = 0.0F;
 		float c4BackScale = 0.42F;
+		List<String> c4PlacementPresets = new ArrayList<>();
+		Map<String, String> roleDescriptionOverrides = new LinkedHashMap<>();
 		float shortSightedFogRange = 5.0F;
 		int medicShieldBlockFlashTicks = 18;
 		int medicShieldBreakFlashTicks = 28;

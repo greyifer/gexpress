@@ -7,6 +7,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.TricksterSkinSwapPayload;
 import dev.mapselect.network.TricksterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -59,6 +60,7 @@ public final class TricksterManager {
 
 	private static void tryActivate(ServerPlayerEntity trickster) {
 		if (trickster == null || trickster.getWorld().isClient) return;
+		if (VultureManager.isStashed(trickster)) return;
 		if (!canUseTricksterHere(trickster.getWorld(), trickster) || !isTrickster(trickster)) return;
 		if (!isPlayableForTrickster(trickster, trickster)) return;
 
@@ -172,6 +174,14 @@ public final class TricksterManager {
 		if (world == null) return false;
 		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
 		return active != null && active.isActive(world);
+	}
+
+	public static void clearForTimeRewind(ServerWorld world) {
+		if (world == null) return;
+		activeSwaps.remove(world.getRegistryKey());
+		nextNoellesCycleCleanupTicks.remove(world.getRegistryKey());
+		clearNoellesMorphCycles(world);
+		broadcastClear(world);
 	}
 
 	private static boolean isTrickster(PlayerEntity player) {

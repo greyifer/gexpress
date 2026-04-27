@@ -9,6 +9,7 @@ import dev.doctor4t.wathe.index.WatheItems;
 import dev.doctor4t.wathe.index.WatheSounds;
 import dev.doctor4t.wathe.index.tag.WatheItemTags;
 import dev.doctor4t.wathe.util.ShootMuzzleS2CPayload;
+import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
@@ -19,6 +20,7 @@ import dev.mapselect.network.PuppetmasterStatePayload;
 import dev.mapselect.network.PuppetmasterTargetsPayload;
 import dev.mapselect.network.PuppetmasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -39,6 +41,10 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import org.agmas.harpymodloader.component.WorldModifierComponent;
+import org.agmas.harpymodloader.events.ModifierAssigned;
+import org.agmas.harpymodloader.events.ModifierRemoved;
+import org.agmas.harpymodloader.modifiers.Modifier;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -160,6 +166,7 @@ public final class PuppetmasterManager {
 			puppetmaster.getWorld().getTime() + durationTicks);
 		sessionsByController.put(puppetmaster.getUuid(), session);
 		controllerByTarget.put(target.getUuid(), puppetmaster.getUuid());
+		applyModifierSwap(puppetmaster.getServerWorld(), puppetmaster, target, session);
 
 		copyHotbar(target, puppetmaster);
 		session.temporaryKnifeSlot = grantTemporaryKnife(puppetmaster);
@@ -264,6 +271,12 @@ public final class PuppetmasterManager {
 		return null;
 	}
 
+	public static UUID replacementFor(UUID playerId) {
+		if (playerId == null) return null;
+		ControlSession controllerSession = sessionsByController.get(playerId);
+		if (controllerSession != null) return controllerSession.targetId;
+		return controllerByTarget.get(playerId);
+	}
 
 	private static int grantTemporaryKnife(ServerPlayerEntity target) {
 		if (target.getInventory().count(WatheItems.KNIFE) > 0) return -1;
@@ -306,6 +319,14 @@ public final class PuppetmasterManager {
 		endControl(playerId, server, false);
 		UUID controller = controllerByTarget.get(playerId);
 		if (controller != null) endControl(controller, server, true);
+	}
+
+	public static void clearForTimeRewind(MinecraftServer server) {
+		for (UUID controllerId : new ArrayList<>(sessionsByController.keySet())) {
+			endControl(controllerId, server, false);
+		}
+		controllerByTarget.clear();
+		cooldownUntilByController.clear();
 	}
 
 	private static boolean allowDamage(ServerPlayerEntity player, DamageSource damageSource, float damageAmount) {
@@ -356,6 +377,7 @@ public final class PuppetmasterManager {
 		broadcastState(server, clear);
 		if (controller != null && target != null && controller.getWorld() instanceof ServerWorld controllerWorld
 				&& target.getWorld() instanceof ServerWorld targetWorld) {
+			restoreModifierSwap(controllerWorld, controller, target, session);
 			ItemStack[] controlledHotbar = copyHotbar(controller);
 			if (session.temporaryKnifeSlot >= 0 && session.temporaryKnifeSlot < controlledHotbar.length
 					&& controlledHotbar[session.temporaryKnifeSlot].isOf(WatheItems.KNIFE)) {
@@ -375,6 +397,9 @@ public final class PuppetmasterManager {
 			target.getInventory().selectedSlot = session.targetSelectedSlot;
 			controller.playerScreenHandler.syncState();
 			target.playerScreenHandler.syncState();
+		}
+		if (controller == null || target == null) {
+			restoreModifierSwap(server, session);
 		}
 		if (controller != null) {
 			if (applyCooldown) {
@@ -418,6 +443,7 @@ public final class PuppetmasterManager {
 
 	private static boolean canUse(ServerPlayerEntity player) {
 		if (player == null || player.getWorld().isClient) return false;
+		if (VultureManager.isStashed(player)) return false;
 		if (!canUseHere(player.getWorld(), player) || !isPuppetmaster(player)) return false;
 		return isPlayable(player, player);
 	}
@@ -454,6 +480,85 @@ public final class PuppetmasterManager {
 		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(puppetmaster);
 	}
 
+	private static ArrayList<Modifier> copyModifiers(World world, UUID playerId) {
+		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
+		if (modifiers == null || playerId == null) return new ArrayList<>();
+		return new ArrayList<>(modifiers.getModifiers(playerId));
+	}
+
+	private static void applyModifierSwap(ServerWorld world, ServerPlayerEntity controller,
+			ServerPlayerEntity target, ControlSession session) {
+		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
+		if (modifiers == null) return;
+		setModifiers(modifiers, controller, session.controllerModifiers, session.targetModifiers);
+		setModifiers(modifiers, target, session.targetModifiers, session.controllerModifiers);
+		modifiers.sync();
+	}
+
+	private static void restoreModifierSwap(ServerWorld world, ServerPlayerEntity controller,
+			ServerPlayerEntity target, ControlSession session) {
+		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
+		if (modifiers == null) return;
+		setModifiers(modifiers, controller, modifiers.getModifiers(controller), session.controllerModifiers);
+		setModifiers(modifiers, target, modifiers.getModifiers(target), session.targetModifiers);
+		modifiers.sync();
+	}
+
+	private static void restoreModifierSwap(MinecraftServer server, ControlSession session) {
+		if (server == null || session == null) return;
+		ServerPlayerEntity controller = server.getPlayerManager().getPlayer(session.controllerId);
+		ServerPlayerEntity target = server.getPlayerManager().getPlayer(session.targetId);
+		if (controller == null && target == null) return;
+		ServerWorld world = controller != null ? controller.getServerWorld() : target.getServerWorld();
+		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
+		if (modifiers == null) return;
+		if (controller != null) setModifiers(modifiers, controller, modifiers.getModifiers(controller), session.controllerModifiers);
+		if (target != null) setModifiers(modifiers, target, modifiers.getModifiers(target), session.targetModifiers);
+		modifiers.sync();
+	}
+
+	private static void setModifiers(WorldModifierComponent component, ServerPlayerEntity player,
+			List<Modifier> before, List<Modifier> after) {
+		if (component == null || player == null) return;
+		ArrayList<Modifier> current = component.getModifiers(player.getUuid());
+		List<Modifier> oldValues = before == null ? List.of() : before;
+		List<Modifier> newValues = after == null ? List.of() : after;
+		for (Modifier modifier : oldValues) {
+			if (!containsModifier(newValues, modifier)) safeRemoveModifier(player, modifier);
+		}
+		current.clear();
+		current.addAll(newValues);
+		for (Modifier modifier : newValues) {
+			if (!containsModifier(oldValues, modifier)) safeAssignModifier(player, modifier);
+		}
+	}
+
+	private static boolean containsModifier(List<Modifier> modifiers, Modifier needle) {
+		if (modifiers == null || needle == null) return false;
+		for (Modifier modifier : modifiers) {
+			if (modifier == needle || (modifier != null && modifier.identifier().equals(needle.identifier()))) return true;
+		}
+		return false;
+	}
+
+	private static void safeAssignModifier(ServerPlayerEntity player, Modifier modifier) {
+		try {
+			ModifierAssigned.EVENT.invoker().assignModifier(player, modifier);
+		} catch (Throwable t) {
+			MapSelect.LOGGER.warn("ModifierAssigned listener failed while Puppetmaster swapped {} onto {}.",
+				modifier == null ? "(none)" : modifier.identifier(), player.getName().getString(), t);
+		}
+	}
+
+	private static void safeRemoveModifier(ServerPlayerEntity player, Modifier modifier) {
+		try {
+			ModifierRemoved.EVENT.invoker().removeModifier(player, modifier);
+		} catch (Throwable t) {
+			MapSelect.LOGGER.warn("ModifierRemoved listener failed while Puppetmaster removed {} from {}.",
+				modifier == null ? "(none)" : modifier.identifier(), player.getName().getString(), t);
+		}
+	}
+
 	private static final class ControlSession {
 		private final UUID controllerId;
 		private final UUID targetId;
@@ -470,6 +575,8 @@ public final class PuppetmasterManager {
 		private final float targetStartPitch;
 		private final ItemStack[] controllerHotbar;
 		private final ItemStack[] targetHotbar;
+		private final ArrayList<Modifier> controllerModifiers;
+		private final ArrayList<Modifier> targetModifiers;
 		private final int controllerSelectedSlot;
 		private final int targetSelectedSlot;
 		private int temporaryKnifeSlot = -1;
@@ -492,6 +599,8 @@ public final class PuppetmasterManager {
 			this.targetStartPitch = target.getPitch();
 			this.controllerHotbar = copyHotbar(controller);
 			this.targetHotbar = copyHotbar(target);
+			this.controllerModifiers = copyModifiers(controller.getWorld(), controller.getUuid());
+			this.targetModifiers = copyModifiers(target.getWorld(), target.getUuid());
 			this.controllerSelectedSlot = MathHelper.clamp(controller.getInventory().selectedSlot, 0, 8);
 			this.targetSelectedSlot = MathHelper.clamp(target.getInventory().selectedSlot, 0, 8);
 			this.input = new PuppetInput(0.0F, 0.0F, false, false, false, false,

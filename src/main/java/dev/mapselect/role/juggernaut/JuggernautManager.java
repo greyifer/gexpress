@@ -201,6 +201,18 @@ public final class JuggernautManager {
 		return isLoadoutItem(stack);
 	}
 
+	public static TimeState snapshotForTimeRewind() {
+		return new TimeState(new HashMap<>(killCounts), new HashMap<>(pendingCooldowns), new HashSet<>(equipped));
+	}
+
+	public static void restoreForTimeRewind(TimeState state) {
+		clearRoundState();
+		if (state == null) return;
+		killCounts.putAll(state.killCounts());
+		pendingCooldowns.putAll(state.pendingCooldowns());
+		equipped.addAll(state.equipped());
+	}
+
 	private static boolean isLoadoutItem(ItemStack stack) {
 		return stack.isOf(WatheItems.KNIFE) || stack.isOf(WatheItems.REVOLVER);
 	}
@@ -232,4 +244,6 @@ public final class JuggernautManager {
 			return net.minecraft.text.Text.literal("Juggernaut cooldown: " + Math.max(0, cooldownTicks / 20) + "s.");
 		}
 	}
+
+	public record TimeState(Map<UUID, Integer> killCounts, Map<UUID, Integer> pendingCooldowns, Set<UUID> equipped) {}
 }

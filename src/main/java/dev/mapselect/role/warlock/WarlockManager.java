@@ -8,6 +8,7 @@ import dev.doctor4t.wathe.index.WatheSounds;
 import dev.mapselect.network.WarlockKillPayload;
 import dev.mapselect.network.WarlockMarkPayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -46,6 +47,7 @@ public final class WarlockManager {
 
 	private static void tryMark(ServerPlayerEntity warlock) {
 		if (warlock == null || warlock.getWorld().isClient) return;
+		if (VultureManager.isStashed(warlock)) return;
 		if (!canUseWarlockHere(warlock.getWorld(), warlock) || !isWarlock(warlock)) return;
 		ServerPlayerEntity target = findLookTarget(warlock, MARK_RANGE);
 		if (target == null) {
@@ -83,6 +85,7 @@ public final class WarlockManager {
 
 	private static void tryHexKill(ServerPlayerEntity warlock) {
 		if (warlock == null || warlock.getWorld().isClient) return;
+		if (VultureManager.isStashed(warlock)) return;
 		if (!canUseWarlockHere(warlock.getWorld(), warlock) || !isWarlock(warlock)) return;
 		if (!isPlayableForWarlock(warlock, warlock)) return;
 
@@ -179,6 +182,7 @@ public final class WarlockManager {
 			ServerPlayerEntity marked = markId == null ? null : server.getPlayerManager().getPlayer(markId);
 			if (warlock == null || marked == null
 					|| marked.getWorld() != world
+					|| VultureManager.isStashed(warlock)
 					|| !canUseWarlockHere(world, warlock)
 					|| !isPlayableForWarlock(warlock, warlock)
 					|| !isPlayableForWarlock(marked, warlock)

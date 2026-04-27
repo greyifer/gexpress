@@ -38,6 +38,8 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientMedicShieldState.register();
 		ClientMedicState.register();
 		ClientSeerState.register();
+		ClientTimeMasterState.register();
+		ClientTimeMasterRewindState.register();
 		ClientSilentShadowState.register();
 		ClientWarlockState.register();
 		ClientTricksterState.register();
@@ -98,6 +100,9 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.puppetmasterRandomTarget(),
 				payload.pelicanEatCooldownSeconds(),
 				payload.snitchTasksRequired(),
+				payload.timeMasterRewindSeconds(),
+				payload.timeMasterCooldownSeconds(),
+				payload.timeMasterMaxUses(),
 				payload.maxKillerAmount(),
 				payload.c4BackOffsetX(),
 				payload.c4BackOffsetY(),
@@ -107,6 +112,8 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.c4BackRotationZ(),
 				payload.c4BackSlant(),
 				payload.c4BackScale(),
+				payload.c4PlacementPresets(),
+				payload.roleDescriptionOverrides(),
 				payload.shortSightedFogRange(),
 				payload.medicShieldBlockFlashTicks(),
 				payload.medicShieldBreakFlashTicks(),

@@ -14,10 +14,12 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int juggernautInitialCooldownSeconds, int juggernautCooldownReductionSeconds,
 		int juggernautMinimumCooldownSeconds, int tricksterSwapDurationSeconds,
 		int puppetmasterControlDurationSeconds, int puppetmasterControlCooldownSeconds,
-		boolean puppetmasterRandomTarget, int pelicanEatCooldownSeconds, int snitchTasksRequired, int maxKillerAmount,
+		boolean puppetmasterRandomTarget, int pelicanEatCooldownSeconds, int snitchTasksRequired,
+		int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses, int maxKillerAmount,
 		float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 		float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
-		float c4BackSlant, float c4BackScale,
+		float c4BackSlant, float c4BackScale, String c4PlacementPresets,
+		String roleDescriptionOverrides,
 		float shortSightedFogRange,
 		int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
 		int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
@@ -48,6 +50,9 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeBoolean(payload.puppetmasterRandomTarget());
 			buf.writeInt(payload.pelicanEatCooldownSeconds());
 			buf.writeInt(payload.snitchTasksRequired());
+			buf.writeInt(payload.timeMasterRewindSeconds());
+			buf.writeInt(payload.timeMasterCooldownSeconds());
+			buf.writeInt(payload.timeMasterMaxUses());
 			buf.writeInt(payload.maxKillerAmount());
 			buf.writeFloat(payload.c4BackOffsetX());
 			buf.writeFloat(payload.c4BackOffsetY());
@@ -57,6 +62,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeFloat(payload.c4BackRotationZ());
 			buf.writeFloat(payload.c4BackSlant());
 			buf.writeFloat(payload.c4BackScale());
+			buf.writeString(payload.c4PlacementPresets());
+			buf.writeString(payload.roleDescriptionOverrides());
 			buf.writeFloat(payload.shortSightedFogRange());
 			buf.writeInt(payload.medicShieldBlockFlashTicks());
 			buf.writeInt(payload.medicShieldBreakFlashTicks());
@@ -86,6 +93,9 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(),
 			buf.readInt(),
 			buf.readInt(),
+			buf.readInt(),
+			buf.readInt(),
+			buf.readInt(),
 			buf.readFloat(),
 			buf.readFloat(),
 			buf.readFloat(),
@@ -94,6 +104,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readFloat(),
 			buf.readFloat(),
 			buf.readFloat(),
+			buf.readString(),
+			buf.readString(),
 			buf.readFloat(),
 			buf.readInt(),
 			buf.readInt(),

@@ -109,12 +109,17 @@ public final class ClientPuppetmasterState {
 		boolean abilityDown = ability != null && ClientAbilityKeys.isDown(client, ability);
 		boolean activeController = isLocalController(client);
 		if (abilityDown && !wasAbilityDown && ClientPlayNetworking.canSend(PuppetmasterUsePayload.ID)
+				&& !ClientVultureState.isLocalStashed(client)
 				&& (activeController || (client.currentScreen == null && isLocalPuppetmaster(client)))) {
 			ClientPlayNetworking.send(new PuppetmasterUsePayload());
 		}
 		wasAbilityDown = abilityDown;
 
-		if (activeController && client.getCameraEntity() != client.player) client.setCameraEntity(client.player);
+		if (activeController) {
+			if (client.getCameraEntity() != client.player) client.setCameraEntity(client.player);
+			syncLookFromLocal(client);
+			sendInput(client);
+		}
 	}
 
 	public static void sendImmediateInput(MinecraftClient client) {
@@ -152,6 +157,10 @@ public final class ClientPuppetmasterState {
 	}
 
 	public static void syncLookFromLocal(MinecraftClient client) {
+		if (client == null || client.player == null || !isLocalController(client)) return;
+		initializePuppetLook(client);
+		puppetYaw = MathHelper.wrapDegrees(client.player.getYaw());
+		puppetPitch = MathHelper.clamp(client.player.getPitch(), -90.0F, 90.0F);
 	}
 
 	public static boolean isLocalController(MinecraftClient client) {
@@ -235,7 +244,7 @@ public final class ClientPuppetmasterState {
 		}
 	}
 
-	private static boolean isLocalTarget(MinecraftClient client) {
+	public static boolean isLocalTarget(MinecraftClient client) {
 		return client != null && client.player != null && targetId != null
 			&& targetId.equals(client.player.getUuid());
 	}

@@ -36,7 +36,8 @@ public final class ClientWarlockState {
 	}
 
 	private static void tick(MinecraftClient client) {
-		if (client == null || client.player == null || client.world == null || !shouldHandleWarlock(client)) {
+		if (client == null || client.player == null || client.world == null
+				|| ClientVultureState.isLocalStashed(client) || !shouldHandleWarlock(client)) {
 			wasMarkDown = false;
 			wasKillDown = false;
 			return;
@@ -64,7 +65,8 @@ public final class ClientWarlockState {
 
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null || client.world == null || !shouldHandleWarlock(client)) return;
+		if (client == null || client.player == null || client.world == null
+				|| ClientVultureState.isLocalStashed(client) || !shouldHandleWarlock(client)) return;
 		if (!hasLocalMark(client)) return;
 
 		boolean ready = isMarkedPlayerInKillRange(client);

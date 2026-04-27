@@ -8,6 +8,7 @@ import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.medic.MedicShieldComponent;
 import dev.mapselect.role.silent.SilentShadowComponent;
+import dev.mapselect.role.timemaster.TimeMasterComponent;
 import dev.mapselect.role.warlock.WarlockComponent;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
@@ -46,6 +47,7 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_WARLOCK_MARK = hudIcon("ability_warlock_mark");
 	private static final Identifier ICON_HEX_KILL = hudIcon("ability_hex_kill");
 	private static final Identifier ICON_MASQUERADE = hudIcon("ability_masquerade");
+	private static final Identifier ICON_TIME_REWIND = hudIcon("ability_masquerade");
 	private static final Identifier ICON_PUPPET_STRINGS = hudIcon("ability_puppet_strings");
 	private static final Identifier ICON_PELICAN_SWALLOW = hudIcon("ability_pelican_swallow");
 	private static final Map<String, SyncedCooldown> SYNCED = new HashMap<>();
@@ -133,6 +135,11 @@ public final class ClientAbilityCooldownHud {
 				0xFFD276FF, 0xFF602375));
 			bars.add(cooldown(ICON_HEX_KILL, kill, GexpressConfig.getWarlockKillCooldownSeconds() * 20L,
 				0xFFFF4A55, 0xFF7C151F));
+		} else if (MapSelectRoles.TIME_MASTER_ID.equals(roleId)) {
+			TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(client.world);
+			long remaining = comp == null ? 0L : comp.cooldownRemainingTicks(playerId);
+			bars.add(cooldown(ICON_TIME_REWIND, remaining, GexpressConfig.getTimeMasterCooldownSeconds() * 20L,
+				0xFF57D4E6, 0xFF176B77));
 		} else if (MapSelectRoles.TRICKSTER_ID.equals(roleId)) {
 			long remaining = ClientTricksterState.remainingTicks();
 			bars.add(remaining > 0L

@@ -35,7 +35,7 @@ public final class ClientSilentShadowState {
 			wasAbilityDown = false;
 			return;
 		}
-		if (!isLocalSilent(client)) {
+		if (ClientVultureState.isLocalStashed(client) || !isLocalSilent(client)) {
 			wasAbilityDown = false;
 			return;
 		}

@@ -14,8 +14,6 @@ import net.minecraft.client.render.item.ItemRenderer;
 import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.RotationAxis;
-import org.joml.Quaternionf;
 
 public class C4BackFeatureRenderer extends FeatureRenderer<AbstractClientPlayerEntity, PlayerEntityModel<AbstractClientPlayerEntity>> {
 	private final ItemStack c4Stack;
@@ -34,31 +32,13 @@ public class C4BackFeatureRenderer extends FeatureRenderer<AbstractClientPlayerE
 
 		matrices.push();
 		this.getContextModel().body.rotate(matrices);
-		// Body-local space. These values are exposed in the dev-only G'Express Options tab.
-		matrices.translate(GexpressConfig.getC4BackOffsetX(), GexpressConfig.getC4BackOffsetY(), GexpressConfig.getC4BackOffsetZ());
-		rotateIfNeeded(matrices, RotationAxis.POSITIVE_X, GexpressConfig.getC4BackRotationX());
-		rotateIfNeeded(matrices, RotationAxis.POSITIVE_Y, GexpressConfig.getC4BackRotationY());
-		rotateIfNeeded(matrices, RotationAxis.POSITIVE_Z, GexpressConfig.getC4BackRotationZ());
-		slantIfNeeded(matrices, GexpressConfig.getC4BackSlant());
-		float scale = GexpressConfig.getC4BackScale();
-		matrices.scale(scale, scale, scale);
+		int presetIndex = C4BackComponent.getPresetIndex(entity);
+		C4ModelTransforms.applyPlacement(matrices, GexpressConfig.getC4PlacementPreset(presetIndex));
 
 		MinecraftClient mc = MinecraftClient.getInstance();
 		ItemRenderer ir = mc.getItemRenderer();
 		ir.renderItem(this.c4Stack, ModelTransformationMode.FIXED, light,
 			OverlayTexture.DEFAULT_UV, matrices, vertexConsumers, mc.world, 0);
 		matrices.pop();
-	}
-
-	private static void rotateIfNeeded(MatrixStack matrices, RotationAxis axis, float degrees) {
-		if (degrees != 0.0F) {
-			matrices.multiply(axis.rotationDegrees(degrees));
-		}
-	}
-
-	private static void slantIfNeeded(MatrixStack matrices, float degrees) {
-		if (degrees != 0.0F) {
-			matrices.multiply(new Quaternionf().rotationAxis((float) Math.toRadians(degrees), 0.70710677F, 0.0F, 0.70710677F));
-		}
 	}
 }

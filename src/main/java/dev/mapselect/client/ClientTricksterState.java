@@ -71,7 +71,8 @@ public final class ClientTricksterState {
 			clear();
 			return;
 		}
-		if (client.currentScreen != null || !isLocalTrickster(client)) {
+		if (client.currentScreen != null || ClientVultureState.isLocalStashed(client)
+				|| !isLocalTrickster(client)) {
 			wasAbilityDown = false;
 			return;
 		}

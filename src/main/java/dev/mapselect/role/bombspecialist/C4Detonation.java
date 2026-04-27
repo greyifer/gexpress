@@ -4,7 +4,6 @@ import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
-import dev.doctor4t.wathe.index.WatheItems;
 import dev.doctor4t.wathe.index.WatheParticles;
 import dev.doctor4t.wathe.index.WatheSounds;
 import dev.mapselect.config.GexpressConfig;
@@ -13,9 +12,10 @@ import dev.mapselect.registry.MapSelectSounds;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.particle.ItemStackParticleEffect;
+import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -23,8 +23,14 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
@@ -37,6 +43,7 @@ public final class C4Detonation {
 	private C4Detonation() {}
 
 	private static final double BLAST_RADIUS = 3.0D;
+	private static final double SURFACE_OFFSET = 0.001D;
 	private static final Map<UUID, ThrownCharge> thrownCharges = new ConcurrentHashMap<>();
 
 	public static void register() {
@@ -50,16 +57,67 @@ public final class C4Detonation {
 
 	public static void registerThrownCharge(ItemEntity entity, UUID owner) {
 		if (entity == null || owner == null) return;
-		thrownCharges.put(entity.getUuid(), new ThrownCharge(owner, -1L, -1L));
+		thrownCharges.put(entity.getUuid(), new ThrownCharge(owner, -1L, -1L, entity.getPos(), false, entity.getWorld().getTime()));
 	}
 
-	public static void triggerRemoteDetonation(ServerPlayerEntity player) {
-		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
-		int armed = 0;
-		long now = world.getTime();
-		long detonationAt = now
-			+ (long) GexpressConfig.getC4FirstBeepSeconds() * 20L
-			+ (long) GexpressConfig.getC4FuseSeconds() * 20L;
+	public static boolean isDefusableBlockCharge(ItemEntity entity) {
+		return entity != null
+			&& !entity.isRemoved()
+			&& entity.getStack().isOf(MapSelectItems.C4)
+			&& (entity.hasNoGravity() || thrownCharges.containsKey(entity.getUuid()));
+	}
+
+	public static ItemEntity findLookedAtCharge(ServerPlayerEntity player, double range) {
+		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return null;
+		Vec3d start = player.getEyePos();
+		Vec3d direction = player.getRotationVec(1.0F).normalize();
+		Vec3d end = start.add(direction.multiply(range));
+		double maxDistanceSq = range * range;
+
+		BlockHitResult blockHit = world.raycast(new RaycastContext(start, end,
+			RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, player));
+		if (blockHit.getType() == HitResult.Type.BLOCK) {
+			maxDistanceSq = Math.min(maxDistanceSq, start.squaredDistanceTo(blockHit.getPos()) + 0.08D);
+		}
+
+		Box searchBox = player.getBoundingBox().stretch(direction.multiply(range)).expand(0.45D);
+		EntityHitResult hit = ProjectileUtil.raycast(player, start, end, searchBox,
+			entity -> entity instanceof ItemEntity item && isDefusableBlockCharge(item), maxDistanceSq);
+		return hit != null && hit.getEntity() instanceof ItemEntity item ? item : null;
+	}
+
+	public static boolean defuseBlockCharge(ServerPlayerEntity defuser, ItemEntity entity) {
+		if (defuser == null || entity == null || entity.isRemoved() || !entity.getStack().isOf(MapSelectItems.C4)) return false;
+		thrownCharges.remove(entity.getUuid());
+		World world = entity.getWorld();
+		Vec3d pos = entity.getPos();
+		entity.discard();
+		world.playSound(null, pos.x, pos.y, pos.z,
+			SoundEvents.BLOCK_TRIPWIRE_CLICK_OFF, SoundCategory.PLAYERS, 0.9F, 1.2F);
+		world.playSound(null, pos.x, pos.y, pos.z,
+			SoundEvents.ENTITY_SHEEP_SHEAR, SoundCategory.PLAYERS, 1.0F, 1.2F);
+		return true;
+	}
+
+	public static boolean misfireBlockCharge(ServerWorld world, ItemEntity entity, PlayerEntity attacker) {
+		if (world == null || entity == null || entity.isRemoved() || !entity.getStack().isOf(MapSelectItems.C4)) return false;
+		thrownCharges.remove(entity.getUuid());
+		Vec3d pos = entity.getPos();
+		entity.discard();
+		detonateAt(world, pos, attacker);
+		return true;
+	}
+
+	private static void registerVisibleThrownCharges(ServerWorld world, ServerPlayerEntity owner) {
+		for (ItemEntity entity : world.getEntitiesByType(EntityType.ITEM, entity ->
+				entity.getStack().isOf(MapSelectItems.C4) && isOwnedBy(entity, owner.getUuid()))) {
+			thrownCharges.putIfAbsent(entity.getUuid(),
+				new ThrownCharge(owner.getUuid(), -1L, -1L, entity.getPos(), entity.hasNoGravity(), placedAt(world, entity)));
+		}
+	}
+
+	private static Map.Entry<UUID, ThrownCharge> newestUnarmedCharge(ServerWorld world, ServerPlayerEntity player) {
+		Map.Entry<UUID, ThrownCharge> newest = null;
 		for (Map.Entry<UUID, ThrownCharge> entry : List.copyOf(thrownCharges.entrySet())) {
 			ThrownCharge charge = entry.getValue();
 			if (!player.getUuid().equals(charge.owner())) continue;
@@ -69,16 +127,52 @@ public final class C4Detonation {
 				continue;
 			}
 			if (charge.isArmed()) continue;
-			thrownCharges.put(entry.getKey(), new ThrownCharge(charge.owner(), now, detonationAt));
-			armed++;
+			if (newest == null || charge.placedAt() > newest.getValue().placedAt()) {
+				newest = entry;
+			}
 		}
-		if (armed <= 0) {
+		return newest;
+	}
+
+	private static long placedAt(ServerWorld world, ItemEntity entity) {
+		return Math.max(0L, world.getTime() - Math.max(0, entity.getItemAge()));
+	}
+
+	public static void triggerRemoteDetonation(ServerPlayerEntity player) {
+		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
+		registerVisibleThrownCharges(world, player);
+		if (hasArmedCharge(world, player)) {
+			player.sendMessage(Text.literal("A C4 charge is already armed."), true);
+			return;
+		}
+		long now = world.getTime();
+		long detonationAt = now
+			+ (long) GexpressConfig.getC4FirstBeepSeconds() * 20L
+			+ (long) GexpressConfig.getC4FuseSeconds() * 20L;
+		Map.Entry<UUID, ThrownCharge> target = newestUnarmedCharge(world, player);
+		if (target == null) {
 			player.sendMessage(Text.literal("No thrown C4 charges to detonate."), true);
 			return;
 		}
+		ThrownCharge charge = target.getValue();
+		thrownCharges.put(target.getKey(), charge.armed(now, detonationAt));
 		world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_LEVER_CLICK,
 			SoundCategory.PLAYERS, 0.8F, 1.4F);
-		player.sendMessage(Text.literal("Armed " + armed + " C4 charge" + (armed == 1 ? "." : "s.")), true);
+		player.sendMessage(Text.literal("Armed 1 C4 charge."), true);
+	}
+
+	private static boolean hasArmedCharge(ServerWorld world, ServerPlayerEntity player) {
+		for (Map.Entry<UUID, ThrownCharge> entry : List.copyOf(thrownCharges.entrySet())) {
+			ThrownCharge charge = entry.getValue();
+			if (!player.getUuid().equals(charge.owner())) continue;
+			ItemEntity entity = thrownChargeEntity(world, entry.getKey());
+			if (entity == null) {
+				thrownCharges.remove(entry.getKey());
+				continue;
+			}
+			if (charge.isArmed()) return true;
+		}
+		return false;
 	}
 
 	private static void tick(ServerWorld world) {
@@ -89,7 +183,7 @@ public final class C4Detonation {
 		boolean hasThrown = !thrownCharges.isEmpty();
 		if (carriers.isEmpty() && !hasThrown) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
-		if ((game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE)
+		if (game != null && game.getGameStatus() == GameWorldComponent.GameStatus.STOPPING
 				&& !GexpressTestState.hasRoleTesters()) {
 			comp.clearAll();
 			clearThrownCharges();
@@ -179,9 +273,6 @@ public final class C4Detonation {
 
 		world.spawnParticles(WatheParticles.BIG_EXPLOSION, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
 		world.spawnParticles(ParticleTypes.EXPLOSION_EMITTER, x, y, z, 100, 0.0, 0.0, 0.0, 0.2);
-		world.spawnParticles(
-			new ItemStackParticleEffect(ParticleTypes.ITEM, WatheItems.THROWN_GRENADE.getDefaultStack()),
-			x, y, z, 100, 0.0, 0.0, 0.0, 1.0);
 
 		List<ServerPlayerEntity> victims = world.getPlayers(p -> {
 			if (!GameFunctions.isPlayerAliveAndSurvival(p)) return false;
@@ -200,6 +291,12 @@ public final class C4Detonation {
 				continue;
 			}
 			ThrownCharge charge = entry.getValue();
+			if (tryAttachThrownToPlayer(world, entity, charge)) {
+				thrownCharges.remove(entry.getKey());
+				continue;
+			}
+			charge = updateStickyState(world, entity, charge);
+			thrownCharges.put(entry.getKey(), charge);
 			if (!charge.isArmed()) continue;
 			long remaining = charge.detonationAt() - now;
 			if (remaining <= 0L) {
@@ -212,6 +309,127 @@ public final class C4Detonation {
 				maybeBeepThrown(world, entity, charge, remaining);
 			}
 		}
+	}
+
+	private static boolean tryAttachThrownToPlayer(ServerWorld world, ItemEntity entity, ThrownCharge charge) {
+		if (charge.stuck()) return false;
+		Vec3d previous = charge.previousPos() != null ? charge.previousPos() : entity.getPos();
+		Vec3d current = entity.getPos();
+		Vec3d delta = current.subtract(previous);
+		if (delta.lengthSquared() <= 1.0E-7D) return false;
+		EntityHitResult hit = net.minecraft.entity.projectile.ProjectileUtil.raycast(
+			entity,
+			previous,
+			current,
+			entity.getBoundingBox().stretch(delta).expand(0.7D),
+			target -> canThrownC4AttachTo(charge, target),
+			delta.lengthSquared() + 1.0D
+		);
+		if (hit == null || !(hit.getEntity() instanceof ServerPlayerEntity target)) return false;
+
+		C4BackComponent comp = C4BackComponent.KEY.getNullable(world);
+		if (comp == null || comp.hasC4(target.getUuid())) return false;
+		if (!comp.addC4(target.getUuid())) return false;
+		entity.discard();
+		world.playSound(null, target.getX(), target.getY(), target.getZ(),
+			SoundEvents.ENTITY_TNT_PRIMED, SoundCategory.PLAYERS, 0.8F, 1.3F);
+		return true;
+	}
+
+	private static boolean canThrownC4AttachTo(ThrownCharge charge, Entity target) {
+		return target instanceof ServerPlayerEntity player
+			&& !player.getUuid().equals(charge.owner())
+			&& !player.isSpectator()
+			&& player.canHit();
+	}
+
+	private static boolean isOwnedBy(ItemEntity entity, UUID ownerId) {
+		if (entity == null || ownerId == null) return false;
+		Entity owner = entity.getOwner();
+		return owner != null && ownerId.equals(owner.getUuid());
+	}
+
+	private static ThrownCharge updateStickyState(ServerWorld world, ItemEntity entity, ThrownCharge charge) {
+		if (charge.stuck()) {
+			keepStuck(entity);
+			return charge.withPreviousPos(entity.getPos());
+		}
+
+		Vec3d previous = charge.previousPos() != null ? charge.previousPos() : entity.getPos();
+		Vec3d current = entity.getPos();
+		BlockHitResult hit = findSurfaceHit(world, entity, previous, current);
+		if (hit != null) {
+			stickToSurface(entity, hit.getPos(), hit.getSide());
+			return charge.stuck(entity.getPos());
+		}
+
+		Direction fallbackSide = fallbackCollisionSide(entity, previous, current);
+		if (fallbackSide != null) {
+			stickToSurface(entity, current, fallbackSide);
+			return charge.stuck(entity.getPos());
+		}
+
+		return charge.withPreviousPos(current);
+	}
+
+	private static BlockHitResult findSurfaceHit(ServerWorld world, ItemEntity entity, Vec3d previous, Vec3d current) {
+		if (previous.squaredDistanceTo(current) <= 1.0E-7D) return null;
+		BlockHitResult hit = world.raycast(new RaycastContext(previous, current,
+			RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity));
+		if (hit.getType() != HitResult.Type.BLOCK) return null;
+		if (world.getBlockState(hit.getBlockPos()).isAir()) return null;
+		return hit;
+	}
+
+	private static Direction fallbackCollisionSide(ItemEntity entity, Vec3d previous, Vec3d current) {
+		Vec3d delta = current.subtract(previous);
+		if (entity.isOnGround()) return Direction.UP;
+		if (entity.verticalCollision) {
+			return delta.y > 0.0D ? Direction.DOWN : Direction.UP;
+		}
+		if (!entity.horizontalCollision) return null;
+		if (Math.abs(delta.x) > Math.abs(delta.z)) {
+			return delta.x > 0.0D ? Direction.WEST : Direction.EAST;
+		}
+		return delta.z > 0.0D ? Direction.NORTH : Direction.SOUTH;
+	}
+
+	private static void stickToSurface(ItemEntity entity, Vec3d surfacePos, Direction side) {
+		Vec3d normal = Vec3d.of(side.getVector());
+		Vec3d plantedPos = surfacePos.add(normal.multiply(SURFACE_OFFSET));
+		entity.setPosition(plantedPos);
+		entity.setVelocity(Vec3d.ZERO);
+		entity.setNoGravity(true);
+		entity.velocityModified = true;
+		entity.setYaw(yawForSide(side));
+		entity.setPitch(pitchForSide(side));
+		entity.setPickupDelayInfinite();
+		entity.setNeverDespawn();
+	}
+
+	private static void keepStuck(ItemEntity entity) {
+		entity.setVelocity(Vec3d.ZERO);
+		entity.setNoGravity(true);
+		entity.velocityModified = true;
+		entity.setPickupDelayInfinite();
+		entity.setNeverDespawn();
+	}
+
+	private static float yawForSide(Direction side) {
+		return switch (side) {
+			case NORTH -> 180.0F;
+			case EAST -> -90.0F;
+			case WEST -> 90.0F;
+			default -> 0.0F;
+		};
+	}
+
+	private static float pitchForSide(Direction side) {
+		return switch (side) {
+			case UP -> -90.0F;
+			case DOWN -> 90.0F;
+			default -> 0.0F;
+		};
 	}
 
 	private static void maybeBeepThrown(ServerWorld world, ItemEntity entity, ThrownCharge charge, long remaining) {
@@ -229,10 +447,6 @@ public final class C4Detonation {
 		float urgency = (float) progress;
 		world.playSound(null, entity.getBlockPos(), MapSelectSounds.C4_BEEP,
 			SoundCategory.PLAYERS, 0.5F + urgency * 0.3F, 1.5F + urgency * 0.5F);
-		world.spawnParticles(
-			new ItemStackParticleEffect(ParticleTypes.ITEM, MapSelectItems.C4.getDefaultStack()),
-			entity.getX(), entity.getY() + 0.1D, entity.getZ(),
-			4, 0.05D, 0.05D, 0.05D, 0.02D);
 	}
 
 	private static ItemEntity thrownChargeEntity(ServerWorld world, UUID entityId) {
@@ -249,9 +463,21 @@ public final class C4Detonation {
 		thrownCharges.clear();
 	}
 
-	private record ThrownCharge(UUID owner, long armedAt, long detonationAt) {
+	private record ThrownCharge(UUID owner, long armedAt, long detonationAt, Vec3d previousPos, boolean stuck, long placedAt) {
 		private boolean isArmed() {
 			return armedAt >= 0L && detonationAt >= 0L;
+		}
+
+		private ThrownCharge armed(long armedAt, long detonationAt) {
+			return new ThrownCharge(owner, armedAt, detonationAt, previousPos, stuck, placedAt);
+		}
+
+		private ThrownCharge withPreviousPos(Vec3d previousPos) {
+			return new ThrownCharge(owner, armedAt, detonationAt, previousPos, stuck, placedAt);
+		}
+
+		private ThrownCharge stuck(Vec3d previousPos) {
+			return new ThrownCharge(owner, armedAt, detonationAt, previousPos, true, placedAt);
 		}
 	}
 }

@@ -29,6 +29,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 	private final Map<UUID, Long> carriers = new LinkedHashMap<>();
 	private final Map<UUID, Long> readOnlyCarriers = Collections.unmodifiableMap(carriers);
 	private final Map<UUID, Long> plantedAt = new LinkedHashMap<>();
+	private final Map<UUID, Integer> presetIndexes = new LinkedHashMap<>();
 
 	public C4BackComponent(World world) {
 		this.world = world;
@@ -57,6 +58,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 		long detonationAt = world.getTime() + firstBeepDelayTicks + Math.max(1L, fuseTicks);
 		carriers.put(uuid, detonationAt);
 		plantedAt.put(uuid, world.getTime());
+		presetIndexes.put(uuid, choosePlacementPresetIndex());
 		KEY.sync(this.world);
 		return true;
 	}
@@ -64,6 +66,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 	public boolean removeC4(UUID uuid) {
 		if (uuid == null || carriers.remove(uuid) == null) return false;
 		plantedAt.remove(uuid);
+		presetIndexes.remove(uuid);
 		KEY.sync(this.world);
 		return true;
 	}
@@ -72,6 +75,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 		if (carriers.isEmpty()) return false;
 		carriers.clear();
 		plantedAt.clear();
+		presetIndexes.clear();
 		KEY.sync(this.world);
 		return true;
 	}
@@ -89,10 +93,16 @@ public class C4BackComponent implements AutoSyncedComponent {
 		return Math.max(0L, world.getTime() - t);
 	}
 
+	public int getPresetIndex(UUID uuid) {
+		if (uuid == null) return 0;
+		return Math.max(0, presetIndexes.getOrDefault(uuid, 0));
+	}
+
 	@Override
 	public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		carriers.clear();
 		plantedAt.clear();
+		presetIndexes.clear();
 		NbtList list = tag.getList("carriers", NbtElement.COMPOUND_TYPE);
 		for (int i = 0; i < list.size(); i++) {
 			NbtCompound entry = list.getCompound(i);
@@ -102,11 +112,13 @@ public class C4BackComponent implements AutoSyncedComponent {
 				? entry.getLong("planted_tick")
 				: detonationAt - ((long) GexpressConfig.getC4FirstBeepSeconds()
 					+ (long) GexpressConfig.getC4FuseSeconds()) * 20L;
+			int presetIndex = entry.contains("preset_index") ? Math.max(0, entry.getInt("preset_index")) : 0;
 			if (uuidStr == null || uuidStr.isEmpty()) continue;
 			try {
 				UUID uuid = UUID.fromString(uuidStr);
 				carriers.put(uuid, detonationAt);
 				plantedAt.put(uuid, plantedTick);
+				presetIndexes.put(uuid, presetIndex);
 			} catch (IllegalArgumentException ignored) {
 			}
 		}
@@ -120,6 +132,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 					UUID uuid = UUID.fromString(legacy.getString(i));
 					carriers.putIfAbsent(uuid, fallback);
 					plantedAt.putIfAbsent(uuid, world.getTime());
+					presetIndexes.putIfAbsent(uuid, 0);
 				} catch (IllegalArgumentException ignored) {
 				}
 			}
@@ -134,14 +147,27 @@ public class C4BackComponent implements AutoSyncedComponent {
 			entry.putString("uuid", e.getKey().toString());
 			entry.putLong("detonation_tick", e.getValue());
 			entry.putLong("planted_tick", plantedAt.getOrDefault(e.getKey(), world.getTime()));
+			entry.putInt("preset_index", presetIndexes.getOrDefault(e.getKey(), 0));
 			list.add(entry);
 		}
 		tag.put("carriers", list);
+	}
+
+	private int choosePlacementPresetIndex() {
+		int count = GexpressConfig.getC4PlacementPresetCount();
+		if (count <= 1) return 0;
+		return this.world.getRandom().nextInt(count);
 	}
 
 	public static boolean hasC4(PlayerEntity player) {
 		if (player == null || player.getWorld() == null) return false;
 		C4BackComponent c = KEY.getNullable(player.getWorld());
 		return c != null && c.hasC4(player.getUuid());
+	}
+
+	public static int getPresetIndex(PlayerEntity player) {
+		if (player == null || player.getWorld() == null) return 0;
+		C4BackComponent c = KEY.getNullable(player.getWorld());
+		return c != null ? c.getPresetIndex(player.getUuid()) : 0;
 	}
 }

@@ -9,6 +9,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.MedicShieldFlashPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -43,6 +44,7 @@ public final class MedicShieldManager {
 
 	private static void tryShield(ServerPlayerEntity medic) {
 		if (medic == null || medic.getWorld().isClient) return;
+		if (VultureManager.isStashed(medic)) return;
 		ServerPlayerEntity target = findLookTarget(medic);
 		if (target == null) {
 			medic.sendMessage(Text.literal("No living player close enough to shield."), true);

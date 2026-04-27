@@ -147,7 +147,7 @@ public final class VultureManager {
 	}
 
 	private static void releaseOne(ServerPlayerEntity vulture) {
-		if (!isVulture(vulture)) return;
+		if (!isVulture(vulture) || isStashed(vulture)) return;
 		Deque<UUID> belly = stashedByVulture.get(vulture.getUuid());
 		if (belly == null || belly.isEmpty()) {
 			vulture.sendMessage(Text.literal("Your belly is empty."), true);
@@ -334,6 +334,16 @@ public final class VultureManager {
 		return player != null && vultureByStashed.containsKey(player.getUuid());
 	}
 
+	public static boolean isStashed(PlayerEntity player) {
+		return player != null && vultureByStashed.containsKey(player.getUuid());
+	}
+
+	public static void clearForTimeRewind(ServerWorld world) {
+		if (world == null) return;
+		releaseAllInWorld(world);
+		clearRoundState();
+	}
+
 	public static boolean shouldCancelVoice(UUID senderId, UUID receiverId) {
 		if (senderId == null || receiverId == null || senderId.equals(receiverId)) return false;
 		UUID senderVulture = vultureByStashed.get(senderId);
@@ -357,7 +367,8 @@ public final class VultureManager {
 
 	private static boolean canUse(ServerPlayerEntity player) {
 		if (player == null || player.getWorld().isClient) return false;
-		return isVulture(player) && canUseHere(player.getWorld(), player) && isPlayable(player, player);
+		return !isStashed(player) && isVulture(player) && canUseHere(player.getWorld(), player)
+			&& isPlayable(player, player);
 	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {

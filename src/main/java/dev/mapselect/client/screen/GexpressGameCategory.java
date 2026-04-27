@@ -39,6 +39,7 @@ public final class GexpressGameCategory {
 	private static final String MEDIC_ID = MapSelect.MOD_ID + ":medic";
 	private static final String SNITCH_ID = MapSelect.MOD_ID + ":snitch";
 	private static final String SEER_ID = MapSelect.MOD_ID + ":seer";
+	private static final String TIME_MASTER_ID = MapSelect.MOD_ID + ":time_master";
 	private static final String THE_SILENT_ID = MapSelect.MOD_ID + ":the_silent";
 	private static final String WARLOCK_ID = MapSelect.MOD_ID + ":warlock";
 	private static final String JUGGERNAUT_ID = MapSelect.MOD_ID + ":juggernaut";
@@ -334,6 +335,34 @@ public final class GexpressGameCategory {
 					v -> GexpressConfig.snitchTasksRequired = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.SNITCH_TASKS_REQUIRED_MIN, GexpressConfig.SNITCH_TASKS_REQUIRED_MAX))
+				.build());
+			return out;
+		}
+		if (TIME_MASTER_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.time_master_rewind_seconds")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.time_master_rewind_seconds.tooltip")))
+				.binding(10, GexpressConfig::getTimeMasterRewindSeconds,
+					v -> GexpressConfig.timeMasterRewindSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.TIME_MASTER_REWIND_SECONDS_MIN, GexpressConfig.TIME_MASTER_REWIND_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.time_master_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.time_master_cooldown.tooltip")))
+				.binding(120, GexpressConfig::getTimeMasterCooldownSeconds,
+					v -> GexpressConfig.timeMasterCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.TIME_MASTER_COOLDOWN_SECONDS_MIN, GexpressConfig.TIME_MASTER_COOLDOWN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.time_master_max_uses")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.time_master_max_uses.tooltip")))
+				.binding(1, GexpressConfig::getTimeMasterMaxUses,
+					v -> GexpressConfig.timeMasterMaxUses = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.TIME_MASTER_MAX_USES_MIN, GexpressConfig.TIME_MASTER_MAX_USES_MAX))
 				.build());
 			return out;
 		}
@@ -689,6 +718,13 @@ public final class GexpressGameCategory {
 	}
 
 	private static void appendLangLineOrFallback(List<Text> out, String key, String fallback) {
+		String override = roleDescriptionOverride(key);
+		if (override != null) {
+			for (String line : override.split("\\\\n|\\n")) {
+				out.add(Text.literal(WeIcons.replaceTokens(line)).formatted(Formatting.WHITE));
+			}
+			return;
+		}
 		String resolved = resolveLang(key);
 		if (resolved == null) {
 			out.add(Text.literal(fallback).formatted(Formatting.DARK_GRAY, Formatting.ITALIC));
@@ -697,6 +733,13 @@ public final class GexpressGameCategory {
 		for (String line : resolved.split("\n")) {
 			out.add(Text.literal(WeIcons.replaceTokens(line)).formatted(Formatting.WHITE));
 		}
+	}
+
+	private static String roleDescriptionOverride(String key) {
+		String prefix = "gui.watheextended.guidebook.role.desc.gexpress.";
+		if (key == null || !key.startsWith(prefix)) return null;
+		String value = GexpressConfig.getRoleDescriptionOverride(key.substring(prefix.length()));
+		return value == null || value.isBlank() ? null : value;
 	}
 
 	private static void appendAbilitiesSection(List<Text> out, String key) {

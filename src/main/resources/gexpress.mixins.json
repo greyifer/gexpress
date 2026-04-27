@@ -13,6 +13,7 @@
 		"PlayerEntityDisplayNameMixin",
 		"PuppetmasterControlledActionsMixin",
 		"PuppetmasterControlledMovementMixin",
+		"PuppetmasterPronounsManagerMixin",
 		"ServerPlayerListNameMixin",
 		"ShopPurchaseMixin",
 		"SilentShadowFootstepMixin",
@@ -29,6 +30,7 @@
 		"client.NightVisionLightmapMixin",
 		"client.BombSpecialistShopMixin",
 		"client.DevWeaponItemRendererMixin",
+		"client.C4ItemEntityRendererMixin",
 		"client.ShopScreenMixin",
 		"client.MedicShieldEntityGlowMixin",
 		"client.SilentShadowPlayerModelMixin",
@@ -43,6 +45,7 @@
 		"client.PuppetmasterHotbarRenderMixin",
 		"client.PuppetmasterHudCameraPlayerMixin",
 		"client.PuppetmasterMouseMixin",
+		"client.PuppetmasterPronounsCacheMixin",
 		"client.YaclOptionNameAccessor"
 	],
 	"injectors": {
