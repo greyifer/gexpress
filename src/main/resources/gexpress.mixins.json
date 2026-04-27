@@ -1,0 +1,51 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "dev.mapselect.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"HostChatBypassMixin",
+		"HostConfigSaveMixin",
+		"HmlRoleModifierTuningMixin",
+		"JuggernautDropMixin",
+		"JuggernautMurderWinMixin",
+		"PassiveMoneyGraceMixin",
+		"PlayerEntityDisplayNameMixin",
+		"PuppetmasterControlledActionsMixin",
+		"PuppetmasterControlledMovementMixin",
+		"ServerPlayerListNameMixin",
+		"ShopPurchaseMixin",
+		"SilentShadowFootstepMixin",
+		"SilentShadowPlayerMoveEffectMixin",
+		"WatheSupporterMixin"
+	],
+	"client": [
+		"client.ClientWorldWeatherMixin",
+		"client.BackgroundRendererFogMixin",
+		"client.HideMapTabMixin",
+		"client.WatheTrainSnowMixin",
+		"client.WatheExtendedOpMixin",
+		"client.ModsNamespaceMixin",
+		"client.NightVisionLightmapMixin",
+		"client.BombSpecialistShopMixin",
+		"client.DevWeaponItemRendererMixin",
+		"client.ShopScreenMixin",
+		"client.MedicShieldEntityGlowMixin",
+		"client.SilentShadowPlayerModelMixin",
+		"client.SilentShadowRoleNameRendererMixin",
+		"client.SilentShadowRendererMixin",
+		"client.ShortSightedEntityRenderMixin",
+		"client.TricksterSkinTexturesMixin",
+		"client.WatheOptionsScreenMixin",
+		"client.OptionEntryVisibilityMixin",
+		"client.PuppetmasterClientDisplayNameMixin",
+		"client.PuppetmasterHeldItemRendererMixin",
+		"client.PuppetmasterHotbarRenderMixin",
+		"client.PuppetmasterHudCameraPlayerMixin",
+		"client.PuppetmasterMouseMixin",
+		"client.YaclOptionNameAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -1,0 +1,30 @@
+# Gradle
+/.gradle/
+/build/
+**/build/
+
+# Minecraft/Fabric run output
+/run/
+/logs/
+/crash-reports/
+
+# Local deployment/output artifacts
+*.log
+*.hprof
+*.tmp
+*.bak
+
+# IDEs/editors
+/.idea/
+*.iml
+/.vscode/
+/.fleet/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local machine overrides
+/local.properties
+/gradle-local.properties

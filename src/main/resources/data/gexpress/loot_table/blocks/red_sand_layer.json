@@ -1,0 +1,76 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"rolls": 1.0,
+			"bonus_rolls": 0.0,
+			"conditions": [
+				{"condition": "minecraft:survives_explosion"}
+			],
+			"entries": [
+				{
+					"type": "minecraft:item",
+					"name": "gexpress:red_sand_layer",
+					"functions": [
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 1, "max": 1},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "1"}}
+							]
+						},
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 2, "max": 2},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "2"}}
+							]
+						},
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 3, "max": 3},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "3"}}
+							]
+						},
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 4, "max": 4},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "4"}}
+							]
+						},
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 5, "max": 5},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "5"}}
+							]
+						},
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 6, "max": 6},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "6"}}
+							]
+						},
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 7, "max": 7},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "7"}}
+							]
+						},
+						{
+							"function": "minecraft:set_count",
+							"count": {"type": "minecraft:uniform", "min": 8, "max": 8},
+							"conditions": [
+								{"condition": "minecraft:block_state_property", "block": "gexpress:red_sand_layer", "properties": {"layers": "8"}}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

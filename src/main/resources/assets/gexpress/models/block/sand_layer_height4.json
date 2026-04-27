@@ -1,0 +1,7 @@
+{
+	"parent": "minecraft:block/snow_height4",
+	"textures": {
+		"particle": "gexpress:block/sand_layer",
+		"texture": "gexpress:block/sand_layer"
+	}
+}

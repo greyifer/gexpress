@@ -1,0 +1,54 @@
+{
+	"schemaVersion": 1,
+	"id": "gexpress",
+	"version": "${version}",
+	"name": "Grey's Express",
+	"description": "Grey's Express - Wathe addon with map presets and custom content",
+	"authors": [],
+	"contact": {},
+	"license": "GPL-3.0-or-later",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.mapselect.MapSelect"
+		],
+		"client": [
+			"dev.mapselect.client.MapSelectClient"
+		],
+		"cardinal-components": [
+			"dev.mapselect.registry.MapSelectComponents"
+		],
+		"voicechat": [
+			"dev.mapselect.voice.GreysVoicechatPlugin"
+		]
+	},
+	"mixins": [
+		"gexpress.mixins.json"
+	],
+	"custom": {
+		"cardinal-components": [
+			"gexpress:map_weather",
+			"gexpress:hosts",
+			"gexpress:c4_back",
+			"gexpress:medic_shield",
+			"gexpress:silent_shadow",
+			"gexpress:warlock",
+			"gexpress:voice_mute"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": ">=0.104.0+1.21.1",
+		"wathe": ">=1.3.2-1.21.1",
+		"watheextended": ">=3.4.132",
+		"harpymodloader": ">=1.2.4-h1.3",
+		"yet_another_config_lib_v3": ">=3.8.0+1.21.1-fabric",
+		"cardinal-components-base": "*",
+		"cardinal-components-world": "*"
+	},
+	"suggests": {
+		"voicechat": ">=1.21.1-2.6.12"
+	}
+}

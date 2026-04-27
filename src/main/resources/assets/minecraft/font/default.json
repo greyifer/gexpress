@@ -1,0 +1,11 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "watheextended:gui/guidebook/sprites/items/c4.png",
+      "ascent": 9,
+      "height": 12,
+      "chars": ["\uE215"]
+    }
+  ]
+}

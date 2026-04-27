@@ -1,0 +1,79 @@
+package dev.mapselect;
+
+import dev.mapselect.command.GreyCommand;
+import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.config.RoleModifierTuningConfig;
+import dev.mapselect.game.FurnaceDupeGuard;
+import dev.mapselect.item.DevWeaponSkinStamper;
+import dev.mapselect.modifier.EodDistribution;
+import dev.mapselect.modifier.LoversManager;
+import dev.mapselect.modifier.NightVisionManager;
+import dev.mapselect.modifier.ShortSightedTracker;
+import dev.mapselect.network.AbilityCooldownSync;
+import dev.mapselect.network.GexpressConfigSyncHandler;
+import dev.mapselect.network.GexpressPresetsSyncHandler;
+import dev.mapselect.registry.MapSelectBlockEntities;
+import dev.mapselect.registry.MapSelectBlocks;
+import dev.mapselect.registry.MapSelectItems;
+import dev.mapselect.registry.MapSelectModifiers;
+import dev.mapselect.registry.MapSelectParticles;
+import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.registry.MapSelectSounds;
+import dev.mapselect.role.bombspecialist.C4Detonation;
+import dev.mapselect.role.medic.MedicShieldManager;
+import dev.mapselect.role.KillerRoleInfoManager;
+import dev.mapselect.role.RoleModifierTuningBridge;
+import dev.mapselect.role.juggernaut.JuggernautManager;
+import dev.mapselect.role.puppetmaster.PuppetmasterManager;
+import dev.mapselect.role.seer.SeerManager;
+import dev.mapselect.role.silent.SilentShadowManager;
+import dev.mapselect.role.snitch.SnitchManager;
+import dev.mapselect.role.trickster.TricksterManager;
+import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.warlock.WarlockManager;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class MapSelect implements ModInitializer {
+	public static final String MOD_ID = "gexpress";
+	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+	@Override
+	public void onInitialize() {
+		GexpressConfig.load();
+		RoleModifierTuningConfig.load();
+		MapSelectBlocks.register();
+		MapSelectBlockEntities.register();
+		MapSelectItems.register();
+		MapSelectRoles.register();
+		MapSelectModifiers.register();
+		RoleModifierTuningBridge.applyConfiguredMaxima();
+		MapSelectParticles.register();
+		MapSelectSounds.register();
+		C4Detonation.register();
+		MedicShieldManager.register();
+		SilentShadowManager.register();
+		WarlockManager.register();
+		JuggernautManager.register();
+		TricksterManager.register();
+		PuppetmasterManager.register();
+		VultureManager.register();
+		SnitchManager.register();
+		SeerManager.register();
+		KillerRoleInfoManager.register();
+		FurnaceDupeGuard.register();
+		DevWeaponSkinStamper.register();
+		EodDistribution.register();
+		LoversManager.register();
+		NightVisionManager.register();
+		ShortSightedTracker.register();
+		AbilityCooldownSync.register();
+		GexpressConfigSyncHandler.register();
+		GexpressPresetsSyncHandler.register();
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
+			GreyCommand.register(dispatcher));
+		LOGGER.info("Grey's Express initialized - adding /g commands");
+	}
+}

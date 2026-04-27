@@ -1,0 +1,409 @@
+package dev.mapselect.role.vulture;
+
+import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
+import dev.doctor4t.wathe.api.event.GameEvents;
+import dev.doctor4t.wathe.cca.GameRoundEndComponent;
+import dev.doctor4t.wathe.cca.GameTimeComponent;
+import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.game.GameFunctions;
+import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.AbilityCooldownPayload;
+import dev.mapselect.network.AbilityCooldownSync;
+import dev.mapselect.network.VultureEatPayload;
+import dev.mapselect.network.VultureReleasePayload;
+import dev.mapselect.network.VultureStatePayload;
+import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.PassiveMoney;
+import dev.mapselect.testing.GexpressTestState;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.packet.s2c.play.SetCameraEntityS2CPacket;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.GameMode;
+import net.minecraft.world.World;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+public final class VultureManager {
+	private static final double EAT_RANGE = 3.15D;
+	private static final double LOOK_RADIUS_SQUARED = 1.0D;
+	private static final Map<UUID, UUID> vultureByStashed = new ConcurrentHashMap<>();
+	private static final Map<UUID, Deque<UUID>> stashedByVulture = new ConcurrentHashMap<>();
+	private static final Map<UUID, Set<UUID>> eatenByVulture = new ConcurrentHashMap<>();
+	private static final Map<UUID, StashedState> stashedStates = new ConcurrentHashMap<>();
+	private static final Map<UUID, ReleasePoint> lastKnownVulturePoint = new ConcurrentHashMap<>();
+	private static final Map<UUID, Long> eatCooldownUntilByPelican = new ConcurrentHashMap<>();
+
+	private VultureManager() {}
+
+	public static void register() {
+		PayloadTypeRegistry.playC2S().register(VultureEatPayload.ID, VultureEatPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(VultureReleasePayload.ID, VultureReleasePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(VultureStatePayload.ID, VultureStatePayload.CODEC);
+
+		ServerPlayNetworking.registerGlobalReceiver(VultureEatPayload.ID,
+			(payload, context) -> context.server().execute(() -> tryEat(context.player())));
+		ServerPlayNetworking.registerGlobalReceiver(VultureReleasePayload.ID,
+			(payload, context) -> context.server().execute(() -> releaseOne(context.player())));
+		ServerTickEvents.END_WORLD_TICK.register(VultureManager::tick);
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
+			server.execute(() -> onDisconnect(handler.player, server)));
+		AllowPlayerDeath.EVENT.register(VultureManager::allowDeath);
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRoundState());
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
+			if (world instanceof ServerWorld serverWorld) {
+				releaseAllInWorld(serverWorld);
+			}
+			clearRoundState();
+		});
+	}
+
+	private static void tryEat(ServerPlayerEntity vulture) {
+		if (!canUse(vulture)) return;
+		long cooldown = remainingEatCooldownTicks(vulture);
+		if (cooldown > 0L) {
+			AbilityCooldownSync.send(vulture, AbilityCooldownPayload.PELICAN_SWALLOW, cooldown,
+				(long) GexpressConfig.getPelicanEatCooldownSeconds() * 20L, false);
+			vulture.sendMessage(Text.literal("Pelican swallow ready in " + secondsCeil(cooldown) + "s."), true);
+			return;
+		}
+		ServerPlayerEntity target = findLookTarget(vulture);
+		if (target == null) {
+			vulture.sendMessage(Text.literal("No living player close enough to swallow."), true);
+			return;
+		}
+		if (stash(vulture, target)) {
+			long cooldownTicks = (long) GexpressConfig.getPelicanEatCooldownSeconds() * 20L;
+			eatCooldownUntilByPelican.put(vulture.getUuid(), vulture.getWorld().getTime() + cooldownTicks);
+			AbilityCooldownSync.send(vulture, AbilityCooldownPayload.PELICAN_SWALLOW, cooldownTicks, cooldownTicks, false);
+		}
+	}
+
+	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity vulture) {
+		Vec3d eye = vulture.getEyePos();
+		Vec3d look = vulture.getRotationVec(1.0F).normalize();
+		ServerPlayerEntity best = null;
+		double bestAlong = Double.MAX_VALUE;
+		for (ServerPlayerEntity candidate : vulture.getServerWorld().getPlayers()) {
+			if (candidate == vulture || isStashed(candidate) || !isPlayable(candidate, vulture)) continue;
+			Vec3d to = candidate.getEyePos().subtract(eye);
+			double along = to.dotProduct(look);
+			if (along < 0.0D || along > EAT_RANGE || along >= bestAlong) continue;
+			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
+			if (perpendicularSq > LOOK_RADIUS_SQUARED) continue;
+			best = candidate;
+			bestAlong = along;
+		}
+		return best;
+	}
+
+	private static boolean stash(ServerPlayerEntity vulture, ServerPlayerEntity target) {
+		UUID vultureId = vulture.getUuid();
+		UUID targetId = target.getUuid();
+		if (vultureByStashed.containsKey(targetId)) {
+			vulture.sendMessage(Text.literal(target.getName().getString() + " is already stashed."), true);
+			return false;
+		}
+
+		lastKnownVulturePoint.put(vultureId, ReleasePoint.from(vulture));
+		stashedStates.put(targetId, new StashedState(target.interactionManager.getGameMode()));
+		vultureByStashed.put(targetId, vultureId);
+		stashedByVulture.computeIfAbsent(vultureId, id -> new ArrayDeque<>()).addLast(targetId);
+		eatenByVulture.computeIfAbsent(vultureId, id -> ConcurrentHashMap.newKeySet()).add(targetId);
+
+		target.stopRiding();
+		target.setSneaking(false);
+		target.changeGameMode(GameMode.SPECTATOR);
+		target.teleport(vulture.getServerWorld(), vulture.getX(), vulture.getY(), vulture.getZ(),
+			vulture.getYaw(), vulture.getPitch());
+		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(vulture));
+		ServerPlayNetworking.send(target, new VultureStatePayload(true, vultureId, vulture.getId()));
+
+		vulture.getWorld().playSound(null, vulture.getBlockPos(), SoundEvents.ENTITY_PLAYER_BURP,
+			SoundCategory.PLAYERS, 0.9F, 0.65F);
+		vulture.sendMessage(progressText(vulture), true);
+		target.sendMessage(Text.literal("You were swallowed by the Pelican."), true);
+		tryEndForVulture(vulture);
+		return true;
+	}
+
+	private static void releaseOne(ServerPlayerEntity vulture) {
+		if (!isVulture(vulture)) return;
+		Deque<UUID> belly = stashedByVulture.get(vulture.getUuid());
+		if (belly == null || belly.isEmpty()) {
+			vulture.sendMessage(Text.literal("Your belly is empty."), true);
+			return;
+		}
+		UUID targetId = belly.peekLast();
+		releasePlayer(targetId, vulture.getServer(), ReleasePoint.from(vulture), true);
+		vulture.sendMessage(Text.literal("Released one player."), true);
+	}
+
+	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
+		if (victim instanceof ServerPlayerEntity vulture && isVulture(vulture)) {
+			releaseAllForVulture(vulture.getUuid(), vulture.getServer(), ReleasePoint.from(vulture), true);
+		}
+		return true;
+	}
+
+	private static void tick(ServerWorld world) {
+		if (world.getRegistryKey() != World.OVERWORLD) return;
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
+		boolean activeGame = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
+		if (!activeGame && !GexpressTestState.hasRoleTesters()) {
+			releaseAllInWorld(world);
+			clearRoundState();
+			return;
+		}
+
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			if (isVulture(player)) {
+				lastKnownVulturePoint.put(player.getUuid(), ReleasePoint.from(player));
+			}
+		}
+
+		for (Map.Entry<UUID, UUID> entry : List.copyOf(vultureByStashed.entrySet())) {
+			UUID targetId = entry.getKey();
+			UUID vultureId = entry.getValue();
+			ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(targetId);
+			ServerPlayerEntity vulture = world.getServer().getPlayerManager().getPlayer(vultureId);
+			if (target == null) {
+				removeMissingTarget(targetId, vultureId);
+				continue;
+			}
+			if (vulture == null || !isPlayable(vulture, vulture)) {
+				releasePlayer(targetId, world.getServer(), lastKnownVulturePoint.get(vultureId), true);
+				continue;
+			}
+			keepStashedWithVulture(target, vulture);
+		}
+	}
+
+	private static void keepStashedWithVulture(ServerPlayerEntity target, ServerPlayerEntity vulture) {
+		if (target.interactionManager.getGameMode() != GameMode.SPECTATOR) {
+			target.changeGameMode(GameMode.SPECTATOR);
+		}
+		if (target.getWorld() != vulture.getWorld()
+				|| target.squaredDistanceTo(vulture) > 4.0D) {
+			target.teleport(vulture.getServerWorld(), vulture.getX(), vulture.getY(), vulture.getZ(),
+				vulture.getYaw(), vulture.getPitch());
+		}
+	}
+
+	private static void onDisconnect(ServerPlayerEntity player, MinecraftServer server) {
+		UUID playerId = player.getUuid();
+		if (stashedByVulture.containsKey(playerId)) {
+			releaseAllForVulture(playerId, server, lastKnownVulturePoint.get(playerId), true);
+		}
+		UUID vultureId = vultureByStashed.get(playerId);
+		if (vultureId != null) {
+			releasePlayer(playerId, server, lastKnownVulturePoint.get(vultureId), false);
+		}
+	}
+
+	public static boolean handleMurderTick(ServerWorld world, GameWorldComponent game) {
+		if (world == null || game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) {
+			return false;
+		}
+
+		List<ServerPlayerEntity> aliveVultures = world.getPlayers(GameFunctions::isPlayerAliveAndSurvival).stream()
+			.filter(VultureManager::isVulture)
+			.toList();
+		if (aliveVultures.isEmpty()) return false;
+
+		PassiveMoney.grant(world, game);
+
+		GameFunctions.WinStatus winStatus = GameFunctions.WinStatus.NONE;
+		if (!GameTimeComponent.KEY.get(world).hasTime()) {
+			winStatus = GameFunctions.WinStatus.TIME;
+		} else {
+			for (ServerPlayerEntity vulture : aliveVultures) {
+				if (hasMetWinCondition(vulture)) {
+					game.setLooseEndWinner(vulture.getUuid());
+					winStatus = GameFunctions.WinStatus.LOOSE_END;
+					break;
+				}
+			}
+		}
+
+		if (winStatus != GameFunctions.WinStatus.NONE) {
+			GameRoundEndComponent.KEY.get(world).setRoundEndData(world.getPlayers(), winStatus);
+			GameFunctions.stopGame(world);
+		}
+		return true;
+	}
+
+	private static void tryEndForVulture(ServerPlayerEntity vulture) {
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(vulture.getWorld());
+		if (game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) return;
+		if (!hasMetWinCondition(vulture)) return;
+		game.setLooseEndWinner(vulture.getUuid());
+		GameRoundEndComponent.KEY.get(vulture.getWorld()).setRoundEndData(vulture.getServerWorld().getPlayers(),
+			GameFunctions.WinStatus.LOOSE_END);
+		GameFunctions.stopGame(vulture.getServerWorld());
+	}
+
+	private static boolean hasMetWinCondition(ServerPlayerEntity vulture) {
+		Set<UUID> eaten = eatenByVulture.get(vulture.getUuid());
+		return eaten != null && eaten.size() >= requiredEaten(vulture);
+	}
+
+	private static Text progressText(ServerPlayerEntity vulture) {
+		int eaten = eatenByVulture.getOrDefault(vulture.getUuid(), Set.of()).size();
+		return Text.literal("Pelican: " + eaten + "/" + requiredEaten(vulture) + " players swallowed.");
+	}
+
+	private static int requiredEaten(ServerPlayerEntity vulture) {
+		int otherPlayers = Math.max(1, vulture.getServerWorld().getPlayers().size() - 1);
+		return Math.max(1, (int) Math.ceil(otherPlayers * 0.8D));
+	}
+
+	private static void releaseAllInWorld(ServerWorld world) {
+		for (UUID vultureId : List.copyOf(stashedByVulture.keySet())) {
+			ReleasePoint point = lastKnownVulturePoint.get(vultureId);
+			releaseAllForVulture(vultureId, world.getServer(), point, false);
+		}
+	}
+
+	private static void releaseAllForVulture(UUID vultureId, MinecraftServer server, ReleasePoint point, boolean notify) {
+		Deque<UUID> belly = stashedByVulture.get(vultureId);
+		if (belly == null || belly.isEmpty()) return;
+		for (UUID targetId : new ArrayList<>(belly)) {
+			releasePlayer(targetId, server, point, notify);
+		}
+	}
+
+	private static void releasePlayer(UUID targetId, MinecraftServer server, ReleasePoint point, boolean notify) {
+		if (targetId == null) return;
+		StashedState state = stashedStates.remove(targetId);
+		UUID vultureId = vultureByStashed.remove(targetId);
+		if (vultureId != null) {
+			Deque<UUID> belly = stashedByVulture.get(vultureId);
+			if (belly != null) {
+				belly.remove(targetId);
+				if (belly.isEmpty()) stashedByVulture.remove(vultureId);
+			}
+		}
+		if (server == null) return;
+		ServerPlayerEntity target = server.getPlayerManager().getPlayer(targetId);
+		if (target == null) return;
+
+		ReleasePoint releasePoint = point != null ? point : ReleasePoint.from(target);
+		ServerWorld releaseWorld = releasePoint.world(server);
+		if (releaseWorld == null) releaseWorld = target.getServerWorld();
+		target.changeGameMode(state != null ? state.previousGameMode : GameMode.SURVIVAL);
+		target.teleport(releaseWorld, releasePoint.x, releasePoint.y, releasePoint.z,
+			releasePoint.yaw, releasePoint.pitch);
+		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(target));
+		ServerPlayNetworking.send(target, VultureStatePayload.clear());
+		if (notify) {
+			target.sendMessage(Text.literal("The Pelican spat you out."), true);
+		}
+	}
+
+	private static void removeMissingTarget(UUID targetId, UUID vultureId) {
+		stashedStates.remove(targetId);
+		vultureByStashed.remove(targetId);
+		Deque<UUID> belly = stashedByVulture.get(vultureId);
+		if (belly != null) {
+			belly.remove(targetId);
+			if (belly.isEmpty()) stashedByVulture.remove(vultureId);
+		}
+	}
+
+	public static boolean isStashed(ServerPlayerEntity player) {
+		return player != null && vultureByStashed.containsKey(player.getUuid());
+	}
+
+	public static boolean shouldCancelVoice(UUID senderId, UUID receiverId) {
+		if (senderId == null || receiverId == null || senderId.equals(receiverId)) return false;
+		UUID senderVulture = vultureByStashed.get(senderId);
+		UUID receiverVulture = vultureByStashed.get(receiverId);
+		if (senderVulture != null) {
+			return !receiverId.equals(senderVulture) && !senderVulture.equals(receiverVulture);
+		}
+		if (receiverVulture != null) {
+			return !senderId.equals(receiverVulture);
+		}
+		return false;
+	}
+
+	public static boolean isVulture(PlayerEntity player) {
+		if (player == null || player.getWorld() == null) return false;
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
+		if (game == null) return false;
+		Role role = game.getRole(player);
+		return role != null && MapSelectRoles.VULTURE_ID.equals(role.identifier());
+	}
+
+	private static boolean canUse(ServerPlayerEntity player) {
+		if (player == null || player.getWorld().isClient) return false;
+		return isVulture(player) && canUseHere(player.getWorld(), player) && isPlayable(player, player);
+	}
+
+	private static boolean canUseHere(World world, PlayerEntity player) {
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
+		return (game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE)
+			|| GexpressTestState.isRoleTester(player);
+	}
+
+	private static boolean isPlayable(PlayerEntity player, PlayerEntity vulture) {
+		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(vulture);
+	}
+
+	private static void clearRoundState() {
+		vultureByStashed.clear();
+		stashedByVulture.clear();
+		eatenByVulture.clear();
+		stashedStates.clear();
+		lastKnownVulturePoint.clear();
+		eatCooldownUntilByPelican.clear();
+	}
+
+	private static long remainingEatCooldownTicks(ServerPlayerEntity player) {
+		Long until = eatCooldownUntilByPelican.get(player.getUuid());
+		if (until == null) return 0L;
+		long remaining = until - player.getWorld().getTime();
+		if (remaining <= 0L) {
+			eatCooldownUntilByPelican.remove(player.getUuid());
+			return 0L;
+		}
+		return remaining;
+	}
+
+	private static long secondsCeil(long ticks) {
+		return Math.max(1L, (ticks + 19L) / 20L);
+	}
+
+	private record StashedState(GameMode previousGameMode) {}
+
+	private record ReleasePoint(RegistryKey<World> worldKey, double x, double y, double z, float yaw, float pitch) {
+		private static ReleasePoint from(ServerPlayerEntity player) {
+			return new ReleasePoint(player.getWorld().getRegistryKey(), player.getX(), player.getY(), player.getZ(),
+				player.getYaw(), player.getPitch());
+		}
+
+		private ServerWorld world(MinecraftServer server) {
+			return server.getWorld(worldKey);
+		}
+	}
+}

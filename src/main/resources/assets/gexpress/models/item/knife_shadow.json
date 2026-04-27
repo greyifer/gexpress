@@ -1,0 +1,6 @@
+{
+	"parent": "wathe:item/template_knife",
+	"textures": {
+		"layer0": "gexpress:item/knife_shadow"
+	}
+}

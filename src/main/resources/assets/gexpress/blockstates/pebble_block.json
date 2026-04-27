@@ -1,0 +1,23 @@
+{
+	"variants": {
+		"facing=north,pebbles=1": {"model": "gexpress:block/pebble_block_1"},
+		"facing=east,pebbles=1": {"model": "gexpress:block/pebble_block_1", "y": 90},
+		"facing=south,pebbles=1": {"model": "gexpress:block/pebble_block_1", "y": 180},
+		"facing=west,pebbles=1": {"model": "gexpress:block/pebble_block_1", "y": 270},
+
+		"facing=north,pebbles=2": {"model": "gexpress:block/pebble_block_2"},
+		"facing=east,pebbles=2": {"model": "gexpress:block/pebble_block_2", "y": 90},
+		"facing=south,pebbles=2": {"model": "gexpress:block/pebble_block_2", "y": 180},
+		"facing=west,pebbles=2": {"model": "gexpress:block/pebble_block_2", "y": 270},
+
+		"facing=north,pebbles=3": {"model": "gexpress:block/pebble_block_3"},
+		"facing=east,pebbles=3": {"model": "gexpress:block/pebble_block_3", "y": 90},
+		"facing=south,pebbles=3": {"model": "gexpress:block/pebble_block_3", "y": 180},
+		"facing=west,pebbles=3": {"model": "gexpress:block/pebble_block_3", "y": 270},
+
+		"facing=north,pebbles=4": {"model": "gexpress:block/pebble_block_4"},
+		"facing=east,pebbles=4": {"model": "gexpress:block/pebble_block_4", "y": 90},
+		"facing=south,pebbles=4": {"model": "gexpress:block/pebble_block_4", "y": 180},
+		"facing=west,pebbles=4": {"model": "gexpress:block/pebble_block_4", "y": 270}
+	}
+}

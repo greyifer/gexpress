@@ -1,0 +1,14 @@
+{
+	"c4_beep": {
+		"sounds": [
+			"gexpress:c4_beep"
+		],
+		"subtitle": "subtitles.gexpress.c4_beep"
+	},
+	"block.greyifer_plush.honk": {
+		"sounds": [
+			"ratatouille:block/rat_maid_plush_honk"
+		],
+		"subtitle": "subtitles.gexpress.greyifer_plush_honk"
+	}
+}

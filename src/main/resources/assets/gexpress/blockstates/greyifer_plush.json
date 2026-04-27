@@ -1,0 +1,19 @@
+{
+	"variants": {
+		"facing=north": {
+			"model": "gexpress:block/greyifer_plush"
+		},
+		"facing=east": {
+			"model": "gexpress:block/greyifer_plush",
+			"y": 90
+		},
+		"facing=south": {
+			"model": "gexpress:block/greyifer_plush",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "gexpress:block/greyifer_plush",
+			"y": 270
+		}
+	}
+}
