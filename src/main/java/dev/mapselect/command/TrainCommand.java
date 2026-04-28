@@ -78,6 +78,7 @@ public class TrainCommand {
 				return 0;
 			}
 			TrainPresetStorage.save(src.getServer(), name, preset);
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
 
 			String currentMap = MapWeatherComponent.KEY.get(src.getWorld()).getCurrentMapName();
 			String suffix = "";
@@ -119,6 +120,7 @@ public class TrainCommand {
 			if (clearedDefaults > 0) {
 				GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
 			}
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
 			final int cleared = clearedDefaults;
 			src.sendFeedback(() -> {
 				Text base = Text.literal("Deleted train preset '" + name + "'.").formatted(Formatting.YELLOW);

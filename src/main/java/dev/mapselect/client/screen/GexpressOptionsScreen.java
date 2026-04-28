@@ -5,6 +5,7 @@ import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.gui.YACLScreen;
 import dev.mapselect.MapSelect;
 import dev.mapselect.client.preset.ClientPresetCache;
+import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
@@ -35,6 +36,8 @@ public final class GexpressOptionsScreen {
 
 	private static String selectedMapPreset = null;
 	private static int mapsTabIndex = -1;
+	private static String selectedTrainCartMap = null;
+	private static int trainCartsTabIndex = -1;
 
 	public static Screen create(Screen parent) {
 		pendingRoleState.clear();
@@ -48,8 +51,9 @@ public final class GexpressOptionsScreen {
 		OptionVisibility.clearAll();
 		resetWatheExtendedState();
 		GexpressMapPresetsCategory.pendingEdits.clear();
-		GexpressDevCategory.clearPendingTrainCartRows();
+		GexpressTrainCartsScreen.pendingEdits.clear();
 		selectedMapPreset = null;
+		selectedTrainCartMap = null;
 		return buildScreen(parent);
 	}
 
@@ -59,6 +63,14 @@ public final class GexpressOptionsScreen {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		mc.setScreen(next);
 		selectMapsTab(next);
+	}
+
+	static void navigateTrainCarts(Screen parent, String mapPresetName) {
+		selectedTrainCartMap = mapPresetName;
+		Screen next = buildScreen(parent);
+		MinecraftClient mc = MinecraftClient.getInstance();
+		mc.setScreen(next);
+		selectTrainCartsTab(next);
 	}
 
 	private static Screen buildScreen(Screen parent) {
@@ -71,12 +83,19 @@ public final class GexpressOptionsScreen {
 			.save(GexpressOptionsScreen::onSave);
 
 		mapsTabIndex = -1;
+		trainCartsTabIndex = -1;
 		int idx = 0;
 		builder.category(GexpressClientCategory.build(parent, isOp, stage));
 		idx++;
 
 		if (isDevPlayer()) {
 			builder.category(GexpressDevCategory.build(parent));
+			idx++;
+			ConfigCategory trainCarts = (selectedTrainCartMap == null)
+				? GexpressTrainCartsScreen.buildListCategory(parent)
+				: GexpressTrainCartsScreen.buildDetailCategory(parent, selectedTrainCartMap);
+			builder.category(trainCarts);
+			trainCartsTabIndex = idx;
 			idx++;
 		}
 
@@ -104,6 +123,17 @@ public final class GexpressOptionsScreen {
 		}
 	}
 
+	private static void selectTrainCartsTab(Screen screen) {
+		if (trainCartsTabIndex < 0) return;
+		try {
+			if (screen instanceof YACLScreen ys && ys.tabNavigationBar != null) {
+				ys.tabNavigationBar.selectTab(trainCartsTabIndex, false);
+			}
+		} catch (Throwable t) {
+			MapSelect.LOGGER.debug("Failed to select Train Carts tab: {}", t.toString());
+		}
+	}
+
 	private static void stage(String fullCommand, Screen parent) {
 		invokeWatheExtendedVoid("stageCommand", new Class<?>[]{String.class, Screen.class}, new Object[]{fullCommand, parent});
 	}
@@ -116,9 +146,9 @@ public final class GexpressOptionsScreen {
 		GexpressConfig.save();
 		pushGexpressConfigToServer();
 		pushMapPresetsToServer();
+		pushTrainPresetsToServer();
 		flushWatheExtendedPending();
 		flushRoleModifierTuningCommands();
-		GexpressDevCategory.flushTrainCartCommands();
 		flushChatCommands();
 		pendingRoleState.clear();
 		pendingModifierState.clear();
@@ -179,6 +209,12 @@ public final class GexpressOptionsScreen {
 		if (GexpressMapPresetsCategory.pendingEdits.isEmpty()) return;
 		ClientPresetCache.savePending(GexpressMapPresetsCategory.pendingEdits);
 		GexpressMapPresetsCategory.pendingEdits.clear();
+	}
+
+	private static void pushTrainPresetsToServer() {
+		if (GexpressTrainCartsScreen.pendingEdits.isEmpty()) return;
+		ClientTrainPresetCache.savePending(GexpressTrainCartsScreen.pendingEdits);
+		GexpressTrainCartsScreen.pendingEdits.clear();
 	}
 
 	static void pushGexpressConfigToServer() {

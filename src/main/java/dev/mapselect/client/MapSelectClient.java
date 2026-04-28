@@ -3,6 +3,7 @@ package dev.mapselect.client;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.item.DevWeaponSkinStamper;
 import dev.mapselect.client.preset.ClientPresetCache;
+import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
 import dev.mapselect.network.PuppetmasterConfigPayload;
@@ -47,6 +48,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientVultureState.register();
 		ClientAbilityCooldownHud.register();
 		ClientPresetCache.registerClient();
+		ClientTrainPresetCache.registerClient();
 		ModelLoadingPlugin.register(new DevWeaponModels());
 		ParticleFactoryRegistry.getInstance().register(MapSelectParticles.SAND_DRIFT, SandDriftParticle.Factory::new);
 		BlockEntityRendererRegistry.register(MapSelectBlockEntities.GREYIFER_PLUSH, GreyiferPlushBlockEntityRenderer::new);

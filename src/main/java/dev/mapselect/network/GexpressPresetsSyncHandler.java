@@ -6,6 +6,7 @@ import dev.mapselect.MapSelect;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
+import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -28,11 +29,16 @@ public final class GexpressPresetsSyncHandler {
 	public static void register() {
 		PayloadTypeRegistry.playS2C().register(GexpressPresetsSyncPayload.ID, GexpressPresetsSyncPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(GexpressPresetsSavePayload.ID, GexpressPresetsSavePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(GexpressTrainPresetsSyncPayload.ID, GexpressTrainPresetsSyncPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(GexpressTrainPresetsSavePayload.ID, GexpressTrainPresetsSavePayload.CODEC);
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ServerPlayerEntity player = handler.player;
 			if (!canEdit(player)) return;
-			server.execute(() -> sendPresetsTo(player));
+			server.execute(() -> {
+				sendPresetsTo(player);
+				sendTrainPresetsTo(player);
+			});
 		});
 
 		ServerPlayNetworking.registerGlobalReceiver(GexpressPresetsSavePayload.ID, (payload, context) -> {
@@ -75,6 +81,47 @@ public final class GexpressPresetsSyncHandler {
 				broadcastPresets(server);
 			});
 		});
+
+		ServerPlayNetworking.registerGlobalReceiver(GexpressTrainPresetsSavePayload.ID, (payload, context) -> {
+			ServerPlayerEntity sender = context.player();
+			MinecraftServer server = sender.getServer();
+			if (server == null) return;
+			if (!canEdit(sender)) {
+				MapSelect.LOGGER.warn("Ignoring gexpress train preset save from {} (not OP/host/dev)",
+					sender.getName().getString());
+				return;
+			}
+			Map<String, String> copy = new LinkedHashMap<>(payload.presets());
+			server.execute(() -> {
+				int ok = 0, fail = 0;
+				if (copy.size() > MAX_PRESET_SAVE_COUNT) {
+					MapSelect.LOGGER.warn("Ignoring oversized gexpress train preset save from {} ({} entries)",
+						sender.getName().getString(), copy.size());
+					return;
+				}
+				for (Map.Entry<String, String> e : copy.entrySet()) {
+					String name = e.getKey();
+					if (!TrainPresetStorage.isValidName(name)) { fail++; continue; }
+					if (e.getValue() == null || e.getValue().length() > MAX_PRESET_JSON_CHARS) {
+						fail++;
+						continue;
+					}
+					try {
+						TrainPreset preset = GSON.fromJson(e.getValue(), TrainPreset.class);
+						if (preset == null) { fail++; continue; }
+						preset.normalize();
+						TrainPresetStorage.save(server, name, preset);
+						ok++;
+					} catch (Throwable t) {
+						MapSelect.LOGGER.warn("Failed to save train preset {}: {}", name, t.toString());
+						fail++;
+					}
+				}
+				MapSelect.LOGGER.info("G'Express train presets updated by {} (saved={}, failed={})",
+					sender.getName().getString(), ok, fail);
+				broadcastTrainPresets(server);
+			});
+		});
 	}
 
 	public static void broadcastPresets(MinecraftServer server) {
@@ -87,11 +134,28 @@ public final class GexpressPresetsSyncHandler {
 		}
 	}
 
+	public static void broadcastTrainPresets(MinecraftServer server) {
+		Map<String, String> snapshot = readAllTrainPresetsAsJson(server);
+		GexpressTrainPresetsSyncPayload payload = new GexpressTrainPresetsSyncPayload(snapshot);
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			if (canEdit(player)) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
 	private static void sendPresetsTo(ServerPlayerEntity player) {
 		MinecraftServer server = player.getServer();
 		if (server == null) return;
 		Map<String, String> snapshot = readAllAsJson(server);
 		ServerPlayNetworking.send(player, new GexpressPresetsSyncPayload(snapshot));
+	}
+
+	private static void sendTrainPresetsTo(ServerPlayerEntity player) {
+		MinecraftServer server = player.getServer();
+		if (server == null) return;
+		Map<String, String> snapshot = readAllTrainPresetsAsJson(server);
+		ServerPlayNetworking.send(player, new GexpressTrainPresetsSyncPayload(snapshot));
 	}
 
 	private static Map<String, String> readAllAsJson(MinecraftServer server) {
@@ -109,6 +173,25 @@ public final class GexpressPresetsSyncHandler {
 			}
 		} catch (IOException ioe) {
 			MapSelect.LOGGER.warn("Failed to list presets: {}", ioe.toString());
+		}
+		return out;
+	}
+
+	private static Map<String, String> readAllTrainPresetsAsJson(MinecraftServer server) {
+		Map<String, String> out = new LinkedHashMap<>();
+		try {
+			List<String> names = TrainPresetStorage.list(server);
+			for (String name : names) {
+				try {
+					TrainPreset preset = TrainPresetStorage.load(server, name);
+					if (preset == null) continue;
+					out.put(name, GSON.toJson(preset));
+				} catch (IOException ioe) {
+					MapSelect.LOGGER.warn("Failed to read train preset {}: {}", name, ioe.toString());
+				}
+			}
+		} catch (IOException ioe) {
+			MapSelect.LOGGER.warn("Failed to list train presets: {}", ioe.toString());
 		}
 		return out;
 	}

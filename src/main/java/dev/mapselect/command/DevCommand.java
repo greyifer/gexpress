@@ -11,6 +11,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.GexpressConfigSyncHandler;
+import dev.mapselect.network.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.train.TrainPreset;
@@ -246,6 +247,7 @@ public final class DevCommand {
 		int index = preset.addTrainCart(corner1, corner2);
 		try {
 			TrainPresetStorage.save(src.getServer(), name, preset);
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to save train preset: " + e.getMessage()));
 			return 0;
@@ -283,6 +285,7 @@ public final class DevCommand {
 		}
 		try {
 			TrainPresetStorage.save(src.getServer(), name, preset);
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to save train preset: " + e.getMessage()));
 			return 0;
@@ -299,6 +302,7 @@ public final class DevCommand {
 		preset.clearTrainCarts();
 		try {
 			TrainPresetStorage.save(src.getServer(), name, preset);
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to save train preset: " + e.getMessage()));
 			return 0;
