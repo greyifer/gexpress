@@ -29,7 +29,7 @@ public final class GexpressDevCategory {
 			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
 			.group(c4BackModelGroup())
 			.group(c4PlacementPresetsOption())
-			.group(trainCartsGroup())
+			.group(trainCartAdditionsOption())
 			.group(roleDescriptionsGroup())
 			.group(shortSightedGroup())
 			.group(medicShieldVisualsGroup())
@@ -87,22 +87,17 @@ public final class GexpressDevCategory {
 			.build();
 	}
 
-	private static OptionGroup trainCartsGroup() {
-		return OptionGroup.createBuilder()
-			.name(Text.translatable("gui.gexpress.config.group.dev.train_carts"))
-			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.train_carts.tooltip")))
+	private static ListOption<String> trainCartAdditionsOption() {
+		return ListOption.<String>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.dev.train_cart_additions"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.train_cart_additions.tooltip")))
+			.binding(List.of(), () -> List.copyOf(pendingTrainCartRows), values -> {
+				pendingTrainCartRows.clear();
+				pendingTrainCartRows.addAll(values);
+			})
+			.controller(StringControllerBuilder::create)
+			.initial(() -> "")
 			.collapsed(true)
-			.option(ListOption.<String>createBuilder()
-				.name(Text.translatable("gui.gexpress.config.option.dev.train_cart_additions"))
-				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.train_cart_additions.tooltip")))
-				.binding(List.of(), () -> List.copyOf(pendingTrainCartRows), values -> {
-					pendingTrainCartRows.clear();
-					pendingTrainCartRows.addAll(values);
-				})
-				.controller(StringControllerBuilder::create)
-				.initial(() -> "")
-				.collapsed(false)
-				.build())
 			.build();
 	}
 
