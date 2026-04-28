@@ -12,6 +12,8 @@ import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.doctor4t.wathe.entity.PlayerBodyEntity;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheEntities;
+import dev.doctor4t.wathe.index.WatheSounds;
+import dev.doctor4t.wathe.util.ShootMuzzleS2CPayload;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.TimeMasterRewindPayload;
@@ -52,6 +54,7 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.property.Property;
 import net.minecraft.text.Text;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
@@ -74,9 +77,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class TimeMasterManager {
 	private static final int SNAPSHOT_INTERVAL_TICKS = 5;
+	private static final int VISUAL_SNAPSHOT_INTERVAL_TICKS = 2;
 	private static final int HISTORY_PADDING_TICKS = 40;
-	private static final int REWIND_ANIMATION_TICKS = 36;
+	private static final int REWIND_ANIMATION_TICKS = 48;
 	private static final Map<RegistryKey<World>, Deque<WorldSnapshot>> HISTORY = new ConcurrentHashMap<>();
+	private static final Map<RegistryKey<World>, Deque<VisualSnapshot>> VISUAL_HISTORY = new ConcurrentHashMap<>();
+	private static final Map<RegistryKey<World>, Deque<WeaponEvent>> WEAPON_EVENTS = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, ActiveRewind> ACTIVE_REWINDS = new ConcurrentHashMap<>();
 
 	private static Field cooldownEntriesField;
@@ -102,9 +108,14 @@ public final class TimeMasterManager {
 			return;
 		}
 
-		Deque<WorldSnapshot> history = HISTORY.computeIfAbsent(world.getRegistryKey(), key -> new ArrayDeque<>());
+		RegistryKey<World> worldKey = world.getRegistryKey();
+		Deque<WorldSnapshot> history = HISTORY.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
+		Deque<VisualSnapshot> visualHistory = VISUAL_HISTORY.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
+		Deque<WeaponEvent> weaponEvents = WEAPON_EVENTS.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
 		if (!canTrack(world)) {
 			history.clear();
+			visualHistory.clear();
+			weaponEvents.clear();
 			TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(world);
 			if (comp != null) comp.clearAll();
 			return;
@@ -123,9 +134,20 @@ public final class TimeMasterManager {
 			history.addLast(WorldSnapshot.capture(world));
 		}
 
+		VisualSnapshot newestVisual = visualHistory.peekLast();
+		if (newestVisual == null || now - newestVisual.tick() >= VISUAL_SNAPSHOT_INTERVAL_TICKS) {
+			visualHistory.addLast(VisualSnapshot.capture(world));
+		}
+
 		long keepTicks = (long) GexpressConfig.getTimeMasterRewindSeconds() * 20L + HISTORY_PADDING_TICKS;
 		while (!history.isEmpty() && now - history.peekFirst().tick() > keepTicks) {
 			history.removeFirst();
+		}
+		while (!visualHistory.isEmpty() && now - visualHistory.peekFirst().tick() > keepTicks) {
+			visualHistory.removeFirst();
+		}
+		while (!weaponEvents.isEmpty() && now - weaponEvents.peekFirst().tick() > keepTicks) {
+			weaponEvents.removeFirst();
 		}
 	}
 
@@ -163,8 +185,9 @@ public final class TimeMasterManager {
 			player.sendMessage(Text.literal("Time is rewinding " + rewindSeconds + "s."), true);
 		}
 
-		List<WorldSnapshot> frames = rewindFrames(history, snapshot.tick());
-		ACTIVE_REWINDS.put(world.getRegistryKey(), new ActiveRewind(timeMaster.getUuid(), frames, snapshot, world.getTime()));
+		List<VisualSnapshot> frames = rewindVisualFrames(VISUAL_HISTORY.get(world.getRegistryKey()), snapshot.tick());
+		List<WeaponEvent> events = rewindWeaponEvents(WEAPON_EVENTS.get(world.getRegistryKey()), snapshot.tick(), world.getTime());
+		ACTIVE_REWINDS.put(world.getRegistryKey(), new ActiveRewind(timeMaster.getUuid(), frames, events, snapshot, world.getTime()));
 	}
 
 	private static WorldSnapshot findSnapshot(Deque<WorldSnapshot> history, long targetTick) {
@@ -191,6 +214,45 @@ public final class TimeMasterManager {
 			}
 		}
 		return frames.isEmpty() ? List.of() : frames;
+	}
+
+	private static List<VisualSnapshot> rewindVisualFrames(Deque<VisualSnapshot> history, long targetTick) {
+		List<VisualSnapshot> frames = new ArrayList<>();
+		if (history != null) {
+			var iterator = history.descendingIterator();
+			while (iterator.hasNext()) {
+				VisualSnapshot snapshot = iterator.next();
+				frames.add(snapshot);
+				if (snapshot.tick() <= targetTick) break;
+			}
+		}
+		return frames.isEmpty() ? List.of() : frames;
+	}
+
+	private static List<WeaponEvent> rewindWeaponEvents(Deque<WeaponEvent> events, long targetTick, long currentTick) {
+		List<WeaponEvent> out = new ArrayList<>();
+		if (events != null) {
+			var iterator = events.descendingIterator();
+			while (iterator.hasNext()) {
+				WeaponEvent event = iterator.next();
+				if (event.tick() > currentTick) continue;
+				if (event.tick() < targetTick) break;
+				out.add(event);
+			}
+		}
+		return out.isEmpty() ? List.of() : out;
+	}
+
+	public static void recordWeaponEvent(ServerPlayerEntity player, WeaponEventType type) {
+		if (player == null || type == null || !(player.getWorld() instanceof ServerWorld world)) return;
+		if (world.getRegistryKey() != World.OVERWORLD || !canTrack(world)) return;
+		Deque<WeaponEvent> events = WEAPON_EVENTS.computeIfAbsent(world.getRegistryKey(), key -> new ArrayDeque<>());
+		events.addLast(WeaponEvent.capture(world, player, type));
+		long keepTicks = (long) GexpressConfig.getTimeMasterRewindSeconds() * 20L + HISTORY_PADDING_TICKS;
+		long now = world.getTime();
+		while (!events.isEmpty() && now - events.peekFirst().tick() > keepTicks) {
+			events.removeFirst();
+		}
 	}
 
 	private static boolean canTrack(ServerWorld world) {
@@ -225,13 +287,46 @@ public final class TimeMasterManager {
 		if (component != null && tag != null) component.readFromNbt(tag.copy(), lookup);
 	}
 
-	private record ActiveRewind(UUID timeMasterId, List<WorldSnapshot> frames, WorldSnapshot finalSnapshot, long startedAt) {
+	private static void syncScreen(ScreenHandler handler) {
+		if (handler != null) handler.syncState();
+	}
+
+	public enum WeaponEventType {
+		REVOLVER_SHOT,
+		KNIFE_READY,
+		KNIFE_STAB
+	}
+
+	private static final class ActiveRewind {
+		private final UUID timeMasterId;
+		private final List<VisualSnapshot> frames;
+		private final List<WeaponEvent> weaponEvents;
+		private final WorldSnapshot finalSnapshot;
+		private final long startedAt;
+		private int nextWeaponEvent;
+
+		private ActiveRewind(UUID timeMasterId, List<VisualSnapshot> frames, List<WeaponEvent> weaponEvents,
+				WorldSnapshot finalSnapshot, long startedAt) {
+			this.timeMasterId = timeMasterId;
+			this.frames = frames;
+			this.weaponEvents = weaponEvents;
+			this.finalSnapshot = finalSnapshot;
+			this.startedAt = startedAt;
+		}
+
 		private boolean tick(ServerWorld world) {
 			int elapsed = (int) Math.max(0L, world.getTime() - startedAt);
 			if (!frames.isEmpty()) {
 				float progress = Math.min(1.0F, elapsed / (float) REWIND_ANIMATION_TICKS);
-				int index = Math.min(frames.size() - 1, Math.round(progress * (frames.size() - 1)));
-				frames.get(index).applyVisualFrame(world);
+				float scaledIndex = progress * (frames.size() - 1);
+				int index = Math.min(frames.size() - 1, (int) Math.floor(scaledIndex));
+				int nextIndex = Math.min(frames.size() - 1, index + 1);
+				VisualSnapshot frame = frames.get(index);
+				VisualSnapshot nextFrame = frames.get(nextIndex);
+				float frameDelta = Math.max(0.0F, Math.min(1.0F, scaledIndex - index));
+				frame.applyVisualFrame(world, nextFrame, frameDelta);
+				long eventTick = Math.round(lerp(frame.tick(), nextFrame.tick(), frameDelta));
+				replayWeaponEvents(world, eventTick);
 			}
 			if (elapsed < REWIND_ANIMATION_TICKS) return false;
 
@@ -242,8 +337,200 @@ public final class TimeMasterManager {
 			Deque<WorldSnapshot> freshHistory = HISTORY.computeIfAbsent(world.getRegistryKey(), key -> new ArrayDeque<>());
 			freshHistory.clear();
 			freshHistory.addLast(WorldSnapshot.capture(world));
+			Deque<VisualSnapshot> freshVisualHistory = VISUAL_HISTORY.computeIfAbsent(world.getRegistryKey(), key -> new ArrayDeque<>());
+			freshVisualHistory.clear();
+			freshVisualHistory.addLast(VisualSnapshot.capture(world));
+			Deque<WeaponEvent> freshWeaponEvents = WEAPON_EVENTS.computeIfAbsent(world.getRegistryKey(), key -> new ArrayDeque<>());
+			freshWeaponEvents.clear();
 			return true;
 		}
+
+		private void replayWeaponEvents(ServerWorld world, long frameTick) {
+			while (nextWeaponEvent < weaponEvents.size()) {
+				WeaponEvent event = weaponEvents.get(nextWeaponEvent);
+				if (event.tick() < frameTick) return;
+				event.replay(world);
+				nextWeaponEvent++;
+			}
+		}
+	}
+
+	private record WeaponEvent(long tick, UUID playerId, WeaponEventType type, double x, double eyeY, double z) {
+		private static WeaponEvent capture(ServerWorld world, ServerPlayerEntity player, WeaponEventType type) {
+			return new WeaponEvent(world.getTime(), player.getUuid(), type, player.getX(), player.getEyeY(), player.getZ());
+		}
+
+		private void replay(ServerWorld world) {
+			ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(playerId);
+			switch (type) {
+				case REVOLVER_SHOT -> {
+					world.playSound(null, x, eyeY, z, WatheSounds.ITEM_REVOLVER_SHOOT,
+						SoundCategory.PLAYERS, 5.0F, 1.0F + (world.getRandom().nextFloat() * 0.1F) - 0.05F);
+					if (player != null) {
+						ShootMuzzleS2CPayload payload = new ShootMuzzleS2CPayload(playerId.toString());
+						for (ServerPlayerEntity viewer : world.getPlayers()) {
+							ServerPlayNetworking.send(viewer, payload);
+						}
+					}
+				}
+				case KNIFE_READY -> world.playSound(null, x, eyeY, z, WatheSounds.ITEM_KNIFE_PREPARE,
+					SoundCategory.PLAYERS, 1.0F, 1.0F);
+				case KNIFE_STAB -> {
+					world.playSound(null, x, eyeY, z, WatheSounds.ITEM_KNIFE_STAB,
+						SoundCategory.PLAYERS, 1.0F, 1.0F);
+					if (player != null) player.swingHand(Hand.MAIN_HAND);
+				}
+			}
+		}
+	}
+
+	private record VisualSnapshot(long tick, Map<UUID, VisualPlayerSnapshot> players,
+			Map<UUID, VisualEntitySnapshot> items, Map<UUID, VisualBodySnapshot> bodies) {
+		private static VisualSnapshot capture(ServerWorld world) {
+			Map<UUID, VisualPlayerSnapshot> players = new LinkedHashMap<>();
+			for (ServerPlayerEntity player : world.getPlayers()) {
+				players.put(player.getUuid(), VisualPlayerSnapshot.capture(player));
+			}
+
+			Map<UUID, VisualEntitySnapshot> items = new LinkedHashMap<>();
+			for (ItemEntity item : world.getEntitiesByType(EntityType.ITEM, entity -> true)) {
+				items.put(item.getUuid(), VisualEntitySnapshot.capture(item));
+			}
+
+			Map<UUID, VisualBodySnapshot> bodies = new LinkedHashMap<>();
+			for (PlayerBodyEntity body : world.getEntitiesByType(WatheEntities.PLAYER_BODY, entity -> true)) {
+				bodies.put(body.getUuid(), VisualBodySnapshot.capture(body));
+			}
+
+			return new VisualSnapshot(world.getTime(), players, items, bodies);
+		}
+
+		private void applyVisualFrame(ServerWorld world, VisualSnapshot nextFrame, float delta) {
+			MinecraftServer server = world.getServer();
+			for (VisualPlayerSnapshot snapshot : players.values()) {
+				ServerPlayerEntity player = server.getPlayerManager().getPlayer(snapshot.playerId());
+				if (player != null && player.getWorld() == world) {
+					snapshot.applyVisualFrame(player, nextFrame.players().get(snapshot.playerId()), delta);
+				}
+			}
+			for (ItemEntity item : world.getEntitiesByType(EntityType.ITEM, entity -> true)) {
+				VisualEntitySnapshot snapshot = items.get(item.getUuid());
+				if (snapshot != null) snapshot.applyVisualFrame(item, nextFrame.items().get(item.getUuid()), delta);
+			}
+			for (PlayerBodyEntity body : world.getEntitiesByType(WatheEntities.PLAYER_BODY, entity -> true)) {
+				VisualBodySnapshot snapshot = bodies.get(body.getUuid());
+				if (snapshot != null) snapshot.applyVisualFrame(body, nextFrame.bodies().get(body.getUuid()), delta);
+			}
+		}
+	}
+
+	private record VisualPlayerSnapshot(UUID playerId, double x, double y, double z, float yaw, float pitch,
+			int selectedSlot, ItemStack mainHand, ItemStack offHand, boolean usingItem, Hand activeHand) {
+		private static VisualPlayerSnapshot capture(ServerPlayerEntity player) {
+			boolean usingItem = player.isUsingItem();
+			Hand activeHand = usingItem ? player.getActiveHand() : Hand.MAIN_HAND;
+			return new VisualPlayerSnapshot(
+				player.getUuid(),
+				player.getX(),
+				player.getY(),
+				player.getZ(),
+				player.getYaw(),
+				player.getPitch(),
+				player.getInventory().selectedSlot,
+				player.getMainHandStack().copy(),
+				player.getOffHandStack().copy(),
+				usingItem,
+				activeHand
+			);
+		}
+
+		private void applyVisualFrame(ServerPlayerEntity player, VisualPlayerSnapshot next, float delta) {
+			VisualPlayerSnapshot heldState = next != null && delta >= 0.5F ? next : this;
+			player.stopRiding();
+			double frameX = next == null ? x : lerp(x, next.x(), delta);
+			double frameY = next == null ? y : lerp(y, next.y(), delta);
+			double frameZ = next == null ? z : lerp(z, next.z(), delta);
+			float frameYaw = next == null ? yaw : lerpYaw(yaw, next.yaw(), delta);
+			float framePitch = next == null ? pitch : (float) lerp(pitch, next.pitch(), delta);
+			player.teleport(player.getServerWorld(), frameX, frameY, frameZ, frameYaw, framePitch);
+			player.setVelocity(Vec3d.ZERO);
+			player.velocityModified = true;
+			boolean changedHeldItem = heldState.applyHeldItems(player);
+			heldState.applyUsingItem(player);
+			if (changedHeldItem) syncScreen(player.playerScreenHandler);
+		}
+
+		private boolean applyHeldItems(ServerPlayerEntity player) {
+			boolean changed = false;
+			if (selectedSlot >= 0 && selectedSlot < 9 && player.getInventory().selectedSlot != selectedSlot) {
+				player.getInventory().selectedSlot = selectedSlot;
+				changed = true;
+			}
+			if (!ItemStack.areEqual(player.getMainHandStack(), mainHand)) {
+				player.setStackInHand(Hand.MAIN_HAND, mainHand.copy());
+				changed = true;
+			}
+			if (!ItemStack.areEqual(player.getOffHandStack(), offHand)) {
+				player.setStackInHand(Hand.OFF_HAND, offHand.copy());
+				changed = true;
+			}
+			if (changed) player.getInventory().markDirty();
+			return changed;
+		}
+
+		private void applyUsingItem(ServerPlayerEntity player) {
+			if (!usingItem) {
+				if (player.isUsingItem()) player.stopUsingItem();
+				return;
+			}
+			if (!player.isUsingItem() || player.getActiveHand() != activeHand) {
+				player.stopUsingItem();
+				player.setCurrentHand(activeHand);
+			}
+		}
+	}
+
+	private record VisualEntitySnapshot(UUID entityId, double x, double y, double z, float yaw, float pitch) {
+		private static VisualEntitySnapshot capture(ItemEntity item) {
+			return new VisualEntitySnapshot(item.getUuid(), item.getX(), item.getY(), item.getZ(), item.getYaw(), item.getPitch());
+		}
+
+		private void applyVisualFrame(ItemEntity item, VisualEntitySnapshot next, float delta) {
+			double frameX = next == null ? x : lerp(x, next.x(), delta);
+			double frameY = next == null ? y : lerp(y, next.y(), delta);
+			double frameZ = next == null ? z : lerp(z, next.z(), delta);
+			float frameYaw = next == null ? yaw : lerpYaw(yaw, next.yaw(), delta);
+			float framePitch = next == null ? pitch : (float) lerp(pitch, next.pitch(), delta);
+			item.refreshPositionAndAngles(frameX, frameY, frameZ, frameYaw, framePitch);
+			item.setVelocity(Vec3d.ZERO);
+			item.velocityModified = true;
+		}
+	}
+
+	private record VisualBodySnapshot(UUID entityId, double x, double y, double z, float yaw, float pitch) {
+		private static VisualBodySnapshot capture(PlayerBodyEntity body) {
+			return new VisualBodySnapshot(body.getUuid(), body.getX(), body.getY(), body.getZ(), body.getYaw(), body.getPitch());
+		}
+
+		private void applyVisualFrame(PlayerBodyEntity body, VisualBodySnapshot next, float delta) {
+			double frameX = next == null ? x : lerp(x, next.x(), delta);
+			double frameY = next == null ? y : lerp(y, next.y(), delta);
+			double frameZ = next == null ? z : lerp(z, next.z(), delta);
+			float frameYaw = next == null ? yaw : lerpYaw(yaw, next.yaw(), delta);
+			float framePitch = next == null ? pitch : (float) lerp(pitch, next.pitch(), delta);
+			body.refreshPositionAndAngles(frameX, frameY, frameZ, frameYaw, framePitch);
+			body.setVelocity(Vec3d.ZERO);
+			body.velocityModified = true;
+		}
+	}
+
+	private static double lerp(double start, double end, float delta) {
+		return start + (end - start) * delta;
+	}
+
+	private static float lerpYaw(float start, float end, float delta) {
+		float diff = ((end - start + 540.0F) % 360.0F) - 180.0F;
+		return start + diff * delta;
 	}
 
 	private record WorldSnapshot(long tick, Map<UUID, PlayerSnapshot> players,
@@ -549,9 +836,6 @@ public final class TimeMasterManager {
 			player.velocityModified = true;
 		}
 
-		private static void syncScreen(ScreenHandler handler) {
-			if (handler != null) handler.syncState();
-		}
 	}
 
 	private record ItemEntitySnapshot(UUID entityId, NbtCompound tag, ItemStack stack,

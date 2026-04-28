@@ -1,3 +1,11 @@
+# Grey's Express 1.1.1
+
+## Changed
+
+- Time Master rewind playback now uses smaller visual steps and interpolated movement so movement history appears smoother and denser.
+- Time Master now shows held items, selected weapons, knife-ready poses, knife stabs, and revolver shots during rewind playback.
+- Time Master visual playback now uses lightweight frame snapshots between full restore snapshots to reduce rewind tracking cost.
+
 # Grey's Express 1.1.0
 
 ## Added

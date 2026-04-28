@@ -18,6 +18,9 @@
 		"ShopPurchaseMixin",
 		"SilentShadowFootstepMixin",
 		"SilentShadowPlayerMoveEffectMixin",
+		"TimeMasterGunShootMixin",
+		"TimeMasterKnifeStabMixin",
+		"TimeMasterKnifeUseMixin",
 		"WatheSupporterMixin"
 	],
 	"client": [
