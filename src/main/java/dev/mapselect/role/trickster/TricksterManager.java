@@ -4,6 +4,7 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.TricksterDancingCartsPayload;
 import dev.mapselect.network.TricksterSkinSwapPayload;
 import dev.mapselect.network.TricksterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -47,9 +48,12 @@ public final class TricksterManager {
 
 	public static void register() {
 		PayloadTypeRegistry.playC2S().register(TricksterUsePayload.ID, TricksterUsePayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(TricksterDancingCartsPayload.ID, TricksterDancingCartsPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(TricksterSkinSwapPayload.ID, TricksterSkinSwapPayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(TricksterUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryActivate(context.player())));
+		ServerPlayNetworking.registerGlobalReceiver(TricksterDancingCartsPayload.ID,
+			(payload, context) -> context.server().execute(() -> DancingCartsManager.tryActivate(context.player())));
 		ServerTickEvents.END_WORLD_TICK.register(TricksterManager::tick);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> {
@@ -180,6 +184,7 @@ public final class TricksterManager {
 		if (world == null) return;
 		activeSwaps.remove(world.getRegistryKey());
 		nextNoellesCycleCleanupTicks.remove(world.getRegistryKey());
+		DancingCartsManager.clearForTimeRewind(world);
 		clearNoellesMorphCycles(world);
 		broadcastClear(world);
 	}

@@ -8,15 +8,19 @@ import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.preset.train.TrainPresetStorage;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public final class GexpressDevCategory {
+	private static final List<String> pendingTrainCartRows = new ArrayList<>();
+
 	private GexpressDevCategory() {}
 
 	public static ConfigCategory build(Screen parent) {
@@ -25,11 +29,24 @@ public final class GexpressDevCategory {
 			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
 			.group(c4BackModelGroup())
 			.group(c4PlacementPresetsOption())
+			.group(trainCartsGroup())
 			.group(roleDescriptionsGroup())
 			.group(shortSightedGroup())
 			.group(medicShieldVisualsGroup())
 			.group(silentShadowVisualsGroup())
 			.build();
+	}
+
+	static void clearPendingTrainCartRows() {
+		pendingTrainCartRows.clear();
+	}
+
+	static void flushTrainCartCommands() {
+		for (String row : pendingTrainCartRows) {
+			String command = trainCartCommand(row);
+			if (command != null) GexpressOptionsScreen.stageChatCommand(command);
+		}
+		pendingTrainCartRows.clear();
 	}
 
 	private static OptionGroup c4BackModelGroup() {
@@ -67,6 +84,25 @@ public final class GexpressDevCategory {
 			.controller(StringControllerBuilder::create)
 			.initial(GexpressConfig::getCurrentC4PlacementPresetString)
 			.collapsed(false)
+			.build();
+	}
+
+	private static OptionGroup trainCartsGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.train_carts"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.train_carts.tooltip")))
+			.collapsed(true)
+			.option(ListOption.<String>createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.dev.train_cart_additions"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.train_cart_additions.tooltip")))
+				.binding(List.of(), () -> List.copyOf(pendingTrainCartRows), values -> {
+					pendingTrainCartRows.clear();
+					pendingTrainCartRows.addAll(values);
+				})
+				.controller(StringControllerBuilder::create)
+				.initial(() -> "")
+				.collapsed(false)
+				.build())
 			.build();
 	}
 
@@ -185,5 +221,19 @@ public final class GexpressDevCategory {
 		} catch (NumberFormatException ignored) {
 			return null;
 		}
+	}
+
+	private static String trainCartCommand(String raw) {
+		if (raw == null || raw.isBlank()) return null;
+		String[] parts = raw.trim().split("\\s+");
+		if (parts.length != 7 || !TrainPresetStorage.isValidName(parts[0])) return null;
+		for (int i = 1; i < parts.length; i++) {
+			try {
+				Integer.parseInt(parts[i]);
+			} catch (NumberFormatException ignored) {
+				return null;
+			}
+		}
+		return "g dev traincart " + String.join(" ", parts);
 	}
 }

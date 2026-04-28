@@ -2,6 +2,7 @@ package dev.mapselect.client;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.mapselect.network.TricksterDancingCartsPayload;
 import dev.mapselect.network.TricksterSkinSwapPayload;
 import dev.mapselect.network.TricksterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -17,6 +18,7 @@ public final class ClientTricksterState {
 	private static Map<UUID, UUID> swaps = Map.of();
 	private static long expiresAtTick = 0L;
 	private static boolean wasAbilityDown;
+	private static boolean wasSecondaryDown;
 
 	private ClientTricksterState() {}
 
@@ -68,21 +70,30 @@ public final class ClientTricksterState {
 	private static void tick(MinecraftClient client) {
 		if (client == null || client.player == null || client.world == null) {
 			wasAbilityDown = false;
+			wasSecondaryDown = false;
 			clear();
 			return;
 		}
 		if (client.currentScreen != null || ClientVultureState.isLocalStashed(client)
 				|| !isLocalTrickster(client)) {
 			wasAbilityDown = false;
+			wasSecondaryDown = false;
 			return;
 		}
 
-		KeyBinding ability = resolveAbilityBinding();
+		KeyBinding ability = ClientAbilityKeys.primaryBinding();
 		boolean abilityDown = ability != null && ClientAbilityKeys.isDown(client, ability);
 		if (abilityDown && !wasAbilityDown && ClientPlayNetworking.canSend(TricksterUsePayload.ID)) {
 			ClientPlayNetworking.send(new TricksterUsePayload());
 		}
 		wasAbilityDown = abilityDown;
+
+		KeyBinding secondary = ClientAbilityKeys.secondaryBinding();
+		boolean secondaryDown = secondary != null && ClientAbilityKeys.isDown(client, secondary);
+		if (secondaryDown && !wasSecondaryDown && ClientPlayNetworking.canSend(TricksterDancingCartsPayload.ID)) {
+			ClientPlayNetworking.send(new TricksterDancingCartsPayload());
+		}
+		wasSecondaryDown = secondaryDown;
 	}
 
 	private static boolean isLocalTrickster(MinecraftClient client) {
@@ -96,7 +107,4 @@ public final class ClientTricksterState {
 		}
 	}
 
-	private static KeyBinding resolveAbilityBinding() {
-		return ClientAbilityKeys.primaryBinding();
-	}
 }

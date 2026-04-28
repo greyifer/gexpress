@@ -5,6 +5,9 @@
 - Time Master rewind playback now uses smaller visual steps and interpolated movement so movement history appears smoother and denser.
 - Time Master now shows held items, selected weapons, knife-ready poses, knife stabs, and revolver shots during rewind playback.
 - Time Master visual playback now uses lightweight frame snapshots between full restore snapshots to reduce rewind tracking cost.
+- Trickster has been renamed to Harlequin.
+- Harlequin now has Dancing Carts, a secondary ability that shuffles the train's middle carts while leaving the front and back carts fixed.
+- Dancing Carts carries players, dropped items, and other entities along with the cart they were inside.
 
 # Grey's Express 1.1.0
 

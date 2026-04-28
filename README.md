@@ -2,6 +2,8 @@
 
 Grey's Express (`gexpress`) is a Fabric 1.21.1 addon for Wathe and Wathe Extended. It adds host-focused tools for running The Harpy Express: Extended games, including map and train presets, ready-area train previews, RTP slot management, host permissions, voice mutes, custom map weather, and extra role/modifier content.
 
+This mod is made for the community Harpy Express server. That server is not run by doctor4t, and some features are intentionally built for the community server setup rather than general-purpose Wathe servers.
+
 ## Features
 
 - `/g map` commands for creating, editing, listing, applying, and snapshotting map presets stored in each world save.

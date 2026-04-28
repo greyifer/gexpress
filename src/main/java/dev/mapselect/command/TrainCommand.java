@@ -92,8 +92,10 @@ public class TrainCommand {
 			}
 
 			final int slots = preset.slotCount();
+			final int carts = preset.cartCount();
 			final String s = suffix;
-			src.sendFeedback(() -> Text.literal("Saved train preset '" + name + "' (" + slots + " TP slot" + (slots == 1 ? "" : "s") + ")." + s).formatted(Formatting.GREEN), true);
+			src.sendFeedback(() -> Text.literal("Saved train preset '" + name + "' (" + slots + " TP slot" + (slots == 1 ? "" : "s")
+				+ ", " + carts + " cart" + (carts == 1 ? "" : "s") + ")." + s).formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to save train preset: " + e.getMessage()));
@@ -181,6 +183,9 @@ public class TrainCommand {
 			final int slots = preset.slotCount();
 			src.sendFeedback(() -> Text.literal("TP Slots: ").formatted(Formatting.AQUA)
 				.append(Text.literal(Integer.toString(slots)).formatted(Formatting.WHITE)), false);
+			final int carts = preset.cartCount();
+			src.sendFeedback(() -> Text.literal("Train Carts: ").formatted(Formatting.AQUA)
+				.append(Text.literal(Integer.toString(carts)).formatted(Formatting.WHITE)), false);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to load train preset: " + e.getMessage()));

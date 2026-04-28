@@ -48,6 +48,7 @@ public final class GexpressOptionsScreen {
 		OptionVisibility.clearAll();
 		resetWatheExtendedState();
 		GexpressMapPresetsCategory.pendingEdits.clear();
+		GexpressDevCategory.clearPendingTrainCartRows();
 		selectedMapPreset = null;
 		return buildScreen(parent);
 	}
@@ -117,6 +118,7 @@ public final class GexpressOptionsScreen {
 		pushMapPresetsToServer();
 		flushWatheExtendedPending();
 		flushRoleModifierTuningCommands();
+		GexpressDevCategory.flushTrainCartCommands();
 		flushChatCommands();
 		pendingRoleState.clear();
 		pendingModifierState.clear();

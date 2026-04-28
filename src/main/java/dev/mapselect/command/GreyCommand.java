@@ -16,6 +16,7 @@ public class GreyCommand {
 			.then(VoiceCommand.buildTree())
 			.then(TestCommand.buildTree())
 			.then(C4Command.buildTree())
-			.then(TuningCommand.buildTree()));
+			.then(TuningCommand.buildTree())
+			.then(DevCommand.buildTree()));
 	}
 }
