@@ -21,6 +21,7 @@ public final class FriendlyFireGuard {
 		if (target == attacker || target.getWorld() != attacker.getWorld()) return true;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(target.getWorld());
 		if (game == null || !game.isRunning()) return true;
+		if (GexpressGameModes.isAmnesia(game)) return true;
 		if (!game.canUseKillerFeatures(target) || !game.canUseKillerFeatures(attacker)) return true;
 		attacker.sendMessage(Text.literal("You cannot melee-kill another killer."), true);
 		return false;

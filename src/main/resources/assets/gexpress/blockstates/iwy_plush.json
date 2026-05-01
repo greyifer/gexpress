@@ -1,0 +1,19 @@
+{
+	"variants": {
+		"facing=north": {
+			"model": "gexpress:block/iwy_plush"
+		},
+		"facing=east": {
+			"model": "gexpress:block/iwy_plush",
+			"y": 90
+		},
+		"facing=south": {
+			"model": "gexpress:block/iwy_plush",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "gexpress:block/iwy_plush",
+			"y": 270
+		}
+	}
+}

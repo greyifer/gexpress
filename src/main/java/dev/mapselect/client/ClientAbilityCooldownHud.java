@@ -154,8 +154,9 @@ public final class ClientAbilityCooldownHud {
 			bars.add(cooldown(ICON_TIME_REWIND, rewindRemaining, GexpressConfig.getTimeMasterCooldownSeconds() * 20L,
 				0xFF57D4E6, 0xFF176B77, rewinds + "x"));
 			long freezeRemaining = comp == null ? 0L : comp.freezeCooldownRemainingTicks(playerId);
+			int freezes = comp == null ? GexpressConfig.getTimeMasterFreezeMaxUses() : comp.freezeUsesRemaining(playerId);
 			bars.add(cooldown(ICON_TIME_FREEZE, freezeRemaining, GexpressConfig.getTimeMasterFreezeCooldownSeconds() * 20L,
-				0xFF9DEBFF, 0xFF225B72));
+				0xFF9DEBFF, 0xFF225B72, freezes + "x"));
 		} else if (MapSelectRoles.TRICKSTER_ID.equals(roleId)) {
 			long remaining = ClientTricksterState.remainingTicks();
 			bars.add(remaining > 0L

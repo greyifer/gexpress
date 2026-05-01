@@ -13,6 +13,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.permissions.GexpressPermissions;
+import dev.mapselect.game.GexpressGameModes;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.Text;
@@ -30,6 +31,7 @@ public final class StartCommand {
 		return CommandManager.literal("start")
 			.requires(OP_OR_HOST)
 			.then(mode("modded", () -> Harpymodloader.MODDED_GAMEMODE))
+			.then(mode("amnesia", () -> GexpressGameModes.AMNESIA))
 			.then(mode("discovery", () -> WatheGameModes.DISCOVERY))
 			.then(mode("loose_ends", () -> WatheGameModes.LOOSE_ENDS))
 			.then(mode("murder", () -> WatheGameModes.MURDER));

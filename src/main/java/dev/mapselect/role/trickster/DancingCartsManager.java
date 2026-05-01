@@ -138,6 +138,32 @@ public final class DancingCartsManager {
 		}
 	}
 
+	public static TimeState snapshotForTimeRewind(ServerWorld world) {
+		if (world == null) return null;
+		RegistryKey<World> key = world.getRegistryKey();
+		return new TimeState(
+			new HashMap<>(nextUseTicks.getOrDefault(key, Map.of())),
+			new HashMap<>(usesRemaining.getOrDefault(key, Map.of())),
+			new HashSet<>(previousPairs.getOrDefault(key, Set.of()))
+		);
+	}
+
+	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
+		if (world == null || state == null) return;
+		RegistryKey<World> key = world.getRegistryKey();
+		if (state.nextUseTicks().isEmpty()) nextUseTicks.remove(key);
+		else nextUseTicks.put(key, new ConcurrentHashMap<>(state.nextUseTicks()));
+		if (state.usesRemaining().isEmpty()) usesRemaining.remove(key);
+		else usesRemaining.put(key, new ConcurrentHashMap<>(state.usesRemaining()));
+		if (state.previousPairs().isEmpty()) previousPairs.remove(key);
+		else previousPairs.put(key, ConcurrentHashMap.newKeySet());
+		Set<CartPair> pairs = previousPairs.get(key);
+		if (pairs != null) pairs.addAll(state.previousPairs());
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			syncCooldownTo(player);
+		}
+	}
+
 	public static void syncCooldownTo(ServerPlayerEntity player) {
 		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
 		long remaining = cooldownRemainingTicks(world, player.getUuid());
@@ -474,7 +500,10 @@ public final class DancingCartsManager {
 		}
 	}
 
-	private record CartPair(int a, int b) {
+	public record TimeState(Map<UUID, Long> nextUseTicks, Map<UUID, Integer> usesRemaining,
+			Set<CartPair> previousPairs) {}
+
+	public record CartPair(int a, int b) {
 		private static CartPair of(int first, int second) {
 			return first < second ? new CartPair(first, second) : new CartPair(second, first);
 		}

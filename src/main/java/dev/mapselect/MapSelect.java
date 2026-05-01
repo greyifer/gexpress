@@ -5,6 +5,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
 import dev.mapselect.game.FurnaceDupeGuard;
 import dev.mapselect.game.FriendlyFireGuard;
+import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.game.LastDeathShieldManager;
 import dev.mapselect.item.DevWeaponSkinStamper;
 import dev.mapselect.modifier.EodDistribution;
@@ -52,6 +53,7 @@ public class MapSelect implements ModInitializer {
 	public void onInitialize() {
 		GexpressConfig.load();
 		RoleModifierTuningConfig.load();
+		GexpressGameModes.register();
 		MapSelectBlocks.register();
 		MapSelectBlockEntities.register();
 		MapSelectItems.register();

@@ -420,6 +420,14 @@ public final class GexpressGameCategory {
 					.range(GexpressConfig.TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MIN, GexpressConfig.TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MAX))
 				.build());
 			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.time_master_freeze_max_uses")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.time_master_freeze_max_uses.tooltip")))
+				.binding(3, GexpressConfig::getTimeMasterFreezeMaxUses,
+					v -> GexpressConfig.timeMasterFreezeMaxUses = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.TIME_MASTER_FREEZE_MAX_USES_MIN, GexpressConfig.TIME_MASTER_FREEZE_MAX_USES_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.time_master_freeze_range")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.time_master_freeze_range.tooltip")))
 				.binding(8, GexpressConfig::getTimeMasterFreezeRange,

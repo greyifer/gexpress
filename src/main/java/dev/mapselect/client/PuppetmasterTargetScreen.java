@@ -17,10 +17,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class PuppetmasterTargetScreen extends Screen {
-	private static final int CARD_WIDTH = 72;
-	private static final int CARD_HEIGHT = 58;
-	private static final int HEAD_SIZE = 24;
-	private static final int GAP = 10;
+	private static final int TILE_WIDTH = 58;
+	private static final int TILE_HEIGHT = 50;
+	private static final int HEAD_SIZE = 32;
+	private static final int GAP = 12;
 	private List<PuppetmasterTargetsPayload.Entry> targets = List.of();
 	private final List<CardRect> cards = new ArrayList<>();
 
@@ -50,34 +50,33 @@ public final class PuppetmasterTargetScreen extends Screen {
 			return;
 		}
 
-		int columns = Math.max(1, Math.min(5, (width - 48) / (CARD_WIDTH + GAP)));
+		int columns = Math.max(1, Math.min(7, (width - 48) / (TILE_WIDTH + GAP)));
 		int rows = (int) Math.ceil(targets.size() / (double) columns);
-		int totalWidth = columns * CARD_WIDTH + (columns - 1) * GAP;
+		int totalWidth = columns * TILE_WIDTH + (columns - 1) * GAP;
 		int startX = width / 2 - totalWidth / 2;
-		int startY = Math.max(48, height / 2 - rows * (CARD_HEIGHT + GAP) / 2);
+		int startY = Math.max(48, height / 2 - rows * (TILE_HEIGHT + GAP) / 2);
 
 		for (int i = 0; i < targets.size(); i++) {
 			int col = i % columns;
 			int row = i / columns;
-			int x = startX + col * (CARD_WIDTH + GAP);
-			int y = startY + row * (CARD_HEIGHT + GAP);
+			int x = startX + col * (TILE_WIDTH + GAP);
+			int y = startY + row * (TILE_HEIGHT + GAP);
 			PuppetmasterTargetsPayload.Entry target = targets.get(i);
-			cards.add(new CardRect(x, y, CARD_WIDTH, CARD_HEIGHT, target));
-			drawCard(context, target, x, y, mouseX >= x && mouseX < x + CARD_WIDTH && mouseY >= y && mouseY < y + CARD_HEIGHT);
+			cards.add(new CardRect(x, y, TILE_WIDTH, TILE_HEIGHT, target));
+			drawTarget(context, target, x, y, mouseX >= x && mouseX < x + TILE_WIDTH && mouseY >= y && mouseY < y + TILE_HEIGHT);
 		}
 	}
 
-	private void drawCard(DrawContext context, PuppetmasterTargetsPayload.Entry target, int x, int y, boolean hovered) {
-		int frame = hovered ? 0xFFFFFFFF : 0xFF9A3240;
-		int fill = hovered ? 0xCC5B1825 : 0xAA240812;
-		context.fill(x - 1, y - 1, x + CARD_WIDTH + 1, y + CARD_HEIGHT + 1, 0xAA000000);
-		context.fill(x, y, x + CARD_WIDTH, y + CARD_HEIGHT, frame);
-		context.fill(x + 1, y + 1, x + CARD_WIDTH - 1, y + CARD_HEIGHT - 1, fill);
-
-		int headX = x + (CARD_WIDTH - HEAD_SIZE) / 2;
-		drawHead(context, target, headX, y + 8);
-		String name = textRenderer.trimToWidth(target.name(), CARD_WIDTH - 8);
-		context.drawCenteredTextWithShadow(textRenderer, Text.literal(name), x + CARD_WIDTH / 2, y + 38, 0xFFFFFF);
+	private void drawTarget(DrawContext context, PuppetmasterTargetsPayload.Entry target, int x, int y, boolean hovered) {
+		int headX = x + (TILE_WIDTH - HEAD_SIZE) / 2;
+		int headY = y + 2;
+		if (hovered) {
+			context.fill(headX - 2, headY - 2, headX + HEAD_SIZE + 2, headY + HEAD_SIZE + 2, 0x66FFFFFF);
+		}
+		drawHead(context, target, headX, headY);
+		String name = textRenderer.trimToWidth(target.name(), TILE_WIDTH);
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal(name), x + TILE_WIDTH / 2, y + 38,
+			hovered ? 0xFFFFE0E7 : 0xFFFFFFFF);
 	}
 
 	private void drawHead(DrawContext context, PuppetmasterTargetsPayload.Entry target, int x, int y) {

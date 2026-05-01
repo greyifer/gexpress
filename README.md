@@ -16,7 +16,7 @@ All G'Express commands are under `/g`.
 
 | Command | Purpose |
 |---|---|
-| `/g start <mode> <effect> [minutes] [seconds]` | Starts a G'Express round. Modes include `modded`, `discovery`, `loose_ends`, and `murder`; effects include `generic`, `day`, `lobby`, `night`, and `sundown`. |
+| `/g start <mode> <effect> [minutes] [seconds]` | Starts a G'Express round. Modes include `modded`, `amnesia`, `discovery`, `loose_ends`, and `murder`; effects include `generic`, `day`, `lobby`, `night`, and `sundown`. |
 | `/g end` | Ends the current round. |
 | `/g end force` | Force-finalizes the current round. |
 | `/g map create <corner1> <corner2> <name>` | Creates a saved map preset from two corners. |
@@ -106,7 +106,7 @@ All G'Express commands are under `/g`.
 | **Medic** | Civilian | Shields another player from danger and receives visual feedback when that shield is hit or broken. |
 | **Snitch** | Civilian | Completes tasks to expose the killers. Progress stays visible beside the mood HUD, and killers are warned/glow the Snitch once they are within the configured task threshold. |
 | **Seer** | Civilian | Receives a visual warning whenever someone dies. |
-| **Time Master** | Civilian | Can rewind the round, track remaining rewinds, and freeze a looked-at player in place with configurable duration, cooldown, and range. |
+| **Time Master** | Civilian | Can rewind the round, track remaining rewinds, and freeze a looked-at player in place with configurable duration, cooldown, range, and uses. |
 | **Tracker** | Civilian | Can track a configurable number of players at once, making those players glow for the Tracker. |
 | **Altruist** | Civilian | Sacrifices themself to revive a dead body. |
 | **Juggernaut** | Neutral | Starts with a Knife and Revolver. Weapon cooldowns become shorter after kills. Wins by being the last player alive. |
@@ -149,6 +149,11 @@ All G'Express commands are under `/g`.
 - A decorative plush item.
 - Plays a sound when used.
 
+### _Iwy Plush
+
+- A decorative plush item using the _Iwy design.
+- Plays the plush sound when used.
+
 ### Map Blocks
 
 - Sand Layer
@@ -172,7 +177,9 @@ Includes support for:
 - Maximum killer and Vigilante counts.
 - Role-specific values.
 - Snitch reveal-task count and killer-warning task threshold.
-- Puppetmaster range, Scatter Brain cooldown, Tracker limits, Altruist range, Hungry/Thirsty carry limits, and last-death shield.
+- Puppetmaster range and self-body kill behavior.
+- Time Master Freeze duration, cooldown, range, and per-round uses.
+- Scatter Brain cooldown, Tracker limits, Altruist range, Hungry/Thirsty carry limits, and last-death shield.
 
 ### Ability HUD
 
@@ -183,6 +190,15 @@ G'Express adds an ability HUD for role abilities.
 - Ability icons appear beside the bars.
 - Time Master shows remaining rewinds beside the rewind bar.
 - Scatter Brain, Tracker, Altruist, Pelican, Harlequin, Juggernaut, Puppetmaster, Warlock, The Silent, Medic, and Time Master abilities are represented when their role needs a bar.
+
+### Amnesia Mode
+
+Amnesia is a G'Express game mode based on modded murder.
+
+- Killer roles are still assigned from the modded role pool.
+- Killers do not see other killers as killer teammates through killer identity features.
+- Other killers appear as civilian-like targets to killer instinct.
+- Killers can kill other killers in this mode.
 
 ### Map Tools
 

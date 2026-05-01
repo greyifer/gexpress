@@ -27,6 +27,7 @@ import dev.mapselect.role.medic.MedicShieldComponent;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.silent.SilentShadowComponent;
 import dev.mapselect.role.snitch.SnitchManager;
+import dev.mapselect.role.trickster.DancingCartsManager;
 import dev.mapselect.role.trickster.TricksterManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.role.warlock.WarlockComponent;
@@ -226,6 +227,10 @@ public final class TimeMasterManager {
 
 		TimeMasterComponent comp = TimeMasterComponent.KEY.get(world);
 		comp.ensurePlayer(timeMaster.getUuid());
+		if (comp.freezeUsesRemaining(timeMaster.getUuid()) <= 0) {
+			timeMaster.sendMessage(Text.literal("No freezes left."), true);
+			return;
+		}
 		long cooldown = comp.freezeCooldownRemainingTicks(timeMaster.getUuid());
 		if (cooldown > 0L) {
 			timeMaster.sendMessage(Text.literal("Freeze ready in " + secondsCeil(cooldown) + "s."), true);
@@ -243,12 +248,12 @@ public final class TimeMasterManager {
 			timeMaster.sendMessage(Text.literal(target.getName().getString() + " is already frozen."), true);
 			return;
 		}
+		if (!comp.consumeFreeze(timeMaster.getUuid())) return;
 
 		int durationTicks = GexpressConfig.getTimeMasterFreezeDurationSeconds() * 20;
 		ActiveFreeze freeze = ActiveFreeze.capture(world, timeMaster.getUuid(), target, durationTicks);
 		ACTIVE_FREEZES.put(target.getUuid(), freeze);
 		freeze.apply(target);
-		comp.setFreezeCooldown(timeMaster.getUuid());
 		syncFreeze(world, target.getUuid(), timeMaster.getUuid(), true, durationTicks);
 		world.playSound(null, target.getBlockPos(), SoundEvents.BLOCK_GLASS_BREAK,
 			SoundCategory.PLAYERS, 0.75F, 0.55F);
@@ -479,6 +484,7 @@ public final class TimeMasterManager {
 			if (elapsed < REWIND_ANIMATION_TICKS) return false;
 
 			finalSnapshot.restore(world);
+			TimeMasterComponent.KEY.get(world).spendRewindAfterRestore(timeMasterId);
 			for (ServerPlayerEntity player : world.getPlayers()) {
 				player.sendMessage(Text.literal("Time snapped back."), true);
 			}
@@ -774,8 +780,8 @@ public final class TimeMasterManager {
 			Map<UUID, ItemEntitySnapshot> items, Map<UUID, BodyEntitySnapshot> bodies,
 			Map<BlockPos, BlockSnapshot> blocks,
 			JuggernautManager.TimeState juggernaut, SnitchManager.TimeState snitch,
-			VultureManager.TimeState vulture,
-			NbtCompound gameTime, NbtCompound c4Back, NbtCompound medicShield,
+			VultureManager.TimeState vulture, DancingCartsManager.TimeState dancingCarts,
+			NbtCompound gameTime, NbtCompound timeMaster, NbtCompound c4Back, NbtCompound medicShield,
 			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute) {
 
 		private static WorldSnapshot capture(ServerWorld world) {
@@ -806,7 +812,9 @@ public final class TimeMasterManager {
 				JuggernautManager.snapshotForTimeRewind(),
 				SnitchManager.snapshotForTimeRewind(),
 				VultureManager.snapshotForTimeRewind(),
+				DancingCartsManager.snapshotForTimeRewind(world),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
+				writeComponent(TimeMasterComponent.KEY.getNullable(world), lookup),
 				writeComponent(C4BackComponent.KEY.getNullable(world), lookup),
 				writeComponent(MedicShieldComponent.KEY.getNullable(world), lookup),
 				writeComponent(SilentShadowComponent.KEY.getNullable(world), lookup),
@@ -858,6 +866,7 @@ public final class TimeMasterManager {
 			PuppetmasterManager.clearForTimeRewind(server);
 			VultureManager.clearForTimeRewind(world);
 			TricksterManager.clearForTimeRewind(world);
+			DancingCartsManager.restoreForTimeRewind(world, dancingCarts);
 			JuggernautManager.restoreForTimeRewind(juggernaut);
 			SnitchManager.restoreForTimeRewind(world, snitch);
 			restoreBlocks(world, lookup);
@@ -879,6 +888,7 @@ public final class TimeMasterManager {
 			restoreItems(world);
 			restoreBodies(world, revived);
 			readComponent(GameTimeComponent.KEY.getNullable(world), gameTime, lookup);
+			readComponent(TimeMasterComponent.KEY.getNullable(world), timeMaster, lookup);
 			readComponent(C4BackComponent.KEY.getNullable(world), c4Back, lookup);
 			readComponent(MedicShieldComponent.KEY.getNullable(world), medicShield, lookup);
 			readComponent(SilentShadowComponent.KEY.getNullable(world), silentShadow, lookup);
@@ -887,6 +897,7 @@ public final class TimeMasterManager {
 			VultureManager.restoreForTimeRewind(world, vulture);
 
 			GameTimeComponent.KEY.sync(world);
+			TimeMasterComponent.KEY.sync(world);
 			C4BackComponent.KEY.sync(world);
 			MedicShieldComponent.KEY.sync(world);
 			SilentShadowComponent.KEY.sync(world);

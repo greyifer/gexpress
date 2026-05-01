@@ -114,6 +114,11 @@ public final class ClientPuppetmasterState {
 		KeyBinding ability = resolveAbilityBinding();
 		boolean abilityDown = ability != null && ClientAbilityKeys.isDown(client, ability);
 		boolean activeController = isLocalController(client);
+		if (abilityDown && !wasAbilityDown && client.currentScreen instanceof PuppetmasterTargetScreen) {
+			client.setScreen(null);
+			wasAbilityDown = true;
+			return;
+		}
 		if (abilityDown && !wasAbilityDown && ClientPlayNetworking.canSend(PuppetmasterUsePayload.ID)
 				&& !ClientVultureState.isLocalStashed(client)
 				&& (activeController || (client.currentScreen == null && isLocalPuppetmaster(client)))) {

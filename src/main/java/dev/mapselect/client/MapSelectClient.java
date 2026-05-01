@@ -60,6 +60,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ParticleFactoryRegistry.getInstance().register(MapSelectParticles.SAND_DRIFT, SandDriftParticle.Factory::new);
 		BlockEntityRendererFactories.register(MapSelectBlockEntities.GREYIFER_PLUSH, GreyiferPlushBlockEntityRenderer::new);
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GREYIFER_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.IWY_PLUSH, RenderLayer.getCutout());
 
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, registrationHelper, context) -> {
 			if (entityRenderer instanceof PlayerEntityRenderer per) {
@@ -119,6 +120,7 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.timeMasterMaxUses(),
 				payload.timeMasterFreezeDurationSeconds(),
 				payload.timeMasterFreezeCooldownSeconds(),
+				payload.timeMasterFreezeMaxUses(),
 				payload.timeMasterFreezeRange(),
 				payload.scatterBrainCooldownSeconds(),
 				payload.trackerMaxTargets(),

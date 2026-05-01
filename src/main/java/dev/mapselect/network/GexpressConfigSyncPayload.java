@@ -20,7 +20,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int snitchWarningTasksRemaining,
 		int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses,
 		int timeMasterFreezeDurationSeconds, int timeMasterFreezeCooldownSeconds,
-		int timeMasterFreezeRange, int scatterBrainCooldownSeconds, int trackerMaxTargets,
+		int timeMasterFreezeMaxUses, int timeMasterFreezeRange,
+		int scatterBrainCooldownSeconds, int trackerMaxTargets,
 		int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
 		int maxKillerAmount, int maxVigilanteAmount,
 		float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
@@ -67,6 +68,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.timeMasterMaxUses());
 			buf.writeInt(payload.timeMasterFreezeDurationSeconds());
 			buf.writeInt(payload.timeMasterFreezeCooldownSeconds());
+			buf.writeInt(payload.timeMasterFreezeMaxUses());
 			buf.writeInt(payload.timeMasterFreezeRange());
 			buf.writeInt(payload.scatterBrainCooldownSeconds());
 			buf.writeInt(payload.trackerMaxTargets());
@@ -124,6 +126,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // timeMasterMaxUses
 			buf.readInt(), // timeMasterFreezeDurationSeconds
 			buf.readInt(), // timeMasterFreezeCooldownSeconds
+			buf.readInt(), // timeMasterFreezeMaxUses
 			buf.readInt(), // timeMasterFreezeRange
 			buf.readInt(), // scatterBrainCooldownSeconds
 			buf.readInt(), // trackerMaxTargets

@@ -54,7 +54,7 @@ public final class GexpressConfigSyncHandler {
 						payload.snitchWarningTasksRemaining(),
 						payload.timeMasterRewindSeconds(), payload.timeMasterCooldownSeconds(), payload.timeMasterMaxUses(),
 						payload.timeMasterFreezeDurationSeconds(), payload.timeMasterFreezeCooldownSeconds(),
-						payload.timeMasterFreezeRange(),
+						payload.timeMasterFreezeMaxUses(), payload.timeMasterFreezeRange(),
 						payload.scatterBrainCooldownSeconds(), payload.trackerMaxTargets(), payload.trackerRange(),
 						payload.trackerCooldownSeconds(), payload.altruistRange(), payload.lastDeathShieldEnabled(),
 						payload.maxKillerAmount(), payload.maxVigilanteAmount(),
@@ -70,7 +70,7 @@ public final class GexpressConfigSyncHandler {
 					if (after.equals(before)) return;
 
 					GexpressConfig.save();
-					MapSelect.LOGGER.info("G'Express config updated by {}: price={}, fuse={}s, firstBeep={}s, wrongWire={}%, grenade={}, maxKillers={}, maxVigilantes={}, medicShieldCooldown={}s, medicShieldKnifeBreaks={}, silent=[duration {}s, cooldown {}s, alpha {}], warlock=[markCooldown {}s, killCooldown {}s], juggernaut=[initial {}s, reduction {}s, min {}s], trickster=[duration {}s, cartUses {}], puppetmaster=[duration {}s, cooldown {}s, random {}], pelican=[eatCooldown {}s], snitch=[tasks {}, warnRemaining {}], timeMaster=[rewind {}s, cooldown {}s, uses {}, freezeDuration {}s, freezeCooldown {}s, freezeRange {}], c4Back=[{}, {}, {}; rot {}, {}, {}; slant {}; scale {}]",
+					MapSelect.LOGGER.info("G'Express config updated by {}: price={}, fuse={}s, firstBeep={}s, wrongWire={}%, grenade={}, maxKillers={}, maxVigilantes={}, medicShieldCooldown={}s, medicShieldKnifeBreaks={}, silent=[duration {}s, cooldown {}s, alpha {}], warlock=[markCooldown {}s, killCooldown {}s], juggernaut=[initial {}s, reduction {}s, min {}s], trickster=[duration {}s, cartUses {}], puppetmaster=[duration {}s, cooldown {}s, random {}], pelican=[eatCooldown {}s], snitch=[tasks {}, warnRemaining {}], timeMaster=[rewind {}s, cooldown {}s, uses {}, freezeDuration {}s, freezeCooldown {}s, freezeUses {}, freezeRange {}], c4Back=[{}, {}, {}; rot {}, {}, {}; slant {}; scale {}]",
 						sender.getName().getString(),
 						GexpressConfig.getC4Price(),
 						GexpressConfig.getC4FuseSeconds(),
@@ -102,6 +102,7 @@ public final class GexpressConfigSyncHandler {
 						GexpressConfig.getTimeMasterMaxUses(),
 						GexpressConfig.getTimeMasterFreezeDurationSeconds(),
 						GexpressConfig.getTimeMasterFreezeCooldownSeconds(),
+						GexpressConfig.getTimeMasterFreezeMaxUses(),
 						GexpressConfig.getTimeMasterFreezeRange(),
 						GexpressConfig.getC4BackOffsetX(),
 						GexpressConfig.getC4BackOffsetY(),
@@ -199,6 +200,7 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getTimeMasterMaxUses(),
 			GexpressConfig.getTimeMasterFreezeDurationSeconds(),
 			GexpressConfig.getTimeMasterFreezeCooldownSeconds(),
+			GexpressConfig.getTimeMasterFreezeMaxUses(),
 			GexpressConfig.getTimeMasterFreezeRange(),
 			GexpressConfig.getScatterBrainCooldownSeconds(),
 			GexpressConfig.getTrackerMaxTargets(),

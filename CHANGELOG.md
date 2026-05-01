@@ -1,3 +1,22 @@
+# Grey's Express 1.2.2
+
+## Added
+
+- New `amnesia` game mode. It uses the modded role pool, but killers see other killers as civilian-like targets and can kill each other.
+- New `_Iwy Plush` decorative plush block/item.
+- Time Master Freeze now has a configurable per-round use count, defaulting to 3.
+
+## Changed
+
+- Puppetmaster's target menu now uses player heads with names underneath instead of full cards.
+- Pressing the Puppetmaster ability key while the target menu is open now closes it.
+- Time Master rewind now snapshots and restores Time Master freeze uses and Harlequin Dancing Carts uses if they happened inside the rewind window.
+- Shop purchases no longer fail just because the bought item is currently on cooldown.
+
+## Fixed
+
+- Damaging the Puppetmaster's abandoned body no longer kills the controlled player. If self-body killing is disabled, the hit is ignored; if enabled, it kills or damages the Puppetmaster instead.
+
 # Grey's Express 1.2.1
 
 ## Fixed

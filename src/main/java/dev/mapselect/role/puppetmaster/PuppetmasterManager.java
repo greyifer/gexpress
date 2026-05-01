@@ -335,9 +335,12 @@ public final class PuppetmasterManager {
 		if (controllerId == null) return true;
 		MinecraftServer server = player.getServer();
 		ServerPlayerEntity controller = server == null ? null : server.getPlayerManager().getPlayer(controllerId);
+		if (!GexpressConfig.canPuppetmasterKillOwnBody()) return false;
+		endControl(controllerId, server, true);
 		if (controller != null && GameFunctions.isPlayerAliveAndSurvival(controller)) {
 			controller.damage(damageSource, damageAmount);
 		}
+		player.setHealth(Math.max(1.0F, player.getHealth()));
 		return false;
 	}
 
@@ -347,7 +350,8 @@ public final class PuppetmasterManager {
 		MinecraftServer server = player.getServer();
 		ServerPlayerEntity controller = server == null ? null : server.getPlayerManager().getPlayer(controllerId);
 		endControl(controllerId, server, true);
-		if (controller != null && GameFunctions.isPlayerAliveAndSurvival(controller)) {
+		if (GexpressConfig.canPuppetmasterKillOwnBody()
+				&& controller != null && GameFunctions.isPlayerAliveAndSurvival(controller)) {
 			GameFunctions.killPlayer(controller, true, player, GameConstants.DeathReasons.GENERIC);
 		}
 		player.setHealth(Math.max(1.0F, player.getHealth()));

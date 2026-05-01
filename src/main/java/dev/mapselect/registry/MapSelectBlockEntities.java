@@ -16,7 +16,9 @@ public final class MapSelectBlockEntities {
 		GREYIFER_PLUSH = Registry.register(
 			Registries.BLOCK_ENTITY_TYPE,
 			Identifier.of(MapSelect.MOD_ID, "greyifer_plush"),
-			BlockEntityType.Builder.create(GreyiferPlushBlockEntity::new, MapSelectBlocks.GREYIFER_PLUSH).build(null)
+			BlockEntityType.Builder.create(GreyiferPlushBlockEntity::new,
+				MapSelectBlocks.GREYIFER_PLUSH,
+				MapSelectBlocks.IWY_PLUSH).build(null)
 		);
 	}
 }

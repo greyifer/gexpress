@@ -250,6 +250,7 @@ public final class GexpressOptionsScreen {
 			GexpressConfig.getTimeMasterMaxUses(),
 			GexpressConfig.getTimeMasterFreezeDurationSeconds(),
 			GexpressConfig.getTimeMasterFreezeCooldownSeconds(),
+			GexpressConfig.getTimeMasterFreezeMaxUses(),
 			GexpressConfig.getTimeMasterFreezeRange(),
 			GexpressConfig.getScatterBrainCooldownSeconds(),
 			GexpressConfig.getTrackerMaxTargets(),

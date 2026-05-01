@@ -26,6 +26,7 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 	private final Map<UUID, Long> cooldownUntil = new LinkedHashMap<>();
 	private final Map<UUID, Long> freezeCooldownUntil = new LinkedHashMap<>();
 	private final Map<UUID, Integer> usesRemaining = new LinkedHashMap<>();
+	private final Map<UUID, Integer> freezeUsesRemaining = new LinkedHashMap<>();
 
 	public TimeMasterComponent(World world) {
 		this.world = world;
@@ -57,12 +58,31 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		return usesRemaining.getOrDefault(playerId, GexpressConfig.getTimeMasterMaxUses());
 	}
 
+	public int freezeUsesRemaining(UUID playerId) {
+		if (playerId == null) return 0;
+		return freezeUsesRemaining.getOrDefault(playerId, GexpressConfig.getTimeMasterFreezeMaxUses());
+	}
+
 	public boolean consume(UUID playerId) {
 		if (playerId == null) return false;
 		int remaining = usesRemaining(playerId);
 		if (remaining <= 0 || cooldownRemainingTicks(playerId) > 0L) return false;
 
 		usesRemaining.put(playerId, remaining - 1);
+		setRewindCooldown(playerId);
+		return true;
+	}
+
+	public void spendRewindAfterRestore(UUID playerId) {
+		if (playerId == null) return;
+		int remaining = usesRemaining(playerId);
+		if (remaining > 0) {
+			usesRemaining.put(playerId, remaining - 1);
+		}
+		setRewindCooldown(playerId);
+	}
+
+	private void setRewindCooldown(UUID playerId) {
 		long cooldownTicks = (long) GexpressConfig.getTimeMasterCooldownSeconds() * 20L;
 		if (cooldownTicks > 0L) {
 			cooldownUntil.put(playerId, world.getTime() + cooldownTicks);
@@ -70,7 +90,6 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 			cooldownUntil.remove(playerId);
 		}
 		KEY.sync(world);
-		return true;
 	}
 
 	public void setFreezeCooldown(UUID playerId) {
@@ -84,21 +103,41 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		KEY.sync(world);
 	}
 
+	public boolean consumeFreeze(UUID playerId) {
+		if (playerId == null) return false;
+		int remaining = freezeUsesRemaining(playerId);
+		if (remaining <= 0 || freezeCooldownRemainingTicks(playerId) > 0L) return false;
+
+		freezeUsesRemaining.put(playerId, remaining - 1);
+		setFreezeCooldown(playerId);
+		return true;
+	}
+
 	public void ensurePlayer(UUID playerId) {
 		if (playerId == null) return;
+		boolean changed = false;
 		int maxUses = GexpressConfig.getTimeMasterMaxUses();
 		Integer current = usesRemaining.get(playerId);
 		if (current == null || current > maxUses) {
 			usesRemaining.put(playerId, maxUses);
-			KEY.sync(world);
+			changed = true;
 		}
+		int maxFreezeUses = GexpressConfig.getTimeMasterFreezeMaxUses();
+		Integer currentFreeze = freezeUsesRemaining.get(playerId);
+		if (currentFreeze == null || currentFreeze > maxFreezeUses) {
+			freezeUsesRemaining.put(playerId, maxFreezeUses);
+			changed = true;
+		}
+		if (changed) KEY.sync(world);
 	}
 
 	public boolean clearAll() {
-		if (cooldownUntil.isEmpty() && freezeCooldownUntil.isEmpty() && usesRemaining.isEmpty()) return false;
+		if (cooldownUntil.isEmpty() && freezeCooldownUntil.isEmpty()
+				&& usesRemaining.isEmpty() && freezeUsesRemaining.isEmpty()) return false;
 		cooldownUntil.clear();
 		freezeCooldownUntil.clear();
 		usesRemaining.clear();
+		freezeUsesRemaining.clear();
 		KEY.sync(world);
 		return true;
 	}
@@ -108,9 +147,11 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		cooldownUntil.clear();
 		freezeCooldownUntil.clear();
 		usesRemaining.clear();
+		freezeUsesRemaining.clear();
 		readCooldowns(tag.getList("cooldowns", NbtElement.COMPOUND_TYPE), cooldownUntil);
 		readCooldowns(tag.getList("freezeCooldowns", NbtElement.COMPOUND_TYPE), freezeCooldownUntil);
-		readUses(tag.getList("uses", NbtElement.COMPOUND_TYPE));
+		readUses(tag.getList("uses", NbtElement.COMPOUND_TYPE), usesRemaining);
+		readUses(tag.getList("freezeUses", NbtElement.COMPOUND_TYPE), freezeUsesRemaining);
 	}
 
 	@Override
@@ -118,14 +159,8 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		tag.put("cooldowns", writeCooldowns(cooldownUntil));
 		tag.put("freezeCooldowns", writeCooldowns(freezeCooldownUntil));
 
-		NbtList uses = new NbtList();
-		for (Map.Entry<UUID, Integer> entry : usesRemaining.entrySet()) {
-			NbtCompound use = new NbtCompound();
-			use.putString("player", entry.getKey().toString());
-			use.putInt("remaining", entry.getValue());
-			uses.add(use);
-		}
-		tag.put("uses", uses);
+		tag.put("uses", writeUses(usesRemaining));
+		tag.put("freezeUses", writeUses(freezeUsesRemaining));
 	}
 
 	private NbtList writeCooldowns(Map<UUID, Long> cooldowns) {
@@ -147,11 +182,22 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		}
 	}
 
-	private void readUses(NbtList list) {
+	private NbtList writeUses(Map<UUID, Integer> usesRemaining) {
+		NbtList uses = new NbtList();
+		for (Map.Entry<UUID, Integer> entry : usesRemaining.entrySet()) {
+			NbtCompound use = new NbtCompound();
+			use.putString("player", entry.getKey().toString());
+			use.putInt("remaining", entry.getValue());
+			uses.add(use);
+		}
+		return uses;
+	}
+
+	private void readUses(NbtList list, Map<UUID, Integer> out) {
 		for (int i = 0; i < list.size(); i++) {
 			NbtCompound entry = list.getCompound(i);
 			UUID player = parseUuid(entry.getString("player"));
-			if (player != null) usesRemaining.put(player, entry.getInt("remaining"));
+			if (player != null) out.put(player, entry.getInt("remaining"));
 		}
 	}
 

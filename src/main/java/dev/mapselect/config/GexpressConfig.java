@@ -89,6 +89,8 @@ public final class GexpressConfig {
 	public static int timeMasterFreezeDurationSeconds = 4;
 	/** Seconds before a Time Master can freeze another player. */
 	public static int timeMasterFreezeCooldownSeconds = 30;
+	/** Total number of freezes each Time Master can use in a round. */
+	public static int timeMasterFreezeMaxUses = 3;
 	/** Maximum block range for Time Master's Freeze target search. */
 	public static int timeMasterFreezeRange = 8;
 	/** Seconds before Scatter Brain can scatter players again. */
@@ -191,6 +193,8 @@ public final class GexpressConfig {
 	public static final int TIME_MASTER_FREEZE_DURATION_SECONDS_MAX = 30;
 	public static final int TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MIN = 0;
 	public static final int TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MAX = 600;
+	public static final int TIME_MASTER_FREEZE_MAX_USES_MIN = 0;
+	public static final int TIME_MASTER_FREEZE_MAX_USES_MAX = 10;
 	public static final int TIME_MASTER_FREEZE_RANGE_MIN = 1;
 	public static final int TIME_MASTER_FREEZE_RANGE_MAX = 32;
 	public static final int SCATTER_BRAIN_COOLDOWN_SECONDS_MIN = 0;
@@ -371,6 +375,11 @@ public final class GexpressConfig {
 	public static int getTimeMasterFreezeCooldownSeconds() {
 		return Math.max(TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MIN,
 			Math.min(TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MAX, timeMasterFreezeCooldownSeconds));
+	}
+
+	public static int getTimeMasterFreezeMaxUses() {
+		return Math.max(TIME_MASTER_FREEZE_MAX_USES_MIN,
+			Math.min(TIME_MASTER_FREEZE_MAX_USES_MAX, timeMasterFreezeMaxUses));
 	}
 
 	public static int getTimeMasterFreezeRange() {
@@ -612,6 +621,7 @@ public final class GexpressConfig {
 			timeMasterMaxUses = snap.timeMasterMaxUses;
 			timeMasterFreezeDurationSeconds = snap.timeMasterFreezeDurationSeconds;
 			timeMasterFreezeCooldownSeconds = snap.timeMasterFreezeCooldownSeconds;
+			timeMasterFreezeMaxUses = snap.timeMasterFreezeMaxUses;
 			timeMasterFreezeRange = snap.timeMasterFreezeRange;
 			scatterBrainCooldownSeconds = snap.scatterBrainCooldownSeconds;
 			trackerMaxTargets = snap.trackerMaxTargets;
@@ -682,6 +692,7 @@ public final class GexpressConfig {
 			snap.timeMasterMaxUses = timeMasterMaxUses;
 			snap.timeMasterFreezeDurationSeconds = timeMasterFreezeDurationSeconds;
 			snap.timeMasterFreezeCooldownSeconds = timeMasterFreezeCooldownSeconds;
+			snap.timeMasterFreezeMaxUses = timeMasterFreezeMaxUses;
 			snap.timeMasterFreezeRange = timeMasterFreezeRange;
 			snap.scatterBrainCooldownSeconds = scatterBrainCooldownSeconds;
 			snap.trackerMaxTargets = trackerMaxTargets;
@@ -729,7 +740,8 @@ public final class GexpressConfig {
 			int snitchWarningTasksRemaining,
 			int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses,
 			int timeMasterFreezeDurationSeconds, int timeMasterFreezeCooldownSeconds,
-			int timeMasterFreezeRange, int scatterBrainCooldownSeconds, int trackerMaxTargets,
+			int timeMasterFreezeMaxUses, int timeMasterFreezeRange,
+			int scatterBrainCooldownSeconds, int trackerMaxTargets,
 			int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
 			int maxKillerAmount, int maxVigilanteAmount,
 			float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
@@ -770,6 +782,7 @@ public final class GexpressConfig {
 		GexpressConfig.timeMasterMaxUses = timeMasterMaxUses;
 		GexpressConfig.timeMasterFreezeDurationSeconds = timeMasterFreezeDurationSeconds;
 		GexpressConfig.timeMasterFreezeCooldownSeconds = timeMasterFreezeCooldownSeconds;
+		GexpressConfig.timeMasterFreezeMaxUses = timeMasterFreezeMaxUses;
 		GexpressConfig.timeMasterFreezeRange = timeMasterFreezeRange;
 		GexpressConfig.scatterBrainCooldownSeconds = scatterBrainCooldownSeconds;
 		GexpressConfig.trackerMaxTargets = trackerMaxTargets;
@@ -827,6 +840,7 @@ public final class GexpressConfig {
 		timeMasterMaxUses = getTimeMasterMaxUses();
 		timeMasterFreezeDurationSeconds = getTimeMasterFreezeDurationSeconds();
 		timeMasterFreezeCooldownSeconds = getTimeMasterFreezeCooldownSeconds();
+		timeMasterFreezeMaxUses = getTimeMasterFreezeMaxUses();
 		timeMasterFreezeRange = getTimeMasterFreezeRange();
 		scatterBrainCooldownSeconds = getScatterBrainCooldownSeconds();
 		trackerMaxTargets = getTrackerMaxTargets();
@@ -944,6 +958,7 @@ public final class GexpressConfig {
 		int timeMasterMaxUses = 1;
 		int timeMasterFreezeDurationSeconds = 4;
 		int timeMasterFreezeCooldownSeconds = 30;
+		int timeMasterFreezeMaxUses = 3;
 		int timeMasterFreezeRange = 8;
 		int scatterBrainCooldownSeconds = 60;
 		int trackerMaxTargets = 3;

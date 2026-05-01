@@ -29,6 +29,7 @@
 	"client": [
 		"client.ClientWorldWeatherMixin",
 		"client.BackgroundRendererFogMixin",
+		"client.AmnesiaKillerIdentityMixin",
 		"client.HideMapTabMixin",
 		"client.WatheTrainSnowMixin",
 		"client.WatheExtendedOpMixin",
@@ -49,6 +50,7 @@
 		"client.ShortSightedEntityRenderMixin",
 		"client.TricksterSkinTexturesMixin",
 		"client.WatheOptionsScreenMixin",
+		"client.WatheClientAmnesiaInstinctMixin",
 		"client.OptionEntryVisibilityMixin",
 		"client.ParanoidHeldItemFeatureMixin",
 		"client.ParanoidHeldItemMixin",
