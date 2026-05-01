@@ -1,3 +1,9 @@
+# Grey's Express 1.2.1
+
+## Fixed
+
+- Last Death Shield now applies only to the first player who died in the previous round, not every player who died that round.
+
 # Grey's Express 1.2.0
 
 ## Added

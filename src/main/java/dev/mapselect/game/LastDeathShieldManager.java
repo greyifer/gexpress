@@ -14,14 +14,12 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.Formatting;
 import net.minecraft.world.World;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 public final class LastDeathShieldManager {
-	private static final Set<UUID> lastRoundDeaths = new HashSet<>();
-	private static final Set<UUID> currentRoundDeaths = new HashSet<>();
-	private static final Set<UUID> shielded = new HashSet<>();
+	private static UUID lastRoundFirstDeath;
+	private static UUID currentRoundFirstDeath;
+	private static UUID shieldedPlayer;
 
 	private LastDeathShieldManager() {}
 
@@ -32,28 +30,28 @@ public final class LastDeathShieldManager {
 	}
 
 	private static void onFinishInitialize(World world, GameWorldComponent game) {
-		currentRoundDeaths.clear();
-		shielded.clear();
+		currentRoundFirstDeath = null;
+		shieldedPlayer = null;
 		if (!(world instanceof ServerWorld serverWorld) || !GexpressConfig.isLastDeathShieldEnabled()) return;
 		for (ServerPlayerEntity player : serverWorld.getPlayers()) {
-			if (lastRoundDeaths.contains(player.getUuid()) && GameFunctions.isPlayerAliveAndSurvival(player)) {
-				shielded.add(player.getUuid());
+			if (player.getUuid().equals(lastRoundFirstDeath) && GameFunctions.isPlayerAliveAndSurvival(player)) {
+				shieldedPlayer = player.getUuid();
 				player.sendMessage(Text.literal("Last-round shield active.").formatted(Formatting.AQUA), true);
+				break;
 			}
 		}
 	}
 
 	private static void onFinishFinalize() {
-		lastRoundDeaths.clear();
-		lastRoundDeaths.addAll(currentRoundDeaths);
-		currentRoundDeaths.clear();
-		shielded.clear();
+		lastRoundFirstDeath = currentRoundFirstDeath;
+		currentRoundFirstDeath = null;
+		shieldedPlayer = null;
 	}
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (!(victim instanceof ServerPlayerEntity player)) return true;
-		if (shielded.contains(player.getUuid()) && isShieldBreakingHit(reason)) {
-			shielded.remove(player.getUuid());
+		if (player.getUuid().equals(shieldedPlayer) && isShieldBreakingHit(reason)) {
+			shieldedPlayer = null;
 			player.sendMessage(Text.literal("Your shield broke."), true);
 			if (killer instanceof ServerPlayerEntity attacker) {
 				attacker.sendMessage(Text.literal(player.getName().getString() + "'s shield broke."), true);
@@ -62,8 +60,10 @@ public final class LastDeathShieldManager {
 		}
 
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
-		if (game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE) {
-			currentRoundDeaths.add(player.getUuid());
+		if (currentRoundFirstDeath == null
+				&& game != null
+				&& game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE) {
+			currentRoundFirstDeath = player.getUuid();
 		}
 		return true;
 	}
