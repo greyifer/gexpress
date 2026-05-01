@@ -1,6 +1,7 @@
 package dev.mapselect.mixin.client;
 
 import dev.mapselect.client.ClientPuppetmasterState;
+import dev.mapselect.client.ClientTimeMasterFreezeState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.Mouse;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,7 +13,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class PuppetmasterMouseMixin {
 	@Inject(method = "updateMouse", at = @At("HEAD"), cancellable = true)
 	private void gexpress$lockControlledPlayerLook(double timeDelta, CallbackInfo ci) {
-		if (ClientPuppetmasterState.isLocalTarget(MinecraftClient.getInstance())) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (ClientPuppetmasterState.isLocalTarget(client) || ClientTimeMasterFreezeState.isLocalFrozen(client)) {
 			ci.cancel();
 		}
 	}

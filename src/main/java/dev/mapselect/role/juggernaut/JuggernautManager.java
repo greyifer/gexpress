@@ -10,7 +10,10 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.AbilityCooldownPayload;
+import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -124,7 +127,7 @@ public final class JuggernautManager {
 		killCounts.putIfAbsent(player.getUuid(), 0);
 		equipped.add(player.getUuid());
 		applyWeaponCooldown(player, cooldownTicksAfterKills(killCounts.getOrDefault(player.getUuid(), 0)));
-		MapSelect.LOGGER.info("Equipped Juggernaut {}", player.getName().getString());
+		MapSelect.LOGGER.debug("Equipped Juggernaut {}", player.getName().getString());
 	}
 
 	private static void giveIfMissing(ServerPlayerEntity player, Item item) {
@@ -137,6 +140,11 @@ public final class JuggernautManager {
 		int ticks = Math.max(0, cooldownTicks);
 		player.getItemCooldownManager().set(WatheItems.KNIFE, ticks);
 		player.getItemCooldownManager().set(WatheItems.REVOLVER, ticks);
+		if (ticks > 0) {
+			AbilityCooldownSync.send(player, AbilityCooldownPayload.JUGGERNAUT_WEAPONS, ticks, ticks, false);
+		} else {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.JUGGERNAUT_WEAPONS);
+		}
 	}
 
 	private static int cooldownTicksAfterKills(int kills) {
@@ -163,7 +171,10 @@ public final class JuggernautManager {
 		if (!GameTimeComponent.KEY.get(world).hasTime()) {
 			winStatus = GameFunctions.WinStatus.TIME;
 		} else if (alive.size() == 1 && alive.getFirst() == aliveJuggernauts.getFirst()) {
-			game.setLooseEndWinner(alive.getFirst().getUuid());
+			ServerPlayerEntity winner = alive.getFirst();
+			game.setLooseEndWinner(winner.getUuid());
+			NeutralWinManager.announce(world, winner, "announcement.win.gexpress.juggernaut",
+				MapSelectRoles.JUGGERNAUT == null ? 0x8F1F1F : MapSelectRoles.JUGGERNAUT.color());
 			winStatus = GameFunctions.WinStatus.LOOSE_END;
 		}
 
@@ -235,6 +246,7 @@ public final class JuggernautManager {
 			}
 		}
 		if (player instanceof ServerPlayerEntity serverPlayer) {
+			AbilityCooldownSync.clear(serverPlayer, AbilityCooldownPayload.JUGGERNAUT_WEAPONS);
 			serverPlayer.playerScreenHandler.syncState();
 		}
 	}

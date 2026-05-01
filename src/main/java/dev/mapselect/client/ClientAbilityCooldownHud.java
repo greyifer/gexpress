@@ -33,7 +33,7 @@ public final class ClientAbilityCooldownHud {
 	private static final int BASE_HOTBAR_SIDE_GAP = 7;
 	private static final int BASE_HOTBAR_TOP_GAP = 3;
 	private static final int HOTBAR_HEIGHT = 22;
-	private static final int TIMER_WIDTH = 13;
+	private static final int TIMER_WIDTH = 50;
 	private static final int FRAME_DARK = 0xFF140801;
 	private static final int FRAME_BROWN = 0xFF5B3108;
 	private static final int FRAME_GOLD = 0xFFC48921;
@@ -46,11 +46,18 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_SHADOW_MARCH = hudIcon("ability_shadow_march");
 	private static final Identifier ICON_WARLOCK_MARK = hudIcon("ability_warlock_mark");
 	private static final Identifier ICON_HEX_KILL = hudIcon("ability_hex_kill");
+	private static final Identifier ICON_JUGGERNAUT_WEAPONS = hudIcon("ability_hex_kill");
 	private static final Identifier ICON_MASQUERADE = hudIcon("ability_masquerade");
+	private static final Identifier ICON_DANCING_CARTS = hudIcon("ability_masquerade");
 	private static final Identifier ICON_TIME_REWIND = hudIcon("ability_masquerade");
+	private static final Identifier ICON_TIME_FREEZE = hudIcon("ability_shadow_march");
 	private static final Identifier ICON_PUPPET_STRINGS = hudIcon("ability_puppet_strings");
 	private static final Identifier ICON_PELICAN_SWALLOW = hudIcon("ability_pelican_swallow");
+	private static final Identifier ICON_SCATTER = hudIcon("ability_masquerade");
+	private static final Identifier ICON_TRACKER = hudIcon("ability_warlock_mark");
+	private static final Identifier ICON_ALTRUIST = hudIcon("ability_medic_shield");
 	private static final Map<String, SyncedCooldown> SYNCED = new HashMap<>();
+	private static Object syncedWorld;
 
 	private ClientAbilityCooldownHud() {}
 
@@ -61,6 +68,7 @@ public final class ClientAbilityCooldownHud {
 	}
 
 	private static void apply(MinecraftClient client, AbilityCooldownPayload payload) {
+		checkSyncedWorld(client);
 		if (client == null || client.world == null || payload.key().isEmpty()
 				|| payload.remainingTicks() <= 0 || payload.totalTicks() <= 0) {
 			SYNCED.remove(payload.key());
@@ -76,6 +84,7 @@ public final class ClientAbilityCooldownHud {
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null || client.world == null || client.options.hudHidden) return;
+		checkSyncedWorld(client);
 
 		List<AbilityBar> bars = barsFor(client);
 		if (bars.isEmpty()) return;
@@ -135,11 +144,18 @@ public final class ClientAbilityCooldownHud {
 				0xFFD276FF, 0xFF602375));
 			bars.add(cooldown(ICON_HEX_KILL, kill, GexpressConfig.getWarlockKillCooldownSeconds() * 20L,
 				0xFFFF4A55, 0xFF7C151F));
+		} else if (MapSelectRoles.JUGGERNAUT_ID.equals(roleId)) {
+			bars.add(syncedOrReady(AbilityCooldownPayload.JUGGERNAUT_WEAPONS, ICON_JUGGERNAUT_WEAPONS,
+				GexpressConfig.getJuggernautInitialCooldownSeconds() * 20L, 0xFFFF7A42, 0xFF7A2418));
 		} else if (MapSelectRoles.TIME_MASTER_ID.equals(roleId)) {
 			TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(client.world);
-			long remaining = comp == null ? 0L : comp.cooldownRemainingTicks(playerId);
-			bars.add(cooldown(ICON_TIME_REWIND, remaining, GexpressConfig.getTimeMasterCooldownSeconds() * 20L,
-				0xFF57D4E6, 0xFF176B77));
+			long rewindRemaining = comp == null ? 0L : comp.cooldownRemainingTicks(playerId);
+			int rewinds = comp == null ? GexpressConfig.getTimeMasterMaxUses() : comp.usesRemaining(playerId);
+			bars.add(cooldown(ICON_TIME_REWIND, rewindRemaining, GexpressConfig.getTimeMasterCooldownSeconds() * 20L,
+				0xFF57D4E6, 0xFF176B77, rewinds + "x"));
+			long freezeRemaining = comp == null ? 0L : comp.freezeCooldownRemainingTicks(playerId);
+			bars.add(cooldown(ICON_TIME_FREEZE, freezeRemaining, GexpressConfig.getTimeMasterFreezeCooldownSeconds() * 20L,
+				0xFF9DEBFF, 0xFF225B72));
 		} else if (MapSelectRoles.TRICKSTER_ID.equals(roleId)) {
 			long remaining = ClientTricksterState.remainingTicks();
 			bars.add(remaining > 0L
@@ -147,12 +163,22 @@ public final class ClientAbilityCooldownHud {
 					0xFF4BE4B1, 0xFF1B775A)
 				: cooldown(ICON_MASQUERADE, 0L, GexpressConfig.getTricksterSwapDurationSeconds() * 20L,
 					0xFF4BE4B1, 0xFF1B775A));
+			bars.add(syncedOrReady(AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS, ICON_DANCING_CARTS,
+				GexpressConfig.getTricksterSwapDurationSeconds() * 20L, 0xFFFFC857, 0xFF7A4D16));
 		} else if (MapSelectRoles.PUPPETMASTER_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PUPPETMASTER_CONTROL, ICON_PUPPET_STRINGS,
 				GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L, 0xFFFF5368, 0xFF741323));
+		} else if (MapSelectRoles.SCATTER_BRAIN_ID.equals(roleId)) {
+			bars.add(syncedOrReady(AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, ICON_SCATTER,
+				GexpressConfig.getScatterBrainCooldownSeconds() * 20L, 0xFFFF8A4C, 0xFF8B2E16));
 		} else if (MapSelectRoles.VULTURE_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PELICAN_SWALLOW, ICON_PELICAN_SWALLOW,
 				GexpressConfig.getPelicanEatCooldownSeconds() * 20L, 0xFFC5DF5C, 0xFF607421));
+		} else if (MapSelectRoles.TRACKER_ID.equals(roleId)) {
+			bars.add(syncedOrReady(AbilityCooldownPayload.TRACKER_TRACK, ICON_TRACKER,
+				GexpressConfig.getTrackerCooldownSeconds() * 20L, 0xFF58B7FF, 0xFF1F4D7A));
+		} else if (MapSelectRoles.ALTRUIST_ID.equals(roleId)) {
+			bars.add(cooldown(ICON_ALTRUIST, 0L, 1L, 0xFFFFE5A3, 0xFF80642B));
 		}
 		return bars;
 	}
@@ -173,15 +199,20 @@ public final class ClientAbilityCooldownHud {
 	}
 
 	private static AbilityBar cooldown(Identifier icon, long remainingTicks, long totalTicks, int color, int darkColor) {
+		return cooldown(icon, remainingTicks, totalTicks, color, darkColor, "");
+	}
+
+	private static AbilityBar cooldown(Identifier icon, long remainingTicks, long totalTicks, int color, int darkColor,
+			String extraText) {
 		long total = Math.max(1L, totalTicks);
 		float progress = remainingTicks <= 0L ? 1.0F : 1.0F - Math.min(1.0F, remainingTicks / (float) total);
-		return new AbilityBar(icon, remainingTicks, progress, color, darkColor);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, extraText == null ? "" : extraText);
 	}
 
 	private static AbilityBar draining(Identifier icon, long remainingTicks, long totalTicks, int color, int darkColor) {
 		long total = Math.max(1L, totalTicks);
 		float progress = Math.min(1.0F, remainingTicks / (float) total);
-		return new AbilityBar(icon, remainingTicks, progress, color, darkColor);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, "");
 	}
 
 	private static void drawBar(DrawContext context, TextRenderer text, AbilityBar bar, int x, int y,
@@ -216,9 +247,15 @@ public final class ClientAbilityCooldownHud {
 			context.fill(tickX, y + 1, tickX + 1, y + barHeight - 1, 0xAA000000);
 		}
 
+		String sideText = "";
 		if (bar.remainingTicks() > 0L) {
-			String seconds = Long.toString(Math.max(1L, (bar.remainingTicks() + 19L) / 20L));
-			context.drawTextWithShadow(text, seconds, x + barWidth + 4, y - 2, 0xFFFFFFFF);
+			sideText = Math.max(1L, (bar.remainingTicks() + 19L) / 20L) + "s";
+		}
+		if (!bar.extraText().isBlank()) {
+			sideText = sideText.isEmpty() ? bar.extraText() : sideText + " " + bar.extraText();
+		}
+		if (!sideText.isEmpty()) {
+			context.drawTextWithShadow(text, sideText, x + barWidth + 4, y - 2, 0xFFFFFFFF);
 		}
 	}
 
@@ -270,7 +307,15 @@ public final class ClientAbilityCooldownHud {
 		}
 	}
 
-	private record AbilityBar(Identifier icon, long remainingTicks, float progress, int color, int darkColor) {}
+	private static void checkSyncedWorld(MinecraftClient client) {
+		Object world = client == null ? null : client.world;
+		if (syncedWorld == world) return;
+		syncedWorld = world;
+		SYNCED.clear();
+	}
+
+	private record AbilityBar(Identifier icon, long remainingTicks, float progress, int color, int darkColor,
+	                          String extraText) {}
 
 	private record SyncedCooldown(long expiresAtTick, int totalTicks, boolean draining) {}
 }

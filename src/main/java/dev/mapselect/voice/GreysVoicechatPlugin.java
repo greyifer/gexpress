@@ -9,14 +9,17 @@ import de.maxhenkel.voicechat.api.events.LocationalSoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.SoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.StaticSoundPacketEvent;
+import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
+import dev.mapselect.modifier.ModifierUtils;
+import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.role.trickster.TricksterManager;
 import dev.mapselect.role.vulture.VultureManager;
-import dev.mapselect.voice.VoiceMuteState;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+import java.util.Set;
 import java.util.UUID;
 
 public class GreysVoicechatPlugin implements VoicechatPlugin {
@@ -47,6 +50,27 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		VoiceMuteState state = VoiceMuteState.KEY.getNullable(world);
 		if (state != null && state.isMuted(senderId)) {
 			event.cancel();
+			return;
+		}
+		Object nativePlayer = sender.getPlayer().getPlayer();
+		if (nativePlayer instanceof ServerPlayerEntity player
+				&& ModifierUtils.has(player, MapSelectModifiers.MUTED_ID)) {
+			event.cancel();
+			return;
+		}
+		Set<UUID> bellyReceivers = VultureManager.bellyVoiceReceivers(senderId);
+		if (!bellyReceivers.isEmpty()) {
+			StaticSoundPacket packet = event.getPacket().staticSoundPacketBuilder()
+				.channelId(senderId)
+				.opusEncodedData(event.getPacket().getOpusEncodedData())
+				.build();
+			for (UUID receiverId : bellyReceivers) {
+				VoicechatConnection connection = event.getVoicechat().getConnectionOf(receiverId);
+				if (connection != null) event.getVoicechat().sendStaticSoundPacketTo(connection, packet);
+			}
+			if (VultureManager.isStashed(senderId)) {
+				event.cancel();
+			}
 		}
 	}
 

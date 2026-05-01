@@ -14,6 +14,7 @@ import dev.mapselect.network.VultureEatPayload;
 import dev.mapselect.network.VultureReleasePayload;
 import dev.mapselect.network.VultureStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -71,7 +72,7 @@ public final class VultureManager {
 		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRoundState());
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
 			if (world instanceof ServerWorld serverWorld) {
-				releaseAllInWorld(serverWorld);
+				releaseAllInWorldAtCurrentPositions(serverWorld);
 			}
 			clearRoundState();
 		});
@@ -168,9 +169,10 @@ public final class VultureManager {
 	private static void tick(ServerWorld world) {
 		if (world.getRegistryKey() != World.OVERWORLD) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
-		boolean activeGame = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
-		if (!activeGame && !GexpressTestState.hasRoleTesters()) {
-			releaseAllInWorld(world);
+		boolean keepBellyState = game != null
+			&& (game.isRunning() || game.getGameStatus() == GameWorldComponent.GameStatus.STOPPING);
+		if (!keepBellyState && !GexpressTestState.hasRoleTesters()) {
+			releaseAllInWorldAtCurrentPositions(world);
 			clearRoundState();
 			return;
 		}
@@ -239,6 +241,8 @@ public final class VultureManager {
 			for (ServerPlayerEntity vulture : aliveVultures) {
 				if (hasMetWinCondition(vulture)) {
 					game.setLooseEndWinner(vulture.getUuid());
+					NeutralWinManager.announce(world, vulture, "announcement.win.gexpress.pelican",
+						MapSelectRoles.VULTURE == null ? 0x6F8A24 : MapSelectRoles.VULTURE.color());
 					winStatus = GameFunctions.WinStatus.LOOSE_END;
 					break;
 				}
@@ -257,6 +261,8 @@ public final class VultureManager {
 		if (game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) return;
 		if (!hasMetWinCondition(vulture)) return;
 		game.setLooseEndWinner(vulture.getUuid());
+		NeutralWinManager.announce(vulture.getServerWorld(), vulture, "announcement.win.gexpress.pelican",
+			MapSelectRoles.VULTURE == null ? 0x6F8A24 : MapSelectRoles.VULTURE.color());
 		GameRoundEndComponent.KEY.get(vulture.getWorld()).setRoundEndData(vulture.getServerWorld().getPlayers(),
 			GameFunctions.WinStatus.LOOSE_END);
 		GameFunctions.stopGame(vulture.getServerWorld());
@@ -281,6 +287,12 @@ public final class VultureManager {
 		for (UUID vultureId : List.copyOf(stashedByVulture.keySet())) {
 			ReleasePoint point = lastKnownVulturePoint.get(vultureId);
 			releaseAllForVulture(vultureId, world.getServer(), point, false);
+		}
+	}
+
+	private static void releaseAllInWorldAtCurrentPositions(ServerWorld world) {
+		for (UUID vultureId : List.copyOf(stashedByVulture.keySet())) {
+			releaseAllForVulture(vultureId, world.getServer(), null, false);
 		}
 	}
 
@@ -338,10 +350,59 @@ public final class VultureManager {
 		return player != null && vultureByStashed.containsKey(player.getUuid());
 	}
 
+	public static boolean isStashed(UUID playerId) {
+		return playerId != null && vultureByStashed.containsKey(playerId);
+	}
+
 	public static void clearForTimeRewind(ServerWorld world) {
 		if (world == null) return;
 		releaseAllInWorld(world);
 		clearRoundState();
+	}
+
+	public static TimeState snapshotForTimeRewind() {
+		Map<UUID, Deque<UUID>> stashedCopy = new ConcurrentHashMap<>();
+		for (Map.Entry<UUID, Deque<UUID>> entry : stashedByVulture.entrySet()) {
+			stashedCopy.put(entry.getKey(), new ArrayDeque<>(entry.getValue()));
+		}
+		Map<UUID, Set<UUID>> eatenCopy = new ConcurrentHashMap<>();
+		for (Map.Entry<UUID, Set<UUID>> entry : eatenByVulture.entrySet()) {
+			eatenCopy.put(entry.getKey(), Set.copyOf(entry.getValue()));
+		}
+		return new TimeState(
+			Map.copyOf(vultureByStashed),
+			stashedCopy,
+			eatenCopy,
+			Map.copyOf(stashedStates),
+			Map.copyOf(lastKnownVulturePoint),
+			Map.copyOf(eatCooldownUntilByPelican)
+		);
+	}
+
+	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
+		clearRoundState();
+		if (world == null || state == null) return;
+		vultureByStashed.putAll(state.vultureByStashed());
+		for (Map.Entry<UUID, Deque<UUID>> entry : state.stashedByVulture().entrySet()) {
+			stashedByVulture.put(entry.getKey(), new ArrayDeque<>(entry.getValue()));
+		}
+		for (Map.Entry<UUID, Set<UUID>> entry : state.eatenByVulture().entrySet()) {
+			Set<UUID> set = ConcurrentHashMap.newKeySet();
+			set.addAll(entry.getValue());
+			eatenByVulture.put(entry.getKey(), set);
+		}
+		stashedStates.putAll(state.stashedStates());
+		lastKnownVulturePoint.putAll(state.lastKnownVulturePoint());
+		eatCooldownUntilByPelican.putAll(state.eatCooldownUntilByPelican());
+
+		for (Map.Entry<UUID, UUID> entry : vultureByStashed.entrySet()) {
+			ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(entry.getKey());
+			ServerPlayerEntity vulture = world.getServer().getPlayerManager().getPlayer(entry.getValue());
+			if (target == null || vulture == null || vulture.getWorld() != world) continue;
+			keepStashedWithVulture(target, vulture);
+			target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(vulture));
+			ServerPlayNetworking.send(target, new VultureStatePayload(true, vulture.getUuid(), vulture.getId()));
+		}
 	}
 
 	public static boolean shouldCancelVoice(UUID senderId, UUID receiverId) {
@@ -355,6 +416,22 @@ public final class VultureManager {
 			return !senderId.equals(receiverVulture);
 		}
 		return false;
+	}
+
+	public static Set<UUID> bellyVoiceReceivers(UUID senderId) {
+		if (senderId == null) return Set.of();
+		UUID vultureId = vultureByStashed.get(senderId);
+		if (vultureId != null) {
+			Set<UUID> receivers = ConcurrentHashMap.newKeySet();
+			receivers.add(vultureId);
+			Deque<UUID> belly = stashedByVulture.get(vultureId);
+			if (belly != null) receivers.addAll(belly);
+			receivers.remove(senderId);
+			return receivers;
+		}
+		Deque<UUID> belly = stashedByVulture.get(senderId);
+		if (belly == null || belly.isEmpty()) return Set.of();
+		return Set.copyOf(belly);
 	}
 
 	public static boolean isVulture(PlayerEntity player) {
@@ -405,9 +482,13 @@ public final class VultureManager {
 		return Math.max(1L, (ticks + 19L) / 20L);
 	}
 
-	private record StashedState(GameMode previousGameMode) {}
+	public record StashedState(GameMode previousGameMode) {}
 
-	private record ReleasePoint(RegistryKey<World> worldKey, double x, double y, double z, float yaw, float pitch) {
+	public record TimeState(Map<UUID, UUID> vultureByStashed, Map<UUID, Deque<UUID>> stashedByVulture,
+			Map<UUID, Set<UUID>> eatenByVulture, Map<UUID, StashedState> stashedStates,
+			Map<UUID, ReleasePoint> lastKnownVulturePoint, Map<UUID, Long> eatCooldownUntilByPelican) {}
+
+	public record ReleasePoint(RegistryKey<World> worldKey, double x, double y, double z, float yaw, float pitch) {
 		private static ReleasePoint from(ServerPlayerEntity player) {
 			return new ReleasePoint(player.getWorld().getRegistryKey(), player.getX(), player.getY(), player.getZ(),
 				player.getYaw(), player.getPitch());

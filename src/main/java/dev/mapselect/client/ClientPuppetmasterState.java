@@ -47,13 +47,19 @@ public final class ClientPuppetmasterState {
 	private static float puppetPitch;
 	private static boolean hasPuppetLook;
 	private static boolean wasAbilityDown;
+	private static int targetRefreshTicks;
 
 	private ClientPuppetmasterState() {}
 
 	public static void register() {
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterTargetsPayload.ID, (payload, context) ->
-			context.client().execute(() ->
-				context.client().setScreen(new PuppetmasterTargetScreen(payload.targets()))));
+			context.client().execute(() -> {
+				if (context.client().currentScreen instanceof PuppetmasterTargetScreen screen) {
+					screen.updateTargets(payload.targets());
+				} else {
+					context.client().setScreen(new PuppetmasterTargetScreen(payload.targets()));
+				}
+			}));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterStatePayload.ID, (payload, context) ->
 			context.client().execute(() -> applyState(context.client(), payload)));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterHotbarPayload.ID, (payload, context) ->
@@ -114,6 +120,14 @@ public final class ClientPuppetmasterState {
 			ClientPlayNetworking.send(new PuppetmasterUsePayload());
 		}
 		wasAbilityDown = abilityDown;
+		if (client.currentScreen instanceof PuppetmasterTargetScreen && ClientPlayNetworking.canSend(PuppetmasterUsePayload.ID)) {
+			if (targetRefreshTicks-- <= 0) {
+				targetRefreshTicks = 10;
+				ClientPlayNetworking.send(new PuppetmasterUsePayload());
+			}
+		} else {
+			targetRefreshTicks = 0;
+		}
 
 		if (activeController) {
 			if (client.getCameraEntity() != client.player) client.setCameraEntity(client.player);

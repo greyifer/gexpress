@@ -21,13 +21,14 @@ public final class KillerRoleInfoManager {
 	private KillerRoleInfoManager() {}
 
 	public static void register() {
-		ServerTickEvents.END_WORLD_TICK.register(KillerRoleInfoManager::tick);
+		// The Snitch reveal now uses the top-right identity HUD, so this old actionbar lookup stays disabled.
 	}
 
 	private static void tick(ServerWorld world) {
 		if (world.getRegistryKey() != World.OVERWORLD) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		if (game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) return;
+		if (!SnitchManager.hasRevealedSnitches()) return;
 
 		for (ServerPlayerEntity viewer : world.getPlayers()) {
 			if (!isPlayable(viewer) || !canInspect(game, viewer)) continue;
@@ -48,6 +49,7 @@ public final class KillerRoleInfoManager {
 		double bestAlong = Double.MAX_VALUE;
 		for (ServerPlayerEntity candidate : viewer.getServerWorld().getPlayers()) {
 			if (candidate == viewer || !isPlayable(candidate) || !isKillerTeam(game, candidate)) continue;
+			if (!viewer.canSee(candidate)) continue;
 			Vec3d to = candidate.getEyePos().subtract(eye);
 			double along = to.dotProduct(look);
 			if (along < 0.0D || along > RANGE || along >= bestAlong) continue;
@@ -60,7 +62,7 @@ public final class KillerRoleInfoManager {
 	}
 
 	private static boolean canInspect(GameWorldComponent game, ServerPlayerEntity viewer) {
-		return isKillerTeam(game, viewer) || SnitchManager.isRevealed(viewer.getUuid());
+		return SnitchManager.isRevealed(viewer.getUuid());
 	}
 
 	private static boolean isKillerTeam(GameWorldComponent game, ServerPlayerEntity player) {

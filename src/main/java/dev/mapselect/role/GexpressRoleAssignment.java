@@ -6,13 +6,16 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.cca.TrainWorldComponent;
 import dev.doctor4t.wathe.client.gui.RoleAnnouncementTexts;
+import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.doctor4t.wathe.util.AnnounceWelcomePayload;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
 import dev.mapselect.registry.MapSelectItems;
+import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.snitch.SnitchManager;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -67,8 +70,9 @@ public final class GexpressRoleAssignment {
 			assignForcedRoles(game, available, assignedCounts);
 			assignConfiguredRoles(game, available, assignedCounts);
 			grantVanillaRoleLoadouts(game, players);
-			resetStartingBalances(players);
+			resetStartingBalances(game, players);
 			game.sync();
+			SnitchManager.syncAll(world, game);
 
 			sendRoleAnnouncements(game, players);
 			assignForcedModifiers(game, modifiers, players);
@@ -114,32 +118,82 @@ public final class GexpressRoleAssignment {
 
 	private static void assignConfiguredRoles(GameWorldComponent game, List<ServerPlayerEntity> available,
 			Map<Role, Integer> assignedCounts) {
-		List<Role> tickets = new ArrayList<>();
-		int killerTickets = Math.max(0, GexpressConfig.getMaxKillerAmount() - countAssignedKillers(assignedCounts));
-		for (Role role : shuffledRoles()) {
-			if (!isAssignableRole(role)) continue;
-			if (isRoleDisabled(role)) continue;
-			if (!passes(RoleModifierTuningConfig.getRoleChance(role.identifier().toString()))) continue;
+		int killerSlots = Math.max(0, Math.min(GexpressConfig.getMaxKillerAmount(), available.size())
+			- countAssignedKillers(assignedCounts));
+		int assignedKillers = assignRolePool(game, available, assignedCounts, rolePool(RolePool.KILLER), killerSlots);
+		assignFallbackKillers(game, available, assignedCounts, killerSlots - assignedKillers);
+		int vigilanteSlots = Math.max(0, Math.min(GexpressConfig.getMaxVigilanteAmount(), available.size())
+			- assignedCounts.getOrDefault(WatheRoles.VIGILANTE, 0));
+		assignRolePool(game, available, assignedCounts, vigilantePool(), vigilanteSlots);
+		assignRolePool(game, available, assignedCounts, rolePool(RolePool.NEUTRAL), available.size());
+		assignRolePool(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
+	}
 
-			int configured = RoleModifierTuningConfig.getRoleMax(role.identifier().toString());
-			int alreadyAssigned = assignedCounts.getOrDefault(role, 0);
-			int remaining = Math.max(0, configured - alreadyAssigned);
-			if (role.canUseKiller()) {
-				remaining = Math.min(remaining, killerTickets);
-				killerTickets -= remaining;
-			}
-			for (int i = 0; i < remaining; i++) {
-				tickets.add(role);
-			}
-		}
+	private static int assignRolePool(GameWorldComponent game, List<ServerPlayerEntity> available,
+			Map<Role, Integer> assignedCounts, List<Role> pool, int maxAssignments) {
+		if (available.isEmpty() || maxAssignments <= 0 || pool.isEmpty()) return 0;
+		List<Role> tickets = roleTickets(pool, assignedCounts);
 		Collections.shuffle(tickets, RANDOM);
-
-		for (Role role : tickets) {
-			if (available.isEmpty()) return;
+		int assignments = Math.min(maxAssignments, tickets.size());
+		for (int i = 0; i < assignments && !available.isEmpty(); i++) {
+			Role role = tickets.get(i);
 			ServerPlayerEntity player = available.remove(RANDOM.nextInt(available.size()));
 			assignRole(game, player, role);
 			assignedCounts.merge(role, 1, Integer::sum);
 		}
+		return assignments;
+	}
+
+	private static void assignFallbackKillers(GameWorldComponent game, List<ServerPlayerEntity> available,
+			Map<Role, Integer> assignedCounts, int count) {
+		if (available.isEmpty() || count <= 0) return;
+		Role fallback = fallbackKillerRole();
+		if (fallback == null) return;
+		for (int i = 0; i < count && !available.isEmpty(); i++) {
+			ServerPlayerEntity player = available.remove(RANDOM.nextInt(available.size()));
+			assignRole(game, player, fallback);
+			assignedCounts.merge(fallback, 1, Integer::sum);
+		}
+	}
+
+	private static Role fallbackKillerRole() {
+		if (WatheRoles.KILLER != null && isAssignableRole(WatheRoles.KILLER) && !isRoleDisabled(WatheRoles.KILLER)) {
+			return WatheRoles.KILLER;
+		}
+		List<Role> pool = rolePool(RolePool.KILLER);
+		if (pool.isEmpty()) return null;
+		return pool.get(RANDOM.nextInt(pool.size()));
+	}
+
+	private static List<Role> roleTickets(List<Role> pool, Map<Role, Integer> assignedCounts) {
+		List<Role> tickets = new ArrayList<>();
+		for (Role role : pool) {
+			if (role == null || role.identifier() == null) continue;
+			if (!passes(RoleModifierTuningConfig.getRoleChance(role.identifier().toString()))) continue;
+			int configured = RoleModifierTuningConfig.getRoleMax(role.identifier().toString());
+			int alreadyAssigned = assignedCounts.getOrDefault(role, 0);
+			int remaining = Math.max(0, configured - alreadyAssigned);
+			for (int i = 0; i < remaining; i++) tickets.add(role);
+		}
+		return tickets;
+	}
+
+	private static List<Role> rolePool(RolePool pool) {
+		List<Role> out = new ArrayList<>();
+		for (Role role : shuffledRoles()) {
+			if (!isAssignableRole(role) || isRoleDisabled(role)) continue;
+			if (role == WatheRoles.VIGILANTE && pool != RolePool.VIGILANTE) continue;
+			if (pool.matches(role)) out.add(role);
+		}
+		return out;
+	}
+
+	private static List<Role> vigilantePool() {
+		if (WatheRoles.VIGILANTE == null || !isAssignableRole(WatheRoles.VIGILANTE)
+				|| isRoleDisabled(WatheRoles.VIGILANTE)) {
+			return List.of();
+		}
+		return List.of(WatheRoles.VIGILANTE);
 	}
 
 	private static int countAssignedKillers(Map<Role, Integer> assignedCounts) {
@@ -306,6 +360,10 @@ public final class GexpressRoleAssignment {
 
 	private static boolean canApplyModifier(GameWorldComponent game, ServerPlayerEntity player, Modifier modifier) {
 		Role role = game.getRole(player);
+		if (isCivilianOnlyGexpressModifier(modifier) && (role == null || !role.isInnocent()
+				|| game.canUseKillerFeatures(player))) {
+			return false;
+		}
 		if (modifier.canOnlyBeAppliedTo != null
 				&& !modifier.canOnlyBeAppliedTo.isEmpty()
 				&& !modifier.canOnlyBeAppliedTo.contains(role)) {
@@ -318,6 +376,14 @@ public final class GexpressRoleAssignment {
 			return false;
 		}
 		return !modifier.civilianOnly || !game.canUseKillerFeatures(player);
+	}
+
+	private static boolean isCivilianOnlyGexpressModifier(Modifier modifier) {
+		if (modifier == null || modifier.identifier() == null) return false;
+		Identifier id = modifier.identifier();
+		return MapSelectModifiers.HUNGRY_ID.equals(id)
+			|| MapSelectModifiers.THIRSTY_ID.equals(id)
+			|| MapSelectModifiers.PARANOID_ID.equals(id);
 	}
 
 	private static boolean hasModifier(WorldModifierComponent modifiers, ServerPlayerEntity player, Modifier modifier) {
@@ -348,9 +414,10 @@ public final class GexpressRoleAssignment {
 		}
 	}
 
-	private static void resetStartingBalances(List<ServerPlayerEntity> players) {
+	private static void resetStartingBalances(GameWorldComponent game, List<ServerPlayerEntity> players) {
 		for (ServerPlayerEntity player : players) {
-			PlayerShopComponent.KEY.get(player).setBalance(0);
+			int balance = game != null && game.canUseKillerFeatures(player) ? GameConstants.MONEY_START : 0;
+			PlayerShopComponent.KEY.get(player).setBalance(balance);
 		}
 	}
 
@@ -380,5 +447,34 @@ public final class GexpressRoleAssignment {
 		int clamped = Math.max(RoleModifierTuningConfig.CHANCE_MIN,
 			Math.min(RoleModifierTuningConfig.CHANCE_MAX, chance));
 		return clamped >= RoleModifierTuningConfig.CHANCE_MAX || RANDOM.nextInt(100) < clamped;
+	}
+
+	private enum RolePool {
+		KILLER {
+			@Override
+			boolean matches(Role role) {
+				return role.canUseKiller();
+			}
+		},
+		NEUTRAL {
+			@Override
+			boolean matches(Role role) {
+				return !role.canUseKiller() && !role.isInnocent();
+			}
+		},
+		CIVILIAN {
+			@Override
+			boolean matches(Role role) {
+				return !role.canUseKiller() && role.isInnocent();
+			}
+		},
+		VIGILANTE {
+			@Override
+			boolean matches(Role role) {
+				return role == WatheRoles.VIGILANTE;
+			}
+		};
+
+		abstract boolean matches(Role role);
 	}
 }

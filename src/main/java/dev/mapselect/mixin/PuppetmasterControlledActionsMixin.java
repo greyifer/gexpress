@@ -1,7 +1,9 @@
 package dev.mapselect.mixin;
 
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
+import dev.mapselect.role.timemaster.TimeMasterManager;
 import dev.mapselect.role.vulture.VultureManager;
+import net.minecraft.network.packet.c2s.common.CustomPayloadC2SPacket;
 import net.minecraft.network.packet.c2s.play.BookUpdateC2SPacket;
 import net.minecraft.network.packet.c2s.play.ButtonClickC2SPacket;
 import net.minecraft.network.packet.c2s.play.ChatCommandSignedC2SPacket;
@@ -123,7 +125,13 @@ public abstract class PuppetmasterControlledActionsMixin {
 		if (isLocked(player)) ci.cancel();
 	}
 
+	@Inject(method = "onCustomPayload", at = @At("HEAD"), cancellable = true)
+	private void gexpress$blockCustomPayload(CustomPayloadC2SPacket packet, CallbackInfo ci) {
+		if (TimeMasterManager.isFrozen(player)) ci.cancel();
+	}
+
 	private static boolean isLocked(ServerPlayerEntity player) {
-		return PuppetmasterManager.isControlled(player) || VultureManager.isStashed(player);
+		return PuppetmasterManager.isControlled(player) || VultureManager.isStashed(player)
+			|| TimeMasterManager.isFrozen(player);
 	}
 }

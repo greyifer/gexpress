@@ -1,13 +1,82 @@
+# Grey's Express 1.2.0
+
+## Added
+
+- New killer role: Scatter Brain, with a configurable cooldown ability that scatters every living player, including themself, to safe random map positions.
+- New civilian role: Tracker, with configurable range, cooldown, and maximum tracked targets. Tracked players glow for the Tracker.
+- New civilian role: Altruist, who can sacrifice themself to revive a nearby dead body.
+- New modifiers: Hungry, Thirsty, Muted, and Paranoid.
+- Hungry and Thirsty add configurable food/drink carry limits from Wathe platters and trays.
+- Muted blocks the player's microphone while still letting them hear others.
+- Paranoid makes players always appear to be holding suspicious items.
+- Host setting for giving the previous round's dead player a one-hit shield at the start of the next round.
+- Puppetmaster now has a configurable target range.
+
+## Changed
+
+- G'Express role assignment now gives killer-side roles their Wathe starting income.
+- G'Express assignment now supports a configurable max Vigilante count.
+- Civilian-only G'Express modifiers now avoid killer and neutral power roles unless the modifier is Muted.
+- Puppetmaster's target menu now shows live head cards with usernames, and updates as players enter or leave range.
+- Puppetmaster control now applies the target-view state before teleporting, reducing the split-second skin flash.
+- Harlequin skin swaps now also swap pronoun lookups while Masquerade is active.
+- Harlequin Dancing Carts avoids self-swaps and avoids immediately repeating the same cart pair when another swap is available.
+- Pelican belly voice now routes swallowed players and the Pelican into the belly channel.
+- Time Master rewind now snapshots and restores Pelican belly state so swallowed players do not desync or softlock.
+- Ability cooldown bars now keep rendering through round start/end fade overlays.
+
+## Fixed
+
+- Knife and bat deaths are blocked when both attacker and victim are killer-side players.
+- Pelican swallowed players are no longer forcibly released during the round-end transition before the ready-area reset.
+- Last-round shield blocks one knife or gun death, then breaks cleanly.
+
 # Grey's Express 1.1.1
+
+## Added
+
+- Time Master now has Freeze, a secondary ability that locks the looked-at player in place for a configurable duration and range.
+- Time Master Freeze keeps the target visually stuck in their current pose while blocking movement and actions.
+- Time Master Freeze now has a configurable cooldown and its own cooldown bar.
+- Snitch now has a configurable killer-warning threshold for how many tasks away from revealing they become visible to killers.
+- Hosts can now configure a maximum Vigilante amount separately from the maximum killer amount.
 
 ## Changed
 
 - Time Master rewind playback now uses smaller visual steps and interpolated movement so movement history appears smoother and denser.
 - Time Master now shows held items, selected weapons, knife-ready poses, knife stabs, and revolver shots during rewind playback.
+- Time Master rewind HUD now shows the number of rewinds remaining.
+- Snitch mood-task text now shows only compact reveal progress like `1/3`.
+- Snitch reveal progress now stays visible beside the mood icon even while Wathe is not showing an active task.
+- Snitch reveal and killer warning info now render as stacked player-head HUD lines, similar to the Lovers partner readout.
+- Revealed killers now glow for the Snitch, and warned Snitches glow for killers.
+- Snitch reveal glows now use role colors for killers and Snitch yellow for Snitch warnings.
+- Killer Snitch warnings now include the Snitch's name once the Snitch is within the configured task threshold.
+- Juggernaut and Pelican now have Athletic/infinite stamina like other solo power roles.
+- Dev role-description overrides now refresh live in the dev preview, G'Express game tab, and Wathe Extended guidebook.
+- Harlequin Dancing Carts now has its own cooldown bar on the ability HUD.
+- Juggernaut weapon cooldown now also appears on the ability HUD.
 - Time Master visual playback now uses lightweight frame snapshots between full restore snapshots to reduce rewind tracking cost.
+- The dev role-description editor now shows each role's current effective description and previews it in the hover details panel.
+- Modifier amount controls are hidden unless a modifier has a real configurable max.
+- Ability cooldown bars now stay visible while the round start/end fade is playing.
+- Killers no longer get exact allied killer-role readouts at round start.
+- Time Master cooldown state now avoids resyncing every tick once a player has already been initialized.
+- Time Master rewind history now only records while a playable Time Master exists.
+- Time Master weapon replay events now only record in rounds where a playable Time Master can use them.
+- Snitch glow and killer-role lookup polling now do less work when nobody can use those effects.
+- Ability HUD synced cooldown state now clears when the client changes worlds.
+- Routine C4, Pliers, and Juggernaut loadout messages now log at debug level to reduce server log noise.
 - Trickster has been renamed to Harlequin.
 - Harlequin now has Dancing Carts, a secondary ability that shuffles the train's middle carts while leaving the front and back carts fixed.
 - Dancing Carts carries players, dropped items, and other entities along with the cart they were inside.
+
+## Fixed
+
+- Rewound revolver shots and knife actions now restore the weapon in hand before replaying the sound and animation.
+- Snitch reveal messages no longer show raw translation keys like `announcement.role.wathe.killer`.
+- Snitch progress packets now resend reliably so the `(0/3)` style HUD progress is restored if the client enters the round after the first sync.
+- G'Express role assignment now fills killer slots first, then neutral roles, then civilian roles, with leftover players remaining normal civilians.
 
 # Grey's Express 1.1.0
 

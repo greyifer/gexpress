@@ -32,10 +32,18 @@ public final class MapSelectModifiers {
 	public static final Identifier EOD_SPECIALIST_ID  = Identifier.of(MapSelect.MOD_ID, "eod_specialist");
 	public static final Identifier SHORT_SIGHTED_ID   = Identifier.of(MapSelect.MOD_ID, "short_sighted");
 	public static final Identifier NIGHT_VISION_ID    = Identifier.of(MapSelect.MOD_ID, "night_vision");
+	public static final Identifier HUNGRY_ID          = Identifier.of(MapSelect.MOD_ID, "hungry");
+	public static final Identifier THIRSTY_ID         = Identifier.of(MapSelect.MOD_ID, "thirsty");
+	public static final Identifier MUTED_ID           = Identifier.of(MapSelect.MOD_ID, "muted");
+	public static final Identifier PARANOID_ID        = Identifier.of(MapSelect.MOD_ID, "paranoid");
 
 	public static Modifier EOD_SPECIALIST;
 	public static Modifier SHORT_SIGHTED;
 	public static Modifier NIGHT_VISION;
+	public static Modifier HUNGRY;
+	public static Modifier THIRSTY;
+	public static Modifier MUTED;
+	public static Modifier PARANOID;
 
 	public static void register() {
 		// Cool steely blue - reads as "tools / defusal" vs the Bomb Specialist's hot TNT-orange.
@@ -66,6 +74,42 @@ public final class MapSelectModifiers {
 			new ArrayList<>(),
 			false,   // killerOnly
 			false    // civilianOnly - any role can see better in the dark
+		));
+
+		HUNGRY = HMLModifiers.registerModifier(new Modifier(
+			HUNGRY_ID,
+			0xD18A2F,
+			new ArrayList<>(),
+			new ArrayList<>(),
+			false,
+			false
+		));
+
+		THIRSTY = HMLModifiers.registerModifier(new Modifier(
+			THIRSTY_ID,
+			0x4AA8E8,
+			new ArrayList<>(),
+			new ArrayList<>(),
+			false,
+			false
+		));
+
+		MUTED = HMLModifiers.registerModifier(new Modifier(
+			MUTED_ID,
+			0x8E8E8E,
+			new ArrayList<>(),
+			new ArrayList<>(),
+			false,
+			false
+		));
+
+		PARANOID = HMLModifiers.registerModifier(new Modifier(
+			PARANOID_ID,
+			0xA44CE2,
+			new ArrayList<>(),
+			new ArrayList<>(),
+			false,
+			false
 		));
 	}
 

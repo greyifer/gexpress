@@ -93,7 +93,7 @@ public final class EodDistribution {
 				player.dropItem(stack, false);
 			}
 			granted.add(id);
-			MapSelect.LOGGER.info("Handed Pliers to EOD Specialist {}", player.getName().getString());
+			MapSelect.LOGGER.debug("Handed Pliers to EOD Specialist {}", player.getName().getString());
 		}
 	}
 }

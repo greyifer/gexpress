@@ -1,5 +1,6 @@
 package dev.mapselect.client.screen;
 
+import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
 import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.ListOption;
 import dev.isxander.yacl3.api.Option;
@@ -10,7 +11,9 @@ import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.mapselect.config.GexpressConfig;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -85,14 +88,47 @@ public final class GexpressDevCategory {
 	private static Option<String> roleDescriptionOption(String rolePath) {
 		return Option.<String>createBuilder()
 			.name(Text.translatable("announcement.role.gexpress." + rolePath))
-			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.role_description.tooltip")))
-			.binding("", () -> GexpressConfig.getRoleDescriptionOverride(rolePath),
-				value -> {
-					GexpressConfig.setRoleDescriptionOverride(rolePath, value);
-					GexpressOptionsScreen.pushGexpressConfigToServer();
-				})
+			.description(DynamicOptionDescription.of(() -> roleDescriptionHoverLines(rolePath)))
+			.binding(currentRoleDescription(rolePath), () -> currentRoleDescription(rolePath),
+				value -> saveRoleDescriptionOverride(rolePath, value))
 			.controller(StringControllerBuilder::create)
+			.instant(true)
 			.build();
+	}
+
+	private static List<Text> roleDescriptionHoverLines(String rolePath) {
+		List<Text> lines = new ArrayList<>();
+		lines.add(Text.translatable("announcement.role.gexpress." + rolePath).formatted(Formatting.GOLD, Formatting.BOLD));
+		for (String line : currentRoleDescription(rolePath).split("\\\\n|\\n")) {
+			if (!line.isEmpty()) {
+				lines.add(Text.literal(line).formatted(Formatting.WHITE));
+			}
+		}
+		lines.add(Text.literal(""));
+		lines.add(Text.translatable("gui.gexpress.config.option.dev.role_description.tooltip")
+			.formatted(Formatting.GRAY));
+		return lines;
+	}
+
+	private static String currentRoleDescription(String rolePath) {
+		String override = GexpressConfig.getRoleDescriptionOverride(rolePath);
+		if (override != null && !override.isBlank()) return override;
+		return builtInRoleDescription(rolePath);
+	}
+
+	private static String builtInRoleDescription(String rolePath) {
+		String key = "gui.watheextended.guidebook.role.desc.gexpress." + rolePath;
+		String resolved = Text.translatable(key).getString();
+		return resolved == null || resolved.equals(key) ? "" : resolved;
+	}
+
+	private static void saveRoleDescriptionOverride(String rolePath, String value) {
+		String cleaned = value == null ? "" : value.strip();
+		String builtIn = builtInRoleDescription(rolePath).strip();
+		GexpressConfig.setRoleDescriptionOverride(rolePath,
+			cleaned.isEmpty() || cleaned.equals(builtIn) ? "" : cleaned);
+		GuidebookScreen.invalidateIfOpen();
+		GexpressOptionsScreen.pushGexpressConfigToServer();
 	}
 
 	private static OptionGroup shortSightedGroup() {

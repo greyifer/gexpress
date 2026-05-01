@@ -12,6 +12,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class TimeMasterGunShootMixin {
 	@Inject(
 		method = "receive(Ldev/doctor4t/wathe/util/GunShootPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
+		at = @At("HEAD"),
+		cancellable = true
+	)
+	private void gexpress$blockFrozenGunShot(GunShootPayload payload,
+			ServerPlayNetworking.Context context, CallbackInfo ci) {
+		if (TimeMasterManager.isFrozen(context.player())) ci.cancel();
+	}
+
+	@Inject(
+		method = "receive(Ldev/doctor4t/wathe/util/GunShootPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
 		at = @At(
 			value = "INVOKE",
 			target = "Lnet/minecraft/world/World;playSound(Lnet/minecraft/entity/player/PlayerEntity;DDDLnet/minecraft/sound/SoundEvent;Lnet/minecraft/sound/SoundCategory;FF)V",

@@ -16,6 +16,8 @@ import dev.doctor4t.wathe.index.WatheSounds;
 import dev.doctor4t.wathe.util.ShootMuzzleS2CPayload;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.TimeMasterFreezeStatePayload;
+import dev.mapselect.network.TimeMasterFreezeUsePayload;
 import dev.mapselect.network.TimeMasterRewindPayload;
 import dev.mapselect.network.TimeMasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -32,6 +34,7 @@ import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.voice.VoiceMuteState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
@@ -80,10 +83,12 @@ public final class TimeMasterManager {
 	private static final int VISUAL_SNAPSHOT_INTERVAL_TICKS = 2;
 	private static final int HISTORY_PADDING_TICKS = 40;
 	private static final int REWIND_ANIMATION_TICKS = 48;
+	private static final double FREEZE_LOOK_RADIUS_SQUARED = 1.0D;
 	private static final Map<RegistryKey<World>, Deque<WorldSnapshot>> HISTORY = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, Deque<VisualSnapshot>> VISUAL_HISTORY = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, Deque<WeaponEvent>> WEAPON_EVENTS = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, ActiveRewind> ACTIVE_REWINDS = new ConcurrentHashMap<>();
+	private static final Map<UUID, ActiveFreeze> ACTIVE_FREEZES = new ConcurrentHashMap<>();
 
 	private static Field cooldownEntriesField;
 	private static Field cooldownTickField;
@@ -94,39 +99,54 @@ public final class TimeMasterManager {
 
 	public static void register() {
 		PayloadTypeRegistry.playC2S().register(TimeMasterUsePayload.ID, TimeMasterUsePayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(TimeMasterFreezeUsePayload.ID, TimeMasterFreezeUsePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(TimeMasterRewindPayload.ID, TimeMasterRewindPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(TimeMasterFreezeStatePayload.ID, TimeMasterFreezeStatePayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(TimeMasterUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryRewind(context.player())));
+		ServerPlayNetworking.registerGlobalReceiver(TimeMasterFreezeUsePayload.ID,
+			(payload, context) -> context.server().execute(() -> tryFreeze(context.player())));
 		ServerTickEvents.END_WORLD_TICK.register(TimeMasterManager::tick);
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+			server.execute(() -> syncActiveFreezes(handler.player)));
 	}
 
 	private static void tick(ServerWorld world) {
 		if (world.getRegistryKey() != World.OVERWORLD) return;
-		ActiveRewind active = ACTIVE_REWINDS.get(world.getRegistryKey());
-		if (active != null) {
-			if (active.tick(world)) ACTIVE_REWINDS.remove(world.getRegistryKey());
-			return;
-		}
-
 		RegistryKey<World> worldKey = world.getRegistryKey();
-		Deque<WorldSnapshot> history = HISTORY.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
-		Deque<VisualSnapshot> visualHistory = VISUAL_HISTORY.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
-		Deque<WeaponEvent> weaponEvents = WEAPON_EVENTS.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
 		if (!canTrack(world)) {
-			history.clear();
-			visualHistory.clear();
-			weaponEvents.clear();
+			clearTimeline(worldKey);
+			ACTIVE_REWINDS.remove(worldKey);
+			clearFreezes(world, true);
 			TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(world);
 			if (comp != null) comp.clearAll();
 			return;
 		}
 
+		tickFreezes(world);
+		ActiveRewind active = ACTIVE_REWINDS.get(worldKey);
+		if (active != null) {
+			if (active.tick(world)) ACTIVE_REWINDS.remove(worldKey);
+			return;
+		}
+
 		TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(world);
+		boolean hasTimelineUser = false;
 		if (comp != null) {
 			for (ServerPlayerEntity player : world.getPlayers()) {
-				if (isTimeMaster(player)) comp.ensurePlayer(player.getUuid());
+				if (!isTimeMaster(player)) continue;
+				comp.ensurePlayer(player.getUuid());
+				if (isPlayable(player, player)) hasTimelineUser = true;
 			}
 		}
+		if (!hasTimelineUser) {
+			clearTimeline(worldKey);
+			return;
+		}
+
+		Deque<WorldSnapshot> history = HISTORY.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
+		Deque<VisualSnapshot> visualHistory = VISUAL_HISTORY.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
+		Deque<WeaponEvent> weaponEvents = WEAPON_EVENTS.computeIfAbsent(worldKey, key -> new ArrayDeque<>());
 
 		long now = world.getTime();
 		WorldSnapshot newest = history.peekLast();
@@ -151,9 +171,15 @@ public final class TimeMasterManager {
 		}
 	}
 
+	private static void clearTimeline(RegistryKey<World> worldKey) {
+		HISTORY.remove(worldKey);
+		VISUAL_HISTORY.remove(worldKey);
+		WEAPON_EVENTS.remove(worldKey);
+	}
+
 	private static void tryRewind(ServerPlayerEntity timeMaster) {
 		if (timeMaster == null || !(timeMaster.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(timeMaster)) return;
+		if (VultureManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
 		if (!canTrack(world) || !isTimeMaster(timeMaster) || !isPlayable(timeMaster, timeMaster)) return;
 
 		TimeMasterComponent comp = TimeMasterComponent.KEY.get(world);
@@ -169,13 +195,15 @@ public final class TimeMasterManager {
 		}
 
 		Deque<WorldSnapshot> history = HISTORY.get(world.getRegistryKey());
-		WorldSnapshot snapshot = findSnapshot(history, world.getTime() - (long) GexpressConfig.getTimeMasterRewindSeconds() * 20L);
+		int configuredSeconds = GexpressConfig.getTimeMasterRewindSeconds();
+		WorldSnapshot snapshot = findSnapshot(history, world.getTime() - (long) configuredSeconds * 20L);
 		if (snapshot == null) {
 			timeMaster.sendMessage(Text.literal("The timeline is not stable enough yet."), true);
 			return;
 		}
 
-		int rewindSeconds = (int) Math.max(1L, (world.getTime() - snapshot.tick() + 19L) / 20L);
+		int rewindSeconds = Math.min(configuredSeconds,
+			(int) Math.max(1L, (world.getTime() - snapshot.tick() + 19L) / 20L));
 		if (!comp.consume(timeMaster.getUuid())) return;
 
 		world.playSound(null, timeMaster.getBlockPos(), SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
@@ -187,33 +215,145 @@ public final class TimeMasterManager {
 
 		List<VisualSnapshot> frames = rewindVisualFrames(VISUAL_HISTORY.get(world.getRegistryKey()), snapshot.tick());
 		List<WeaponEvent> events = rewindWeaponEvents(WEAPON_EVENTS.get(world.getRegistryKey()), snapshot.tick(), world.getTime());
+		clearFreezes(world, true);
 		ACTIVE_REWINDS.put(world.getRegistryKey(), new ActiveRewind(timeMaster.getUuid(), frames, events, snapshot, world.getTime()));
+	}
+
+	private static void tryFreeze(ServerPlayerEntity timeMaster) {
+		if (timeMaster == null || !(timeMaster.getWorld() instanceof ServerWorld world)) return;
+		if (VultureManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
+		if (!canTrack(world) || !isTimeMaster(timeMaster) || !isPlayable(timeMaster, timeMaster)) return;
+
+		TimeMasterComponent comp = TimeMasterComponent.KEY.get(world);
+		comp.ensurePlayer(timeMaster.getUuid());
+		long cooldown = comp.freezeCooldownRemainingTicks(timeMaster.getUuid());
+		if (cooldown > 0L) {
+			timeMaster.sendMessage(Text.literal("Freeze ready in " + secondsCeil(cooldown) + "s."), true);
+			return;
+		}
+
+		ServerPlayerEntity target = findFreezeTarget(timeMaster);
+		if (target == null) {
+			timeMaster.sendMessage(Text.literal("No living player close enough to freeze."), true);
+			return;
+		}
+		if (target == timeMaster) return;
+		if (VultureManager.isStashed(target) || !isPlayable(target, timeMaster)) return;
+		if (isFrozen(target)) {
+			timeMaster.sendMessage(Text.literal(target.getName().getString() + " is already frozen."), true);
+			return;
+		}
+
+		int durationTicks = GexpressConfig.getTimeMasterFreezeDurationSeconds() * 20;
+		ActiveFreeze freeze = ActiveFreeze.capture(world, timeMaster.getUuid(), target, durationTicks);
+		ACTIVE_FREEZES.put(target.getUuid(), freeze);
+		freeze.apply(target);
+		comp.setFreezeCooldown(timeMaster.getUuid());
+		syncFreeze(world, target.getUuid(), timeMaster.getUuid(), true, durationTicks);
+		world.playSound(null, target.getBlockPos(), SoundEvents.BLOCK_GLASS_BREAK,
+			SoundCategory.PLAYERS, 0.75F, 0.55F);
+		timeMaster.sendMessage(Text.literal("Froze " + target.getName().getString() + "."), true);
+		target.sendMessage(Text.literal("You are frozen in time."), true);
+	}
+
+	private static ServerPlayerEntity findFreezeTarget(ServerPlayerEntity timeMaster) {
+		double range = GexpressConfig.getTimeMasterFreezeRange();
+		Vec3d eye = timeMaster.getEyePos();
+		Vec3d look = timeMaster.getRotationVec(1.0F).normalize();
+		ServerPlayerEntity best = null;
+		double bestAlong = Double.MAX_VALUE;
+		for (ServerPlayerEntity candidate : timeMaster.getServerWorld().getPlayers()) {
+			if (candidate == timeMaster || VultureManager.isStashed(candidate)
+					|| !isPlayable(candidate, timeMaster)) continue;
+			Vec3d to = candidate.getEyePos().subtract(eye);
+			double along = to.dotProduct(look);
+			if (along < 0.0D || along > range || along >= bestAlong) continue;
+			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
+			if (perpendicularSq > FREEZE_LOOK_RADIUS_SQUARED || !timeMaster.canSee(candidate)) continue;
+			best = candidate;
+			bestAlong = along;
+		}
+		return best;
+	}
+
+	private static void tickFreezes(ServerWorld world) {
+		MinecraftServer server = world.getServer();
+		long now = world.getTime();
+		for (Map.Entry<UUID, ActiveFreeze> entry : List.copyOf(ACTIVE_FREEZES.entrySet())) {
+			UUID targetId = entry.getKey();
+			ActiveFreeze freeze = entry.getValue();
+			if (!freeze.worldKey().equals(world.getRegistryKey())) continue;
+
+			ServerPlayerEntity target = server.getPlayerManager().getPlayer(targetId);
+			if (target == null || target.getWorld() != world || !isPlayable(target, target)) {
+				ACTIVE_FREEZES.remove(targetId);
+				syncFreeze(world, targetId, freeze.timeMasterId(), false, 0);
+				continue;
+			}
+			if (now >= freeze.expiresAt()) {
+				ACTIVE_FREEZES.remove(targetId);
+				syncFreeze(world, targetId, freeze.timeMasterId(), false, 0);
+				target.sendMessage(Text.literal("Time moves again."), true);
+				continue;
+			}
+			freeze.apply(target);
+		}
+	}
+
+	private static void clearFreezes(ServerWorld world, boolean sync) {
+		if (world == null || ACTIVE_FREEZES.isEmpty()) return;
+		for (Map.Entry<UUID, ActiveFreeze> entry : List.copyOf(ACTIVE_FREEZES.entrySet())) {
+			UUID targetId = entry.getKey();
+			ActiveFreeze freeze = entry.getValue();
+			if (!freeze.worldKey().equals(world.getRegistryKey())) continue;
+			ACTIVE_FREEZES.remove(targetId);
+			if (sync) syncFreeze(world, targetId, freeze.timeMasterId(), false, 0);
+		}
+	}
+
+	public static boolean isFrozen(ServerPlayerEntity player) {
+		return player != null && ACTIVE_FREEZES.containsKey(player.getUuid());
+	}
+
+	private static void syncFreeze(ServerWorld world, UUID targetId, UUID timeMasterId, boolean frozen, int durationTicks) {
+		if (world == null || targetId == null) return;
+		TimeMasterFreezeStatePayload payload = frozen
+			? new TimeMasterFreezeStatePayload(true, targetId, timeMasterId, durationTicks)
+			: TimeMasterFreezeStatePayload.clear(targetId);
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			if (ServerPlayNetworking.canSend(player, TimeMasterFreezeStatePayload.ID)) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
+	private static void syncActiveFreezes(ServerPlayerEntity player) {
+		if (player == null || !World.OVERWORLD.equals(player.getWorld().getRegistryKey())) return;
+		for (Map.Entry<UUID, ActiveFreeze> entry : ACTIVE_FREEZES.entrySet()) {
+			ActiveFreeze freeze = entry.getValue();
+			if (!freeze.worldKey().equals(player.getWorld().getRegistryKey())) continue;
+			long remaining = Math.max(0L, freeze.expiresAt() - player.getWorld().getTime());
+			if (remaining <= 0L || !ServerPlayNetworking.canSend(player, TimeMasterFreezeStatePayload.ID)) continue;
+			ServerPlayNetworking.send(player, new TimeMasterFreezeStatePayload(true, entry.getKey(), freeze.timeMasterId(),
+				(int) Math.min(Integer.MAX_VALUE, remaining)));
+		}
 	}
 
 	private static WorldSnapshot findSnapshot(Deque<WorldSnapshot> history, long targetTick) {
 		if (history == null || history.isEmpty()) return null;
-		WorldSnapshot best = null;
+		WorldSnapshot best = history.peekFirst();
+		long bestDistance = Math.abs(best.tick() - targetTick);
 		for (WorldSnapshot snapshot : history) {
-			if (snapshot.tick() <= targetTick) {
+			long distance = Math.abs(snapshot.tick() - targetTick);
+			if (distance <= bestDistance) {
 				best = snapshot;
-			} else {
+				bestDistance = distance;
+			}
+			if (snapshot.tick() > targetTick && distance > bestDistance) {
 				break;
 			}
 		}
-		return best != null ? best : history.peekFirst();
-	}
-
-	private static List<WorldSnapshot> rewindFrames(Deque<WorldSnapshot> history, long targetTick) {
-		List<WorldSnapshot> frames = new ArrayList<>();
-		if (history != null) {
-			var iterator = history.descendingIterator();
-			while (iterator.hasNext()) {
-				WorldSnapshot snapshot = iterator.next();
-				frames.add(snapshot);
-				if (snapshot.tick() <= targetTick) break;
-			}
-		}
-		return frames.isEmpty() ? List.of() : frames;
+		return best;
 	}
 
 	private static List<VisualSnapshot> rewindVisualFrames(Deque<VisualSnapshot> history, long targetTick) {
@@ -246,6 +386,7 @@ public final class TimeMasterManager {
 	public static void recordWeaponEvent(ServerPlayerEntity player, WeaponEventType type) {
 		if (player == null || type == null || !(player.getWorld() instanceof ServerWorld world)) return;
 		if (world.getRegistryKey() != World.OVERWORLD || !canTrack(world)) return;
+		if (!hasPlayableTimeMaster(world)) return;
 		Deque<WeaponEvent> events = WEAPON_EVENTS.computeIfAbsent(world.getRegistryKey(), key -> new ArrayDeque<>());
 		events.addLast(WeaponEvent.capture(world, player, type));
 		long keepTicks = (long) GexpressConfig.getTimeMasterRewindSeconds() * 20L + HISTORY_PADDING_TICKS;
@@ -267,6 +408,13 @@ public final class TimeMasterManager {
 		if (game == null) return false;
 		Role role = game.getRole(player);
 		return role != null && MapSelectRoles.TIME_MASTER_ID.equals(role.identifier());
+	}
+
+	private static boolean hasPlayableTimeMaster(ServerWorld world) {
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			if (isTimeMaster(player) && isPlayable(player, player)) return true;
+		}
+		return false;
 	}
 
 	private static boolean isPlayable(ServerPlayerEntity player, ServerPlayerEntity timeMaster) {
@@ -355,13 +503,74 @@ public final class TimeMasterManager {
 		}
 	}
 
-	private record WeaponEvent(long tick, UUID playerId, WeaponEventType type, double x, double eyeY, double z) {
+	private record ActiveFreeze(RegistryKey<World> worldKey, UUID timeMasterId, long expiresAt,
+			double x, double y, double z, float yaw, float pitch, int selectedSlot,
+			boolean usingItem, Hand activeHand, boolean sneaking, boolean sprinting) {
+		private static ActiveFreeze capture(ServerWorld world, UUID timeMasterId, ServerPlayerEntity target,
+				int durationTicks) {
+			return new ActiveFreeze(
+				world.getRegistryKey(),
+				timeMasterId,
+				world.getTime() + durationTicks,
+				target.getX(),
+				target.getY(),
+				target.getZ(),
+				target.getYaw(),
+				target.getPitch(),
+				target.getInventory().selectedSlot,
+				target.isUsingItem(),
+				target.isUsingItem() ? target.getActiveHand() : Hand.MAIN_HAND,
+				target.isSneaking(),
+				target.isSprinting()
+			);
+		}
+
+		private void apply(ServerPlayerEntity target) {
+			target.stopRiding();
+			target.teleport(target.getServerWorld(), x, y, z, yaw, pitch);
+			target.setVelocity(Vec3d.ZERO);
+			target.velocityModified = true;
+			target.fallDistance = 0.0F;
+			target.setSneaking(sneaking);
+			target.setSprinting(sprinting);
+			if (target.getInventory().selectedSlot != selectedSlot) {
+				target.getInventory().selectedSlot = selectedSlot;
+				target.getInventory().markDirty();
+				syncScreen(target.playerScreenHandler);
+			}
+			if (usingItem) {
+				if (!target.isUsingItem() || target.getActiveHand() != activeHand) {
+					target.setCurrentHand(activeHand);
+				}
+			} else if (target.isUsingItem()) {
+				target.stopUsingItem();
+			}
+		}
+	}
+
+	private record WeaponEvent(long tick, UUID playerId, WeaponEventType type, double x, double eyeY, double z,
+			int selectedSlot, ItemStack mainHand, ItemStack offHand, boolean usingItem, Hand activeHand) {
 		private static WeaponEvent capture(ServerWorld world, ServerPlayerEntity player, WeaponEventType type) {
-			return new WeaponEvent(world.getTime(), player.getUuid(), type, player.getX(), player.getEyeY(), player.getZ());
+			boolean usingItem = player.isUsingItem();
+			return new WeaponEvent(
+				world.getTime(),
+				player.getUuid(),
+				type,
+				player.getX(),
+				player.getEyeY(),
+				player.getZ(),
+				player.getInventory().selectedSlot,
+				player.getMainHandStack().copy(),
+				player.getOffHandStack().copy(),
+				usingItem,
+				usingItem ? player.getActiveHand() : Hand.MAIN_HAND
+			);
 		}
 
 		private void replay(ServerWorld world) {
 			ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(playerId);
+			if (player != null && player.getWorld() != world) player = null;
+			if (player != null) applyHeldState(player);
 			switch (type) {
 				case REVOLVER_SHOT -> {
 					world.playSound(null, x, eyeY, z, WatheSounds.ITEM_REVOLVER_SHOOT,
@@ -378,8 +587,36 @@ public final class TimeMasterManager {
 				case KNIFE_STAB -> {
 					world.playSound(null, x, eyeY, z, WatheSounds.ITEM_KNIFE_STAB,
 						SoundCategory.PLAYERS, 1.0F, 1.0F);
-					if (player != null) player.swingHand(Hand.MAIN_HAND);
+					if (player != null) player.swingHand(activeHand);
 				}
+			}
+		}
+
+		private void applyHeldState(ServerPlayerEntity player) {
+			boolean changed = false;
+			if (selectedSlot >= 0 && selectedSlot < 9 && player.getInventory().selectedSlot != selectedSlot) {
+				player.getInventory().selectedSlot = selectedSlot;
+				changed = true;
+			}
+			if (!ItemStack.areEqual(player.getMainHandStack(), mainHand)) {
+				player.setStackInHand(Hand.MAIN_HAND, mainHand.copy());
+				changed = true;
+			}
+			if (!ItemStack.areEqual(player.getOffHandStack(), offHand)) {
+				player.setStackInHand(Hand.OFF_HAND, offHand.copy());
+				changed = true;
+			}
+			if (changed) {
+				player.getInventory().markDirty();
+				syncScreen(player.playerScreenHandler);
+			}
+			if (usingItem) {
+				if (!player.isUsingItem() || player.getActiveHand() != activeHand) {
+					player.stopUsingItem();
+					player.setCurrentHand(activeHand);
+				}
+			} else if (player.isUsingItem()) {
+				player.stopUsingItem();
 			}
 		}
 	}
@@ -537,6 +774,7 @@ public final class TimeMasterManager {
 			Map<UUID, ItemEntitySnapshot> items, Map<UUID, BodyEntitySnapshot> bodies,
 			Map<BlockPos, BlockSnapshot> blocks,
 			JuggernautManager.TimeState juggernaut, SnitchManager.TimeState snitch,
+			VultureManager.TimeState vulture,
 			NbtCompound gameTime, NbtCompound c4Back, NbtCompound medicShield,
 			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute) {
 
@@ -567,6 +805,7 @@ public final class TimeMasterManager {
 				blocks,
 				JuggernautManager.snapshotForTimeRewind(),
 				SnitchManager.snapshotForTimeRewind(),
+				VultureManager.snapshotForTimeRewind(),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
 				writeComponent(C4BackComponent.KEY.getNullable(world), lookup),
 				writeComponent(MedicShieldComponent.KEY.getNullable(world), lookup),
@@ -645,12 +884,14 @@ public final class TimeMasterManager {
 			readComponent(SilentShadowComponent.KEY.getNullable(world), silentShadow, lookup);
 			readComponent(WarlockComponent.KEY.getNullable(world), warlock, lookup);
 			readComponent(VoiceMuteState.KEY.getNullable(world), voiceMute, lookup);
+			VultureManager.restoreForTimeRewind(world, vulture);
 
 			GameTimeComponent.KEY.sync(world);
 			C4BackComponent.KEY.sync(world);
 			MedicShieldComponent.KEY.sync(world);
 			SilentShadowComponent.KEY.sync(world);
 			WarlockComponent.KEY.sync(world);
+			VoiceMuteState.KEY.sync(world);
 		}
 
 		private void restoreBlocks(ServerWorld world, RegistryWrapper.WrapperLookup lookup) {

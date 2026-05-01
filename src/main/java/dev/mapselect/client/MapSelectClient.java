@@ -1,5 +1,6 @@
 package dev.mapselect.client;
 
+import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.item.DevWeaponSkinStamper;
 import dev.mapselect.client.preset.ClientPresetCache;
@@ -17,11 +18,11 @@ import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleFactoryRegistry;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
-import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
 import net.minecraft.client.render.entity.PlayerEntityRenderer;
 import net.minecraft.client.render.entity.feature.FeatureRendererContext;
 import net.minecraft.client.render.entity.model.PlayerEntityModel;
@@ -38,22 +39,27 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientNightVisionState.register();
 		ClientMedicShieldState.register();
 		ClientMedicState.register();
+		ClientNeutralWinState.register();
+		ClientSnitchState.register();
 		ClientSeerState.register();
 		ClientTimeMasterState.register();
+		ClientTimeMasterFreezeState.register();
 		ClientTimeMasterRewindState.register();
 		ClientSilentShadowState.register();
 		ClientWarlockState.register();
 		ClientTricksterState.register();
 		ClientPuppetmasterState.register();
+		ClientScatterBrainState.register();
 		ClientVultureState.register();
+		ClientTrackerState.register();
+		ClientAltruistState.register();
 		ClientAbilityCooldownHud.register();
 		ClientPresetCache.registerClient();
 		ClientTrainPresetCache.registerClient();
 		ModelLoadingPlugin.register(new DevWeaponModels());
 		ParticleFactoryRegistry.getInstance().register(MapSelectParticles.SAND_DRIFT, SandDriftParticle.Factory::new);
-		BlockEntityRendererRegistry.register(MapSelectBlockEntities.GREYIFER_PLUSH, GreyiferPlushBlockEntityRenderer::new);
+		BlockEntityRendererFactories.register(MapSelectBlockEntities.GREYIFER_PLUSH, GreyiferPlushBlockEntityRenderer::new);
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GREYIFER_PLUSH, RenderLayer.getCutout());
-		BlockRenderLayerMap.INSTANCE.putItem(MapSelectBlocks.GREYIFER_PLUSH_ITEM, RenderLayer.getCutout());
 
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, registrationHelper, context) -> {
 			if (entityRenderer instanceof PlayerEntityRenderer per) {
@@ -81,7 +87,8 @@ public class MapSelectClient implements ClientModInitializer {
 
 	private static void registerConfigReceiver() {
 		ClientPlayNetworking.registerGlobalReceiver(GexpressConfigSyncPayload.ID, (payload, context) ->
-			context.client().execute(() -> GexpressConfig.apply(
+			context.client().execute(() -> {
+				GexpressConfig.apply(
 				payload.c4Price(),
 				payload.c4FuseSeconds(),
 				payload.c4FirstBeepSeconds(),
@@ -97,15 +104,30 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.juggernautCooldownReductionSeconds(),
 				payload.juggernautMinimumCooldownSeconds(),
 				payload.tricksterSwapDurationSeconds(),
+				payload.tricksterDancingCartsMaxUses(),
 				payload.puppetmasterControlDurationSeconds(),
 				payload.puppetmasterControlCooldownSeconds(),
 				payload.puppetmasterRandomTarget(),
+				payload.puppetmasterControlRange(),
 				payload.pelicanEatCooldownSeconds(),
+				payload.hungryFoodLimit(),
+				payload.thirstyDrinkLimit(),
 				payload.snitchTasksRequired(),
+				payload.snitchWarningTasksRemaining(),
 				payload.timeMasterRewindSeconds(),
 				payload.timeMasterCooldownSeconds(),
 				payload.timeMasterMaxUses(),
+				payload.timeMasterFreezeDurationSeconds(),
+				payload.timeMasterFreezeCooldownSeconds(),
+				payload.timeMasterFreezeRange(),
+				payload.scatterBrainCooldownSeconds(),
+				payload.trackerMaxTargets(),
+				payload.trackerRange(),
+				payload.trackerCooldownSeconds(),
+				payload.altruistRange(),
+				payload.lastDeathShieldEnabled(),
 				payload.maxKillerAmount(),
+				payload.maxVigilanteAmount(),
 				payload.c4BackOffsetX(),
 				payload.c4BackOffsetY(),
 				payload.c4BackOffsetZ(),
@@ -122,7 +144,9 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.medicShieldBlockFlashAlpha(),
 				payload.medicShieldBreakFlashAlpha(),
 				payload.silentShadowAlpha()
-			)));
+				);
+				GuidebookScreen.invalidateIfOpen();
+			}));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID, (payload, context) ->
 			context.client().execute(() -> GexpressConfig.puppetmasterCanKillOwnBody = payload.canKillOwnBody()));
 	}

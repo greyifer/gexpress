@@ -18,6 +18,9 @@ public final class MapSelectRoles {
 	public static final Identifier TRICKSTER_ID = Identifier.of(MapSelect.MOD_ID, "trickster");
 	public static final Identifier PUPPETMASTER_ID = Identifier.of(MapSelect.MOD_ID, "puppetmaster");
 	public static final Identifier VULTURE_ID = Identifier.of(MapSelect.MOD_ID, "pelican");
+	public static final Identifier SCATTER_BRAIN_ID = Identifier.of(MapSelect.MOD_ID, "scatter_brain");
+	public static final Identifier TRACKER_ID = Identifier.of(MapSelect.MOD_ID, "tracker");
+	public static final Identifier ALTRUIST_ID = Identifier.of(MapSelect.MOD_ID, "altruist");
 
 	public static Role BOMB_SPECIALIST;
 	public static Role MEDIC;
@@ -30,6 +33,9 @@ public final class MapSelectRoles {
 	public static Role TRICKSTER;
 	public static Role PUPPETMASTER;
 	public static Role VULTURE;
+	public static Role SCATTER_BRAIN;
+	public static Role TRACKER;
+	public static Role ALTRUIST;
 
 	public static void register() {
 		// Killer-side role. Same build as vanilla Killer:
@@ -111,7 +117,7 @@ public final class MapSelectRoles {
 			false,
 			false,
 			Role.MoodType.NONE,
-			GameConstants.getInTicks(0, 10),
+			-1,
 			true
 		));
 
@@ -135,14 +141,44 @@ public final class MapSelectRoles {
 			true
 		));
 
+		SCATTER_BRAIN = WatheRoles.registerRole(new Role(
+			SCATTER_BRAIN_ID,
+			0xE36A2E,
+			false,
+			true,
+			Role.MoodType.FAKE,
+			-1,
+			true
+		));
+
 		VULTURE = WatheRoles.registerRole(new Role(
 			VULTURE_ID,
 			0x6F8A24, // pelican green, neutral solo
 			false,
 			false,
 			Role.MoodType.NONE,
-			GameConstants.getInTicks(0, 10),
+			-1,
 			true
+		));
+
+		TRACKER = WatheRoles.registerRole(new Role(
+			TRACKER_ID,
+			0x3E9CFF,
+			true,
+			false,
+			Role.MoodType.REAL,
+			GameConstants.getInTicks(0, 10),
+			false
+		));
+
+		ALTRUIST = WatheRoles.registerRole(new Role(
+			ALTRUIST_ID,
+			0xF0D38C,
+			true,
+			false,
+			Role.MoodType.REAL,
+			GameConstants.getInTicks(0, 10),
+			false
 		));
 	}
 

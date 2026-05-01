@@ -12,6 +12,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class TimeMasterKnifeStabMixin {
 	@Inject(
 		method = "receive(Ldev/doctor4t/wathe/util/KnifeStabPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
+		at = @At("HEAD"),
+		cancellable = true
+	)
+	private void gexpress$blockFrozenKnifeStab(KnifeStabPayload payload,
+			ServerPlayNetworking.Context context, CallbackInfo ci) {
+		if (TimeMasterManager.isFrozen(context.player())) ci.cancel();
+	}
+
+	@Inject(
+		method = "receive(Ldev/doctor4t/wathe/util/KnifeStabPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
 		at = @At(
 			value = "INVOKE",
 			target = "Lnet/minecraft/server/network/ServerPlayerEntity;swingHand(Lnet/minecraft/util/Hand;)V",

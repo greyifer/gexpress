@@ -24,6 +24,7 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 
 	private final World world;
 	private final Map<UUID, Long> cooldownUntil = new LinkedHashMap<>();
+	private final Map<UUID, Long> freezeCooldownUntil = new LinkedHashMap<>();
 	private final Map<UUID, Integer> usesRemaining = new LinkedHashMap<>();
 
 	public TimeMasterComponent(World world) {
@@ -31,12 +32,20 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 	}
 
 	public long cooldownRemainingTicks(UUID playerId) {
+		return cooldownRemainingTicks(cooldownUntil, playerId);
+	}
+
+	public long freezeCooldownRemainingTicks(UUID playerId) {
+		return cooldownRemainingTicks(freezeCooldownUntil, playerId);
+	}
+
+	private long cooldownRemainingTicks(Map<UUID, Long> cooldowns, UUID playerId) {
 		if (playerId == null) return 0L;
-		Long until = cooldownUntil.get(playerId);
+		Long until = cooldowns.get(playerId);
 		if (until == null) return 0L;
 		long remaining = until - world.getTime();
 		if (remaining <= 0L) {
-			cooldownUntil.remove(playerId);
+			cooldowns.remove(playerId);
 			KEY.sync(world);
 			return 0L;
 		}
@@ -64,15 +73,31 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		return true;
 	}
 
-	public void ensurePlayer(UUID playerId) {
+	public void setFreezeCooldown(UUID playerId) {
 		if (playerId == null) return;
-		usesRemaining.putIfAbsent(playerId, GexpressConfig.getTimeMasterMaxUses());
+		long cooldownTicks = (long) GexpressConfig.getTimeMasterFreezeCooldownSeconds() * 20L;
+		if (cooldownTicks > 0L) {
+			freezeCooldownUntil.put(playerId, world.getTime() + cooldownTicks);
+		} else {
+			freezeCooldownUntil.remove(playerId);
+		}
 		KEY.sync(world);
 	}
 
+	public void ensurePlayer(UUID playerId) {
+		if (playerId == null) return;
+		int maxUses = GexpressConfig.getTimeMasterMaxUses();
+		Integer current = usesRemaining.get(playerId);
+		if (current == null || current > maxUses) {
+			usesRemaining.put(playerId, maxUses);
+			KEY.sync(world);
+		}
+	}
+
 	public boolean clearAll() {
-		if (cooldownUntil.isEmpty() && usesRemaining.isEmpty()) return false;
+		if (cooldownUntil.isEmpty() && freezeCooldownUntil.isEmpty() && usesRemaining.isEmpty()) return false;
 		cooldownUntil.clear();
+		freezeCooldownUntil.clear();
 		usesRemaining.clear();
 		KEY.sync(world);
 		return true;
@@ -81,21 +106,17 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 	@Override
 	public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		cooldownUntil.clear();
+		freezeCooldownUntil.clear();
 		usesRemaining.clear();
-		readCooldowns(tag.getList("cooldowns", NbtElement.COMPOUND_TYPE));
+		readCooldowns(tag.getList("cooldowns", NbtElement.COMPOUND_TYPE), cooldownUntil);
+		readCooldowns(tag.getList("freezeCooldowns", NbtElement.COMPOUND_TYPE), freezeCooldownUntil);
 		readUses(tag.getList("uses", NbtElement.COMPOUND_TYPE));
 	}
 
 	@Override
 	public void writeToNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
-		NbtList cooldowns = new NbtList();
-		for (Map.Entry<UUID, Long> entry : cooldownUntil.entrySet()) {
-			NbtCompound cooldown = new NbtCompound();
-			cooldown.putString("player", entry.getKey().toString());
-			cooldown.putLong("until", entry.getValue());
-			cooldowns.add(cooldown);
-		}
-		tag.put("cooldowns", cooldowns);
+		tag.put("cooldowns", writeCooldowns(cooldownUntil));
+		tag.put("freezeCooldowns", writeCooldowns(freezeCooldownUntil));
 
 		NbtList uses = new NbtList();
 		for (Map.Entry<UUID, Integer> entry : usesRemaining.entrySet()) {
@@ -107,11 +128,22 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		tag.put("uses", uses);
 	}
 
-	private void readCooldowns(NbtList list) {
+	private NbtList writeCooldowns(Map<UUID, Long> cooldowns) {
+		NbtList list = new NbtList();
+		for (Map.Entry<UUID, Long> entry : cooldowns.entrySet()) {
+			NbtCompound cooldown = new NbtCompound();
+			cooldown.putString("player", entry.getKey().toString());
+			cooldown.putLong("until", entry.getValue());
+			list.add(cooldown);
+		}
+		return list;
+	}
+
+	private void readCooldowns(NbtList list, Map<UUID, Long> out) {
 		for (int i = 0; i < list.size(); i++) {
 			NbtCompound entry = list.getCompound(i);
 			UUID player = parseUuid(entry.getString("player"));
-			if (player != null) cooldownUntil.put(player, entry.getLong("until"));
+			if (player != null) out.put(player, entry.getLong("until"));
 		}
 	}
 

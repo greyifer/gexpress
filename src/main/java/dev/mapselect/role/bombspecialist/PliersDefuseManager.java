@@ -144,11 +144,11 @@ public final class PliersDefuseManager {
 		if (target == null || comp == null || !comp.hasC4(target.getUuid())) return;
 		comp.removeC4(target.getUuid());
 		if (clippedWrongWire) {
-			MapSelect.LOGGER.info("Pliers MISFIRE on {} - detonating now", target.getName().getString());
+			MapSelect.LOGGER.debug("Pliers MISFIRE on {} - detonating now", target.getName().getString());
 			C4Detonation.detonateAt(world, target, defuser);
 			return;
 		}
-		MapSelect.LOGGER.info("Pliers SUCCESS on {} - C4 removed", target.getName().getString());
+		MapSelect.LOGGER.debug("Pliers SUCCESS on {} - C4 removed", target.getName().getString());
 		world.playSound(null, target.getX(), target.getY(), target.getZ(),
 			SoundEvents.BLOCK_TRIPWIRE_CLICK_OFF, SoundCategory.PLAYERS, 0.9F, 1.2F);
 		world.playSound(null, target.getX(), target.getY(), target.getZ(),
@@ -159,10 +159,10 @@ public final class PliersDefuseManager {
 			DefuseAttempt attempt, boolean clippedWrongWire) {
 		if (!(world.getEntity(attempt.blockChargeId()) instanceof ItemEntity charge)) return;
 		if (clippedWrongWire) {
-			MapSelect.LOGGER.info("Pliers MISFIRE on block C4 - detonating now");
+			MapSelect.LOGGER.debug("Pliers MISFIRE on block C4 - detonating now");
 			C4Detonation.misfireBlockCharge(world, charge, defuser);
 		} else {
-			MapSelect.LOGGER.info("Pliers SUCCESS on block C4 - C4 removed");
+			MapSelect.LOGGER.debug("Pliers SUCCESS on block C4 - C4 removed");
 			C4Detonation.defuseBlockCharge(defuser, charge);
 		}
 	}

@@ -4,6 +4,8 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.AbilityCooldownPayload;
+import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.preset.train.TrainPreset;
@@ -12,10 +14,13 @@ import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.weather.MapWeatherComponent;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
@@ -34,15 +39,20 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class DancingCartsManager {
 	private static final int MAX_BLOCKS_PER_CART = 32768;
+	private static final int BLOCK_MOVE_FLAGS = Block.NOTIFY_ALL | Block.FORCE_STATE | Block.SKIP_DROPS;
 	private static final Map<RegistryKey<World>, Map<UUID, Long>> nextUseTicks = new ConcurrentHashMap<>();
+	private static final Map<RegistryKey<World>, Map<UUID, Integer>> usesRemaining = new ConcurrentHashMap<>();
+	private static final Map<RegistryKey<World>, Set<CartPair>> previousPairs = new ConcurrentHashMap<>();
 
 	private DancingCartsManager() {}
 
@@ -53,8 +63,15 @@ public final class DancingCartsManager {
 		if (!isPlayableForHarlequin(harlequin, harlequin)) return;
 
 		ServerWorld world = harlequin.getServerWorld();
+		int uses = remainingUses(world, harlequin.getUuid());
+		if (uses <= 0) {
+			harlequin.sendMessage(Text.literal("Dancing Carts has no uses left."), true);
+			return;
+		}
+
 		long remaining = cooldownRemainingTicks(world, harlequin.getUuid());
 		if (remaining > 0L) {
+			syncCooldown(harlequin, remaining);
 			harlequin.sendMessage(Text.literal("Dancing Carts ready in " + secondsCeil(remaining) + "s."), true);
 			return;
 		}
@@ -83,7 +100,7 @@ public final class DancingCartsManager {
 			return;
 		}
 
-		Map<Integer, Integer> moves = buildCartMoves(movable);
+		Map<Integer, Integer> moves = buildCartMoves(world, movable);
 		try {
 			performMove(world, regions, moves);
 		} catch (RuntimeException e) {
@@ -91,14 +108,40 @@ public final class DancingCartsManager {
 			return;
 		}
 
+		int usesLeft = consumeUse(world, harlequin.getUuid());
+		previousPairs.put(world.getRegistryKey(), CartPair.fromMoves(moves));
 		setCooldown(world, harlequin.getUuid());
+		syncCooldown(harlequin, cooldownRemainingTicks(world, harlequin.getUuid()));
 		world.playSound(null, harlequin.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT,
 			SoundCategory.PLAYERS, 0.9F, 0.85F);
-		harlequin.sendMessage(Text.literal("Dancing Carts."), true);
+		harlequin.sendMessage(Text.literal("Dancing Carts. Uses left: " + usesLeft + "/"
+			+ GexpressConfig.getTricksterDancingCartsMaxUses() + "."), true);
 	}
 
 	public static void clearForTimeRewind(ServerWorld world) {
-		if (world != null) nextUseTicks.remove(world.getRegistryKey());
+		if (world == null) return;
+		nextUseTicks.remove(world.getRegistryKey());
+		usesRemaining.remove(world.getRegistryKey());
+		previousPairs.remove(world.getRegistryKey());
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS);
+		}
+	}
+
+	public static void clearRoundState(ServerWorld world) {
+		if (world == null) return;
+		nextUseTicks.remove(world.getRegistryKey());
+		usesRemaining.remove(world.getRegistryKey());
+		previousPairs.remove(world.getRegistryKey());
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS);
+		}
+	}
+
+	public static void syncCooldownTo(ServerPlayerEntity player) {
+		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
+		long remaining = cooldownRemainingTicks(world, player.getUuid());
+		syncCooldown(player, remaining);
 	}
 
 	private static TrainPreset activeTrainPreset(ServerWorld world) {
@@ -148,29 +191,25 @@ public final class DancingCartsManager {
 		return null;
 	}
 
-	private static Map<Integer, Integer> buildCartMoves(List<Integer> movable) {
+	private static Map<Integer, Integer> buildCartMoves(ServerWorld world, List<Integer> movable) {
+		Set<CartPair> previous = previousPairs.getOrDefault(world.getRegistryKey(), Set.of());
 		List<Integer> destinations = new ArrayList<>(movable);
-		if (destinations.size() == 2) {
-			Collections.swap(destinations, 0, 1);
-		} else {
-			for (int attempt = 0; attempt < 32; attempt++) {
-				Collections.shuffle(destinations);
-				boolean valid = true;
-				for (int i = 0; i < movable.size(); i++) {
-					if (movable.get(i).equals(destinations.get(i))) {
-						valid = false;
-						break;
-					}
-				}
-				if (valid) break;
-			}
-			for (int i = 0; i < movable.size(); i++) {
-				if (!movable.get(i).equals(destinations.get(i))) continue;
-				Collections.rotate(destinations, 1);
-				break;
-			}
+		for (int attempt = 0; attempt < 96; attempt++) {
+			Collections.shuffle(destinations);
+			Map<Integer, Integer> moves = toMoves(movable, destinations);
+			if (isValidMoves(moves, previous)) return moves;
 		}
+		for (int rotate = 1; rotate < movable.size(); rotate++) {
+			destinations = new ArrayList<>(movable);
+			Collections.rotate(destinations, rotate);
+			Map<Integer, Integer> moves = toMoves(movable, destinations);
+			if (isValidMoves(moves, previous)) return moves;
+		}
+		Collections.rotate(destinations, 1);
+		return toMoves(movable, destinations);
+	}
 
+	private static Map<Integer, Integer> toMoves(List<Integer> movable, List<Integer> destinations) {
 		Map<Integer, Integer> moves = new LinkedHashMap<>();
 		for (int i = 0; i < movable.size(); i++) {
 			moves.put(movable.get(i), destinations.get(i));
@@ -178,8 +217,20 @@ public final class DancingCartsManager {
 		return moves;
 	}
 
+	private static boolean isValidMoves(Map<Integer, Integer> moves, Set<CartPair> previous) {
+		for (Map.Entry<Integer, Integer> move : moves.entrySet()) {
+			if (move.getKey().equals(move.getValue())) return false;
+			if (previous.contains(CartPair.of(move.getKey(), move.getValue()))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	private static void performMove(ServerWorld world, List<CartRegion> regions, Map<Integer, Integer> moves) {
 		RegistryWrapper.WrapperLookup lookup = world.getRegistryManager();
+		Set<UUID> existingItems = itemEntityIds(world);
+		List<Box> affectedBoxes = affectedBoxes(regions, moves);
 		List<CartSnapshot> snapshots = new ArrayList<>();
 		for (Map.Entry<Integer, Integer> move : moves.entrySet()) {
 			CartRegion source = regions.get(move.getKey());
@@ -194,8 +245,37 @@ public final class DancingCartsManager {
 		for (CartSnapshot snapshot : snapshots) {
 			snapshot.paste(world, lookup);
 		}
+		discardNewItemDrops(world, existingItems, affectedBoxes);
 		for (EntityMove move : entityMoves.values()) {
 			move.apply(world);
+		}
+	}
+
+	private static Set<UUID> itemEntityIds(ServerWorld world) {
+		Set<UUID> ids = new HashSet<>();
+		for (ItemEntity item : world.getEntitiesByType(EntityType.ITEM, entity -> true)) {
+			ids.add(item.getUuid());
+		}
+		return ids;
+	}
+
+	private static List<Box> affectedBoxes(List<CartRegion> regions, Map<Integer, Integer> moves) {
+		List<Box> boxes = new ArrayList<>();
+		for (Map.Entry<Integer, Integer> move : moves.entrySet()) {
+			boxes.add(regions.get(move.getKey()).entityBox());
+			boxes.add(regions.get(move.getValue()).entityBox());
+		}
+		return boxes;
+	}
+
+	private static void discardNewItemDrops(ServerWorld world, Set<UUID> existingItems, List<Box> affectedBoxes) {
+		for (ItemEntity item : world.getEntitiesByType(EntityType.ITEM, entity -> !existingItems.contains(entity.getUuid()))) {
+			for (Box box : affectedBoxes) {
+				if (box.intersects(item.getBoundingBox())) {
+					item.discard();
+					break;
+				}
+			}
 		}
 	}
 
@@ -227,6 +307,31 @@ public final class DancingCartsManager {
 	private static void setCooldown(ServerWorld world, UUID playerId) {
 		nextUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
 			.put(playerId, world.getTime() + GexpressConfig.getTricksterSwapDurationSeconds() * 20L);
+	}
+
+	private static int remainingUses(ServerWorld world, UUID playerId) {
+		int max = GexpressConfig.getTricksterDancingCartsMaxUses();
+		if (max <= 0) return 0;
+		Map<UUID, Integer> worldUses = usesRemaining.get(world.getRegistryKey());
+		if (worldUses == null) return max;
+		return Math.max(0, Math.min(max, worldUses.getOrDefault(playerId, max)));
+	}
+
+	private static int consumeUse(ServerWorld world, UUID playerId) {
+		int next = Math.max(0, remainingUses(world, playerId) - 1);
+		usesRemaining.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
+			.put(playerId, next);
+		return next;
+	}
+
+	private static void syncCooldown(ServerPlayerEntity player, long remainingTicks) {
+		if (remainingTicks <= 0L) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS);
+			return;
+		}
+		long totalTicks = Math.max(remainingTicks, (long) GexpressConfig.getTricksterSwapDurationSeconds() * 20L);
+		AbilityCooldownSync.send(player, AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS,
+			remainingTicks, totalTicks, false);
 	}
 
 	private static boolean isHarlequin(PlayerEntity player) {
@@ -297,7 +402,7 @@ public final class DancingCartsManager {
 				for (int y = min.getY(); y <= max.getY(); y++) {
 					for (int z = min.getZ(); z <= max.getZ(); z++) {
 						mutable.set(x, y, z);
-						world.setBlockState(mutable, Blocks.AIR.getDefaultState(), 3);
+						world.setBlockState(mutable, Blocks.AIR.getDefaultState(), BLOCK_MOVE_FLAGS);
 					}
 				}
 			}
@@ -338,7 +443,7 @@ public final class DancingCartsManager {
 					destination.min().getZ() + entry.dz()
 				);
 				BlockPos target = mutable.toImmutable();
-				world.setBlockState(target, entry.state(), 3);
+				world.setBlockState(target, entry.state(), BLOCK_MOVE_FLAGS);
 				if (entry.blockEntityNbt() == null) continue;
 				BlockEntity blockEntity = world.getBlockEntity(target);
 				if (blockEntity == null) continue;
@@ -366,6 +471,20 @@ public final class DancingCartsManager {
 				entity.refreshPositionAndAngles(x, y, z, entity.getYaw(), entity.getPitch());
 				entity.velocityModified = true;
 			}
+		}
+	}
+
+	private record CartPair(int a, int b) {
+		private static CartPair of(int first, int second) {
+			return first < second ? new CartPair(first, second) : new CartPair(second, first);
+		}
+
+		private static Set<CartPair> fromMoves(Map<Integer, Integer> moves) {
+			Set<CartPair> pairs = new HashSet<>();
+			for (Map.Entry<Integer, Integer> move : moves.entrySet()) {
+				if (!move.getKey().equals(move.getValue())) pairs.add(of(move.getKey(), move.getValue()));
+			}
+			return pairs;
 		}
 	}
 }

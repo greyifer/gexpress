@@ -57,6 +57,8 @@ public final class GexpressConfig {
 	public static int juggernautMinimumCooldownSeconds = 10;
 	/** Seconds the Trickster's skin shuffle and global voice mute lasts. */
 	public static int tricksterSwapDurationSeconds = 25;
+	/** Number of times each Harlequin can shuffle train carts per round. */
+	public static int tricksterDancingCartsMaxUses = 1;
 	/** Seconds the Puppetmaster can control a target. */
 	public static int puppetmasterControlDurationSeconds = 15;
 	/** Seconds the Puppetmaster must wait after control ends. */
@@ -65,18 +67,46 @@ public final class GexpressConfig {
 	public static boolean puppetmasterRandomTarget = false;
 	/** Whether a controlled puppet can kill the Puppetmaster's abandoned body. */
 	public static boolean puppetmasterCanKillOwnBody = false;
+	/** Maximum block range for Puppetmaster's target menu. */
+	public static int puppetmasterControlRange = 16;
 	/** Seconds before the Pelican can swallow another player. */
 	public static int pelicanEatCooldownSeconds = 20;
+	/** Food items a Hungry player may carry from platters at once. */
+	public static int hungryFoodLimit = 2;
+	/** Drink items a Thirsty player may carry from trays at once. */
+	public static int thirstyDrinkLimit = 2;
 	/** Number of task completions before a Snitch learns the killer roster. */
 	public static int snitchTasksRequired = 3;
+	/** Remaining tasks at which killers are warned and shown the Snitch. 0 disables the warning. */
+	public static int snitchWarningTasksRemaining = 1;
 	/** Seconds a Time Master rewinds the active round. */
 	public static int timeMasterRewindSeconds = 10;
 	/** Seconds before a Time Master can rewind again. */
 	public static int timeMasterCooldownSeconds = 120;
 	/** Total number of rewinds each Time Master can use in a round. */
 	public static int timeMasterMaxUses = 1;
+	/** Seconds a Time Master's Freeze holds a target in place. */
+	public static int timeMasterFreezeDurationSeconds = 4;
+	/** Seconds before a Time Master can freeze another player. */
+	public static int timeMasterFreezeCooldownSeconds = 30;
+	/** Maximum block range for Time Master's Freeze target search. */
+	public static int timeMasterFreezeRange = 8;
+	/** Seconds before Scatter Brain can scatter players again. */
+	public static int scatterBrainCooldownSeconds = 60;
+	/** Maximum number of players the Tracker can track at once. */
+	public static int trackerMaxTargets = 3;
+	/** Maximum block range for Tracker target search. */
+	public static int trackerRange = 24;
+	/** Seconds before Tracker can change a tracked target again. */
+	public static int trackerCooldownSeconds = 10;
+	/** Maximum block range for Altruist's revive target search. */
+	public static int altruistRange = 4;
+	/** Whether the player who died last round starts the next round with one breakable shield. */
+	public static boolean lastDeathShieldEnabled = false;
 	/** Maximum number of normal killer-team players assigned by G'Express role assignment. */
 	public static int maxKillerAmount = 64;
+	/** Maximum number of Vigilantes assigned by G'Express role assignment. */
+	public static int maxVigilanteAmount = 1;
 	/** Synced C4 backpack model tuning. */
 	public static float c4BackOffsetX = 0.0F;
 	public static float c4BackOffsetY = 0.24F;
@@ -133,22 +163,50 @@ public final class GexpressConfig {
 	public static final int JUGGERNAUT_MINIMUM_COOLDOWN_MAX = 600;
 	public static final int TRICKSTER_SWAP_DURATION_MIN = 1;
 	public static final int TRICKSTER_SWAP_DURATION_MAX = 300;
+	public static final int TRICKSTER_DANCING_CARTS_MAX_USES_MIN = 0;
+	public static final int TRICKSTER_DANCING_CARTS_MAX_USES_MAX = 10;
 	public static final int PUPPETMASTER_CONTROL_DURATION_MIN = 1;
 	public static final int PUPPETMASTER_CONTROL_DURATION_MAX = 120;
 	public static final int PUPPETMASTER_CONTROL_COOLDOWN_MIN = 0;
 	public static final int PUPPETMASTER_CONTROL_COOLDOWN_MAX = 600;
+	public static final int PUPPETMASTER_CONTROL_RANGE_MIN = 1;
+	public static final int PUPPETMASTER_CONTROL_RANGE_MAX = 64;
 	public static final int PELICAN_EAT_COOLDOWN_MIN = 0;
 	public static final int PELICAN_EAT_COOLDOWN_MAX = 600;
+	public static final int HUNGRY_FOOD_LIMIT_MIN = 1;
+	public static final int HUNGRY_FOOD_LIMIT_MAX = 9;
+	public static final int THIRSTY_DRINK_LIMIT_MIN = 1;
+	public static final int THIRSTY_DRINK_LIMIT_MAX = 9;
 	public static final int SNITCH_TASKS_REQUIRED_MIN = 1;
 	public static final int SNITCH_TASKS_REQUIRED_MAX = 25;
+	public static final int SNITCH_WARNING_TASKS_REMAINING_MIN = 0;
+	public static final int SNITCH_WARNING_TASKS_REMAINING_MAX = 25;
 	public static final int TIME_MASTER_REWIND_SECONDS_MIN = 1;
 	public static final int TIME_MASTER_REWIND_SECONDS_MAX = 60;
 	public static final int TIME_MASTER_COOLDOWN_SECONDS_MIN = 0;
 	public static final int TIME_MASTER_COOLDOWN_SECONDS_MAX = 900;
 	public static final int TIME_MASTER_MAX_USES_MIN = 0;
 	public static final int TIME_MASTER_MAX_USES_MAX = 10;
-	public static final int MAX_KILLER_AMOUNT_MIN = 0;
+	public static final int TIME_MASTER_FREEZE_DURATION_SECONDS_MIN = 1;
+	public static final int TIME_MASTER_FREEZE_DURATION_SECONDS_MAX = 30;
+	public static final int TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MIN = 0;
+	public static final int TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MAX = 600;
+	public static final int TIME_MASTER_FREEZE_RANGE_MIN = 1;
+	public static final int TIME_MASTER_FREEZE_RANGE_MAX = 32;
+	public static final int SCATTER_BRAIN_COOLDOWN_SECONDS_MIN = 0;
+	public static final int SCATTER_BRAIN_COOLDOWN_SECONDS_MAX = 900;
+	public static final int TRACKER_MAX_TARGETS_MIN = 1;
+	public static final int TRACKER_MAX_TARGETS_MAX = 16;
+	public static final int TRACKER_RANGE_MIN = 1;
+	public static final int TRACKER_RANGE_MAX = 96;
+	public static final int TRACKER_COOLDOWN_SECONDS_MIN = 0;
+	public static final int TRACKER_COOLDOWN_SECONDS_MAX = 600;
+	public static final int ALTRUIST_RANGE_MIN = 1;
+	public static final int ALTRUIST_RANGE_MAX = 16;
+	public static final int MAX_KILLER_AMOUNT_MIN = 1;
 	public static final int MAX_KILLER_AMOUNT_MAX = 64;
+	public static final int MAX_VIGILANTE_AMOUNT_MIN = 0;
+	public static final int MAX_VIGILANTE_AMOUNT_MAX = 64;
 	public static final float C4_BACK_OFFSET_MIN = -1.0F;
 	public static final float C4_BACK_OFFSET_MAX = 1.0F;
 	public static final float C4_BACK_ROTATION_MIN = -180.0F;
@@ -239,6 +297,11 @@ public final class GexpressConfig {
 			Math.min(TRICKSTER_SWAP_DURATION_MAX, tricksterSwapDurationSeconds));
 	}
 
+	public static int getTricksterDancingCartsMaxUses() {
+		return Math.max(TRICKSTER_DANCING_CARTS_MAX_USES_MIN,
+			Math.min(TRICKSTER_DANCING_CARTS_MAX_USES_MAX, tricksterDancingCartsMaxUses));
+	}
+
 	public static int getPuppetmasterControlDurationSeconds() {
 		return Math.max(PUPPETMASTER_CONTROL_DURATION_MIN,
 			Math.min(PUPPETMASTER_CONTROL_DURATION_MAX, puppetmasterControlDurationSeconds));
@@ -257,14 +320,32 @@ public final class GexpressConfig {
 		return puppetmasterCanKillOwnBody;
 	}
 
+	public static int getPuppetmasterControlRange() {
+		return Math.max(PUPPETMASTER_CONTROL_RANGE_MIN,
+			Math.min(PUPPETMASTER_CONTROL_RANGE_MAX, puppetmasterControlRange));
+	}
+
 	public static int getPelicanEatCooldownSeconds() {
 		return Math.max(PELICAN_EAT_COOLDOWN_MIN,
 			Math.min(PELICAN_EAT_COOLDOWN_MAX, pelicanEatCooldownSeconds));
 	}
 
+	public static int getHungryFoodLimit() {
+		return Math.max(HUNGRY_FOOD_LIMIT_MIN, Math.min(HUNGRY_FOOD_LIMIT_MAX, hungryFoodLimit));
+	}
+
+	public static int getThirstyDrinkLimit() {
+		return Math.max(THIRSTY_DRINK_LIMIT_MIN, Math.min(THIRSTY_DRINK_LIMIT_MAX, thirstyDrinkLimit));
+	}
+
 	public static int getSnitchTasksRequired() {
 		return Math.max(SNITCH_TASKS_REQUIRED_MIN,
 			Math.min(SNITCH_TASKS_REQUIRED_MAX, snitchTasksRequired));
+	}
+
+	public static int getSnitchWarningTasksRemaining() {
+		return Math.max(SNITCH_WARNING_TASKS_REMAINING_MIN,
+			Math.min(SNITCH_WARNING_TASKS_REMAINING_MAX, snitchWarningTasksRemaining));
 	}
 
 	public static int getTimeMasterRewindSeconds() {
@@ -282,8 +363,54 @@ public final class GexpressConfig {
 			Math.min(TIME_MASTER_MAX_USES_MAX, timeMasterMaxUses));
 	}
 
+	public static int getTimeMasterFreezeDurationSeconds() {
+		return Math.max(TIME_MASTER_FREEZE_DURATION_SECONDS_MIN,
+			Math.min(TIME_MASTER_FREEZE_DURATION_SECONDS_MAX, timeMasterFreezeDurationSeconds));
+	}
+
+	public static int getTimeMasterFreezeCooldownSeconds() {
+		return Math.max(TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MIN,
+			Math.min(TIME_MASTER_FREEZE_COOLDOWN_SECONDS_MAX, timeMasterFreezeCooldownSeconds));
+	}
+
+	public static int getTimeMasterFreezeRange() {
+		return Math.max(TIME_MASTER_FREEZE_RANGE_MIN,
+			Math.min(TIME_MASTER_FREEZE_RANGE_MAX, timeMasterFreezeRange));
+	}
+
+	public static int getScatterBrainCooldownSeconds() {
+		return Math.max(SCATTER_BRAIN_COOLDOWN_SECONDS_MIN,
+			Math.min(SCATTER_BRAIN_COOLDOWN_SECONDS_MAX, scatterBrainCooldownSeconds));
+	}
+
+	public static int getTrackerMaxTargets() {
+		return Math.max(TRACKER_MAX_TARGETS_MIN,
+			Math.min(TRACKER_MAX_TARGETS_MAX, trackerMaxTargets));
+	}
+
+	public static int getTrackerRange() {
+		return Math.max(TRACKER_RANGE_MIN, Math.min(TRACKER_RANGE_MAX, trackerRange));
+	}
+
+	public static int getTrackerCooldownSeconds() {
+		return Math.max(TRACKER_COOLDOWN_SECONDS_MIN,
+			Math.min(TRACKER_COOLDOWN_SECONDS_MAX, trackerCooldownSeconds));
+	}
+
+	public static int getAltruistRange() {
+		return Math.max(ALTRUIST_RANGE_MIN, Math.min(ALTRUIST_RANGE_MAX, altruistRange));
+	}
+
+	public static boolean isLastDeathShieldEnabled() {
+		return lastDeathShieldEnabled;
+	}
+
 	public static int getMaxKillerAmount() {
 		return Math.max(MAX_KILLER_AMOUNT_MIN, Math.min(MAX_KILLER_AMOUNT_MAX, maxKillerAmount));
+	}
+
+	public static int getMaxVigilanteAmount() {
+		return Math.max(MAX_VIGILANTE_AMOUNT_MIN, Math.min(MAX_VIGILANTE_AMOUNT_MAX, maxVigilanteAmount));
 	}
 
 	public static float getC4BackOffsetX() {
@@ -469,16 +596,31 @@ public final class GexpressConfig {
 			juggernautCooldownReductionSeconds = snap.juggernautCooldownReductionSeconds;
 			juggernautMinimumCooldownSeconds = snap.juggernautMinimumCooldownSeconds;
 			tricksterSwapDurationSeconds = snap.tricksterSwapDurationSeconds;
+			tricksterDancingCartsMaxUses = snap.tricksterDancingCartsMaxUses;
 			puppetmasterControlDurationSeconds = snap.puppetmasterControlDurationSeconds;
 			puppetmasterControlCooldownSeconds = snap.puppetmasterControlCooldownSeconds;
 			puppetmasterRandomTarget = snap.puppetmasterRandomTarget;
 			puppetmasterCanKillOwnBody = snap.puppetmasterCanKillOwnBody;
+			puppetmasterControlRange = snap.puppetmasterControlRange;
 			pelicanEatCooldownSeconds = snap.pelicanEatCooldownSeconds;
+			hungryFoodLimit = snap.hungryFoodLimit;
+			thirstyDrinkLimit = snap.thirstyDrinkLimit;
 			snitchTasksRequired = snap.snitchTasksRequired;
+			snitchWarningTasksRemaining = snap.snitchWarningTasksRemaining;
 			timeMasterRewindSeconds = snap.timeMasterRewindSeconds;
 			timeMasterCooldownSeconds = snap.timeMasterCooldownSeconds;
 			timeMasterMaxUses = snap.timeMasterMaxUses;
+			timeMasterFreezeDurationSeconds = snap.timeMasterFreezeDurationSeconds;
+			timeMasterFreezeCooldownSeconds = snap.timeMasterFreezeCooldownSeconds;
+			timeMasterFreezeRange = snap.timeMasterFreezeRange;
+			scatterBrainCooldownSeconds = snap.scatterBrainCooldownSeconds;
+			trackerMaxTargets = snap.trackerMaxTargets;
+			trackerRange = snap.trackerRange;
+			trackerCooldownSeconds = snap.trackerCooldownSeconds;
+			altruistRange = snap.altruistRange;
+			lastDeathShieldEnabled = snap.lastDeathShieldEnabled;
 			maxKillerAmount = snap.maxKillerAmount;
+			maxVigilanteAmount = snap.maxVigilanteAmount;
 			c4BackOffsetX = snap.c4BackOffsetX;
 			c4BackOffsetY = snap.c4BackOffsetY;
 			c4BackOffsetZ = snap.c4BackOffsetZ;
@@ -524,16 +666,31 @@ public final class GexpressConfig {
 			snap.juggernautCooldownReductionSeconds = juggernautCooldownReductionSeconds;
 			snap.juggernautMinimumCooldownSeconds = juggernautMinimumCooldownSeconds;
 			snap.tricksterSwapDurationSeconds = tricksterSwapDurationSeconds;
+			snap.tricksterDancingCartsMaxUses = tricksterDancingCartsMaxUses;
 			snap.puppetmasterControlDurationSeconds = puppetmasterControlDurationSeconds;
 			snap.puppetmasterControlCooldownSeconds = puppetmasterControlCooldownSeconds;
 			snap.puppetmasterRandomTarget = puppetmasterRandomTarget;
 			snap.puppetmasterCanKillOwnBody = puppetmasterCanKillOwnBody;
+			snap.puppetmasterControlRange = puppetmasterControlRange;
 			snap.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
+			snap.hungryFoodLimit = hungryFoodLimit;
+			snap.thirstyDrinkLimit = thirstyDrinkLimit;
 			snap.snitchTasksRequired = snitchTasksRequired;
+			snap.snitchWarningTasksRemaining = snitchWarningTasksRemaining;
 			snap.timeMasterRewindSeconds = timeMasterRewindSeconds;
 			snap.timeMasterCooldownSeconds = timeMasterCooldownSeconds;
 			snap.timeMasterMaxUses = timeMasterMaxUses;
+			snap.timeMasterFreezeDurationSeconds = timeMasterFreezeDurationSeconds;
+			snap.timeMasterFreezeCooldownSeconds = timeMasterFreezeCooldownSeconds;
+			snap.timeMasterFreezeRange = timeMasterFreezeRange;
+			snap.scatterBrainCooldownSeconds = scatterBrainCooldownSeconds;
+			snap.trackerMaxTargets = trackerMaxTargets;
+			snap.trackerRange = trackerRange;
+			snap.trackerCooldownSeconds = trackerCooldownSeconds;
+			snap.altruistRange = altruistRange;
+			snap.lastDeathShieldEnabled = lastDeathShieldEnabled;
 			snap.maxKillerAmount = maxKillerAmount;
+			snap.maxVigilanteAmount = maxVigilanteAmount;
 			snap.c4BackOffsetX = c4BackOffsetX;
 			snap.c4BackOffsetY = c4BackOffsetY;
 			snap.c4BackOffsetZ = c4BackOffsetZ;
@@ -565,9 +722,16 @@ public final class GexpressConfig {
 			int warlockMarkCooldownSeconds, int warlockKillCooldownSeconds,
 			int juggernautInitialCooldownSeconds, int juggernautCooldownReductionSeconds,
 			int juggernautMinimumCooldownSeconds, int tricksterSwapDurationSeconds,
+			int tricksterDancingCartsMaxUses,
 			int puppetmasterControlDurationSeconds, int puppetmasterControlCooldownSeconds,
-			boolean puppetmasterRandomTarget, int pelicanEatCooldownSeconds, int snitchTasksRequired,
-			int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses, int maxKillerAmount,
+			boolean puppetmasterRandomTarget, int puppetmasterControlRange,
+			int pelicanEatCooldownSeconds, int hungryFoodLimit, int thirstyDrinkLimit, int snitchTasksRequired,
+			int snitchWarningTasksRemaining,
+			int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses,
+			int timeMasterFreezeDurationSeconds, int timeMasterFreezeCooldownSeconds,
+			int timeMasterFreezeRange, int scatterBrainCooldownSeconds, int trackerMaxTargets,
+			int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
+			int maxKillerAmount, int maxVigilanteAmount,
 			float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 			float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
 			float c4BackSlant, float c4BackScale, String c4PlacementPresets,
@@ -591,15 +755,30 @@ public final class GexpressConfig {
 		GexpressConfig.juggernautCooldownReductionSeconds = juggernautCooldownReductionSeconds;
 		GexpressConfig.juggernautMinimumCooldownSeconds = juggernautMinimumCooldownSeconds;
 		GexpressConfig.tricksterSwapDurationSeconds = tricksterSwapDurationSeconds;
+		GexpressConfig.tricksterDancingCartsMaxUses = tricksterDancingCartsMaxUses;
 		GexpressConfig.puppetmasterControlDurationSeconds = puppetmasterControlDurationSeconds;
 		GexpressConfig.puppetmasterControlCooldownSeconds = puppetmasterControlCooldownSeconds;
 		GexpressConfig.puppetmasterRandomTarget = puppetmasterRandomTarget;
+		GexpressConfig.puppetmasterControlRange = puppetmasterControlRange;
 		GexpressConfig.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
+		GexpressConfig.hungryFoodLimit = hungryFoodLimit;
+		GexpressConfig.thirstyDrinkLimit = thirstyDrinkLimit;
 		GexpressConfig.snitchTasksRequired = snitchTasksRequired;
+		GexpressConfig.snitchWarningTasksRemaining = snitchWarningTasksRemaining;
 		GexpressConfig.timeMasterRewindSeconds = timeMasterRewindSeconds;
 		GexpressConfig.timeMasterCooldownSeconds = timeMasterCooldownSeconds;
 		GexpressConfig.timeMasterMaxUses = timeMasterMaxUses;
+		GexpressConfig.timeMasterFreezeDurationSeconds = timeMasterFreezeDurationSeconds;
+		GexpressConfig.timeMasterFreezeCooldownSeconds = timeMasterFreezeCooldownSeconds;
+		GexpressConfig.timeMasterFreezeRange = timeMasterFreezeRange;
+		GexpressConfig.scatterBrainCooldownSeconds = scatterBrainCooldownSeconds;
+		GexpressConfig.trackerMaxTargets = trackerMaxTargets;
+		GexpressConfig.trackerRange = trackerRange;
+		GexpressConfig.trackerCooldownSeconds = trackerCooldownSeconds;
+		GexpressConfig.altruistRange = altruistRange;
+		GexpressConfig.lastDeathShieldEnabled = lastDeathShieldEnabled;
 		GexpressConfig.maxKillerAmount = maxKillerAmount;
+		GexpressConfig.maxVigilanteAmount = maxVigilanteAmount;
 		GexpressConfig.c4BackOffsetX = c4BackOffsetX;
 		GexpressConfig.c4BackOffsetY = c4BackOffsetY;
 		GexpressConfig.c4BackOffsetZ = c4BackOffsetZ;
@@ -634,14 +813,28 @@ public final class GexpressConfig {
 		juggernautCooldownReductionSeconds = getJuggernautCooldownReductionSeconds();
 		juggernautMinimumCooldownSeconds = getJuggernautMinimumCooldownSeconds();
 		tricksterSwapDurationSeconds = getTricksterSwapDurationSeconds();
+		tricksterDancingCartsMaxUses = getTricksterDancingCartsMaxUses();
 		puppetmasterControlDurationSeconds = getPuppetmasterControlDurationSeconds();
 		puppetmasterControlCooldownSeconds = getPuppetmasterControlCooldownSeconds();
+		puppetmasterControlRange = getPuppetmasterControlRange();
 		pelicanEatCooldownSeconds = getPelicanEatCooldownSeconds();
+		hungryFoodLimit = getHungryFoodLimit();
+		thirstyDrinkLimit = getThirstyDrinkLimit();
 		snitchTasksRequired = getSnitchTasksRequired();
+		snitchWarningTasksRemaining = getSnitchWarningTasksRemaining();
 		timeMasterRewindSeconds = getTimeMasterRewindSeconds();
 		timeMasterCooldownSeconds = getTimeMasterCooldownSeconds();
 		timeMasterMaxUses = getTimeMasterMaxUses();
+		timeMasterFreezeDurationSeconds = getTimeMasterFreezeDurationSeconds();
+		timeMasterFreezeCooldownSeconds = getTimeMasterFreezeCooldownSeconds();
+		timeMasterFreezeRange = getTimeMasterFreezeRange();
+		scatterBrainCooldownSeconds = getScatterBrainCooldownSeconds();
+		trackerMaxTargets = getTrackerMaxTargets();
+		trackerRange = getTrackerRange();
+		trackerCooldownSeconds = getTrackerCooldownSeconds();
+		altruistRange = getAltruistRange();
 		maxKillerAmount = getMaxKillerAmount();
+		maxVigilanteAmount = getMaxVigilanteAmount();
 		c4BackOffsetX = getC4BackOffsetX();
 		c4BackOffsetY = getC4BackOffsetY();
 		c4BackOffsetZ = getC4BackOffsetZ();
@@ -735,16 +928,31 @@ public final class GexpressConfig {
 		int juggernautCooldownReductionSeconds = 10;
 		int juggernautMinimumCooldownSeconds = 10;
 		int tricksterSwapDurationSeconds = 25;
+		int tricksterDancingCartsMaxUses = 1;
 		int puppetmasterControlDurationSeconds = 15;
 		int puppetmasterControlCooldownSeconds = 45;
 		boolean puppetmasterRandomTarget = false;
 		boolean puppetmasterCanKillOwnBody = false;
+		int puppetmasterControlRange = 16;
 		int pelicanEatCooldownSeconds = 20;
+		int hungryFoodLimit = 2;
+		int thirstyDrinkLimit = 2;
 		int snitchTasksRequired = 3;
+		int snitchWarningTasksRemaining = 1;
 		int timeMasterRewindSeconds = 10;
 		int timeMasterCooldownSeconds = 120;
 		int timeMasterMaxUses = 1;
+		int timeMasterFreezeDurationSeconds = 4;
+		int timeMasterFreezeCooldownSeconds = 30;
+		int timeMasterFreezeRange = 8;
+		int scatterBrainCooldownSeconds = 60;
+		int trackerMaxTargets = 3;
+		int trackerRange = 24;
+		int trackerCooldownSeconds = 10;
+		int altruistRange = 4;
+		boolean lastDeathShieldEnabled = false;
 		int maxKillerAmount = 64;
+		int maxVigilanteAmount = 1;
 		float c4BackOffsetX = 0.0F;
 		float c4BackOffsetY = 0.24F;
 		float c4BackOffsetZ = 0.28F;

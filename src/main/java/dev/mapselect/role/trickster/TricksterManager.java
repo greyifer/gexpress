@@ -1,6 +1,7 @@
 package dev.mapselect.role.trickster;
 
 import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
@@ -55,10 +56,17 @@ public final class TricksterManager {
 		ServerPlayNetworking.registerGlobalReceiver(TricksterDancingCartsPayload.ID,
 			(payload, context) -> context.server().execute(() -> DancingCartsManager.tryActivate(context.player())));
 		ServerTickEvents.END_WORLD_TICK.register(TricksterManager::tick);
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> {
+			if (world instanceof ServerWorld serverWorld) DancingCartsManager.clearRoundState(serverWorld);
+		});
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
+			if (world instanceof ServerWorld serverWorld) DancingCartsManager.clearRoundState(serverWorld);
+		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> {
 				clearNoellesMorphCycles(handler.player.getServerWorld());
 				syncActiveSwap(handler.player);
+				DancingCartsManager.syncCooldownTo(handler.player);
 			}));
 	}
 
@@ -178,6 +186,15 @@ public final class TricksterManager {
 		if (world == null) return false;
 		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
 		return active != null && active.isActive(world);
+	}
+
+	public static UUID replacementFor(UUID playerId) {
+		if (playerId == null) return null;
+		for (ActiveSwap active : activeSwaps.values()) {
+			UUID replacement = active.swaps().get(playerId);
+			if (replacement != null) return replacement;
+		}
+		return null;
 	}
 
 	public static void clearForTimeRewind(ServerWorld world) {

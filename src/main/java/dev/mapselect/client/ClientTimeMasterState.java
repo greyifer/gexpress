@@ -2,6 +2,7 @@ package dev.mapselect.client;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.mapselect.network.TimeMasterFreezeUsePayload;
 import dev.mapselect.network.TimeMasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -11,6 +12,7 @@ import net.minecraft.client.option.KeyBinding;
 
 public final class ClientTimeMasterState {
 	private static boolean wasAbilityDown;
+	private static boolean wasFreezeDown;
 
 	private ClientTimeMasterState() {}
 
@@ -23,6 +25,7 @@ public final class ClientTimeMasterState {
 				|| client.currentScreen != null || ClientVultureState.isLocalStashed(client)
 				|| !isLocalTimeMaster(client)) {
 			wasAbilityDown = false;
+			wasFreezeDown = false;
 			return;
 		}
 
@@ -32,6 +35,13 @@ public final class ClientTimeMasterState {
 			ClientPlayNetworking.send(new TimeMasterUsePayload());
 		}
 		wasAbilityDown = abilityDown;
+
+		KeyBinding freeze = ClientAbilityKeys.secondaryBinding();
+		boolean freezeDown = freeze != null && ClientAbilityKeys.isDown(client, freeze);
+		if (freezeDown && !wasFreezeDown && ClientPlayNetworking.canSend(TimeMasterFreezeUsePayload.ID)) {
+			ClientPlayNetworking.send(new TimeMasterFreezeUsePayload());
+		}
+		wasFreezeDown = freezeDown;
 	}
 
 	private static boolean isLocalTimeMaster(MinecraftClient client) {

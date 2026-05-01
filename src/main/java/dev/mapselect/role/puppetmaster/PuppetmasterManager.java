@@ -141,6 +141,7 @@ public final class PuppetmasterManager {
 		for (ServerPlayerEntity player : puppetmaster.getServerWorld().getPlayers()) {
 			if (player == puppetmaster) continue;
 			if (!isPlayable(player, puppetmaster)) continue;
+			if (!withinControlRange(puppetmaster, player)) continue;
 			targets.add(player);
 		}
 		return targets;
@@ -151,7 +152,7 @@ public final class PuppetmasterManager {
 		MinecraftServer server = puppetmaster.getServer();
 		ServerPlayerEntity target = server == null ? null : server.getPlayerManager().getPlayer(targetId);
 		if (target == null || target == puppetmaster || target.getWorld() != puppetmaster.getWorld()
-				|| !isPlayable(target, puppetmaster)) {
+				|| !isPlayable(target, puppetmaster) || !withinControlRange(puppetmaster, target)) {
 			puppetmaster.sendMessage(Text.literal("That puppet is no longer available."), true);
 			return;
 		}
@@ -173,6 +174,9 @@ public final class PuppetmasterManager {
 		copyHotbar(session.controllerHotbar, target);
 		puppetmaster.getInventory().selectedSlot = session.targetSelectedSlot;
 		target.getInventory().selectedSlot = session.controllerSelectedSlot;
+		PuppetmasterStatePayload state = new PuppetmasterStatePayload(true,
+			puppetmaster.getUuid(), target.getUuid(), target.getId());
+		broadcastState(puppetmaster.getServerWorld(), state);
 		target.setSneaking(false);
 		target.setSprinting(false);
 		target.setVelocity(Vec3d.ZERO);
@@ -184,9 +188,6 @@ public final class PuppetmasterManager {
 		puppetmaster.playerScreenHandler.syncState();
 		target.playerScreenHandler.syncState();
 
-		PuppetmasterStatePayload state = new PuppetmasterStatePayload(true,
-			puppetmaster.getUuid(), target.getUuid(), target.getId());
-		broadcastState(puppetmaster.getServerWorld(), state);
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(puppetmaster));
 		puppetmaster.getWorld().playSound(null, puppetmaster.getBlockPos(),
 			SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.75F, 0.55F);
@@ -478,6 +479,13 @@ public final class PuppetmasterManager {
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity puppetmaster) {
 		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(puppetmaster);
+	}
+
+	private static boolean withinControlRange(ServerPlayerEntity puppetmaster, ServerPlayerEntity target) {
+		if (GexpressTestState.isRoleTester(puppetmaster)) return true;
+		if (puppetmaster == null || target == null || puppetmaster.getWorld() != target.getWorld()) return false;
+		double range = GexpressConfig.getPuppetmasterControlRange();
+		return puppetmaster.squaredDistanceTo(target) <= range * range;
 	}
 
 	private static ArrayList<Modifier> copyModifiers(World world, UUID playerId) {
