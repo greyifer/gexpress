@@ -3,6 +3,7 @@ package dev.mapselect.client;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.network.VultureEatPayload;
+import dev.mapselect.network.VultureProgressPayload;
 import dev.mapselect.network.VultureReleasePayload;
 import dev.mapselect.network.VultureStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -14,12 +15,18 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.Entity;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.UUID;
 
 public final class ClientVultureState {
 	private static volatile UUID vultureId;
 	private static volatile int vultureEntityId = -1;
+	private static int eaten;
+	private static int required = 1;
+	private static boolean showProgress;
+	private static float progressAlpha;
 	private static boolean wasEatDown;
 	private static boolean wasReleaseDown;
 
@@ -28,6 +35,8 @@ public final class ClientVultureState {
 	public static void register() {
 		ClientPlayNetworking.registerGlobalReceiver(VultureStatePayload.ID, (payload, context) ->
 			context.client().execute(() -> applyState(context.client(), payload)));
+		ClientPlayNetworking.registerGlobalReceiver(VultureProgressPayload.ID, (payload, context) ->
+			context.client().execute(() -> applyProgress(payload)));
 		ClientTickEvents.END_CLIENT_TICK.register(ClientVultureState::tick);
 		HudRenderCallback.EVENT.register(ClientVultureState::renderHud);
 	}
@@ -46,6 +55,12 @@ public final class ClientVultureState {
 		if (vulture != null) client.setCameraEntity(vulture);
 	}
 
+	private static void applyProgress(VultureProgressPayload payload) {
+		showProgress = payload.show();
+		eaten = Math.max(0, payload.eaten());
+		required = Math.max(1, payload.required());
+	}
+
 	private static void tick(MinecraftClient client) {
 		if (client == null || client.player == null || client.world == null) {
 			clearLocal();
@@ -53,6 +68,8 @@ public final class ClientVultureState {
 			wasReleaseDown = false;
 			return;
 		}
+		progressAlpha = MathHelper.lerp(0.22F, progressAlpha,
+			showProgress && isLocalVulture(client) ? 1.0F : 0.0F);
 
 		if (isLocalStashed(client)) {
 			Entity vulture = client.world.getEntityById(vultureEntityId);
@@ -84,10 +101,18 @@ public final class ClientVultureState {
 
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null || !isLocalStashed(client)) return;
-		int alpha = 96;
-		int color = (alpha << 24) | 0x303030;
-		context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), color);
+		if (client == null || client.player == null) return;
+		if (isLocalStashed(client)) {
+			int alpha = 96;
+			int color = (alpha << 24) | 0x303030;
+			context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), color);
+		}
+		if (progressAlpha > 0.02F && client.textRenderer != null && !client.options.hudHidden) {
+			int alpha = Math.max(0, Math.min(255, (int) (progressAlpha * 255.0F)));
+			Text text = Text.literal("Pelican " + Math.min(eaten, required) + "/" + required);
+			int x = context.getScaledWindowWidth() - client.textRenderer.getWidth(text) - 8;
+			context.drawTextWithShadow(client.textRenderer, text, x, 26, 0x00C5DF5C | (alpha << 24));
+		}
 	}
 
 	public static boolean isLocalStashed(MinecraftClient client) {
@@ -108,6 +133,8 @@ public final class ClientVultureState {
 	private static void clearLocal() {
 		vultureId = null;
 		vultureEntityId = -1;
+		showProgress = false;
+		progressAlpha = 0.0F;
 	}
 
 	private static KeyBinding resolveAbilityBinding() {

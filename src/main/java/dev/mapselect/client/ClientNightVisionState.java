@@ -1,33 +1,32 @@
 package dev.mapselect.client;
 
 import dev.mapselect.network.NightVisionSyncPayload;
-import dev.mapselect.registry.MapSelectModifiers;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import org.agmas.harpymodloader.component.WorldModifierComponent;
+import net.minecraft.util.math.MathHelper;
 
 public final class ClientNightVisionState {
 	private static volatile boolean nightVision = false;
+	private static float strength = 0.0F;
 
 	private ClientNightVisionState() {}
 
 	public static void register() {
 		ClientPlayNetworking.registerGlobalReceiver(NightVisionSyncPayload.ID, (payload, context) ->
 			context.client().execute(() -> nightVision = payload.nightVision()));
+		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			if (client == null || client.world == null || client.player == null) {
+				nightVision = false;
+			}
+			strength = MathHelper.lerp(0.18F, strength, nightVision ? 1.0F : 0.0F);
+		});
 	}
 
 	public static boolean hasNightVision() {
-		return nightVision || hasClientModifier();
+		return strength > 0.01F;
 	}
 
-	private static boolean hasClientModifier() {
-		MinecraftClient mc = MinecraftClient.getInstance();
-		if (mc == null || mc.world == null || mc.player == null) return false;
-		try {
-			WorldModifierComponent mods = WorldModifierComponent.KEY.getNullable(mc.world);
-			return mods != null && mods.isModifier(mc.player, MapSelectModifiers.NIGHT_VISION);
-		} catch (Throwable ignored) {
-			return false;
-		}
+	public static float strength() {
+		return strength;
 	}
 }

@@ -1,6 +1,7 @@
 package dev.mapselect.permissions;
 
 import dev.mapselect.host.HostComponent;
+import dev.mapselect.host.TrustedComponent;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
@@ -18,6 +19,7 @@ public final class GexpressPermissions {
 	public static final String DEV_USERNAME = "greyifer";
 	public static final UUID DEV_UUID = UUID.fromString("4eaa64ee-f4a5-4fb5-868e-2580327543fd");
 	public static final int DEV_COLOR = 0xCBFF2E;
+	public static final int TRUSTED_COLOR = 0xF2C94C;
 
 	private GexpressPermissions() {}
 
@@ -44,6 +46,10 @@ public final class GexpressPermissions {
 
 	public static boolean isHostOrDev(PlayerEntity player) {
 		return isDev(player) || HostComponent.isHost(player);
+	}
+
+	public static boolean isTrusted(PlayerEntity player) {
+		return TrustedComponent.isTrusted(player);
 	}
 
 	public static boolean canUseAdminCommands(ServerCommandSource source) {
@@ -77,14 +83,20 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean hasBadge(PlayerEntity player) {
-		return isDev(player) || HostComponent.isHost(player);
+		return isDev(player) || isTrusted(player) || HostComponent.isHost(player);
 	}
 
 	public static MutableText displayName(PlayerEntity player) {
 		return Text.empty()
-			.append(isDev(player) ? devBadge() : hostBadge())
+			.append(badgeFor(player))
 			.append(Text.literal(" "))
 			.append(Text.literal(player.getGameProfile().getName()));
+	}
+
+	private static Text badgeFor(PlayerEntity player) {
+		if (isDev(player)) return devBadge();
+		if (isTrusted(player)) return trustedBadge();
+		return hostBadge();
 	}
 
 	public static Text hostBadge() {
@@ -93,5 +105,9 @@ public final class GexpressPermissions {
 
 	public static Text devBadge() {
 		return Text.literal("Dev").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(DEV_COLOR)));
+	}
+
+	public static Text trustedBadge() {
+		return Text.literal("Trusted").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(TRUSTED_COLOR)));
 	}
 }

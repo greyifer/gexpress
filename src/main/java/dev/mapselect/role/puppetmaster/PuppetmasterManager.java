@@ -486,7 +486,6 @@ public final class PuppetmasterManager {
 	}
 
 	private static boolean withinControlRange(ServerPlayerEntity puppetmaster, ServerPlayerEntity target) {
-		if (GexpressTestState.isRoleTester(puppetmaster)) return true;
 		if (puppetmaster == null || target == null || puppetmaster.getWorld() != target.getWorld()) return false;
 		double range = GexpressConfig.getPuppetmasterControlRange();
 		return puppetmaster.squaredDistanceTo(target) <= range * range;

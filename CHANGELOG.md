@@ -1,3 +1,25 @@
+# Grey's Express 1.2.3
+
+## Added
+
+- New Trusted tag with `/g trusted add/remove/list`, gold-yellow display text, and custom Trusted weapon models.
+- Trusted players now use the Coca-Cola Revolver and Chicken Stick Knife textures.
+- New killer role: Bounty Hunter. Bounty Hunters receive timed targets, earn configurable gold for killing the target, and receive configurable weapon cooldowns if the bounty timer expires.
+- Game settings can now switch between fixed max Killer/Vigilante counts and scaled players-per-Killer/Vigilante role counts.
+- Pelican now has a dedicated top-corner swallow progress counter.
+
+## Changed
+
+- Dev-tagged players continue to bypass supporter-gated skin checks so the dev tag can access all skins.
+- Juggernaut and Pelican now use Wathe's fake-task mood, so neutral power roles receive fake task prompts like killers.
+- Puppetmaster target range now applies even while role testing.
+- Night Vision now fades in/out from the server-synced modifier state to avoid screen flashing.
+
+## Fixed
+
+- Trusted weapon ownership now stamps onto Knife/Revolver stacks like Host/Dev cosmetics.
+- Time Master rewind snapshots now include Bounty Hunter bounty state.
+
 # Grey's Express 1.2.2
 
 ## Added

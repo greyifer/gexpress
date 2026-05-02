@@ -13,6 +13,7 @@ public class GreyCommand {
 			.then(StartCommand.buildTree())
 			.then(EndCommand.buildTree())
 			.then(HostCommand.buildTree())
+			.then(TrustedCommand.buildTree())
 			.then(VoiceCommand.buildTree())
 			.then(TestCommand.buildTree())
 			.then(C4Command.buildTree())

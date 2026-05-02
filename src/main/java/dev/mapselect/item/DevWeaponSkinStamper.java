@@ -20,7 +20,7 @@ public final class DevWeaponSkinStamper {
 	}
 
 	public static void stamp(PlayerEntity player) {
-		if (!GexpressPermissions.isHostOrDev(player)) return;
+		if (!GexpressPermissions.isHostOrDev(player) && !GexpressPermissions.isTrusted(player)) return;
 		String owner = player.getUuidAsString();
 		for (int i = 0; i < player.getInventory().size(); i++) {
 			stampStack(player.getInventory().getStack(i), owner);

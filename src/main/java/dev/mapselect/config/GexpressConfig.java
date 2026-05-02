@@ -103,12 +103,24 @@ public final class GexpressConfig {
 	public static int trackerCooldownSeconds = 10;
 	/** Maximum block range for Altruist's revive target search. */
 	public static int altruistRange = 4;
+	/** Seconds before Bounty Hunter's current bounty expires and changes. */
+	public static int bountyHunterBountyIntervalSeconds = 60;
+	/** Coins paid to a Bounty Hunter for killing their current bounty. */
+	public static int bountyHunterRewardGold = 200;
+	/** Weapon cooldown penalty in seconds when a Bounty Hunter misses their bounty window. */
+	public static int bountyHunterFailCooldownSeconds = 90;
 	/** Whether the player who died last round starts the next round with one breakable shield. */
 	public static boolean lastDeathShieldEnabled = false;
+	/** Whether G'Express uses fixed max Killer/Vigilante counts instead of per-player scaling. */
+	public static boolean useCustomRoleCounts = true;
 	/** Maximum number of normal killer-team players assigned by G'Express role assignment. */
 	public static int maxKillerAmount = 64;
 	/** Maximum number of Vigilantes assigned by G'Express role assignment. */
 	public static int maxVigilanteAmount = 1;
+	/** Number of players per killer when custom role counts are disabled. */
+	public static int playersPerKiller = 6;
+	/** Number of players per Vigilante when custom role counts are disabled. */
+	public static int playersPerVigilante = 8;
 	/** Synced C4 backpack model tuning. */
 	public static float c4BackOffsetX = 0.0F;
 	public static float c4BackOffsetY = 0.24F;
@@ -207,10 +219,20 @@ public final class GexpressConfig {
 	public static final int TRACKER_COOLDOWN_SECONDS_MAX = 600;
 	public static final int ALTRUIST_RANGE_MIN = 1;
 	public static final int ALTRUIST_RANGE_MAX = 16;
+	public static final int BOUNTY_HUNTER_INTERVAL_SECONDS_MIN = 10;
+	public static final int BOUNTY_HUNTER_INTERVAL_SECONDS_MAX = 600;
+	public static final int BOUNTY_HUNTER_REWARD_GOLD_MIN = 0;
+	public static final int BOUNTY_HUNTER_REWARD_GOLD_MAX = 9999;
+	public static final int BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MIN = 0;
+	public static final int BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MAX = 900;
 	public static final int MAX_KILLER_AMOUNT_MIN = 1;
 	public static final int MAX_KILLER_AMOUNT_MAX = 64;
 	public static final int MAX_VIGILANTE_AMOUNT_MIN = 0;
 	public static final int MAX_VIGILANTE_AMOUNT_MAX = 64;
+	public static final int PLAYERS_PER_KILLER_MIN = 1;
+	public static final int PLAYERS_PER_KILLER_MAX = 64;
+	public static final int PLAYERS_PER_VIGILANTE_MIN = 1;
+	public static final int PLAYERS_PER_VIGILANTE_MAX = 64;
 	public static final float C4_BACK_OFFSET_MIN = -1.0F;
 	public static final float C4_BACK_OFFSET_MAX = 1.0F;
 	public static final float C4_BACK_ROTATION_MIN = -180.0F;
@@ -410,8 +432,27 @@ public final class GexpressConfig {
 		return Math.max(ALTRUIST_RANGE_MIN, Math.min(ALTRUIST_RANGE_MAX, altruistRange));
 	}
 
+	public static int getBountyHunterBountyIntervalSeconds() {
+		return Math.max(BOUNTY_HUNTER_INTERVAL_SECONDS_MIN,
+			Math.min(BOUNTY_HUNTER_INTERVAL_SECONDS_MAX, bountyHunterBountyIntervalSeconds));
+	}
+
+	public static int getBountyHunterRewardGold() {
+		return Math.max(BOUNTY_HUNTER_REWARD_GOLD_MIN,
+			Math.min(BOUNTY_HUNTER_REWARD_GOLD_MAX, bountyHunterRewardGold));
+	}
+
+	public static int getBountyHunterFailCooldownSeconds() {
+		return Math.max(BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MIN,
+			Math.min(BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MAX, bountyHunterFailCooldownSeconds));
+	}
+
 	public static boolean isLastDeathShieldEnabled() {
 		return lastDeathShieldEnabled;
+	}
+
+	public static boolean useCustomRoleCounts() {
+		return useCustomRoleCounts;
 	}
 
 	public static int getMaxKillerAmount() {
@@ -420,6 +461,15 @@ public final class GexpressConfig {
 
 	public static int getMaxVigilanteAmount() {
 		return Math.max(MAX_VIGILANTE_AMOUNT_MIN, Math.min(MAX_VIGILANTE_AMOUNT_MAX, maxVigilanteAmount));
+	}
+
+	public static int getPlayersPerKiller() {
+		return Math.max(PLAYERS_PER_KILLER_MIN, Math.min(PLAYERS_PER_KILLER_MAX, playersPerKiller));
+	}
+
+	public static int getPlayersPerVigilante() {
+		return Math.max(PLAYERS_PER_VIGILANTE_MIN,
+			Math.min(PLAYERS_PER_VIGILANTE_MAX, playersPerVigilante));
 	}
 
 	public static float getC4BackOffsetX() {
@@ -628,9 +678,15 @@ public final class GexpressConfig {
 			trackerRange = snap.trackerRange;
 			trackerCooldownSeconds = snap.trackerCooldownSeconds;
 			altruistRange = snap.altruistRange;
+			bountyHunterBountyIntervalSeconds = snap.bountyHunterBountyIntervalSeconds;
+			bountyHunterRewardGold = snap.bountyHunterRewardGold;
+			bountyHunterFailCooldownSeconds = snap.bountyHunterFailCooldownSeconds;
 			lastDeathShieldEnabled = snap.lastDeathShieldEnabled;
+			useCustomRoleCounts = snap.useCustomRoleCounts;
 			maxKillerAmount = snap.maxKillerAmount;
 			maxVigilanteAmount = snap.maxVigilanteAmount;
+			playersPerKiller = snap.playersPerKiller;
+			playersPerVigilante = snap.playersPerVigilante;
 			c4BackOffsetX = snap.c4BackOffsetX;
 			c4BackOffsetY = snap.c4BackOffsetY;
 			c4BackOffsetZ = snap.c4BackOffsetZ;
@@ -699,9 +755,15 @@ public final class GexpressConfig {
 			snap.trackerRange = trackerRange;
 			snap.trackerCooldownSeconds = trackerCooldownSeconds;
 			snap.altruistRange = altruistRange;
+			snap.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
+			snap.bountyHunterRewardGold = bountyHunterRewardGold;
+			snap.bountyHunterFailCooldownSeconds = bountyHunterFailCooldownSeconds;
 			snap.lastDeathShieldEnabled = lastDeathShieldEnabled;
+			snap.useCustomRoleCounts = useCustomRoleCounts;
 			snap.maxKillerAmount = maxKillerAmount;
 			snap.maxVigilanteAmount = maxVigilanteAmount;
+			snap.playersPerKiller = playersPerKiller;
+			snap.playersPerVigilante = playersPerVigilante;
 			snap.c4BackOffsetX = c4BackOffsetX;
 			snap.c4BackOffsetY = c4BackOffsetY;
 			snap.c4BackOffsetZ = c4BackOffsetZ;
@@ -743,7 +805,9 @@ public final class GexpressConfig {
 			int timeMasterFreezeMaxUses, int timeMasterFreezeRange,
 			int scatterBrainCooldownSeconds, int trackerMaxTargets,
 			int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
-			int maxKillerAmount, int maxVigilanteAmount,
+			int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold,
+			int bountyHunterFailCooldownSeconds, boolean useCustomRoleCounts,
+			int maxKillerAmount, int maxVigilanteAmount, int playersPerKiller, int playersPerVigilante,
 			float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 			float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
 			float c4BackSlant, float c4BackScale, String c4PlacementPresets,
@@ -789,9 +853,15 @@ public final class GexpressConfig {
 		GexpressConfig.trackerRange = trackerRange;
 		GexpressConfig.trackerCooldownSeconds = trackerCooldownSeconds;
 		GexpressConfig.altruistRange = altruistRange;
+		GexpressConfig.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
+		GexpressConfig.bountyHunterRewardGold = bountyHunterRewardGold;
+		GexpressConfig.bountyHunterFailCooldownSeconds = bountyHunterFailCooldownSeconds;
 		GexpressConfig.lastDeathShieldEnabled = lastDeathShieldEnabled;
+		GexpressConfig.useCustomRoleCounts = useCustomRoleCounts;
 		GexpressConfig.maxKillerAmount = maxKillerAmount;
 		GexpressConfig.maxVigilanteAmount = maxVigilanteAmount;
+		GexpressConfig.playersPerKiller = playersPerKiller;
+		GexpressConfig.playersPerVigilante = playersPerVigilante;
 		GexpressConfig.c4BackOffsetX = c4BackOffsetX;
 		GexpressConfig.c4BackOffsetY = c4BackOffsetY;
 		GexpressConfig.c4BackOffsetZ = c4BackOffsetZ;
@@ -847,8 +917,13 @@ public final class GexpressConfig {
 		trackerRange = getTrackerRange();
 		trackerCooldownSeconds = getTrackerCooldownSeconds();
 		altruistRange = getAltruistRange();
+		bountyHunterBountyIntervalSeconds = getBountyHunterBountyIntervalSeconds();
+		bountyHunterRewardGold = getBountyHunterRewardGold();
+		bountyHunterFailCooldownSeconds = getBountyHunterFailCooldownSeconds();
 		maxKillerAmount = getMaxKillerAmount();
 		maxVigilanteAmount = getMaxVigilanteAmount();
+		playersPerKiller = getPlayersPerKiller();
+		playersPerVigilante = getPlayersPerVigilante();
 		c4BackOffsetX = getC4BackOffsetX();
 		c4BackOffsetY = getC4BackOffsetY();
 		c4BackOffsetZ = getC4BackOffsetZ();
@@ -965,9 +1040,15 @@ public final class GexpressConfig {
 		int trackerRange = 24;
 		int trackerCooldownSeconds = 10;
 		int altruistRange = 4;
+		int bountyHunterBountyIntervalSeconds = 60;
+		int bountyHunterRewardGold = 200;
+		int bountyHunterFailCooldownSeconds = 90;
 		boolean lastDeathShieldEnabled = false;
+		boolean useCustomRoleCounts = true;
 		int maxKillerAmount = 64;
 		int maxVigilanteAmount = 1;
+		int playersPerKiller = 6;
+		int playersPerVigilante = 8;
 		float c4BackOffsetX = 0.0F;
 		float c4BackOffsetY = 0.24F;
 		float c4BackOffsetZ = 0.28F;

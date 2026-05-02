@@ -5,6 +5,7 @@ import dev.doctor4t.wathe.index.WatheCosmetics;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.MapSelect;
 import dev.mapselect.host.HostComponent;
+import dev.mapselect.host.TrustedComponent;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.fabricmc.fabric.api.client.model.loading.v1.FabricBakedModelManager;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
@@ -23,13 +24,15 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	public static final Identifier DEV_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_dev");
 	public static final Identifier HOST_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_host");
 	public static final Identifier HOST_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_host");
+	public static final Identifier TRUSTED_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_trusted");
+	public static final Identifier TRUSTED_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_trusted");
 	public static final Identifier SHADOW_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_shadow");
 	public static final Identifier SHADOW_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shadow");
 
 	@Override
 	public void onInitializeModelLoader(Context pluginContext) {
 		pluginContext.addModels(DEV_KNIFE_MODEL, DEV_REVOLVER_MODEL, HOST_KNIFE_MODEL, HOST_REVOLVER_MODEL,
-			SHADOW_KNIFE_MODEL, SHADOW_REVOLVER_MODEL);
+			TRUSTED_KNIFE_MODEL, TRUSTED_REVOLVER_MODEL, SHADOW_KNIFE_MODEL, SHADOW_REVOLVER_MODEL);
 	}
 
 	public static BakedModel resolve(BakedModelManager manager, ItemStack stack, LivingEntity entity) {
@@ -47,18 +50,34 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 
 		WeaponSkin skin = resolveSkin(stack, entity);
 		if (skin == WeaponSkin.NONE) return null;
-		if (stack.isOf(WatheItems.KNIFE)) return skin == WeaponSkin.DEV ? DEV_KNIFE_MODEL : HOST_KNIFE_MODEL;
-		if (stack.isOf(WatheItems.REVOLVER)) return skin == WeaponSkin.DEV ? DEV_REVOLVER_MODEL : HOST_REVOLVER_MODEL;
+		if (stack.isOf(WatheItems.KNIFE)) {
+			return switch (skin) {
+				case DEV -> DEV_KNIFE_MODEL;
+				case TRUSTED -> TRUSTED_KNIFE_MODEL;
+				case HOST -> HOST_KNIFE_MODEL;
+				default -> null;
+			};
+		}
+		if (stack.isOf(WatheItems.REVOLVER)) {
+			return switch (skin) {
+				case DEV -> DEV_REVOLVER_MODEL;
+				case TRUSTED -> TRUSTED_REVOLVER_MODEL;
+				case HOST -> HOST_REVOLVER_MODEL;
+				default -> null;
+			};
+		}
 		return null;
 	}
 
 	private static WeaponSkin resolveSkin(ItemStack stack, LivingEntity entity) {
 		if (entity instanceof PlayerEntity player) {
 			if (GexpressPermissions.isDev(player)) return WeaponSkin.DEV;
+			if (TrustedComponent.isTrusted(player)) return WeaponSkin.TRUSTED;
 			if (HostComponent.isHost(player)) return WeaponSkin.HOST;
 		}
 		String owner = stack.get(WatheDataComponentTypes.OWNER);
 		if (GexpressPermissions.isDevUuidString(owner)) return WeaponSkin.DEV;
+		if (isTrustedUuidString(owner)) return WeaponSkin.TRUSTED;
 		return isHostUuidString(owner) ? WeaponSkin.HOST : WeaponSkin.NONE;
 	}
 
@@ -72,11 +91,24 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	}
 
 	private static boolean isHostUuidString(String uuid) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client == null || client.world == null) return false;
+		return isUuidInComponent(uuid, HostComponent.KEY.getNullable(client.world));
+	}
+
+	private static boolean isTrustedUuidString(String uuid) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client == null || client.world == null) return false;
+		return isUuidInComponent(uuid, TrustedComponent.KEY.getNullable(client.world));
+	}
+
+	private static boolean isUuidInComponent(String uuid, Object component) {
 		if (uuid == null || uuid.isBlank()) return false;
 		try {
-			if (MinecraftClient.getInstance().world == null) return false;
-			HostComponent hosts = HostComponent.KEY.getNullable(MinecraftClient.getInstance().world);
-			return hosts != null && hosts.isHost(UUID.fromString(uuid));
+			UUID parsed = UUID.fromString(uuid);
+			if (component instanceof HostComponent hosts) return hosts.isHost(parsed);
+			if (component instanceof TrustedComponent trusted) return trusted.isTrusted(parsed);
+			return false;
 		} catch (IllegalArgumentException ignored) {
 			return false;
 		}
@@ -85,6 +117,7 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	private enum WeaponSkin {
 		NONE,
 		DEV,
+		TRUSTED,
 		HOST
 	}
 }

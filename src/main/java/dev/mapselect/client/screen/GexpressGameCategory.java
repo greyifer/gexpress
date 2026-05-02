@@ -45,6 +45,7 @@ public final class GexpressGameCategory {
 	private static final String JUGGERNAUT_ID = MapSelect.MOD_ID + ":juggernaut";
 	private static final String TRICKSTER_ID = MapSelect.MOD_ID + ":trickster";
 	private static final String PUPPETMASTER_ID = MapSelect.MOD_ID + ":puppetmaster";
+	private static final String BOUNTY_HUNTER_ID = MapSelect.MOD_ID + ":bounty_hunter";
 	private static final String VULTURE_ID = MapSelect.MOD_ID + ":pelican";
 	private static final String SCATTER_BRAIN_ID = MapSelect.MOD_ID + ":scatter_brain";
 	private static final String TRACKER_ID = MapSelect.MOD_ID + ":tracker";
@@ -89,8 +90,19 @@ public final class GexpressGameCategory {
 		List<Option<?>> globalRoleOpts = new ArrayList<>();
 		OptionGroup rolesGroup = weGroupByKey.get(WE_ROLES_KEY);
 		if (rolesGroup != null) parseWeGroup(rolesGroup, WE_ROLES_OPTS_PREFIX, roleKeyToWeOpts, globalRoleOpts);
-		globalRoleOpts.add(buildMaxKillerAmountOption());
-		globalRoleOpts.add(buildMaxVigilanteAmountOption());
+		globalRoleOpts.add(buildUseCustomRoleCountsOption());
+		Option<Integer> maxKillers = buildMaxKillerAmountOption();
+		Option<Integer> maxVigilantes = buildMaxVigilanteAmountOption();
+		Option<Integer> playersPerKiller = buildPlayersPerKillerOption();
+		Option<Integer> playersPerVigilante = buildPlayersPerVigilanteOption();
+		OptionVisibility.setHiddenWhen(maxKillers, () -> !GexpressConfig.useCustomRoleCounts());
+		OptionVisibility.setHiddenWhen(maxVigilantes, () -> !GexpressConfig.useCustomRoleCounts());
+		OptionVisibility.setHiddenWhen(playersPerKiller, GexpressConfig::useCustomRoleCounts);
+		OptionVisibility.setHiddenWhen(playersPerVigilante, GexpressConfig::useCustomRoleCounts);
+		globalRoleOpts.add(maxKillers);
+		globalRoleOpts.add(maxVigilantes);
+		globalRoleOpts.add(playersPerKiller);
+		globalRoleOpts.add(playersPerVigilante);
 		globalRoleOpts.add(buildLastDeathShieldOption());
 
 		Map<String, List<Option<?>>> modKeyToWeOpts = new LinkedHashMap<>();
@@ -261,6 +273,16 @@ public final class GexpressGameCategory {
 			.build();
 	}
 
+	private static Option<Boolean> buildUseCustomRoleCountsOption() {
+		return Option.<Boolean>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.use_custom_role_counts"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.use_custom_role_counts.tooltip")))
+			.binding(true, GexpressConfig::useCustomRoleCounts, v -> GexpressConfig.useCustomRoleCounts = v)
+			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
+				.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+			.build();
+	}
+
 	private static Option<Integer> buildMaxKillerAmountOption() {
 		return Option.<Integer>createBuilder()
 			.name(Text.translatable("gui.gexpress.config.option.max_killer_amount"))
@@ -268,6 +290,26 @@ public final class GexpressGameCategory {
 			.binding(64, GexpressConfig::getMaxKillerAmount, v -> GexpressConfig.maxKillerAmount = v)
 			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 				.range(GexpressConfig.MAX_KILLER_AMOUNT_MIN, GexpressConfig.MAX_KILLER_AMOUNT_MAX))
+			.build();
+	}
+
+	private static Option<Integer> buildPlayersPerKillerOption() {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.players_per_killer"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.players_per_killer.tooltip")))
+			.binding(6, GexpressConfig::getPlayersPerKiller, v -> GexpressConfig.playersPerKiller = v)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+				.range(GexpressConfig.PLAYERS_PER_KILLER_MIN, GexpressConfig.PLAYERS_PER_KILLER_MAX))
+			.build();
+	}
+
+	private static Option<Integer> buildPlayersPerVigilanteOption() {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.players_per_vigilante"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.players_per_vigilante.tooltip")))
+			.binding(8, GexpressConfig::getPlayersPerVigilante, v -> GexpressConfig.playersPerVigilante = v)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+				.range(GexpressConfig.PLAYERS_PER_VIGILANTE_MIN, GexpressConfig.PLAYERS_PER_VIGILANTE_MAX))
 			.build();
 	}
 
@@ -567,6 +609,37 @@ public final class GexpressGameCategory {
 					v -> GexpressConfig.puppetmasterCanKillOwnBody = v)
 				.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
 					.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+				.build());
+			return out;
+		}
+		if (BOUNTY_HUNTER_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.bounty_hunter_interval")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.bounty_hunter_interval.tooltip")))
+				.binding(60, GexpressConfig::getBountyHunterBountyIntervalSeconds,
+					v -> GexpressConfig.bountyHunterBountyIntervalSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.BOUNTY_HUNTER_INTERVAL_SECONDS_MIN,
+						GexpressConfig.BOUNTY_HUNTER_INTERVAL_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.bounty_hunter_reward")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.bounty_hunter_reward.tooltip")))
+				.binding(200, GexpressConfig::getBountyHunterRewardGold,
+					v -> GexpressConfig.bountyHunterRewardGold = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.BOUNTY_HUNTER_REWARD_GOLD_MIN,
+						GexpressConfig.BOUNTY_HUNTER_REWARD_GOLD_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.bounty_hunter_fail_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.bounty_hunter_fail_cooldown.tooltip")))
+				.binding(90, GexpressConfig::getBountyHunterFailCooldownSeconds,
+					v -> GexpressConfig.bountyHunterFailCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MIN,
+						GexpressConfig.BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MAX))
 				.build());
 			return out;
 		}

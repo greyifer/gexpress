@@ -11,6 +11,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.VultureEatPayload;
+import dev.mapselect.network.VultureProgressPayload;
 import dev.mapselect.network.VultureReleasePayload;
 import dev.mapselect.network.VultureStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -53,6 +54,8 @@ public final class VultureManager {
 	private static final Map<UUID, StashedState> stashedStates = new ConcurrentHashMap<>();
 	private static final Map<UUID, ReleasePoint> lastKnownVulturePoint = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long> eatCooldownUntilByPelican = new ConcurrentHashMap<>();
+	private static final int PROGRESS_SYNC_INTERVAL_TICKS = 10;
+	private static int progressSyncTicker = 0;
 
 	private VultureManager() {}
 
@@ -60,6 +63,7 @@ public final class VultureManager {
 		PayloadTypeRegistry.playC2S().register(VultureEatPayload.ID, VultureEatPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(VultureReleasePayload.ID, VultureReleasePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(VultureStatePayload.ID, VultureStatePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(VultureProgressPayload.ID, VultureProgressPayload.CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(VultureEatPayload.ID,
 			(payload, context) -> context.server().execute(() -> tryEat(context.player())));
@@ -73,6 +77,7 @@ public final class VultureManager {
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
 			if (world instanceof ServerWorld serverWorld) {
 				releaseAllInWorldAtCurrentPositions(serverWorld);
+				clearProgress(serverWorld);
 			}
 			clearRoundState();
 		});
@@ -142,6 +147,7 @@ public final class VultureManager {
 		vulture.getWorld().playSound(null, vulture.getBlockPos(), SoundEvents.ENTITY_PLAYER_BURP,
 			SoundCategory.PLAYERS, 0.9F, 0.65F);
 		vulture.sendMessage(progressText(vulture), true);
+		syncProgress(vulture, true);
 		target.sendMessage(Text.literal("You were swallowed by the Pelican."), true);
 		tryEndForVulture(vulture);
 		return true;
@@ -156,6 +162,7 @@ public final class VultureManager {
 		}
 		UUID targetId = belly.peekLast();
 		releasePlayer(targetId, vulture.getServer(), ReleasePoint.from(vulture), true);
+		syncProgress(vulture, true);
 		vulture.sendMessage(Text.literal("Released one player."), true);
 	}
 
@@ -173,8 +180,13 @@ public final class VultureManager {
 			&& (game.isRunning() || game.getGameStatus() == GameWorldComponent.GameStatus.STOPPING);
 		if (!keepBellyState && !GexpressTestState.hasRoleTesters()) {
 			releaseAllInWorldAtCurrentPositions(world);
+			clearProgress(world);
 			clearRoundState();
 			return;
+		}
+		if (progressSyncTicker-- <= 0) {
+			progressSyncTicker = PROGRESS_SYNC_INTERVAL_TICKS;
+			syncProgressForWorld(world, keepBellyState || GexpressTestState.hasRoleTesters());
 		}
 
 		for (ServerPlayerEntity player : world.getPlayers()) {
@@ -403,6 +415,7 @@ public final class VultureManager {
 			target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(vulture));
 			ServerPlayNetworking.send(target, new VultureStatePayload(true, vulture.getUuid(), vulture.getId()));
 		}
+		syncProgressForWorld(world, true);
 	}
 
 	public static boolean shouldCancelVoice(UUID senderId, UUID receiverId) {
@@ -465,6 +478,36 @@ public final class VultureManager {
 		stashedStates.clear();
 		lastKnownVulturePoint.clear();
 		eatCooldownUntilByPelican.clear();
+		progressSyncTicker = 0;
+	}
+
+	private static void syncProgressForWorld(ServerWorld world, boolean show) {
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			if (show && isVulture(player)) {
+				syncProgress(player, true);
+			} else {
+				sendProgress(player, VultureProgressPayload.clear());
+			}
+		}
+	}
+
+	private static void syncProgress(ServerPlayerEntity vulture, boolean show) {
+		if (vulture == null) return;
+		int eaten = eatenByVulture.getOrDefault(vulture.getUuid(), Set.of()).size();
+		sendProgress(vulture, new VultureProgressPayload(show, eaten, requiredEaten(vulture)));
+	}
+
+	private static void clearProgress(ServerWorld world) {
+		if (world == null) return;
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			sendProgress(player, VultureProgressPayload.clear());
+		}
+	}
+
+	private static void sendProgress(ServerPlayerEntity player, VultureProgressPayload payload) {
+		if (player != null && ServerPlayNetworking.canSend(player, VultureProgressPayload.ID)) {
+			ServerPlayNetworking.send(player, payload);
+		}
 	}
 
 	private static long remainingEatCooldownTicks(ServerPlayerEntity player) {

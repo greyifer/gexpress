@@ -118,15 +118,38 @@ public final class GexpressRoleAssignment {
 
 	private static void assignConfiguredRoles(GameWorldComponent game, List<ServerPlayerEntity> available,
 			Map<Role, Integer> assignedCounts) {
-		int killerSlots = Math.max(0, Math.min(GexpressConfig.getMaxKillerAmount(), available.size())
+		int killerTarget = GexpressConfig.useCustomRoleCounts()
+			? GexpressConfig.getMaxKillerAmount()
+			: scaledKillerCount(available, assignedCounts);
+		int vigilanteTarget = GexpressConfig.useCustomRoleCounts()
+			? GexpressConfig.getMaxVigilanteAmount()
+			: scaledVigilanteCount(available, assignedCounts);
+		int killerSlots = Math.max(0, Math.min(killerTarget, available.size())
 			- countAssignedKillers(assignedCounts));
 		int assignedKillers = assignRolePool(game, available, assignedCounts, rolePool(RolePool.KILLER), killerSlots);
 		assignFallbackKillers(game, available, assignedCounts, killerSlots - assignedKillers);
-		int vigilanteSlots = Math.max(0, Math.min(GexpressConfig.getMaxVigilanteAmount(), available.size())
+		int vigilanteSlots = Math.max(0, Math.min(vigilanteTarget, available.size())
 			- assignedCounts.getOrDefault(WatheRoles.VIGILANTE, 0));
 		assignRolePool(game, available, assignedCounts, vigilantePool(), vigilanteSlots);
 		assignRolePool(game, available, assignedCounts, rolePool(RolePool.NEUTRAL), available.size());
 		assignRolePool(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
+	}
+
+	private static int scaledKillerCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
+		int players = totalPlayerCount(available, assignedCounts);
+		if (players <= 1) return 0;
+		return Math.max(1, players / GexpressConfig.getPlayersPerKiller());
+	}
+
+	private static int scaledVigilanteCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
+		int players = totalPlayerCount(available, assignedCounts);
+		return Math.max(0, players / GexpressConfig.getPlayersPerVigilante());
+	}
+
+	private static int totalPlayerCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
+		int total = available.size();
+		for (int count : assignedCounts.values()) total += Math.max(0, count);
+		return total;
 	}
 
 	private static int assignRolePool(GameWorldComponent game, List<ServerPlayerEntity> available,

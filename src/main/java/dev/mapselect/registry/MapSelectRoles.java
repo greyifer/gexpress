@@ -17,6 +17,7 @@ public final class MapSelectRoles {
 	public static final Identifier JUGGERNAUT_ID = Identifier.of(MapSelect.MOD_ID, "juggernaut");
 	public static final Identifier TRICKSTER_ID = Identifier.of(MapSelect.MOD_ID, "trickster");
 	public static final Identifier PUPPETMASTER_ID = Identifier.of(MapSelect.MOD_ID, "puppetmaster");
+	public static final Identifier BOUNTY_HUNTER_ID = Identifier.of(MapSelect.MOD_ID, "bounty_hunter");
 	public static final Identifier VULTURE_ID = Identifier.of(MapSelect.MOD_ID, "pelican");
 	public static final Identifier SCATTER_BRAIN_ID = Identifier.of(MapSelect.MOD_ID, "scatter_brain");
 	public static final Identifier TRACKER_ID = Identifier.of(MapSelect.MOD_ID, "tracker");
@@ -32,6 +33,7 @@ public final class MapSelectRoles {
 	public static Role JUGGERNAUT;
 	public static Role TRICKSTER;
 	public static Role PUPPETMASTER;
+	public static Role BOUNTY_HUNTER;
 	public static Role VULTURE;
 	public static Role SCATTER_BRAIN;
 	public static Role TRACKER;
@@ -116,7 +118,7 @@ public final class MapSelectRoles {
 			0x8F1F1F, // blood-steel red, but registered as neutral solo
 			false,
 			false,
-			Role.MoodType.NONE,
+			Role.MoodType.FAKE,
 			-1,
 			true
 		));
@@ -141,6 +143,16 @@ public final class MapSelectRoles {
 			true
 		));
 
+		BOUNTY_HUNTER = WatheRoles.registerRole(new Role(
+			BOUNTY_HUNTER_ID,
+			0xC8892F,
+			false,
+			true,
+			Role.MoodType.FAKE,
+			-1,
+			true
+		));
+
 		SCATTER_BRAIN = WatheRoles.registerRole(new Role(
 			SCATTER_BRAIN_ID,
 			0xE36A2E,
@@ -156,7 +168,7 @@ public final class MapSelectRoles {
 			0x6F8A24, // pelican green, neutral solo
 			false,
 			false,
-			Role.MoodType.NONE,
+			Role.MoodType.FAKE,
 			-1,
 			true
 		));

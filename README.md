@@ -53,6 +53,9 @@ All G'Express commands are under `/g`.
 | `/g host add <players>` | Adds host permission to players. |
 | `/g host remove <players>` | Removes host permission from players. |
 | `/g host list` | Lists saved hosts. |
+| `/g trusted add <players>` | Adds the Trusted tag to players. |
+| `/g trusted remove <players>` | Removes the Trusted tag from players. |
+| `/g trusted list` | Lists saved Trusted players. |
 | `/g voice mute <players>` / `/g voice mute all` | Voice-mutes players or all non-privileged players. |
 | `/g voice unmute <players>` / `/g voice unmute all` | Removes voice mutes. |
 | `/g voice list` | Lists voice-muted players. |
@@ -102,6 +105,7 @@ All G'Express commands are under `/g`.
 | **Warlock** | Killer | Marks a player, then uses that mark to kill another player standing close to them. |
 | **Harlequin** | Killer | Can swap player skins or train carts to create confusion during rounds. |
 | **Puppetmaster** | Killer | Takes control of another living player while leaving their own body vulnerable. |
+| **Bounty Hunter** | Killer | Receives a timed bounty target. Killing the bounty pays configurable gold; missing the timer applies configurable weapon cooldowns. |
 | **Scatter Brain** | Killer | Scatters every living player, including themself, to safe random positions around the active map. |
 | **Medic** | Civilian | Shields another player from danger and receives visual feedback when that shield is hit or broken. |
 | **Snitch** | Civilian | Completes tasks to expose the killers. Progress stays visible beside the mood HUD, and killers are warned/glow the Snitch once they are within the configured task threshold. |
@@ -110,7 +114,7 @@ All G'Express commands are under `/g`.
 | **Tracker** | Civilian | Can track a configurable number of players at once, making those players glow for the Tracker. |
 | **Altruist** | Civilian | Sacrifices themself to revive a dead body. |
 | **Juggernaut** | Neutral | Starts with a Knife and Revolver. Weapon cooldowns become shorter after kills. Wins by being the last player alive. |
-| **Pelican** | Neutral | Can swallow living players. Eaten players see through the Pelican and communicate through a dedicated belly voice channel. |
+| **Pelican** | Neutral | Can swallow living players. Eaten players see through the Pelican, communicate through a dedicated belly voice channel, and the Pelican sees a top-corner swallow counter. |
 
 ---
 
@@ -174,8 +178,9 @@ Includes support for:
 
 - Role chances and role amounts.
 - Modifier chances and modifier amounts.
-- Maximum killer and Vigilante counts.
+- Fixed maximum killer/Vigilante counts or scaled players-per-killer/Vigilante counts.
 - Role-specific values.
+- Bounty Hunter timer, reward, and failed-bounty cooldown.
 - Snitch reveal-task count and killer-warning task threshold.
 - Puppetmaster range and self-body kill behavior.
 - Time Master Freeze duration, cooldown, range, and per-round uses.
@@ -190,6 +195,15 @@ G'Express adds an ability HUD for role abilities.
 - Ability icons appear beside the bars.
 - Time Master shows remaining rewinds beside the rewind bar.
 - Scatter Brain, Tracker, Altruist, Pelican, Harlequin, Juggernaut, Puppetmaster, Warlock, The Silent, Medic, and Time Master abilities are represented when their role needs a bar.
+- Pelican swallow progress renders as a dedicated top-corner counter.
+
+### Tags & Custom Skins
+
+G'Express adds server-side tags for community presentation and custom cosmetics.
+
+- Host and Trusted tags can be managed through `/g host` and `/g trusted`.
+- The Trusted tag is gold-yellow and gives Trusted players custom Coca-Cola Revolver and Chicken Stick Knife models.
+- Dev-tagged players can access supporter-gated skin options.
 
 ### Amnesia Mode
 

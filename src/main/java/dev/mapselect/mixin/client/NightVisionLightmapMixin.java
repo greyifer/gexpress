@@ -24,6 +24,8 @@ public abstract class NightVisionLightmapMixin {
 	@Inject(method = "update", at = @At("RETURN"))
 	private void gexpress$softNightVision(float delta, CallbackInfo ci) {
 		if (!ClientNightVisionState.hasNightVision()) return;
+		float amount = 0.68F * ClientNightVisionState.strength();
+		if (amount <= 0.01F) return;
 
 		boolean changed = false;
 		for (int sky = 0; sky < 16; sky++) {
@@ -47,9 +49,9 @@ public abstract class NightVisionLightmapMixin {
 					boostedB = Math.min(220, Math.round(b * scale));
 				}
 
-				int nr = blend(r, boostedR, 0.68F);
-				int ng = blend(g, boostedG, 0.68F);
-				int nb = blend(b, boostedB, 0.68F);
+				int nr = blend(r, boostedR, amount);
+				int ng = blend(g, boostedG, amount);
+				int nb = blend(b, boostedB, amount);
 				if (nr != r || ng != g || nb != b) {
 					image.setColor(block, sky, (color & 0xFF000000) | (nb << 16) | (ng << 8) | nr);
 					changed = true;

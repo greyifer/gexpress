@@ -23,7 +23,9 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int timeMasterFreezeMaxUses, int timeMasterFreezeRange,
 		int scatterBrainCooldownSeconds, int trackerMaxTargets,
 		int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
-		int maxKillerAmount, int maxVigilanteAmount,
+		int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold, int bountyHunterFailCooldownSeconds,
+		boolean useCustomRoleCounts, int maxKillerAmount, int maxVigilanteAmount,
+		int playersPerKiller, int playersPerVigilante,
 		float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 		float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
 		float c4BackSlant, float c4BackScale, String c4PlacementPresets,
@@ -76,8 +78,14 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.trackerCooldownSeconds());
 			buf.writeInt(payload.altruistRange());
 			buf.writeBoolean(payload.lastDeathShieldEnabled());
+			buf.writeInt(payload.bountyHunterBountyIntervalSeconds());
+			buf.writeInt(payload.bountyHunterRewardGold());
+			buf.writeInt(payload.bountyHunterFailCooldownSeconds());
+			buf.writeBoolean(payload.useCustomRoleCounts());
 			buf.writeInt(payload.maxKillerAmount());
 			buf.writeInt(payload.maxVigilanteAmount());
+			buf.writeInt(payload.playersPerKiller());
+			buf.writeInt(payload.playersPerVigilante());
 			buf.writeFloat(payload.c4BackOffsetX());
 			buf.writeFloat(payload.c4BackOffsetY());
 			buf.writeFloat(payload.c4BackOffsetZ());
@@ -134,8 +142,14 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // trackerCooldownSeconds
 			buf.readInt(), // altruistRange
 			buf.readBoolean(), // lastDeathShieldEnabled
+			buf.readInt(), // bountyHunterBountyIntervalSeconds
+			buf.readInt(), // bountyHunterRewardGold
+			buf.readInt(), // bountyHunterFailCooldownSeconds
+			buf.readBoolean(), // useCustomRoleCounts
 			buf.readInt(), // maxKillerAmount
 			buf.readInt(), // maxVigilanteAmount
+			buf.readInt(), // playersPerKiller
+			buf.readInt(), // playersPerVigilante
 			buf.readFloat(), // c4BackOffsetX
 			buf.readFloat(), // c4BackOffsetY
 			buf.readFloat(), // c4BackOffsetZ
