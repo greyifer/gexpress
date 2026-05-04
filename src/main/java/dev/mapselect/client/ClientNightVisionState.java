@@ -26,6 +26,10 @@ public final class ClientNightVisionState {
 		return strength > 0.01F;
 	}
 
+	public static boolean isEnabled() {
+		return nightVision;
+	}
+
 	public static float strength() {
 		return strength;
 	}

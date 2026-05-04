@@ -192,13 +192,13 @@ public final class GexpressOptionsScreen {
 
 	private static void flushRoleModifierTuningCommands() {
 		pendingRoleChance.forEach((id, value) ->
-			stageChatCommand("g tuning role " + id + " chance " + value));
+			stageChatCommand("g roles tuning role " + id + " chance " + value));
 		pendingRoleMax.forEach((id, value) ->
-			stageChatCommand("g tuning role " + id + " amount " + value));
+			stageChatCommand("g roles tuning role " + id + " amount " + value));
 		pendingModifierChance.forEach((id, value) ->
-			stageChatCommand("g tuning modifier " + id + " chance " + value));
+			stageChatCommand("g roles tuning modifier " + id + " chance " + value));
 		pendingModifierMax.forEach((id, value) ->
-			stageChatCommand("g tuning modifier " + id + " amount " + value));
+			stageChatCommand("g roles tuning modifier " + id + " amount " + value));
 	}
 
 	private static int clamp(int value, int min, int max) {
@@ -234,13 +234,17 @@ public final class GexpressOptionsScreen {
 			GexpressConfig.getJuggernautInitialCooldownSeconds(),
 			GexpressConfig.getJuggernautCooldownReductionSeconds(),
 			GexpressConfig.getJuggernautMinimumCooldownSeconds(),
+			GexpressConfig.getJuggernautShieldRechargeSeconds(),
 			GexpressConfig.getTricksterSwapDurationSeconds(),
+			GexpressConfig.getTricksterMasqueradeCooldownSeconds(),
+			GexpressConfig.getTricksterDancingCartsCooldownSeconds(),
 			GexpressConfig.getTricksterDancingCartsMaxUses(),
 			GexpressConfig.getPuppetmasterControlDurationSeconds(),
 			GexpressConfig.getPuppetmasterControlCooldownSeconds(),
 			GexpressConfig.isPuppetmasterRandomTarget(),
 			GexpressConfig.getPuppetmasterControlRange(),
 			GexpressConfig.getPelicanEatCooldownSeconds(),
+			GexpressConfig.getPelicanEatPercentage(),
 			GexpressConfig.getHungryFoodLimit(),
 			GexpressConfig.getThirstyDrinkLimit(),
 			GexpressConfig.getSnitchTasksRequired(),
@@ -261,6 +265,21 @@ public final class GexpressOptionsScreen {
 			GexpressConfig.getBountyHunterBountyIntervalSeconds(),
 			GexpressConfig.getBountyHunterRewardGold(),
 			GexpressConfig.getBountyHunterFailCooldownSeconds(),
+			GexpressConfig.getGodfatherBulletPrice(),
+			GexpressConfig.getGodfatherStartingBullets(),
+			GexpressConfig.getGodfatherMaxLoadedBullets(),
+			GexpressConfig.getMafiaStartingGold(),
+			GexpressConfig.getMafiaMinimumPlayers(),
+			GexpressConfig.getGodfatherStartingGold(),
+			GexpressConfig.getMafiosoStartingGold(),
+			GexpressConfig.getJanitorStartingGold(),
+			GexpressConfig.getMafiaRecruitRange(),
+			GexpressConfig.getMafiaReplacementCooldownSeconds(),
+			GexpressConfig.getMafiaRevolverKillCooldownSeconds(),
+			GexpressConfig.getJanitorCleanRange(),
+			GexpressConfig.getJanitorCleanCooldownSeconds(),
+			GexpressConfig.getJanitorRevolverCooldownAfterCleanSeconds(),
+			GexpressConfig.getJanitorCleanCooldownAfterKillSeconds(),
 			GexpressConfig.useCustomRoleCounts(),
 			GexpressConfig.getMaxKillerAmount(),
 			GexpressConfig.getMaxVigilanteAmount(),

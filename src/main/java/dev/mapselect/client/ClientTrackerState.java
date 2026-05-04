@@ -30,12 +30,14 @@ public final class ClientTrackerState {
 	}
 
 	public static boolean isTracked(UUID playerId) {
-		return playerId != null && trackedIds.contains(playerId);
+		return playerId != null && ClientRoleRevealState.canShowRoleHud(MinecraftClient.getInstance())
+			&& trackedIds.contains(playerId);
 	}
 
 	private static void tick(MinecraftClient client) {
 		if (client == null || client.player == null || client.world == null
 				|| client.currentScreen != null || ClientVultureState.isLocalStashed(client)
+				|| !ClientRoleRevealState.canUseRoleAbility(client)
 				|| !isLocalTracker(client)) {
 			wasAbilityDown = false;
 			return;

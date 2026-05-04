@@ -1,6 +1,7 @@
 package dev.mapselect.registry;
 
 import dev.mapselect.MapSelect;
+import dev.mapselect.item.BulletItem;
 import dev.mapselect.item.C4DetonatorItem;
 import dev.mapselect.item.C4Item;
 import dev.mapselect.item.PliersItem;
@@ -15,14 +16,17 @@ public final class MapSelectItems {
 	public static final C4Item C4 = new C4Item(new Item.Settings().maxCount(16));
 	public static final C4DetonatorItem C4_DETONATOR = new C4DetonatorItem(new Item.Settings().maxCount(1));
 	public static final PliersItem PLIERS = new PliersItem(new Item.Settings().maxCount(1));
+	public static final BulletItem BULLET = new BulletItem(new Item.Settings().maxCount(3));
 
 	public static void register() {
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "c4"), C4);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "c4_detonator"), C4_DETONATOR);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "pliers"), PLIERS);
+		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "bullet"), BULLET);
 
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(entries -> entries.add(C4));
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(entries -> entries.add(C4_DETONATOR));
+		ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(entries -> entries.add(BULLET));
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.TOOLS).register(entries -> entries.add(PLIERS));
 	}
 

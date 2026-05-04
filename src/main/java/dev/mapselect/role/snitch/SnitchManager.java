@@ -10,6 +10,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.SnitchProgressPayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.testing.GexpressTestState;
+import dev.mapselect.role.vulture.VultureManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -310,7 +311,9 @@ public final class SnitchManager {
 	}
 
 	private static boolean isPlayable(ServerPlayerEntity player) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(player);
+		return GameFunctions.isPlayerAliveAndSurvival(player)
+			|| VultureManager.isStashed(player)
+			|| GexpressTestState.isRoleTester(player);
 	}
 
 	public static TimeState snapshotForTimeRewind() {

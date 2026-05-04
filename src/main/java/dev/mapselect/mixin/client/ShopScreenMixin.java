@@ -1,10 +1,12 @@
 package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.client.gui.screen.ingame.LimitedInventoryScreen;
+import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.util.ShopEntry;
 import dev.mapselect.role.GexpressRoleShop;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import org.spongepowered.asm.mixin.Dynamic;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,6 +26,19 @@ import java.util.List;
  */
 @Mixin(value = LimitedInventoryScreen.class, remap = false)
 public abstract class ShopScreenMixin {
+	@Dynamic("LimitedInventoryScreen is compiled with intermediary method names in the Wathe jar.")
+	@Redirect(
+		method = "method_25426",
+		at = @At(
+			value = "INVOKE",
+			target = "Ldev/doctor4t/wathe/cca/GameWorldComponent;canUseKillerFeatures(Lnet/minecraft/class_1657;)Z"
+		),
+		remap = false
+	)
+	private boolean gexpress$customShopRolesCanSeeShop(GameWorldComponent game, PlayerEntity player) {
+		return game.canUseKillerFeatures(player) || GexpressRoleShop.hasCustomShop(player);
+	}
+
 	@Dynamic("LimitedInventoryScreen is compiled with intermediary method names in the Wathe jar.")
 	@Redirect(
 		method = "method_25426",

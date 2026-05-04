@@ -1,5 +1,6 @@
 package dev.mapselect.mixin;
 
+import dev.mapselect.game.GexpressAbilityGuards;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
 import dev.mapselect.role.vulture.VultureManager;
@@ -97,12 +98,12 @@ public abstract class PuppetmasterControlledActionsMixin {
 
 	@Inject(method = "onCommandExecution", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockCommandExecution(CommandExecutionC2SPacket packet, CallbackInfo ci) {
-		if (isLocked(player)) ci.cancel();
+		if (isLocked(player) && !isAllowedLockedCommand(packet.command())) ci.cancel();
 	}
 
 	@Inject(method = "onChatCommandSigned", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockSignedCommand(ChatCommandSignedC2SPacket packet, CallbackInfo ci) {
-		if (isLocked(player)) ci.cancel();
+		if (isLocked(player) && !isAllowedLockedCommand(packet.command())) ci.cancel();
 	}
 
 	@Inject(method = "onBookUpdate", at = @At("HEAD"), cancellable = true)
@@ -127,11 +128,19 @@ public abstract class PuppetmasterControlledActionsMixin {
 
 	@Inject(method = "onCustomPayload", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockCustomPayload(CustomPayloadC2SPacket packet, CallbackInfo ci) {
-		if (TimeMasterManager.isFrozen(player)) ci.cancel();
+		if (GexpressAbilityGuards.shouldBlockAbilityPayload(player, packet.payload())) {
+			ci.cancel();
+			return;
+		}
+		if (isLocked(player)) ci.cancel();
 	}
 
 	private static boolean isLocked(ServerPlayerEntity player) {
 		return PuppetmasterManager.isControlled(player) || VultureManager.isStashed(player)
 			|| TimeMasterManager.isFrozen(player);
+	}
+
+	private static boolean isAllowedLockedCommand(String command) {
+		return "g roles pelican leave".equals(command) || "g pelican leave".equals(command);
 	}
 }

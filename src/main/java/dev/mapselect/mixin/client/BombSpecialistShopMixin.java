@@ -21,15 +21,37 @@ public abstract class BombSpecialistShopMixin {
 	@Inject(method = "getItemsForRole", at = @At("HEAD"), cancellable = true)
 	private static void gexpress$bombSpecialistShop(String roleId, boolean includeGlobal,
 			CallbackInfoReturnable<List<RoleItem>> cir) {
-		if (!"gexpress:bomb_specialist".equals(roleId)) return;
-		cir.setReturnValue(List.of(
+		if ("gexpress:bomb_specialist".equals(roleId)) {
+			cir.setReturnValue(List.of(
 			new RoleItem("c4", "item.gexpress.c4", GexpressConfig.getC4Price()),
 			new RoleItem("grenade", "item.wathe.grenade", GexpressConfig.getGrenadePrice()),
 			new RoleItem("firecracker", "item.wathe.firecracker", 10),
 			new RoleItem("lockpick", "item.wathe.lockpick", 50),
 			new RoleItem("crowbar", "item.wathe.crowbar", 25),
 			new RoleItem("note", "item.wathe.note", 10)
-		));
+			));
+			return;
+		}
+		if ("gexpress:godfather".equals(roleId)) {
+			cir.setReturnValue(List.of(
+				new RoleItem("revolver", "item.wathe.revolver", 0),
+				new RoleItem("bullet", "item.gexpress.bullet", GexpressConfig.getGodfatherBulletPrice())
+			));
+			return;
+		}
+		if ("gexpress:mafioso".equals(roleId)) {
+			cir.setReturnValue(List.of(
+				new RoleItem("knife", "item.wathe.knife", 200),
+				new RoleItem("revolver", "item.wathe.revolver", 350),
+				new RoleItem("grenade", "item.wathe.grenade", GexpressConfig.getGrenadePrice())
+			));
+			return;
+		}
+		if ("gexpress:janitor".equals(roleId)) {
+			cir.setReturnValue(List.of(
+				new RoleItem("poison_vial", "item.wathe.poison_vial", 100)
+			));
+		}
 	}
 
 	/**
@@ -40,7 +62,10 @@ public abstract class BombSpecialistShopMixin {
 	@Inject(method = "hasExplicitRegistration", at = @At("HEAD"), cancellable = true)
 	private static void gexpress$bombSpecialistIsRegistered(String roleId,
 			CallbackInfoReturnable<Boolean> cir) {
-		if ("gexpress:bomb_specialist".equals(roleId)) {
+		if ("gexpress:bomb_specialist".equals(roleId)
+				|| "gexpress:godfather".equals(roleId)
+				|| "gexpress:mafioso".equals(roleId)
+				|| "gexpress:janitor".equals(roleId)) {
 			cir.setReturnValue(Boolean.TRUE);
 		}
 	}

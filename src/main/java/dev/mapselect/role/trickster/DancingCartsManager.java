@@ -53,6 +53,7 @@ public final class DancingCartsManager {
 	private static final Map<RegistryKey<World>, Map<UUID, Long>> nextUseTicks = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, Map<UUID, Integer>> usesRemaining = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, Set<CartPair>> previousPairs = new ConcurrentHashMap<>();
+	private static final Map<RegistryKey<World>, java.util.Deque<TrainMoveSnapshot>> trainMoveHistory = new ConcurrentHashMap<>();
 
 	private DancingCartsManager() {}
 
@@ -133,6 +134,7 @@ public final class DancingCartsManager {
 		nextUseTicks.remove(world.getRegistryKey());
 		usesRemaining.remove(world.getRegistryKey());
 		previousPairs.remove(world.getRegistryKey());
+		trainMoveHistory.remove(world.getRegistryKey());
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS);
 		}
@@ -142,6 +144,7 @@ public final class DancingCartsManager {
 		if (world == null) return null;
 		RegistryKey<World> key = world.getRegistryKey();
 		return new TimeState(
+			world.getTime(),
 			new HashMap<>(nextUseTicks.getOrDefault(key, Map.of())),
 			new HashMap<>(usesRemaining.getOrDefault(key, Map.of())),
 			new HashSet<>(previousPairs.getOrDefault(key, Set.of()))
@@ -159,6 +162,7 @@ public final class DancingCartsManager {
 		else previousPairs.put(key, ConcurrentHashMap.newKeySet());
 		Set<CartPair> pairs = previousPairs.get(key);
 		if (pairs != null) pairs.addAll(state.previousPairs());
+		restoreWholeTrainForRewind(world, state.tick());
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			syncCooldownTo(player);
 		}
@@ -257,6 +261,7 @@ public final class DancingCartsManager {
 		RegistryWrapper.WrapperLookup lookup = world.getRegistryManager();
 		Set<UUID> existingItems = itemEntityIds(world);
 		List<Box> affectedBoxes = affectedBoxes(regions, moves);
+		rememberWholeTrainBeforeMove(world, regions, lookup);
 		List<CartSnapshot> snapshots = new ArrayList<>();
 		for (Map.Entry<Integer, Integer> move : moves.entrySet()) {
 			CartRegion source = regions.get(move.getKey());
@@ -275,6 +280,49 @@ public final class DancingCartsManager {
 		for (EntityMove move : entityMoves.values()) {
 			move.apply(world);
 		}
+		pruneTrainMoveHistory(world);
+	}
+
+	private static void rememberWholeTrainBeforeMove(ServerWorld world, List<CartRegion> regions,
+			RegistryWrapper.WrapperLookup lookup) {
+		List<CartSnapshot> snapshots = new ArrayList<>(regions.size());
+		for (CartRegion region : regions) {
+			if (region.blockCount() > MAX_BLOCKS_PER_CART) continue;
+			snapshots.add(CartSnapshot.capture(world, region, region, lookup));
+		}
+		if (snapshots.isEmpty()) return;
+		RegistryKey<World> key = world.getRegistryKey();
+		trainMoveHistory.computeIfAbsent(key, ignored -> new java.util.ArrayDeque<>())
+			.addLast(new TrainMoveSnapshot(world.getTime(), snapshots));
+	}
+
+	private static void restoreWholeTrainForRewind(ServerWorld world, long targetTick) {
+		java.util.Deque<TrainMoveSnapshot> history = trainMoveHistory.get(world.getRegistryKey());
+		if (history == null || history.isEmpty()) return;
+		TrainMoveSnapshot restore = null;
+		long now = world.getTime();
+		for (TrainMoveSnapshot snapshot : history) {
+			if (snapshot.tick() <= targetTick || snapshot.tick() > now) continue;
+			restore = snapshot;
+			break;
+		}
+		if (restore == null) return;
+		RegistryWrapper.WrapperLookup lookup = world.getRegistryManager();
+		for (CartSnapshot snapshot : restore.carts()) {
+			snapshot.paste(world, lookup);
+		}
+		pruneTrainMoveHistory(world);
+	}
+
+	private static void pruneTrainMoveHistory(ServerWorld world) {
+		java.util.Deque<TrainMoveSnapshot> history = trainMoveHistory.get(world.getRegistryKey());
+		if (history == null) return;
+		long keepTicks = (long) GexpressConfig.getTimeMasterRewindSeconds() * 20L + 80L;
+		long now = world.getTime();
+		while (!history.isEmpty() && now - history.peekFirst().tick() > keepTicks) {
+			history.removeFirst();
+		}
+		if (history.isEmpty()) trainMoveHistory.remove(world.getRegistryKey());
 	}
 
 	private static Set<UUID> itemEntityIds(ServerWorld world) {
@@ -332,7 +380,7 @@ public final class DancingCartsManager {
 
 	private static void setCooldown(ServerWorld world, UUID playerId) {
 		nextUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
-			.put(playerId, world.getTime() + GexpressConfig.getTricksterSwapDurationSeconds() * 20L);
+			.put(playerId, world.getTime() + GexpressConfig.getTricksterDancingCartsCooldownSeconds() * 20L);
 	}
 
 	private static int remainingUses(ServerWorld world, UUID playerId) {
@@ -355,7 +403,7 @@ public final class DancingCartsManager {
 			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS);
 			return;
 		}
-		long totalTicks = Math.max(remainingTicks, (long) GexpressConfig.getTricksterSwapDurationSeconds() * 20L);
+		long totalTicks = Math.max(remainingTicks, (long) GexpressConfig.getTricksterDancingCartsCooldownSeconds() * 20L);
 		AbilityCooldownSync.send(player, AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS,
 			remainingTicks, totalTicks, false);
 	}
@@ -500,7 +548,9 @@ public final class DancingCartsManager {
 		}
 	}
 
-	public record TimeState(Map<UUID, Long> nextUseTicks, Map<UUID, Integer> usesRemaining,
+	private record TrainMoveSnapshot(long tick, List<CartSnapshot> carts) {}
+
+	public record TimeState(long tick, Map<UUID, Long> nextUseTicks, Map<UUID, Integer> usesRemaining,
 			Set<CartPair> previousPairs) {}
 
 	public record CartPair(int a, int b) {

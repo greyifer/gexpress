@@ -85,9 +85,10 @@ public final class ClientSnitchState {
 			watheTaskVisibleTicks--;
 		}
 
+		boolean revealReady = ClientRoleRevealState.canShowRoleHud(client);
 		progressAlpha = MathHelper.lerp(0.25F, progressAlpha, shouldShowProgress(client) ? 1.0F : 0.0F);
 		progressX = MathHelper.lerp(0.35F, progressX, progressTargetX(client));
-		infoAlpha = MathHelper.lerp(0.25F, infoAlpha, infoLines.isEmpty() ? 0.0F : 1.0F);
+		infoAlpha = MathHelper.lerp(0.25F, infoAlpha, revealReady && !infoLines.isEmpty() ? 1.0F : 0.0F);
 	}
 
 	public static void renderMoodOverlay(DrawContext context, TextRenderer renderer) {
@@ -102,7 +103,8 @@ public final class ClientSnitchState {
 		if (progressAlpha > 0.02F && shouldShowProgress(client) && watheTaskVisibleTicks <= 0) {
 			renderProgress(context, renderer, client);
 		}
-		if (infoAlpha > 0.02F && !infoLines.isEmpty() && isRoundRunning(client)) {
+		if (infoAlpha > 0.02F && !infoLines.isEmpty() && isRoundRunning(client)
+				&& ClientRoleRevealState.canShowRoleHud(client)) {
 			renderInfoLines(context, renderer, client);
 		}
 	}
@@ -112,7 +114,8 @@ public final class ClientSnitchState {
 	}
 
 	public static Integer glowColor(Entity entity) {
-		if (entity == null || infoLines.isEmpty()) return null;
+		if (entity == null || infoLines.isEmpty()
+				|| !ClientRoleRevealState.canShowRoleHud(MinecraftClient.getInstance())) return null;
 		UUID id = entity.getUuid();
 		for (SnitchProgressPayload.InfoLine line : infoLines) {
 			if (line.playerId().equals(id) && "Snitch".equals(line.roleName())) {
@@ -123,6 +126,7 @@ public final class ClientSnitchState {
 	}
 
 	private static boolean shouldShowProgress(MinecraftClient client) {
+		if (!ClientRoleRevealState.canShowRoleHud(client)) return false;
 		if (receivedPayload) {
 			if (!showProgress) return false;
 		} else if (!isLocalSnitch(client)) {

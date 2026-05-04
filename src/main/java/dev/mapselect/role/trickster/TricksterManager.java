@@ -1,14 +1,19 @@
 package dev.mapselect.role.trickster;
 
 import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.AbilityCooldownPayload;
+import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.TricksterDancingCartsPayload;
 import dev.mapselect.network.TricksterSkinSwapPayload;
 import dev.mapselect.network.TricksterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.registry.MapSelectSounds;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -21,6 +26,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.ComponentKey;
 
@@ -41,6 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class TricksterManager {
 	private static final Map<net.minecraft.registry.RegistryKey<World>, ActiveSwap> activeSwaps = new ConcurrentHashMap<>();
 	private static final Map<net.minecraft.registry.RegistryKey<World>, Map<UUID, UUID>> previousSwaps = new ConcurrentHashMap<>();
+	private static final Map<net.minecraft.registry.RegistryKey<World>, Map<UUID, Long>> nextMasqueradeUseTicks = new ConcurrentHashMap<>();
 	private static final Map<net.minecraft.registry.RegistryKey<World>, Long> nextNoellesCycleCleanupTicks = new ConcurrentHashMap<>();
 	private static NoellesMorphBridge noellesMorphBridge;
 	private static boolean lookedUpNoellesMorphBridge;
@@ -55,19 +62,35 @@ public final class TricksterManager {
 			(payload, context) -> context.server().execute(() -> tryActivate(context.player())));
 		ServerPlayNetworking.registerGlobalReceiver(TricksterDancingCartsPayload.ID,
 			(payload, context) -> context.server().execute(() -> DancingCartsManager.tryActivate(context.player())));
+		AllowPlayerDeath.EVENT.register(TricksterManager::allowDeath);
 		ServerTickEvents.END_WORLD_TICK.register(TricksterManager::tick);
 		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> {
-			if (world instanceof ServerWorld serverWorld) DancingCartsManager.clearRoundState(serverWorld);
+			if (world instanceof ServerWorld serverWorld) clearRoundState(serverWorld);
 		});
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
-			if (world instanceof ServerWorld serverWorld) DancingCartsManager.clearRoundState(serverWorld);
+			if (world instanceof ServerWorld serverWorld) clearRoundState(serverWorld);
 		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> {
 				clearNoellesMorphCycles(handler.player.getServerWorld());
 				syncActiveSwap(handler.player);
+				syncMasqueradeCooldownTo(handler.player);
 				DancingCartsManager.syncCooldownTo(handler.player);
 			}));
+	}
+
+	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
+		if (!(victim instanceof ServerPlayerEntity trickster) || !isTrickster(trickster)) return true;
+		if (!GameConstants.DeathReasons.KNIFE.equals(reason) && !GameConstants.DeathReasons.GUN.equals(reason)) {
+			return true;
+		}
+		ServerWorld world = trickster.getServerWorld();
+		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
+		if (active == null || !active.isActive(world)) return true;
+		world.playSound(null, trickster.getX(), trickster.getY(), trickster.getZ(),
+			MapSelectSounds.JEVIL_LAUGH, SoundCategory.PLAYERS, 1.0F, 1.0F);
+		cancelActiveMasquerade(world);
+		return false;
 	}
 
 	private static void tryActivate(ServerPlayerEntity trickster) {
@@ -82,6 +105,12 @@ public final class TricksterManager {
 			trickster.sendMessage(Text.literal("Masquerade ready in " + secondsCeil(active.remainingTicks(world)) + "s."), true);
 			return;
 		}
+		long cooldown = masqueradeCooldownRemainingTicks(world, trickster.getUuid());
+		if (cooldown > 0L) {
+			syncMasqueradeCooldown(trickster, cooldown);
+			trickster.sendMessage(Text.literal("Masquerade ready in " + secondsCeil(cooldown) + "s."), true);
+			return;
+		}
 
 		List<ServerPlayerEntity> players = eligiblePlayers(world, trickster);
 		if (players.size() < 2) {
@@ -93,6 +122,9 @@ public final class TricksterManager {
 		previousSwaps.put(world.getRegistryKey(), swaps);
 		int durationTicks = GexpressConfig.getTricksterSwapDurationSeconds() * 20;
 		activeSwaps.put(world.getRegistryKey(), new ActiveSwap(world.getTime() + durationTicks, swaps));
+		nextMasqueradeUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
+			.put(trickster.getUuid(), world.getTime() + durationTicks
+				+ (long) GexpressConfig.getTricksterMasqueradeCooldownSeconds() * 20L);
 
 		TricksterSkinSwapPayload payload = new TricksterSkinSwapPayload(swaps, durationTicks);
 		for (ServerPlayerEntity player : world.getPlayers()) {
@@ -164,6 +196,9 @@ public final class TricksterManager {
 		if (world.getTime() >= active.untilTick() || (!activeGame && !GexpressTestState.hasRoleTesters())) {
 			activeSwaps.remove(world.getRegistryKey());
 			broadcastClear(world);
+			for (ServerPlayerEntity player : world.getPlayers()) {
+				syncMasqueradeCooldownTo(player);
+			}
 		}
 	}
 
@@ -171,6 +206,16 @@ public final class TricksterManager {
 		TricksterSkinSwapPayload clear = new TricksterSkinSwapPayload(Map.of(), 0);
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			ServerPlayNetworking.send(player, clear);
+		}
+	}
+
+	private static void cancelActiveMasquerade(ServerWorld world) {
+		if (world == null) return;
+		activeSwaps.remove(world.getRegistryKey());
+		clearNoellesMorphCycles(world);
+		broadcastClear(world);
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			syncMasqueradeCooldownTo(player);
 		}
 	}
 
@@ -200,10 +245,50 @@ public final class TricksterManager {
 	public static void clearForTimeRewind(ServerWorld world) {
 		if (world == null) return;
 		activeSwaps.remove(world.getRegistryKey());
+		nextMasqueradeUseTicks.remove(world.getRegistryKey());
 		nextNoellesCycleCleanupTicks.remove(world.getRegistryKey());
 		DancingCartsManager.clearForTimeRewind(world);
 		clearNoellesMorphCycles(world);
 		broadcastClear(world);
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_MASQUERADE);
+		}
+	}
+
+	private static void clearRoundState(ServerWorld world) {
+		if (world == null) return;
+		activeSwaps.remove(world.getRegistryKey());
+		previousSwaps.remove(world.getRegistryKey());
+		nextMasqueradeUseTicks.remove(world.getRegistryKey());
+		nextNoellesCycleCleanupTicks.remove(world.getRegistryKey());
+		DancingCartsManager.clearRoundState(world);
+		broadcastClear(world);
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_MASQUERADE);
+		}
+	}
+
+	private static long masqueradeCooldownRemainingTicks(ServerWorld world, UUID playerId) {
+		Map<UUID, Long> worldCooldowns = nextMasqueradeUseTicks.get(world.getRegistryKey());
+		if (worldCooldowns == null) return 0L;
+		long remaining = Math.max(0L, worldCooldowns.getOrDefault(playerId, 0L) - world.getTime());
+		if (remaining <= 0L) worldCooldowns.remove(playerId);
+		return remaining;
+	}
+
+	private static void syncMasqueradeCooldownTo(ServerPlayerEntity player) {
+		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
+		syncMasqueradeCooldown(player, masqueradeCooldownRemainingTicks(world, player.getUuid()));
+	}
+
+	private static void syncMasqueradeCooldown(ServerPlayerEntity player, long remainingTicks) {
+		if (remainingTicks <= 0L) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.HARLEQUIN_MASQUERADE);
+			return;
+		}
+		long totalTicks = (long) GexpressConfig.getTricksterMasqueradeCooldownSeconds() * 20L;
+		AbilityCooldownSync.send(player, AbilityCooldownPayload.HARLEQUIN_MASQUERADE,
+			remainingTicks, Math.max(remainingTicks, totalTicks), false);
 	}
 
 	private static boolean isTrickster(PlayerEntity player) {

@@ -1,3 +1,47 @@
+# Grey's Express 1.3.0
+
+## Added
+
+- Pelican swallow requirement is now configurable from 10% to 100% of the round lobby.
+- Mafia role assignment can now be gated by minimum lobby size, with separate starting gold for Godfather, Mafioso, and Janitor.
+- Harlequin Masquerade and Dancing Carts cooldowns are now configurable in the game options tab.
+
+## Changed
+
+- Janitor now shops for Poison Vials instead of knives or guns.
+- Janitor body cleanup is driven by the body the Janitor is looking at, with a private glow to make the target clear.
+- Pelican progress now decreases when a swallowed player is spat back out.
+- Night Vision now uses the synced G'Express lightmap without repeatedly removing vanilla Night Vision effects, preventing the add/remove flash.
+
+## Fixed
+
+- Harlequin no longer dies when shot or stabbed during active Masquerade; the hit breaks the Masquerade and plays the laugh at the hit location.
+- Snitch task progress no longer resets while swallowed by the Pelican.
+- Mafia black-and-white visuals stay active after being released from the Pelican.
+- Config buttons that stage in-game commands now use the newer `/g setup` and `/g roles` command paths.
+
+# Grey's Express 1.2.4
+
+## Added
+
+- Harlequin now plays the new laugh sound when Masquerade is broken by a knife or gun hit.
+- Juggernaut now has a five-stage progression with configurable stage cooldown reduction and shield recharge.
+
+## Changed
+
+- Scatter Brain no longer teleports players onto `wathe:gold_ledge` support blocks.
+- Bounty Hunter now waits until the failed-bounty penalty ends before assigning a new bounty.
+- Puppetmaster control now keeps the controlling body hidden during position swaps.
+- Night Vision now strips the vanilla night-vision status effect while using G'Express' synced modifier lighting to prevent flicker.
+- Trusted Knife now uses the updated chicken leg texture.
+- The Silent is protected from death while Shadow March is active.
+
+## Fixed
+
+- Puppetmaster control no longer routes damage/death from the abandoned body back into the Puppetmaster. If the controller body is killed during control, the controlled target dies instead.
+- Harlequin Masquerade now clears skin swaps and voice mute immediately if the Harlequin is stabbed or shot during the active Masquerade.
+- Time Master rewind snapshots now include Juggernaut shield recharge state.
+
 # Grey's Express 1.2.3
 
 ## Added

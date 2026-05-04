@@ -19,11 +19,13 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
@@ -38,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class ScatterBrainManager {
 	private static final Random RANDOM = new Random();
+	private static final Identifier GOLD_LEDGE_ID = Identifier.of("wathe", "gold_ledge");
 	private static final Map<UUID, Long> cooldownUntil = new ConcurrentHashMap<>();
 
 	private ScatterBrainManager() {}
@@ -152,6 +155,7 @@ public final class ScatterBrainManager {
 		BlockState feet = world.getBlockState(pos);
 		BlockState head = world.getBlockState(pos.up());
 		BlockState below = world.getBlockState(pos.down());
+		if (GOLD_LEDGE_ID.equals(Registries.BLOCK.getId(below.getBlock()))) return false;
 		return feet.getCollisionShape(world, pos).isEmpty()
 			&& head.getCollisionShape(world, pos.up()).isEmpty()
 			&& !below.getCollisionShape(world, pos.down()).isEmpty();

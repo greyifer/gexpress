@@ -29,6 +29,7 @@ public final class WeIcons {
 		Map.entry("crowbar", "\uE10E"),
 		Map.entry("dream_imprint", "\uE10F"),
 		Map.entry("c4", "\uE215"),
+		Map.entry("bullet", "\u2022"),
 		Map.entry("firecracker", "\uE200"),
 		Map.entry("grenade", "\uE201"),
 		Map.entry("hunting_knife", "\uE202"),

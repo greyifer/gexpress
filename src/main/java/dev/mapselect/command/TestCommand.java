@@ -200,7 +200,7 @@ public final class TestCommand {
 		try {
 			ModifierAssigned.EVENT.invoker().assignModifier(player, modifier);
 		} catch (Throwable t) {
-			MapSelect.LOGGER.warn("ModifierAssigned listener failed during /g test modifier add for {} on {}.",
+			MapSelect.LOGGER.warn("ModifierAssigned listener failed during /g roles test modifier add for {} on {}.",
 				id(modifier), player.getName().getString(), t);
 		}
 	}
@@ -209,7 +209,7 @@ public final class TestCommand {
 		try {
 			ModifierRemoved.EVENT.invoker().removeModifier(player, modifier);
 		} catch (Throwable t) {
-			MapSelect.LOGGER.warn("ModifierRemoved listener failed during /g test modifier remove for {} on {}.",
+			MapSelect.LOGGER.warn("ModifierRemoved listener failed during /g roles test modifier remove for {} on {}.",
 				id(modifier), player.getName().getString(), t);
 		}
 	}

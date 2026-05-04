@@ -15,6 +15,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 
@@ -69,7 +70,7 @@ public final class ClientVultureState {
 			return;
 		}
 		progressAlpha = MathHelper.lerp(0.22F, progressAlpha,
-			showProgress && isLocalVulture(client) ? 1.0F : 0.0F);
+			showProgress && isLocalVulture(client) && ClientRoleRevealState.canShowRoleHud(client) ? 1.0F : 0.0F);
 
 		if (isLocalStashed(client)) {
 			Entity vulture = client.world.getEntityById(vultureEntityId);
@@ -78,7 +79,8 @@ public final class ClientVultureState {
 			}
 		}
 
-		if (isLocalStashed(client) || !isLocalVulture(client) || client.currentScreen != null) {
+		if (isLocalStashed(client) || !isLocalVulture(client) || client.currentScreen != null
+				|| !ClientRoleRevealState.canUseRoleAbility(client)) {
 			wasEatDown = false;
 			wasReleaseDown = false;
 			return;
@@ -102,12 +104,8 @@ public final class ClientVultureState {
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null) return;
-		if (isLocalStashed(client)) {
-			int alpha = 96;
-			int color = (alpha << 24) | 0x303030;
-			context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), color);
-		}
-		if (progressAlpha > 0.02F && client.textRenderer != null && !client.options.hudHidden) {
+		if (progressAlpha > 0.02F && client.textRenderer != null && !client.options.hudHidden
+				&& ClientRoleRevealState.canShowRoleHud(client)) {
 			int alpha = Math.max(0, Math.min(255, (int) (progressAlpha * 255.0F)));
 			Text text = Text.literal("Pelican " + Math.min(eaten, required) + "/" + required);
 			int x = context.getScaledWindowWidth() - client.textRenderer.getWidth(text) - 8;
@@ -117,6 +115,13 @@ public final class ClientVultureState {
 
 	public static boolean isLocalStashed(MinecraftClient client) {
 		return client != null && client.player != null && vultureId != null;
+	}
+
+	public static boolean shouldHideBellyEntity(MinecraftClient client, Entity entity) {
+		if (!isLocalStashed(client) || !(entity instanceof PlayerEntity player)) return false;
+		if (vultureId != null && vultureId.equals(player.getUuid())) return false;
+		Entity vulture = client.world == null ? null : client.world.getEntityById(vultureEntityId);
+		return vulture != null && player.isSpectator() && player.squaredDistanceTo(vulture) <= 9.0D;
 	}
 
 	private static boolean isLocalVulture(MinecraftClient client) {

@@ -22,6 +22,9 @@ public final class MapSelectRoles {
 	public static final Identifier SCATTER_BRAIN_ID = Identifier.of(MapSelect.MOD_ID, "scatter_brain");
 	public static final Identifier TRACKER_ID = Identifier.of(MapSelect.MOD_ID, "tracker");
 	public static final Identifier ALTRUIST_ID = Identifier.of(MapSelect.MOD_ID, "altruist");
+	public static final Identifier GODFATHER_ID = Identifier.of(MapSelect.MOD_ID, "godfather");
+	public static final Identifier MAFIOSO_ID = Identifier.of(MapSelect.MOD_ID, "mafioso");
+	public static final Identifier JANITOR_ID = Identifier.of(MapSelect.MOD_ID, "janitor");
 
 	public static Role BOMB_SPECIALIST;
 	public static Role MEDIC;
@@ -38,6 +41,9 @@ public final class MapSelectRoles {
 	public static Role SCATTER_BRAIN;
 	public static Role TRACKER;
 	public static Role ALTRUIST;
+	public static Role GODFATHER;
+	public static Role MAFIOSO;
+	public static Role JANITOR;
 
 	public static void register() {
 		// Killer-side role. Same build as vanilla Killer:
@@ -191,6 +197,36 @@ public final class MapSelectRoles {
 			Role.MoodType.REAL,
 			GameConstants.getInTicks(0, 10),
 			false
+		));
+
+		GODFATHER = WatheRoles.registerRole(new Role(
+			GODFATHER_ID,
+			0x6B6B6B,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			-1,
+			true
+		));
+
+		MAFIOSO = WatheRoles.registerRole(new Role(
+			MAFIOSO_ID,
+			0x4F4F4F,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			-1,
+			true
+		));
+
+		JANITOR = WatheRoles.registerRole(new Role(
+			JANITOR_ID,
+			0x7A7A7A,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			-1,
+			true
 		));
 	}
 

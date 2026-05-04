@@ -114,6 +114,10 @@ public final class ClientPuppetmasterState {
 		KeyBinding ability = resolveAbilityBinding();
 		boolean abilityDown = ability != null && ClientAbilityKeys.isDown(client, ability);
 		boolean activeController = isLocalController(client);
+		if (!ClientRoleRevealState.canUseRoleAbility(client)) {
+			wasAbilityDown = false;
+			return;
+		}
 		if (abilityDown && !wasAbilityDown && client.currentScreen instanceof PuppetmasterTargetScreen) {
 			client.setScreen(null);
 			wasAbilityDown = true;
@@ -168,7 +172,7 @@ public final class ClientPuppetmasterState {
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null) return;
-		if (isLocalTarget(client)) {
+		if (ClientRoleRevealState.canUseRoleAbility(client) && isLocalTarget(client)) {
 			int alpha = 88;
 			int color = (alpha << 24) | 0xB00018;
 			context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), color);

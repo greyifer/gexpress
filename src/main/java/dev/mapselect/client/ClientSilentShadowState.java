@@ -35,7 +35,8 @@ public final class ClientSilentShadowState {
 			wasAbilityDown = false;
 			return;
 		}
-		if (ClientVultureState.isLocalStashed(client) || !isLocalSilent(client)) {
+		if (ClientVultureState.isLocalStashed(client) || !ClientRoleRevealState.canUseRoleAbility(client)
+				|| !isLocalSilent(client)) {
 			wasAbilityDown = false;
 			return;
 		}

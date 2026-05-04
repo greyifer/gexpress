@@ -1,6 +1,7 @@
 package dev.mapselect.role.silent;
 
 import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
@@ -20,6 +21,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 
 import java.util.UUID;
@@ -31,7 +33,16 @@ public final class SilentShadowManager {
 		PayloadTypeRegistry.playC2S().register(ShadowMarchUsePayload.ID, ShadowMarchUsePayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(ShadowMarchUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryActivate(context.player())));
+		AllowPlayerDeath.EVENT.register(SilentShadowManager::allowDeath);
 		ServerTickEvents.END_WORLD_TICK.register(SilentShadowManager::tick);
+	}
+
+	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
+		if (!(victim instanceof ServerPlayerEntity player)) return true;
+		SilentShadowComponent comp = SilentShadowComponent.KEY.getNullable(player.getWorld());
+		if (comp == null || !comp.isActive(player.getUuid())) return true;
+		player.sendMessage(Text.literal("Shadow March protected you."), true);
+		return false;
 	}
 
 	private static void tryActivate(ServerPlayerEntity player) {

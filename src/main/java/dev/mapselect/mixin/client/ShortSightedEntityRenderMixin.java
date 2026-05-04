@@ -1,6 +1,7 @@
 package dev.mapselect.mixin.client;
 
 import dev.mapselect.client.ClientShortSightedState;
+import dev.mapselect.client.ClientVultureState;
 import dev.mapselect.config.GexpressConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -18,11 +19,14 @@ public abstract class ShortSightedEntityRenderMixin {
 	private <E extends Entity> void gexpress$hideDistantEntities(E entity, double x, double y, double z,
 			float yaw, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers,
 			int light, CallbackInfo ci) {
-		if (!ClientShortSightedState.isShortSighted()) return;
-
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || entity == null) return;
+		if (ClientVultureState.shouldHideBellyEntity(client, entity)) {
+			ci.cancel();
+			return;
+		}
 
+		if (!ClientShortSightedState.isShortSighted()) return;
 		Entity viewer = client.cameraEntity != null ? client.cameraEntity : client.player;
 		if (viewer == null || entity == viewer) return;
 

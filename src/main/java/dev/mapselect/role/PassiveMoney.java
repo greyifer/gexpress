@@ -4,6 +4,7 @@ import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameConstants;
+import dev.mapselect.role.mafia.MafiaManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 
@@ -23,7 +24,7 @@ public final class PassiveMoney {
 		Integer money = value(world);
 		if (money <= 0) return;
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (game.canUseKillerFeatures(player)) {
+			if (game.canUseKillerFeatures(player) || MafiaManager.isMafiaRole(player)) {
 				PlayerShopComponent.KEY.get(player).addToBalance(money);
 			}
 		}

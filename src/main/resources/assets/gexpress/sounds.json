@@ -10,5 +10,17 @@
 			"ratatouille:block/rat_maid_plush_honk"
 		],
 		"subtitle": "subtitles.gexpress.greyifer_plush_honk"
+	},
+	"jevil_laugh": {
+		"sounds": [
+			"gexpress:jevil_laugh2"
+		],
+		"subtitle": "subtitles.gexpress.jevil_laugh"
+	},
+	"mafia": {
+		"sounds": [
+			"gexpress:mafia"
+		],
+		"subtitle": "subtitles.gexpress.mafia"
 	}
 }

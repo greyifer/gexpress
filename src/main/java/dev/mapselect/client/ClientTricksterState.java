@@ -75,6 +75,7 @@ public final class ClientTricksterState {
 			return;
 		}
 		if (client.currentScreen != null || ClientVultureState.isLocalStashed(client)
+				|| !ClientRoleRevealState.canUseRoleAbility(client)
 				|| !isLocalTrickster(client)) {
 			wasAbilityDown = false;
 			wasSecondaryDown = false;

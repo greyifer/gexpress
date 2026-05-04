@@ -58,7 +58,7 @@ public class RtpCommand {
 		ServerCommandSource src = ctx.getSource();
 		ServerPlayerEntity p = src.getPlayer();
 		if (p == null) {
-			src.sendError(Text.literal("'add' without coords requires a player. Use /g rtp add <x> <y> <z>."));
+			src.sendError(Text.literal("'add' without coords requires a player. Use /g setup rtp add <x> <y> <z>."));
 			return 0;
 		}
 		int id = comp(src).addTeleportationSlot(new TeleportationSlot(p.getX(), p.getY(), p.getZ(), p.getYaw(), p.getPitch()));
@@ -124,7 +124,7 @@ public class RtpCommand {
 		WatheExtendedWorldComponent c = comp(src);
 		Map<Integer, TeleportationSlot> slots = c.getTeleportationSlots();
 		if (slots == null || slots.isEmpty()) {
-			src.sendFeedback(() -> Text.literal("No RTP slots. Use /g rtp add.").formatted(Formatting.GRAY), false);
+			src.sendFeedback(() -> Text.literal("No RTP slots. Use /g setup rtp add.").formatted(Formatting.GRAY), false);
 			return 1;
 		}
 		boolean enabled = c.isRtpEnabled();

@@ -1,6 +1,7 @@
 package dev.mapselect.mixin;
 
 import dev.mapselect.role.juggernaut.JuggernautManager;
+import dev.mapselect.role.mafia.MafiaManager;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -16,6 +17,10 @@ public abstract class JuggernautDropMixin {
 			boolean retainOwnership, CallbackInfoReturnable<ItemEntity> cir) {
 		PlayerEntity player = (PlayerEntity) (Object) this;
 		if (JuggernautManager.shouldBlockLoadoutDrop(player, stack)) {
+			cir.setReturnValue(null);
+			return;
+		}
+		if (MafiaManager.shouldBlockWeaponDrop(player, stack)) {
 			cir.setReturnValue(null);
 		}
 	}

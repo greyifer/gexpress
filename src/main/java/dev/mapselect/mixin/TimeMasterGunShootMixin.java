@@ -1,6 +1,7 @@
 package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.util.GunShootPayload;
+import dev.mapselect.role.mafia.MafiaManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,7 +18,11 @@ public abstract class TimeMasterGunShootMixin {
 	)
 	private void gexpress$blockFrozenGunShot(GunShootPayload payload,
 			ServerPlayNetworking.Context context, CallbackInfo ci) {
-		if (TimeMasterManager.isFrozen(context.player())) ci.cancel();
+		if (TimeMasterManager.isFrozen(context.player())) {
+			ci.cancel();
+			return;
+		}
+		if (!MafiaManager.beforeGunShot(context.player())) ci.cancel();
 	}
 
 	@Inject(
@@ -32,5 +37,14 @@ public abstract class TimeMasterGunShootMixin {
 	private void gexpress$recordTimeMasterRevolverShot(GunShootPayload payload,
 			ServerPlayNetworking.Context context, CallbackInfo ci) {
 		TimeMasterManager.recordWeaponEvent(context.player(), TimeMasterManager.WeaponEventType.REVOLVER_SHOT);
+	}
+
+	@Inject(
+		method = "receive(Ldev/doctor4t/wathe/util/GunShootPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
+		at = @At("TAIL")
+	)
+	private void gexpress$applyMafiaGunRules(GunShootPayload payload,
+			ServerPlayNetworking.Context context, CallbackInfo ci) {
+		MafiaManager.afterGunShot(context.player());
 	}
 }

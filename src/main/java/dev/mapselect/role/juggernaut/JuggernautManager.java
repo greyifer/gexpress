@@ -22,6 +22,9 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 
@@ -35,8 +38,12 @@ import java.util.UUID;
 public final class JuggernautManager {
 	private static final Map<UUID, Integer> killCounts = new HashMap<>();
 	private static final Map<UUID, Integer> pendingCooldowns = new HashMap<>();
+	private static final Map<UUID, Long> shieldRechargeUntil = new HashMap<>();
 	private static final Set<UUID> equipped = new HashSet<>();
 	private static final int CHECK_INTERVAL_TICKS = 10;
+	private static final int MAX_STAGE = 5;
+	private static final int SHIELD_STAGE = 2;
+	private static final int GUN_SHIELD_STAGE = 4;
 	private static int ticksUntilNextCheck = 0;
 
 	private JuggernautManager() {}
@@ -66,8 +73,14 @@ public final class JuggernautManager {
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (victim == null || victim.getWorld().isClient) return true;
 		if (isJuggernaut(victim)) {
+			if (victim instanceof ServerPlayerEntity juggernaut
+					&& canUseJuggernautHere(juggernaut.getWorld(), juggernaut)
+					&& tryBlockWithShield(juggernaut, reason)) {
+				return false;
+			}
 			removeLoadout(victim);
 			equipped.remove(victim.getUuid());
+			shieldRechargeUntil.remove(victim.getUuid());
 		}
 		if (!(killer instanceof ServerPlayerEntity juggernaut)) return true;
 		if (victim == juggernaut || !isJuggernaut(juggernaut)) return true;
@@ -75,9 +88,13 @@ public final class JuggernautManager {
 
 		UUID id = juggernaut.getUuid();
 		int kills = killCounts.merge(id, 1, Integer::sum);
-		int cooldownTicks = cooldownTicksAfterKills(kills);
+		int stage = stageForKills(kills);
+		int cooldownTicks = cooldownTicksAtStage(stage);
 		pendingCooldowns.put(id, cooldownTicks);
-		juggernaut.sendMessage(Texts.cooldown(cooldownTicks), true);
+		if (stage >= SHIELD_STAGE && !shieldRechargeUntil.containsKey(id)) {
+			AbilityCooldownSync.clear(juggernaut, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
+		}
+		juggernaut.sendMessage(Texts.stage(stage, cooldownTicks), true);
 		return true;
 	}
 
@@ -107,6 +124,7 @@ public final class JuggernautManager {
 			if (!equipped.contains(player.getUuid())) {
 				grantLoadout(player);
 			}
+			syncShieldCooldown(player);
 		}
 	}
 
@@ -126,7 +144,8 @@ public final class JuggernautManager {
 		giveIfMissing(player, WatheItems.REVOLVER);
 		killCounts.putIfAbsent(player.getUuid(), 0);
 		equipped.add(player.getUuid());
-		applyWeaponCooldown(player, cooldownTicksAfterKills(killCounts.getOrDefault(player.getUuid(), 0)));
+		applyWeaponCooldown(player, cooldownTicksAtStage(stageForKills(killCounts.getOrDefault(player.getUuid(), 0))));
+		syncShieldCooldown(player);
 		MapSelect.LOGGER.debug("Equipped Juggernaut {}", player.getName().getString());
 	}
 
@@ -147,12 +166,73 @@ public final class JuggernautManager {
 		}
 	}
 
-	private static int cooldownTicksAfterKills(int kills) {
+	private static int cooldownTicksAtStage(int stage) {
 		int initial = GexpressConfig.getJuggernautInitialCooldownSeconds();
 		int reduction = GexpressConfig.getJuggernautCooldownReductionSeconds();
 		int minimum = Math.min(initial, GexpressConfig.getJuggernautMinimumCooldownSeconds());
-		int seconds = Math.max(minimum, initial - Math.max(0, kills) * reduction);
+		int seconds = Math.max(minimum, initial - cooldownReductionSteps(stage) * reduction);
 		return seconds * 20;
+	}
+
+	private static int stageForKills(int kills) {
+		return Math.min(MAX_STAGE, Math.max(0, kills));
+	}
+
+	private static int cooldownReductionSteps(int stage) {
+		return Math.min(3, (Math.min(MAX_STAGE, Math.max(0, stage)) + 1) / 2);
+	}
+
+	private static boolean tryBlockWithShield(ServerPlayerEntity juggernaut, Identifier reason) {
+		boolean knife = dev.doctor4t.wathe.game.GameConstants.DeathReasons.KNIFE.equals(reason);
+		boolean gun = dev.doctor4t.wathe.game.GameConstants.DeathReasons.GUN.equals(reason);
+		if (!knife && !gun) return false;
+
+		int stage = stageForKills(killCounts.getOrDefault(juggernaut.getUuid(), 0));
+		if (stage < SHIELD_STAGE) return false;
+		if (gun && stage < GUN_SHIELD_STAGE) return false;
+
+		long remaining = shieldRechargeRemainingTicks(juggernaut);
+		if (remaining > 0L) {
+			syncShieldCooldown(juggernaut, remaining);
+			return false;
+		}
+
+		long rechargeTicks = (long) GexpressConfig.getJuggernautShieldRechargeSeconds() * 20L;
+		shieldRechargeUntil.put(juggernaut.getUuid(), juggernaut.getWorld().getTime() + rechargeTicks);
+		syncShieldCooldown(juggernaut, rechargeTicks);
+		juggernaut.getWorld().playSound(null, juggernaut.getBlockPos(), SoundEvents.ITEM_SHIELD_BLOCK,
+			SoundCategory.PLAYERS, 0.9F, 0.85F);
+		juggernaut.sendMessage(Text.literal("Juggernaut shield blocked the hit."), true);
+		return true;
+	}
+
+	private static long shieldRechargeRemainingTicks(ServerPlayerEntity player) {
+		Long until = shieldRechargeUntil.get(player.getUuid());
+		if (until == null) return 0L;
+		long remaining = until - player.getWorld().getTime();
+		if (remaining <= 0L) {
+			shieldRechargeUntil.remove(player.getUuid());
+			return 0L;
+		}
+		return remaining;
+	}
+
+	private static void syncShieldCooldown(ServerPlayerEntity player) {
+		int stage = stageForKills(killCounts.getOrDefault(player.getUuid(), 0));
+		if (stage < SHIELD_STAGE) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
+			return;
+		}
+		syncShieldCooldown(player, shieldRechargeRemainingTicks(player));
+	}
+
+	private static void syncShieldCooldown(ServerPlayerEntity player, long remainingTicks) {
+		if (remainingTicks <= 0L) {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
+			return;
+		}
+		AbilityCooldownSync.send(player, AbilityCooldownPayload.JUGGERNAUT_SHIELD, remainingTicks,
+			(long) GexpressConfig.getJuggernautShieldRechargeSeconds() * 20L, false);
 	}
 
 	public static boolean handleMurderTick(ServerWorld world, GameWorldComponent game) {
@@ -202,6 +282,7 @@ public final class JuggernautManager {
 	private static void clearRoundState() {
 		killCounts.clear();
 		pendingCooldowns.clear();
+		shieldRechargeUntil.clear();
 		equipped.clear();
 	}
 
@@ -213,7 +294,8 @@ public final class JuggernautManager {
 	}
 
 	public static TimeState snapshotForTimeRewind() {
-		return new TimeState(new HashMap<>(killCounts), new HashMap<>(pendingCooldowns), new HashSet<>(equipped));
+		return new TimeState(new HashMap<>(killCounts), new HashMap<>(pendingCooldowns),
+			new HashMap<>(shieldRechargeUntil), new HashSet<>(equipped));
 	}
 
 	public static void restoreForTimeRewind(TimeState state) {
@@ -221,6 +303,7 @@ public final class JuggernautManager {
 		if (state == null) return;
 		killCounts.putAll(state.killCounts());
 		pendingCooldowns.putAll(state.pendingCooldowns());
+		shieldRechargeUntil.putAll(state.shieldRechargeUntil());
 		equipped.addAll(state.equipped());
 	}
 
@@ -247,15 +330,18 @@ public final class JuggernautManager {
 		}
 		if (player instanceof ServerPlayerEntity serverPlayer) {
 			AbilityCooldownSync.clear(serverPlayer, AbilityCooldownPayload.JUGGERNAUT_WEAPONS);
+			AbilityCooldownSync.clear(serverPlayer, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
 			serverPlayer.playerScreenHandler.syncState();
 		}
 	}
 
 	private static final class Texts {
-		private static net.minecraft.text.Text cooldown(int cooldownTicks) {
-			return net.minecraft.text.Text.literal("Juggernaut cooldown: " + Math.max(0, cooldownTicks / 20) + "s.");
+		private static Text stage(int stage, int cooldownTicks) {
+			return Text.literal("Juggernaut stage " + stage + "/" + MAX_STAGE
+				+ " - weapons: " + Math.max(0, cooldownTicks / 20) + "s.");
 		}
 	}
 
-	public record TimeState(Map<UUID, Integer> killCounts, Map<UUID, Integer> pendingCooldowns, Set<UUID> equipped) {}
+	public record TimeState(Map<UUID, Integer> killCounts, Map<UUID, Integer> pendingCooldowns,
+			Map<UUID, Long> shieldRechargeUntil, Set<UUID> equipped) {}
 }

@@ -53,6 +53,9 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientVultureState.register();
 		ClientTrackerState.register();
 		ClientAltruistState.register();
+		ClientMafiaState.register();
+		ClientJanitorState.register();
+		ClientBountyHunterState.register();
 		ClientAbilityCooldownHud.register();
 		ClientPresetCache.registerClient();
 		ClientTrainPresetCache.registerClient();
@@ -104,13 +107,17 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.juggernautInitialCooldownSeconds(),
 				payload.juggernautCooldownReductionSeconds(),
 				payload.juggernautMinimumCooldownSeconds(),
+				payload.juggernautShieldRechargeSeconds(),
 				payload.tricksterSwapDurationSeconds(),
+				payload.tricksterMasqueradeCooldownSeconds(),
+				payload.tricksterDancingCartsCooldownSeconds(),
 				payload.tricksterDancingCartsMaxUses(),
 				payload.puppetmasterControlDurationSeconds(),
 				payload.puppetmasterControlCooldownSeconds(),
 				payload.puppetmasterRandomTarget(),
 				payload.puppetmasterControlRange(),
 				payload.pelicanEatCooldownSeconds(),
+				payload.pelicanEatPercentage(),
 				payload.hungryFoodLimit(),
 				payload.thirstyDrinkLimit(),
 				payload.snitchTasksRequired(),
@@ -131,6 +138,21 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.bountyHunterBountyIntervalSeconds(),
 				payload.bountyHunterRewardGold(),
 				payload.bountyHunterFailCooldownSeconds(),
+				payload.godfatherBulletPrice(),
+				payload.godfatherStartingBullets(),
+				payload.godfatherMaxLoadedBullets(),
+				payload.mafiaStartingGold(),
+				payload.mafiaMinimumPlayers(),
+				payload.godfatherStartingGold(),
+				payload.mafiosoStartingGold(),
+				payload.janitorStartingGold(),
+				payload.mafiaRecruitRange(),
+				payload.mafiaReplacementCooldownSeconds(),
+				payload.mafiaRevolverKillCooldownSeconds(),
+				payload.janitorCleanRange(),
+				payload.janitorCleanCooldownSeconds(),
+				payload.janitorRevolverCooldownAfterCleanSeconds(),
+				payload.janitorCleanCooldownAfterKillSeconds(),
 				payload.useCustomRoleCounts(),
 				payload.maxKillerAmount(),
 				payload.maxVigilanteAmount(),

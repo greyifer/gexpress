@@ -14,6 +14,7 @@ import dev.mapselect.modifier.ModifierUtils;
 import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.role.trickster.TricksterManager;
 import dev.mapselect.role.vulture.VultureManager;
+import dev.doctor4t.wathe.game.GameFunctions;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -43,7 +44,10 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		UUID senderId = sender.getPlayer().getUuid();
 		Object level = sender.getPlayer().getServerLevel().getServerLevel();
 		if (!(level instanceof ServerWorld world)) return;
-		if (TricksterManager.isGlobalMuteActive(world)) {
+		Object nativePlayer = sender.getPlayer().getPlayer();
+		if (TricksterManager.isGlobalMuteActive(world)
+				&& nativePlayer instanceof ServerPlayerEntity player
+				&& GameFunctions.isPlayerAliveAndSurvival(player)) {
 			event.cancel();
 			return;
 		}
@@ -52,7 +56,6 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 			event.cancel();
 			return;
 		}
-		Object nativePlayer = sender.getPlayer().getPlayer();
 		if (nativePlayer instanceof ServerPlayerEntity player
 				&& ModifierUtils.has(player, MapSelectModifiers.MUTED_ID)) {
 			event.cancel();

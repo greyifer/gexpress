@@ -10,10 +10,15 @@ public record AbilityCooldownPayload(String key, int remainingTicks, int totalTi
 		implements CustomPayload {
 	public static final String PUPPETMASTER_CONTROL = "puppetmaster_control";
 	public static final String PELICAN_SWALLOW = "pelican_swallow";
+	public static final String HARLEQUIN_MASQUERADE = "harlequin_masquerade";
 	public static final String HARLEQUIN_DANCING_CARTS = "harlequin_dancing_carts";
 	public static final String JUGGERNAUT_WEAPONS = "juggernaut_weapons";
+	public static final String JUGGERNAUT_SHIELD = "juggernaut_shield";
 	public static final String SCATTER_BRAIN_SCATTER = "scatter_brain_scatter";
 	public static final String TRACKER_TRACK = "tracker_track";
+	public static final String GODFATHER_RECRUIT_MAFIOSO = "godfather_recruit_mafioso";
+	public static final String GODFATHER_RECRUIT_JANITOR = "godfather_recruit_janitor";
+	public static final String JANITOR_CLEAN = "janitor_clean";
 
 	public static final CustomPayload.Id<AbilityCooldownPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "ability_cooldown"));

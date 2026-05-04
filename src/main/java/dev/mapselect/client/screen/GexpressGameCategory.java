@@ -50,6 +50,9 @@ public final class GexpressGameCategory {
 	private static final String SCATTER_BRAIN_ID = MapSelect.MOD_ID + ":scatter_brain";
 	private static final String TRACKER_ID = MapSelect.MOD_ID + ":tracker";
 	private static final String ALTRUIST_ID = MapSelect.MOD_ID + ":altruist";
+	private static final String GODFATHER_ID = MapSelect.MOD_ID + ":godfather";
+	private static final String MAFIOSO_ID = MapSelect.MOD_ID + ":mafioso";
+	private static final String JANITOR_ID = MapSelect.MOD_ID + ":janitor";
 	private static final String EOD_SPECIALIST_ID = MapSelect.MOD_ID + ":eod_specialist";
 	private static final String SHORT_SIGHTED_ID = MapSelect.MOD_ID + ":short_sighted";
 	private static final String HUNGRY_ID = MapSelect.MOD_ID + ":hungry";
@@ -532,7 +535,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.juggernaut_cooldown_reduction")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.juggernaut_cooldown_reduction.tooltip")))
-				.binding(10, GexpressConfig::getJuggernautCooldownReductionSeconds,
+				.binding(20, GexpressConfig::getJuggernautCooldownReductionSeconds,
 					v -> GexpressConfig.juggernautCooldownReductionSeconds = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.JUGGERNAUT_COOLDOWN_REDUCTION_MIN, GexpressConfig.JUGGERNAUT_COOLDOWN_REDUCTION_MAX))
@@ -545,6 +548,14 @@ public final class GexpressGameCategory {
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.JUGGERNAUT_MINIMUM_COOLDOWN_MIN, GexpressConfig.JUGGERNAUT_MINIMUM_COOLDOWN_MAX))
 				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.juggernaut_shield_recharge")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.juggernaut_shield_recharge.tooltip")))
+				.binding(60, GexpressConfig::getJuggernautShieldRechargeSeconds,
+					v -> GexpressConfig.juggernautShieldRechargeSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.JUGGERNAUT_SHIELD_RECHARGE_MIN, GexpressConfig.JUGGERNAUT_SHIELD_RECHARGE_MAX))
+				.build());
 			return out;
 		}
 		if (TRICKSTER_ID.equals(roleId)) {
@@ -556,6 +567,24 @@ public final class GexpressGameCategory {
 					v -> GexpressConfig.tricksterSwapDurationSeconds = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.TRICKSTER_SWAP_DURATION_MIN, GexpressConfig.TRICKSTER_SWAP_DURATION_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.trickster_masquerade_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.trickster_masquerade_cooldown.tooltip")))
+				.binding(35, GexpressConfig::getTricksterMasqueradeCooldownSeconds,
+					v -> GexpressConfig.tricksterMasqueradeCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.TRICKSTER_MASQUERADE_COOLDOWN_MIN,
+						GexpressConfig.TRICKSTER_MASQUERADE_COOLDOWN_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.trickster_dancing_carts_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.trickster_dancing_carts_cooldown.tooltip")))
+				.binding(45, GexpressConfig::getTricksterDancingCartsCooldownSeconds,
+					v -> GexpressConfig.tricksterDancingCartsCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.TRICKSTER_DANCING_CARTS_COOLDOWN_MIN,
+						GexpressConfig.TRICKSTER_DANCING_CARTS_COOLDOWN_MAX))
 				.build());
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.trickster_dancing_carts_max_uses")))
@@ -643,6 +672,109 @@ public final class GexpressGameCategory {
 				.build());
 			return out;
 		}
+		if (GODFATHER_ID.equals(roleId) || MAFIOSO_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			if (GODFATHER_ID.equals(roleId)) {
+				out.add(Option.<Integer>createBuilder()
+					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_bullet_price")))
+					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_bullet_price.tooltip")))
+					.binding(75, GexpressConfig::getGodfatherBulletPrice, v -> GexpressConfig.godfatherBulletPrice = v)
+					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+						.range(GexpressConfig.GODFATHER_BULLET_PRICE_MIN, GexpressConfig.GODFATHER_BULLET_PRICE_MAX))
+					.build());
+				out.add(Option.<Integer>createBuilder()
+					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_bullets")))
+					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_bullets.tooltip")))
+					.binding(1, GexpressConfig::getGodfatherStartingBullets, v -> GexpressConfig.godfatherStartingBullets = v)
+					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+						.range(GexpressConfig.GODFATHER_STARTING_BULLETS_MIN, GexpressConfig.GODFATHER_STARTING_BULLETS_MAX))
+					.build());
+				out.add(Option.<Integer>createBuilder()
+					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_max_loaded_bullets")))
+					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_max_loaded_bullets.tooltip")))
+					.binding(3, GexpressConfig::getGodfatherMaxLoadedBullets, v -> GexpressConfig.godfatherMaxLoadedBullets = v)
+					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+						.range(GexpressConfig.GODFATHER_MAX_LOADED_BULLETS_MIN, GexpressConfig.GODFATHER_MAX_LOADED_BULLETS_MAX))
+					.build());
+				out.add(Option.<Integer>createBuilder()
+					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players")))
+					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players.tooltip")))
+					.binding(15, GexpressConfig::getMafiaMinimumPlayers, v -> GexpressConfig.mafiaMinimumPlayers = v)
+					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+						.range(GexpressConfig.MAFIA_MINIMUM_PLAYERS_MIN, GexpressConfig.MAFIA_MINIMUM_PLAYERS_MAX))
+					.build());
+				out.add(Option.<Integer>createBuilder()
+					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_gold")))
+					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_gold.tooltip")))
+					.binding(100, GexpressConfig::getGodfatherStartingGold, v -> GexpressConfig.godfatherStartingGold = v)
+					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+						.range(GexpressConfig.MAFIA_STARTING_GOLD_MIN, GexpressConfig.MAFIA_STARTING_GOLD_MAX))
+					.build());
+				out.add(Option.<Integer>createBuilder()
+					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range")))
+					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range.tooltip")))
+					.binding(16, GexpressConfig::getMafiaRecruitRange, v -> GexpressConfig.mafiaRecruitRange = v)
+					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+						.range(GexpressConfig.MAFIA_RECRUIT_RANGE_MIN, GexpressConfig.MAFIA_RECRUIT_RANGE_MAX))
+					.build());
+				out.add(Option.<Integer>createBuilder()
+					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_replacement_cooldown")))
+					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_replacement_cooldown.tooltip")))
+					.binding(120, GexpressConfig::getMafiaReplacementCooldownSeconds, v -> GexpressConfig.mafiaReplacementCooldownSeconds = v)
+					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+						.range(GexpressConfig.MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MIN, GexpressConfig.MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MAX))
+					.build());
+			}
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafioso_starting_gold")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafioso_starting_gold.tooltip")))
+				.binding(100, GexpressConfig::getMafiosoStartingGold, v -> GexpressConfig.mafiosoStartingGold = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.MAFIA_STARTING_GOLD_MIN, GexpressConfig.MAFIA_STARTING_GOLD_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_revolver_kill_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_revolver_kill_cooldown.tooltip")))
+				.binding(60, GexpressConfig::getMafiaRevolverKillCooldownSeconds, v -> GexpressConfig.mafiaRevolverKillCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.MAFIA_REVOLVER_KILL_COOLDOWN_SECONDS_MIN, GexpressConfig.MAFIA_REVOLVER_KILL_COOLDOWN_SECONDS_MAX))
+				.build());
+			return out;
+		}
+		if (JANITOR_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.janitor_starting_gold")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.janitor_starting_gold.tooltip")))
+				.binding(100, GexpressConfig::getJanitorStartingGold, v -> GexpressConfig.janitorStartingGold = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.MAFIA_STARTING_GOLD_MIN, GexpressConfig.MAFIA_STARTING_GOLD_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.janitor_clean_range")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.janitor_clean_range.tooltip")))
+				.binding(4, GexpressConfig::getJanitorCleanRange, v -> GexpressConfig.janitorCleanRange = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.JANITOR_CLEAN_RANGE_MIN, GexpressConfig.JANITOR_CLEAN_RANGE_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.janitor_clean_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.janitor_clean_cooldown.tooltip")))
+				.binding(20, GexpressConfig::getJanitorCleanCooldownSeconds, v -> GexpressConfig.janitorCleanCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.JANITOR_CLEAN_COOLDOWN_SECONDS_MIN, GexpressConfig.JANITOR_CLEAN_COOLDOWN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.janitor_clean_cooldown_after_kill")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.janitor_clean_cooldown_after_kill.tooltip")))
+				.binding(45, GexpressConfig::getJanitorCleanCooldownAfterKillSeconds,
+					v -> GexpressConfig.janitorCleanCooldownAfterKillSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MIN,
+						GexpressConfig.JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MAX))
+				.build());
+			return out;
+		}
 		if (SCATTER_BRAIN_ID.equals(roleId)) {
 			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
@@ -665,6 +797,14 @@ public final class GexpressGameCategory {
 					v -> GexpressConfig.pelicanEatCooldownSeconds = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.PELICAN_EAT_COOLDOWN_MIN, GexpressConfig.PELICAN_EAT_COOLDOWN_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.pelican_eat_percentage")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.pelican_eat_percentage.tooltip")))
+				.binding(80, GexpressConfig::getPelicanEatPercentage,
+					v -> GexpressConfig.pelicanEatPercentage = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PELICAN_EAT_PERCENTAGE_MIN, GexpressConfig.PELICAN_EAT_PERCENTAGE_MAX))
 				.build());
 			return out;
 		}

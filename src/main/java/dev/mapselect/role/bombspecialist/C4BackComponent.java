@@ -49,7 +49,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 	}
 
 	/**
-	 * Attach with a specific fuse length in ticks. Used by the /g c4 attach command
+	 * Attach with a specific fuse length in ticks. Used by the /g roles c4 attach command
 	 * when we want to honor live config changes without requiring a server restart.
 	 */
 	public boolean addC4(UUID uuid, long fuseTicks) {

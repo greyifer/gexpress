@@ -21,6 +21,7 @@ public final class ClientAltruistState {
 	private static void tick(MinecraftClient client) {
 		if (client == null || client.player == null || client.world == null
 				|| client.currentScreen != null || ClientVultureState.isLocalStashed(client)
+				|| !ClientRoleRevealState.canUseRoleAbility(client)
 				|| !isLocalAltruist(client)) {
 			wasAbilityDown = false;
 			return;

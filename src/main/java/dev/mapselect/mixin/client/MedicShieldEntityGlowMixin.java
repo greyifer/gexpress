@@ -1,7 +1,9 @@
 package dev.mapselect.mixin.client;
 
 import dev.mapselect.client.ClientMedicShieldState;
+import dev.mapselect.client.ClientMafiaState;
 import dev.mapselect.client.ClientSnitchState;
+import dev.mapselect.client.ClientJanitorState;
 import dev.mapselect.client.ClientTimeMasterFreezeState;
 import dev.mapselect.client.ClientTrackerState;
 import net.minecraft.entity.Entity;
@@ -17,8 +19,10 @@ public abstract class MedicShieldEntityGlowMixin {
 	private void gexpress$medicShieldGlow(CallbackInfoReturnable<Boolean> cir) {
 		if (ClientMedicShieldState.shouldGlow((Entity) (Object) this)
 				|| ClientSnitchState.shouldGlow((Entity) (Object) this)
+				|| ClientJanitorState.shouldGlow((Entity) (Object) this)
 				|| ((Object) this instanceof AbstractClientPlayerEntity player
 					&& (ClientTimeMasterFreezeState.shouldGlow(player)
+						|| ClientMafiaState.shouldGlow(player.getUuid())
 						|| ClientTrackerState.isTracked(player.getUuid())))) {
 			cir.setReturnValue(true);
 		}
@@ -35,9 +39,18 @@ public abstract class MedicShieldEntityGlowMixin {
 			cir.setReturnValue(snitchColor);
 			return;
 		}
+		if (ClientJanitorState.shouldGlow((Entity) (Object) this)) {
+			cir.setReturnValue(ClientJanitorState.glowColor());
+			return;
+		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientTimeMasterFreezeState.shouldGlow(player)) {
 			cir.setReturnValue(ClientTimeMasterFreezeState.glowColor());
+			return;
+		}
+		if ((Object) this instanceof AbstractClientPlayerEntity player
+				&& ClientMafiaState.shouldGlow(player.getUuid())) {
+			cir.setReturnValue(ClientMafiaState.glowColor());
 			return;
 		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player

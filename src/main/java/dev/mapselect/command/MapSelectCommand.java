@@ -336,7 +336,7 @@ public class MapSelectCommand {
 		}
 		try {
 			if (PresetStorage.exists(src.getServer(), name)) {
-				src.sendError(Text.literal("Preset '" + name + "' already exists. Use /g map edit or /g map delete."));
+				src.sendError(Text.literal("Preset '" + name + "' already exists. Use /g setup map edit or /g setup map delete."));
 				return 0;
 			}
 
@@ -557,7 +557,7 @@ public class MapSelectCommand {
 		try {
 			List<String> names = PresetStorage.list(src.getServer());
 			if (names.isEmpty()) {
-				src.sendFeedback(() -> Text.literal("No presets saved. Use /g map create <corner1> <corner2> <name>."), false);
+				src.sendFeedback(() -> Text.literal("No presets saved. Use /g setup map create <corner1> <corner2> <name>."), false);
 				return 1;
 			}
 			String joined = String.join(", ", names);

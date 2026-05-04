@@ -51,12 +51,18 @@ public final class GexpressConfig {
 	public static int warlockKillCooldownSeconds = 45;
 	/** Seconds before a fresh Juggernaut can kill with their starting weapons. */
 	public static int juggernautInitialCooldownSeconds = 60;
-	/** Seconds removed from the Juggernaut weapon cooldown after each kill. */
-	public static int juggernautCooldownReductionSeconds = 10;
+	/** Seconds removed from the Juggernaut weapon cooldown at each odd Juggernaut stage. */
+	public static int juggernautCooldownReductionSeconds = 20;
 	/** Lowest Juggernaut weapon cooldown after repeated kills. */
 	public static int juggernautMinimumCooldownSeconds = 10;
+	/** Seconds before the Juggernaut stage shield can block again. */
+	public static int juggernautShieldRechargeSeconds = 60;
 	/** Seconds the Trickster's skin shuffle and global voice mute lasts. */
 	public static int tricksterSwapDurationSeconds = 25;
+	/** Seconds the Harlequin waits after Masquerade ends. */
+	public static int tricksterMasqueradeCooldownSeconds = 35;
+	/** Seconds before Harlequin can shuffle train carts again. */
+	public static int tricksterDancingCartsCooldownSeconds = 45;
 	/** Number of times each Harlequin can shuffle train carts per round. */
 	public static int tricksterDancingCartsMaxUses = 1;
 	/** Seconds the Puppetmaster can control a target. */
@@ -71,6 +77,8 @@ public final class GexpressConfig {
 	public static int puppetmasterControlRange = 16;
 	/** Seconds before the Pelican can swallow another player. */
 	public static int pelicanEatCooldownSeconds = 20;
+	/** Percent of the round lobby the Pelican must swallow to win. */
+	public static int pelicanEatPercentage = 80;
 	/** Food items a Hungry player may carry from platters at once. */
 	public static int hungryFoodLimit = 2;
 	/** Drink items a Thirsty player may carry from trays at once. */
@@ -109,6 +117,36 @@ public final class GexpressConfig {
 	public static int bountyHunterRewardGold = 200;
 	/** Weapon cooldown penalty in seconds when a Bounty Hunter misses their bounty window. */
 	public static int bountyHunterFailCooldownSeconds = 90;
+	/** Coins paid by the Godfather for one Bullet. */
+	public static int godfatherBulletPrice = 75;
+	/** Bullets a Godfather starts with. */
+	public static int godfatherStartingBullets = 1;
+	/** Bullets a Godfather can keep loaded in the revolver. */
+	public static int godfatherMaxLoadedBullets = 3;
+	/** Coins Mafia roles start with when they join the family. */
+	public static int mafiaStartingGold = 100;
+	/** Minimum lobby size required before Godfather can be naturally assigned. */
+	public static int mafiaMinimumPlayers = 15;
+	/** Coins Godfather starts with. */
+	public static int godfatherStartingGold = 100;
+	/** Coins Mafioso starts with. */
+	public static int mafiosoStartingGold = 100;
+	/** Coins Janitor starts with. */
+	public static int janitorStartingGold = 100;
+	/** Maximum block range for Godfather recruitment. */
+	public static int mafiaRecruitRange = 16;
+	/** Seconds before a dead Mafioso or Janitor slot can be refilled. */
+	public static int mafiaReplacementCooldownSeconds = 120;
+	/** Seconds Mafioso and Janitor revolver kills put the revolver on cooldown. */
+	public static int mafiaRevolverKillCooldownSeconds = 60;
+	/** Maximum block range for Janitor body cleanup. */
+	public static int janitorCleanRange = 4;
+	/** Seconds before Janitor can clean again after cleaning. */
+	public static int janitorCleanCooldownSeconds = 20;
+	/** Seconds cleaning a body puts the Janitor revolver on cooldown. */
+	public static int janitorRevolverCooldownAfterCleanSeconds = 45;
+	/** Seconds killing a player puts Janitor cleanup on cooldown. */
+	public static int janitorCleanCooldownAfterKillSeconds = 45;
 	/** Whether the player who died last round starts the next round with one breakable shield. */
 	public static boolean lastDeathShieldEnabled = false;
 	/** Whether G'Express uses fixed max Killer/Vigilante counts instead of per-player scaling. */
@@ -175,8 +213,14 @@ public final class GexpressConfig {
 	public static final int JUGGERNAUT_COOLDOWN_REDUCTION_MAX = 600;
 	public static final int JUGGERNAUT_MINIMUM_COOLDOWN_MIN = 0;
 	public static final int JUGGERNAUT_MINIMUM_COOLDOWN_MAX = 600;
+	public static final int JUGGERNAUT_SHIELD_RECHARGE_MIN = 1;
+	public static final int JUGGERNAUT_SHIELD_RECHARGE_MAX = 600;
 	public static final int TRICKSTER_SWAP_DURATION_MIN = 1;
 	public static final int TRICKSTER_SWAP_DURATION_MAX = 300;
+	public static final int TRICKSTER_MASQUERADE_COOLDOWN_MIN = 0;
+	public static final int TRICKSTER_MASQUERADE_COOLDOWN_MAX = 600;
+	public static final int TRICKSTER_DANCING_CARTS_COOLDOWN_MIN = 0;
+	public static final int TRICKSTER_DANCING_CARTS_COOLDOWN_MAX = 600;
 	public static final int TRICKSTER_DANCING_CARTS_MAX_USES_MIN = 0;
 	public static final int TRICKSTER_DANCING_CARTS_MAX_USES_MAX = 10;
 	public static final int PUPPETMASTER_CONTROL_DURATION_MIN = 1;
@@ -187,6 +231,8 @@ public final class GexpressConfig {
 	public static final int PUPPETMASTER_CONTROL_RANGE_MAX = 64;
 	public static final int PELICAN_EAT_COOLDOWN_MIN = 0;
 	public static final int PELICAN_EAT_COOLDOWN_MAX = 600;
+	public static final int PELICAN_EAT_PERCENTAGE_MIN = 10;
+	public static final int PELICAN_EAT_PERCENTAGE_MAX = 100;
 	public static final int HUNGRY_FOOD_LIMIT_MIN = 1;
 	public static final int HUNGRY_FOOD_LIMIT_MAX = 9;
 	public static final int THIRSTY_DRINK_LIMIT_MIN = 1;
@@ -225,6 +271,30 @@ public final class GexpressConfig {
 	public static final int BOUNTY_HUNTER_REWARD_GOLD_MAX = 9999;
 	public static final int BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MIN = 0;
 	public static final int BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MAX = 900;
+	public static final int GODFATHER_BULLET_PRICE_MIN = 0;
+	public static final int GODFATHER_BULLET_PRICE_MAX = 9999;
+	public static final int GODFATHER_STARTING_BULLETS_MIN = 0;
+	public static final int GODFATHER_STARTING_BULLETS_MAX = 64;
+	public static final int GODFATHER_MAX_LOADED_BULLETS_MIN = 1;
+	public static final int GODFATHER_MAX_LOADED_BULLETS_MAX = 12;
+	public static final int MAFIA_STARTING_GOLD_MIN = 0;
+	public static final int MAFIA_STARTING_GOLD_MAX = 9999;
+	public static final int MAFIA_MINIMUM_PLAYERS_MIN = 1;
+	public static final int MAFIA_MINIMUM_PLAYERS_MAX = 64;
+	public static final int MAFIA_RECRUIT_RANGE_MIN = 1;
+	public static final int MAFIA_RECRUIT_RANGE_MAX = 96;
+	public static final int MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MIN = 0;
+	public static final int MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MAX = 900;
+	public static final int MAFIA_REVOLVER_KILL_COOLDOWN_SECONDS_MIN = 0;
+	public static final int MAFIA_REVOLVER_KILL_COOLDOWN_SECONDS_MAX = 900;
+	public static final int JANITOR_CLEAN_RANGE_MIN = 1;
+	public static final int JANITOR_CLEAN_RANGE_MAX = 16;
+	public static final int JANITOR_CLEAN_COOLDOWN_SECONDS_MIN = 0;
+	public static final int JANITOR_CLEAN_COOLDOWN_SECONDS_MAX = 900;
+	public static final int JANITOR_REVOLVER_COOLDOWN_AFTER_CLEAN_SECONDS_MIN = 0;
+	public static final int JANITOR_REVOLVER_COOLDOWN_AFTER_CLEAN_SECONDS_MAX = 900;
+	public static final int JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MIN = 0;
+	public static final int JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MAX = 900;
 	public static final int MAX_KILLER_AMOUNT_MIN = 1;
 	public static final int MAX_KILLER_AMOUNT_MAX = 64;
 	public static final int MAX_VIGILANTE_AMOUNT_MIN = 0;
@@ -318,9 +388,24 @@ public final class GexpressConfig {
 			Math.min(JUGGERNAUT_MINIMUM_COOLDOWN_MAX, juggernautMinimumCooldownSeconds));
 	}
 
+	public static int getJuggernautShieldRechargeSeconds() {
+		return Math.max(JUGGERNAUT_SHIELD_RECHARGE_MIN,
+			Math.min(JUGGERNAUT_SHIELD_RECHARGE_MAX, juggernautShieldRechargeSeconds));
+	}
+
 	public static int getTricksterSwapDurationSeconds() {
 		return Math.max(TRICKSTER_SWAP_DURATION_MIN,
 			Math.min(TRICKSTER_SWAP_DURATION_MAX, tricksterSwapDurationSeconds));
+	}
+
+	public static int getTricksterMasqueradeCooldownSeconds() {
+		return Math.max(TRICKSTER_MASQUERADE_COOLDOWN_MIN,
+			Math.min(TRICKSTER_MASQUERADE_COOLDOWN_MAX, tricksterMasqueradeCooldownSeconds));
+	}
+
+	public static int getTricksterDancingCartsCooldownSeconds() {
+		return Math.max(TRICKSTER_DANCING_CARTS_COOLDOWN_MIN,
+			Math.min(TRICKSTER_DANCING_CARTS_COOLDOWN_MAX, tricksterDancingCartsCooldownSeconds));
 	}
 
 	public static int getTricksterDancingCartsMaxUses() {
@@ -354,6 +439,11 @@ public final class GexpressConfig {
 	public static int getPelicanEatCooldownSeconds() {
 		return Math.max(PELICAN_EAT_COOLDOWN_MIN,
 			Math.min(PELICAN_EAT_COOLDOWN_MAX, pelicanEatCooldownSeconds));
+	}
+
+	public static int getPelicanEatPercentage() {
+		return Math.max(PELICAN_EAT_PERCENTAGE_MIN,
+			Math.min(PELICAN_EAT_PERCENTAGE_MAX, pelicanEatPercentage));
 	}
 
 	public static int getHungryFoodLimit() {
@@ -445,6 +535,80 @@ public final class GexpressConfig {
 	public static int getBountyHunterFailCooldownSeconds() {
 		return Math.max(BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MIN,
 			Math.min(BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MAX, bountyHunterFailCooldownSeconds));
+	}
+
+	public static int getGodfatherBulletPrice() {
+		return Math.max(GODFATHER_BULLET_PRICE_MIN,
+			Math.min(GODFATHER_BULLET_PRICE_MAX, godfatherBulletPrice));
+	}
+
+	public static int getGodfatherStartingBullets() {
+		return Math.max(GODFATHER_STARTING_BULLETS_MIN,
+			Math.min(GODFATHER_STARTING_BULLETS_MAX, godfatherStartingBullets));
+	}
+
+	public static int getGodfatherMaxLoadedBullets() {
+		return Math.max(GODFATHER_MAX_LOADED_BULLETS_MIN,
+			Math.min(GODFATHER_MAX_LOADED_BULLETS_MAX, godfatherMaxLoadedBullets));
+	}
+
+	public static int getMafiaStartingGold() {
+		return Math.max(MAFIA_STARTING_GOLD_MIN,
+			Math.min(MAFIA_STARTING_GOLD_MAX, mafiaStartingGold));
+	}
+
+	public static int getMafiaMinimumPlayers() {
+		return Math.max(MAFIA_MINIMUM_PLAYERS_MIN,
+			Math.min(MAFIA_MINIMUM_PLAYERS_MAX, mafiaMinimumPlayers));
+	}
+
+	public static int getGodfatherStartingGold() {
+		return Math.max(MAFIA_STARTING_GOLD_MIN,
+			Math.min(MAFIA_STARTING_GOLD_MAX, godfatherStartingGold));
+	}
+
+	public static int getMafiosoStartingGold() {
+		return Math.max(MAFIA_STARTING_GOLD_MIN,
+			Math.min(MAFIA_STARTING_GOLD_MAX, mafiosoStartingGold));
+	}
+
+	public static int getJanitorStartingGold() {
+		return Math.max(MAFIA_STARTING_GOLD_MIN,
+			Math.min(MAFIA_STARTING_GOLD_MAX, janitorStartingGold));
+	}
+
+	public static int getMafiaRecruitRange() {
+		return Math.max(MAFIA_RECRUIT_RANGE_MIN,
+			Math.min(MAFIA_RECRUIT_RANGE_MAX, mafiaRecruitRange));
+	}
+
+	public static int getMafiaReplacementCooldownSeconds() {
+		return Math.max(MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MIN,
+			Math.min(MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MAX, mafiaReplacementCooldownSeconds));
+	}
+
+	public static int getMafiaRevolverKillCooldownSeconds() {
+		return Math.max(MAFIA_REVOLVER_KILL_COOLDOWN_SECONDS_MIN,
+			Math.min(MAFIA_REVOLVER_KILL_COOLDOWN_SECONDS_MAX, mafiaRevolverKillCooldownSeconds));
+	}
+
+	public static int getJanitorCleanRange() {
+		return Math.max(JANITOR_CLEAN_RANGE_MIN, Math.min(JANITOR_CLEAN_RANGE_MAX, janitorCleanRange));
+	}
+
+	public static int getJanitorCleanCooldownSeconds() {
+		return Math.max(JANITOR_CLEAN_COOLDOWN_SECONDS_MIN,
+			Math.min(JANITOR_CLEAN_COOLDOWN_SECONDS_MAX, janitorCleanCooldownSeconds));
+	}
+
+	public static int getJanitorRevolverCooldownAfterCleanSeconds() {
+		return Math.max(JANITOR_REVOLVER_COOLDOWN_AFTER_CLEAN_SECONDS_MIN,
+			Math.min(JANITOR_REVOLVER_COOLDOWN_AFTER_CLEAN_SECONDS_MAX, janitorRevolverCooldownAfterCleanSeconds));
+	}
+
+	public static int getJanitorCleanCooldownAfterKillSeconds() {
+		return Math.max(JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MIN,
+			Math.min(JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MAX, janitorCleanCooldownAfterKillSeconds));
 	}
 
 	public static boolean isLastDeathShieldEnabled() {
@@ -654,7 +818,10 @@ public final class GexpressConfig {
 			juggernautInitialCooldownSeconds = snap.juggernautInitialCooldownSeconds;
 			juggernautCooldownReductionSeconds = snap.juggernautCooldownReductionSeconds;
 			juggernautMinimumCooldownSeconds = snap.juggernautMinimumCooldownSeconds;
+			juggernautShieldRechargeSeconds = snap.juggernautShieldRechargeSeconds;
 			tricksterSwapDurationSeconds = snap.tricksterSwapDurationSeconds;
+			tricksterMasqueradeCooldownSeconds = snap.tricksterMasqueradeCooldownSeconds;
+			tricksterDancingCartsCooldownSeconds = snap.tricksterDancingCartsCooldownSeconds;
 			tricksterDancingCartsMaxUses = snap.tricksterDancingCartsMaxUses;
 			puppetmasterControlDurationSeconds = snap.puppetmasterControlDurationSeconds;
 			puppetmasterControlCooldownSeconds = snap.puppetmasterControlCooldownSeconds;
@@ -662,6 +829,7 @@ public final class GexpressConfig {
 			puppetmasterCanKillOwnBody = snap.puppetmasterCanKillOwnBody;
 			puppetmasterControlRange = snap.puppetmasterControlRange;
 			pelicanEatCooldownSeconds = snap.pelicanEatCooldownSeconds;
+			pelicanEatPercentage = snap.pelicanEatPercentage;
 			hungryFoodLimit = snap.hungryFoodLimit;
 			thirstyDrinkLimit = snap.thirstyDrinkLimit;
 			snitchTasksRequired = snap.snitchTasksRequired;
@@ -681,6 +849,21 @@ public final class GexpressConfig {
 			bountyHunterBountyIntervalSeconds = snap.bountyHunterBountyIntervalSeconds;
 			bountyHunterRewardGold = snap.bountyHunterRewardGold;
 			bountyHunterFailCooldownSeconds = snap.bountyHunterFailCooldownSeconds;
+			godfatherBulletPrice = snap.godfatherBulletPrice;
+			godfatherStartingBullets = snap.godfatherStartingBullets;
+			godfatherMaxLoadedBullets = snap.godfatherMaxLoadedBullets;
+			mafiaStartingGold = snap.mafiaStartingGold;
+			mafiaMinimumPlayers = snap.mafiaMinimumPlayers;
+			godfatherStartingGold = snap.godfatherStartingGold;
+			mafiosoStartingGold = snap.mafiosoStartingGold;
+			janitorStartingGold = snap.janitorStartingGold;
+			mafiaRecruitRange = snap.mafiaRecruitRange;
+			mafiaReplacementCooldownSeconds = snap.mafiaReplacementCooldownSeconds;
+			mafiaRevolverKillCooldownSeconds = snap.mafiaRevolverKillCooldownSeconds;
+			janitorCleanRange = snap.janitorCleanRange;
+			janitorCleanCooldownSeconds = snap.janitorCleanCooldownSeconds;
+			janitorRevolverCooldownAfterCleanSeconds = snap.janitorRevolverCooldownAfterCleanSeconds;
+			janitorCleanCooldownAfterKillSeconds = snap.janitorCleanCooldownAfterKillSeconds;
 			lastDeathShieldEnabled = snap.lastDeathShieldEnabled;
 			useCustomRoleCounts = snap.useCustomRoleCounts;
 			maxKillerAmount = snap.maxKillerAmount;
@@ -731,7 +914,10 @@ public final class GexpressConfig {
 			snap.juggernautInitialCooldownSeconds = juggernautInitialCooldownSeconds;
 			snap.juggernautCooldownReductionSeconds = juggernautCooldownReductionSeconds;
 			snap.juggernautMinimumCooldownSeconds = juggernautMinimumCooldownSeconds;
+			snap.juggernautShieldRechargeSeconds = juggernautShieldRechargeSeconds;
 			snap.tricksterSwapDurationSeconds = tricksterSwapDurationSeconds;
+			snap.tricksterMasqueradeCooldownSeconds = tricksterMasqueradeCooldownSeconds;
+			snap.tricksterDancingCartsCooldownSeconds = tricksterDancingCartsCooldownSeconds;
 			snap.tricksterDancingCartsMaxUses = tricksterDancingCartsMaxUses;
 			snap.puppetmasterControlDurationSeconds = puppetmasterControlDurationSeconds;
 			snap.puppetmasterControlCooldownSeconds = puppetmasterControlCooldownSeconds;
@@ -739,6 +925,7 @@ public final class GexpressConfig {
 			snap.puppetmasterCanKillOwnBody = puppetmasterCanKillOwnBody;
 			snap.puppetmasterControlRange = puppetmasterControlRange;
 			snap.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
+			snap.pelicanEatPercentage = pelicanEatPercentage;
 			snap.hungryFoodLimit = hungryFoodLimit;
 			snap.thirstyDrinkLimit = thirstyDrinkLimit;
 			snap.snitchTasksRequired = snitchTasksRequired;
@@ -758,6 +945,21 @@ public final class GexpressConfig {
 			snap.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
 			snap.bountyHunterRewardGold = bountyHunterRewardGold;
 			snap.bountyHunterFailCooldownSeconds = bountyHunterFailCooldownSeconds;
+			snap.godfatherBulletPrice = godfatherBulletPrice;
+			snap.godfatherStartingBullets = godfatherStartingBullets;
+			snap.godfatherMaxLoadedBullets = godfatherMaxLoadedBullets;
+			snap.mafiaStartingGold = mafiaStartingGold;
+			snap.mafiaMinimumPlayers = mafiaMinimumPlayers;
+			snap.godfatherStartingGold = godfatherStartingGold;
+			snap.mafiosoStartingGold = mafiosoStartingGold;
+			snap.janitorStartingGold = janitorStartingGold;
+			snap.mafiaRecruitRange = mafiaRecruitRange;
+			snap.mafiaReplacementCooldownSeconds = mafiaReplacementCooldownSeconds;
+			snap.mafiaRevolverKillCooldownSeconds = mafiaRevolverKillCooldownSeconds;
+			snap.janitorCleanRange = janitorCleanRange;
+			snap.janitorCleanCooldownSeconds = janitorCleanCooldownSeconds;
+			snap.janitorRevolverCooldownAfterCleanSeconds = janitorRevolverCooldownAfterCleanSeconds;
+			snap.janitorCleanCooldownAfterKillSeconds = janitorCleanCooldownAfterKillSeconds;
 			snap.lastDeathShieldEnabled = lastDeathShieldEnabled;
 			snap.useCustomRoleCounts = useCustomRoleCounts;
 			snap.maxKillerAmount = maxKillerAmount;
@@ -794,11 +996,14 @@ public final class GexpressConfig {
 			int silentShadowDurationSeconds, int silentShadowCooldownSeconds,
 			int warlockMarkCooldownSeconds, int warlockKillCooldownSeconds,
 			int juggernautInitialCooldownSeconds, int juggernautCooldownReductionSeconds,
-			int juggernautMinimumCooldownSeconds, int tricksterSwapDurationSeconds,
+			int juggernautMinimumCooldownSeconds, int juggernautShieldRechargeSeconds,
+			int tricksterSwapDurationSeconds, int tricksterMasqueradeCooldownSeconds,
+			int tricksterDancingCartsCooldownSeconds,
 			int tricksterDancingCartsMaxUses,
 			int puppetmasterControlDurationSeconds, int puppetmasterControlCooldownSeconds,
 			boolean puppetmasterRandomTarget, int puppetmasterControlRange,
-			int pelicanEatCooldownSeconds, int hungryFoodLimit, int thirstyDrinkLimit, int snitchTasksRequired,
+			int pelicanEatCooldownSeconds, int pelicanEatPercentage, int hungryFoodLimit, int thirstyDrinkLimit,
+			int snitchTasksRequired,
 			int snitchWarningTasksRemaining,
 			int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses,
 			int timeMasterFreezeDurationSeconds, int timeMasterFreezeCooldownSeconds,
@@ -806,7 +1011,13 @@ public final class GexpressConfig {
 			int scatterBrainCooldownSeconds, int trackerMaxTargets,
 			int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
 			int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold,
-			int bountyHunterFailCooldownSeconds, boolean useCustomRoleCounts,
+			int bountyHunterFailCooldownSeconds, int godfatherBulletPrice, int godfatherStartingBullets,
+			int godfatherMaxLoadedBullets, int mafiaStartingGold, int mafiaMinimumPlayers,
+			int godfatherStartingGold, int mafiosoStartingGold, int janitorStartingGold,
+			int mafiaRecruitRange, int mafiaReplacementCooldownSeconds,
+			int mafiaRevolverKillCooldownSeconds, int janitorCleanRange, int janitorCleanCooldownSeconds,
+			int janitorRevolverCooldownAfterCleanSeconds, int janitorCleanCooldownAfterKillSeconds,
+			boolean useCustomRoleCounts,
 			int maxKillerAmount, int maxVigilanteAmount, int playersPerKiller, int playersPerVigilante,
 			float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 			float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
@@ -830,13 +1041,17 @@ public final class GexpressConfig {
 		GexpressConfig.juggernautInitialCooldownSeconds = juggernautInitialCooldownSeconds;
 		GexpressConfig.juggernautCooldownReductionSeconds = juggernautCooldownReductionSeconds;
 		GexpressConfig.juggernautMinimumCooldownSeconds = juggernautMinimumCooldownSeconds;
+		GexpressConfig.juggernautShieldRechargeSeconds = juggernautShieldRechargeSeconds;
 		GexpressConfig.tricksterSwapDurationSeconds = tricksterSwapDurationSeconds;
+		GexpressConfig.tricksterMasqueradeCooldownSeconds = tricksterMasqueradeCooldownSeconds;
+		GexpressConfig.tricksterDancingCartsCooldownSeconds = tricksterDancingCartsCooldownSeconds;
 		GexpressConfig.tricksterDancingCartsMaxUses = tricksterDancingCartsMaxUses;
 		GexpressConfig.puppetmasterControlDurationSeconds = puppetmasterControlDurationSeconds;
 		GexpressConfig.puppetmasterControlCooldownSeconds = puppetmasterControlCooldownSeconds;
 		GexpressConfig.puppetmasterRandomTarget = puppetmasterRandomTarget;
 		GexpressConfig.puppetmasterControlRange = puppetmasterControlRange;
 		GexpressConfig.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
+		GexpressConfig.pelicanEatPercentage = pelicanEatPercentage;
 		GexpressConfig.hungryFoodLimit = hungryFoodLimit;
 		GexpressConfig.thirstyDrinkLimit = thirstyDrinkLimit;
 		GexpressConfig.snitchTasksRequired = snitchTasksRequired;
@@ -856,6 +1071,21 @@ public final class GexpressConfig {
 		GexpressConfig.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
 		GexpressConfig.bountyHunterRewardGold = bountyHunterRewardGold;
 		GexpressConfig.bountyHunterFailCooldownSeconds = bountyHunterFailCooldownSeconds;
+		GexpressConfig.godfatherBulletPrice = godfatherBulletPrice;
+		GexpressConfig.godfatherStartingBullets = godfatherStartingBullets;
+		GexpressConfig.godfatherMaxLoadedBullets = godfatherMaxLoadedBullets;
+		GexpressConfig.mafiaStartingGold = mafiaStartingGold;
+		GexpressConfig.mafiaMinimumPlayers = mafiaMinimumPlayers;
+		GexpressConfig.godfatherStartingGold = godfatherStartingGold;
+		GexpressConfig.mafiosoStartingGold = mafiosoStartingGold;
+		GexpressConfig.janitorStartingGold = janitorStartingGold;
+		GexpressConfig.mafiaRecruitRange = mafiaRecruitRange;
+		GexpressConfig.mafiaReplacementCooldownSeconds = mafiaReplacementCooldownSeconds;
+		GexpressConfig.mafiaRevolverKillCooldownSeconds = mafiaRevolverKillCooldownSeconds;
+		GexpressConfig.janitorCleanRange = janitorCleanRange;
+		GexpressConfig.janitorCleanCooldownSeconds = janitorCleanCooldownSeconds;
+		GexpressConfig.janitorRevolverCooldownAfterCleanSeconds = janitorRevolverCooldownAfterCleanSeconds;
+		GexpressConfig.janitorCleanCooldownAfterKillSeconds = janitorCleanCooldownAfterKillSeconds;
 		GexpressConfig.lastDeathShieldEnabled = lastDeathShieldEnabled;
 		GexpressConfig.useCustomRoleCounts = useCustomRoleCounts;
 		GexpressConfig.maxKillerAmount = maxKillerAmount;
@@ -895,12 +1125,16 @@ public final class GexpressConfig {
 		juggernautInitialCooldownSeconds = getJuggernautInitialCooldownSeconds();
 		juggernautCooldownReductionSeconds = getJuggernautCooldownReductionSeconds();
 		juggernautMinimumCooldownSeconds = getJuggernautMinimumCooldownSeconds();
+		juggernautShieldRechargeSeconds = getJuggernautShieldRechargeSeconds();
 		tricksterSwapDurationSeconds = getTricksterSwapDurationSeconds();
+		tricksterMasqueradeCooldownSeconds = getTricksterMasqueradeCooldownSeconds();
+		tricksterDancingCartsCooldownSeconds = getTricksterDancingCartsCooldownSeconds();
 		tricksterDancingCartsMaxUses = getTricksterDancingCartsMaxUses();
 		puppetmasterControlDurationSeconds = getPuppetmasterControlDurationSeconds();
 		puppetmasterControlCooldownSeconds = getPuppetmasterControlCooldownSeconds();
 		puppetmasterControlRange = getPuppetmasterControlRange();
 		pelicanEatCooldownSeconds = getPelicanEatCooldownSeconds();
+		pelicanEatPercentage = getPelicanEatPercentage();
 		hungryFoodLimit = getHungryFoodLimit();
 		thirstyDrinkLimit = getThirstyDrinkLimit();
 		snitchTasksRequired = getSnitchTasksRequired();
@@ -920,6 +1154,21 @@ public final class GexpressConfig {
 		bountyHunterBountyIntervalSeconds = getBountyHunterBountyIntervalSeconds();
 		bountyHunterRewardGold = getBountyHunterRewardGold();
 		bountyHunterFailCooldownSeconds = getBountyHunterFailCooldownSeconds();
+		godfatherBulletPrice = getGodfatherBulletPrice();
+		godfatherStartingBullets = getGodfatherStartingBullets();
+		godfatherMaxLoadedBullets = getGodfatherMaxLoadedBullets();
+		mafiaStartingGold = getMafiaStartingGold();
+		mafiaMinimumPlayers = getMafiaMinimumPlayers();
+		godfatherStartingGold = getGodfatherStartingGold();
+		mafiosoStartingGold = getMafiosoStartingGold();
+		janitorStartingGold = getJanitorStartingGold();
+		mafiaRecruitRange = getMafiaRecruitRange();
+		mafiaReplacementCooldownSeconds = getMafiaReplacementCooldownSeconds();
+		mafiaRevolverKillCooldownSeconds = getMafiaRevolverKillCooldownSeconds();
+		janitorCleanRange = getJanitorCleanRange();
+		janitorCleanCooldownSeconds = getJanitorCleanCooldownSeconds();
+		janitorRevolverCooldownAfterCleanSeconds = getJanitorRevolverCooldownAfterCleanSeconds();
+		janitorCleanCooldownAfterKillSeconds = getJanitorCleanCooldownAfterKillSeconds();
 		maxKillerAmount = getMaxKillerAmount();
 		maxVigilanteAmount = getMaxVigilanteAmount();
 		playersPerKiller = getPlayersPerKiller();
@@ -1014,9 +1263,12 @@ public final class GexpressConfig {
 		int warlockMarkCooldownSeconds = 20;
 		int warlockKillCooldownSeconds = 45;
 		int juggernautInitialCooldownSeconds = 60;
-		int juggernautCooldownReductionSeconds = 10;
+		int juggernautCooldownReductionSeconds = 20;
 		int juggernautMinimumCooldownSeconds = 10;
+		int juggernautShieldRechargeSeconds = 60;
 		int tricksterSwapDurationSeconds = 25;
+		int tricksterMasqueradeCooldownSeconds = 35;
+		int tricksterDancingCartsCooldownSeconds = 45;
 		int tricksterDancingCartsMaxUses = 1;
 		int puppetmasterControlDurationSeconds = 15;
 		int puppetmasterControlCooldownSeconds = 45;
@@ -1024,6 +1276,7 @@ public final class GexpressConfig {
 		boolean puppetmasterCanKillOwnBody = false;
 		int puppetmasterControlRange = 16;
 		int pelicanEatCooldownSeconds = 20;
+		int pelicanEatPercentage = 80;
 		int hungryFoodLimit = 2;
 		int thirstyDrinkLimit = 2;
 		int snitchTasksRequired = 3;
@@ -1043,6 +1296,21 @@ public final class GexpressConfig {
 		int bountyHunterBountyIntervalSeconds = 60;
 		int bountyHunterRewardGold = 200;
 		int bountyHunterFailCooldownSeconds = 90;
+		int godfatherBulletPrice = 75;
+		int godfatherStartingBullets = 1;
+		int godfatherMaxLoadedBullets = 3;
+		int mafiaStartingGold = 100;
+		int mafiaMinimumPlayers = 15;
+		int godfatherStartingGold = 100;
+		int mafiosoStartingGold = 100;
+		int janitorStartingGold = 100;
+		int mafiaRecruitRange = 16;
+		int mafiaReplacementCooldownSeconds = 120;
+		int mafiaRevolverKillCooldownSeconds = 60;
+		int janitorCleanRange = 4;
+		int janitorCleanCooldownSeconds = 20;
+		int janitorRevolverCooldownAfterCleanSeconds = 45;
+		int janitorCleanCooldownAfterKillSeconds = 45;
 		boolean lastDeathShieldEnabled = false;
 		boolean useCustomRoleCounts = true;
 		int maxKillerAmount = 64;

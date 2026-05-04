@@ -133,7 +133,7 @@ public final class GexpressMapPresetsCategory {
 				.name(Text.translatable("gui.gexpress.config.maps.randomSpawns.import"))
 				.text(Text.translatable("gui.gexpress.config.maps.randomSpawns.import.action").formatted(Formatting.AQUA))
 				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.maps.randomSpawns.import.tooltip")))
-				.action((screen, option) -> GexpressOptionsScreen.stageChatCommand("g map edit " + name + " randomspawns snapshot"))
+				.action((screen, option) -> GexpressOptionsScreen.stageChatCommand("g setup map edit " + name + " randomspawns snapshot"))
 				.build())
 			.option(ButtonOption.createBuilder()
 				.name(Text.translatable("gui.gexpress.config.maps.randomSpawns.clear"))
@@ -141,7 +141,7 @@ public final class GexpressMapPresetsCategory {
 				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.maps.randomSpawns.clear.tooltip")))
 				.action((screen, option) -> {
 					edit.randomSpawnPositions = new ArrayList<>();
-					GexpressOptionsScreen.stageChatCommand("g map edit " + name + " randomspawns clear");
+					GexpressOptionsScreen.stageChatCommand("g setup map edit " + name + " randomspawns clear");
 				})
 				.build())
 			.build();

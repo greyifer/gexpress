@@ -131,13 +131,14 @@ public final class VultureManager {
 		}
 
 		lastKnownVulturePoint.put(vultureId, ReleasePoint.from(vulture));
-		stashedStates.put(targetId, new StashedState(target.interactionManager.getGameMode()));
+		stashedStates.put(targetId, new StashedState(target.interactionManager.getGameMode(), target.isInvisible()));
 		vultureByStashed.put(targetId, vultureId);
 		stashedByVulture.computeIfAbsent(vultureId, id -> new ArrayDeque<>()).addLast(targetId);
 		eatenByVulture.computeIfAbsent(vultureId, id -> ConcurrentHashMap.newKeySet()).add(targetId);
 
 		target.stopRiding();
 		target.setSneaking(false);
+		target.setInvisible(true);
 		target.changeGameMode(GameMode.SPECTATOR);
 		target.teleport(vulture.getServerWorld(), vulture.getX(), vulture.getY(), vulture.getZ(),
 			vulture.getYaw(), vulture.getPitch());
@@ -216,6 +217,7 @@ public final class VultureManager {
 		if (target.interactionManager.getGameMode() != GameMode.SPECTATOR) {
 			target.changeGameMode(GameMode.SPECTATOR);
 		}
+		target.setInvisible(true);
 		if (target.getWorld() != vulture.getWorld()
 				|| target.squaredDistanceTo(vulture) > 4.0D) {
 			target.teleport(vulture.getServerWorld(), vulture.getX(), vulture.getY(), vulture.getZ(),
@@ -282,7 +284,11 @@ public final class VultureManager {
 
 	private static boolean hasMetWinCondition(ServerPlayerEntity vulture) {
 		Set<UUID> eaten = eatenByVulture.get(vulture.getUuid());
-		return eaten != null && eaten.size() >= requiredEaten(vulture);
+		int eatenCount = eaten == null ? 0 : eaten.size();
+		int required = requiredEaten(vulture);
+		if (eatenCount >= required) return true;
+		int remaining = required - eatenCount;
+		return aliveOtherParticipants(vulture) == 0 && deadOtherParticipants(vulture, eaten) > remaining;
 	}
 
 	private static Text progressText(ServerPlayerEntity vulture) {
@@ -291,8 +297,48 @@ public final class VultureManager {
 	}
 
 	private static int requiredEaten(ServerPlayerEntity vulture) {
-		int otherPlayers = Math.max(1, vulture.getServerWorld().getPlayers().size() - 1);
-		return Math.max(1, (int) Math.ceil(otherPlayers * 0.8D));
+		int players = Math.max(1, roundParticipantCount(vulture));
+		return Math.max(1, (int) Math.floor(players * (GexpressConfig.getPelicanEatPercentage() / 100.0D)));
+	}
+
+	private static int roundParticipantCount(ServerPlayerEntity vulture) {
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(vulture.getWorld());
+		if (game != null && !game.getRoles().isEmpty()) {
+			return game.getRoles().size();
+		}
+		return vulture.getServerWorld().getPlayers().size();
+	}
+
+	private static Set<UUID> roundParticipants(ServerPlayerEntity vulture) {
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(vulture.getWorld());
+		if (game != null && !game.getRoles().isEmpty()) {
+			return Set.copyOf(game.getRoles().keySet());
+		}
+		Set<UUID> participants = ConcurrentHashMap.newKeySet();
+		for (ServerPlayerEntity player : vulture.getServerWorld().getPlayers()) {
+			participants.add(player.getUuid());
+		}
+		return participants;
+	}
+
+	private static int aliveOtherParticipants(ServerPlayerEntity vulture) {
+		int alive = 0;
+		for (UUID playerId : roundParticipants(vulture)) {
+			if (playerId.equals(vulture.getUuid())) continue;
+			ServerPlayerEntity player = vulture.getServer().getPlayerManager().getPlayer(playerId);
+			if (player != null && !isStashed(player) && GameFunctions.isPlayerAliveAndSurvival(player)) alive++;
+		}
+		return alive;
+	}
+
+	private static int deadOtherParticipants(ServerPlayerEntity vulture, Set<UUID> eaten) {
+		int dead = 0;
+		for (UUID playerId : roundParticipants(vulture)) {
+			if (playerId.equals(vulture.getUuid()) || (eaten != null && eaten.contains(playerId))) continue;
+			ServerPlayerEntity player = vulture.getServer().getPlayerManager().getPlayer(playerId);
+			if (player == null || !GameFunctions.isPlayerAliveAndSurvival(player)) dead++;
+		}
+		return dead;
 	}
 
 	private static void releaseAllInWorld(ServerWorld world) {
@@ -326,6 +372,11 @@ public final class VultureManager {
 				belly.remove(targetId);
 				if (belly.isEmpty()) stashedByVulture.remove(vultureId);
 			}
+			Set<UUID> eaten = eatenByVulture.get(vultureId);
+			if (eaten != null) {
+				eaten.remove(targetId);
+				if (eaten.isEmpty()) eatenByVulture.remove(vultureId);
+			}
 		}
 		if (server == null) return;
 		ServerPlayerEntity target = server.getPlayerManager().getPlayer(targetId);
@@ -335,12 +386,17 @@ public final class VultureManager {
 		ServerWorld releaseWorld = releasePoint.world(server);
 		if (releaseWorld == null) releaseWorld = target.getServerWorld();
 		target.changeGameMode(state != null ? state.previousGameMode : GameMode.SURVIVAL);
+		target.setInvisible(state != null && state.previousInvisible());
 		target.teleport(releaseWorld, releasePoint.x, releasePoint.y, releasePoint.z,
 			releasePoint.yaw, releasePoint.pitch);
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(target));
 		ServerPlayNetworking.send(target, VultureStatePayload.clear());
 		if (notify) {
 			target.sendMessage(Text.literal("The Pelican spat you out."), true);
+		}
+		if (server != null && vultureId != null) {
+			ServerPlayerEntity vulture = server.getPlayerManager().getPlayer(vultureId);
+			if (vulture != null) syncProgress(vulture, true);
 		}
 	}
 
@@ -364,6 +420,18 @@ public final class VultureManager {
 
 	public static boolean isStashed(UUID playerId) {
 		return playerId != null && vultureByStashed.containsKey(playerId);
+	}
+
+	public static boolean releaseFromBelly(ServerPlayerEntity target, boolean notify) {
+		if (target == null) return false;
+		UUID targetId = target.getUuid();
+		UUID vultureId = vultureByStashed.get(targetId);
+		if (vultureId == null) return false;
+		MinecraftServer server = target.getServer();
+		releasePlayer(targetId, server, lastKnownVulturePoint.get(vultureId), notify);
+		ServerPlayerEntity vulture = server == null ? null : server.getPlayerManager().getPlayer(vultureId);
+		if (vulture != null) syncProgress(vulture, true);
+		return true;
 	}
 
 	public static void clearForTimeRewind(ServerWorld world) {
@@ -525,7 +593,7 @@ public final class VultureManager {
 		return Math.max(1L, (ticks + 19L) / 20L);
 	}
 
-	public record StashedState(GameMode previousGameMode) {}
+	public record StashedState(GameMode previousGameMode, boolean previousInvisible) {}
 
 	public record TimeState(Map<UUID, UUID> vultureByStashed, Map<UUID, Deque<UUID>> stashedByVulture,
 			Map<UUID, Set<UUID>> eatenByVulture, Map<UUID, StashedState> stashedStates,

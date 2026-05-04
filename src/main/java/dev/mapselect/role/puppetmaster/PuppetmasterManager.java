@@ -177,6 +177,7 @@ public final class PuppetmasterManager {
 		PuppetmasterStatePayload state = new PuppetmasterStatePayload(true,
 			puppetmaster.getUuid(), target.getUuid(), target.getId());
 		broadcastState(puppetmaster.getServerWorld(), state);
+		puppetmaster.setInvisible(true);
 		target.setSneaking(false);
 		target.setSprinting(false);
 		target.setVelocity(Vec3d.ZERO);
@@ -331,31 +332,38 @@ public final class PuppetmasterManager {
 	}
 
 	private static boolean allowDamage(ServerPlayerEntity player, DamageSource damageSource, float damageAmount) {
-		UUID controllerId = controllerByTarget.get(player.getUuid());
-		if (controllerId == null) return true;
-		MinecraftServer server = player.getServer();
-		ServerPlayerEntity controller = server == null ? null : server.getPlayerManager().getPlayer(controllerId);
-		if (!GexpressConfig.canPuppetmasterKillOwnBody()) return false;
-		endControl(controllerId, server, true);
-		if (controller != null && GameFunctions.isPlayerAliveAndSurvival(controller)) {
-			controller.damage(damageSource, damageAmount);
+		ControlSession controllerSession = sessionsByController.get(player.getUuid());
+		if (controllerSession != null) {
+			if (damageAmount >= player.getHealth()) {
+				killControlledTargetForControllerHit(player, controllerSession);
+			}
+			return false;
 		}
-		player.setHealth(Math.max(1.0F, player.getHealth()));
-		return false;
+		return true;
 	}
 
 	private static boolean allowDeath(ServerPlayerEntity player, DamageSource damageSource, float damageAmount) {
+		ControlSession controllerSession = sessionsByController.get(player.getUuid());
+		if (controllerSession != null) {
+			killControlledTargetForControllerHit(player, controllerSession);
+			return false;
+		}
 		UUID controllerId = controllerByTarget.get(player.getUuid());
 		if (controllerId == null) return true;
 		MinecraftServer server = player.getServer();
-		ServerPlayerEntity controller = server == null ? null : server.getPlayerManager().getPlayer(controllerId);
 		endControl(controllerId, server, true);
-		if (GexpressConfig.canPuppetmasterKillOwnBody()
-				&& controller != null && GameFunctions.isPlayerAliveAndSurvival(controller)) {
-			GameFunctions.killPlayer(controller, true, player, GameConstants.DeathReasons.GENERIC);
+		return true;
+	}
+
+	private static void killControlledTargetForControllerHit(ServerPlayerEntity controller, ControlSession session) {
+		if (controller == null || session == null) return;
+		MinecraftServer server = controller.getServer();
+		ServerPlayerEntity target = server == null ? null : server.getPlayerManager().getPlayer(session.targetId);
+		endControl(session.controllerId, server, true);
+		controller.setHealth(Math.max(1.0F, controller.getHealth()));
+		if (target != null && GameFunctions.isPlayerAliveAndSurvival(target)) {
+			GameFunctions.killPlayer(target, true, controller, GameConstants.DeathReasons.GENERIC);
 		}
-		player.setHealth(Math.max(1.0F, player.getHealth()));
-		return false;
 	}
 
 	private static void endControl(UUID controllerId, MinecraftServer server, boolean applyCooldown) {
@@ -407,6 +415,7 @@ public final class PuppetmasterManager {
 			restoreModifierSwap(server, session);
 		}
 		if (controller != null) {
+			controller.setInvisible(session.controllerWasInvisible);
 			if (applyCooldown) {
 				long cooldownTicks = (long) GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L;
 				cooldownUntilByController.put(controller.getUuid(), controller.getWorld().getTime() + cooldownTicks);
@@ -590,6 +599,7 @@ public final class PuppetmasterManager {
 		private final ArrayList<Modifier> targetModifiers;
 		private final int controllerSelectedSlot;
 		private final int targetSelectedSlot;
+		private final boolean controllerWasInvisible;
 		private int temporaryKnifeSlot = -1;
 		private PuppetInput input = new PuppetInput(0.0F, 0.0F, false, false, false, false, 0.0F, 0.0F, 0);
 		private long lastInputTick;
@@ -614,6 +624,7 @@ public final class PuppetmasterManager {
 			this.targetModifiers = copyModifiers(target.getWorld(), target.getUuid());
 			this.controllerSelectedSlot = MathHelper.clamp(controller.getInventory().selectedSlot, 0, 8);
 			this.targetSelectedSlot = MathHelper.clamp(target.getInventory().selectedSlot, 0, 8);
+			this.controllerWasInvisible = controller.isInvisible();
 			this.input = new PuppetInput(0.0F, 0.0F, false, false, false, false,
 				target.getYaw(), target.getPitch(), this.targetSelectedSlot);
 			this.lastInputTick = now;

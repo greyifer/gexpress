@@ -153,7 +153,7 @@ public class TrainCommand {
 		try {
 			List<String> names = TrainPresetStorage.list(src.getServer());
 			if (names.isEmpty()) {
-				src.sendFeedback(() -> Text.literal("No train presets. Use /g train preset save <name>."), false);
+				src.sendFeedback(() -> Text.literal("No train presets. Use /g setup train preset save <name>."), false);
 				return 1;
 			}
 			String joined = String.join(", ", names);

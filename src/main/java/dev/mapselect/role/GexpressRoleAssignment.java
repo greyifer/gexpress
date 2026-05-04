@@ -46,6 +46,7 @@ import java.util.UUID;
 
 public final class GexpressRoleAssignment {
 	private static final Random RANDOM = new Random();
+	private static int assignmentPlayerCount;
 
 	private GexpressRoleAssignment() {}
 
@@ -54,6 +55,7 @@ public final class GexpressRoleAssignment {
 			Harpymodloader.refreshRoles();
 			HarpyModLoaderConfig.HANDLER.load();
 			RoleModifierTuningConfig.load();
+			assignmentPlayerCount = players.size();
 			setNight(world);
 
 			WorldModifierComponent modifiers = WorldModifierComponent.KEY.get(world);
@@ -87,6 +89,8 @@ public final class GexpressRoleAssignment {
 		} catch (Throwable t) {
 			MapSelect.LOGGER.error("G'Express role assignment failed; falling back to Harpy's assigner.", t);
 			return false;
+		} finally {
+			assignmentPlayerCount = 0;
 		}
 	}
 
@@ -241,10 +245,19 @@ public final class GexpressRoleAssignment {
 				|| role == WatheRoles.CIVILIAN
 				|| role == WatheRoles.DISCOVERY_CIVILIAN
 				|| role == WatheRoles.LOOSE_END
+				|| MapSelectRoles.MAFIOSO == role
+				|| MapSelectRoles.JANITOR == role
+				|| isMafiaDisabledForLobby(role)
 				|| isRetiredExternalVulture(role)) {
 			return false;
 		}
 		return !Harpymodloader.NON_MURDER_ROLES.contains(role);
+	}
+
+	private static boolean isMafiaDisabledForLobby(Role role) {
+		return role == MapSelectRoles.GODFATHER
+			&& assignmentPlayerCount > 0
+			&& assignmentPlayerCount < GexpressConfig.getMafiaMinimumPlayers();
 	}
 
 	private static boolean isRetiredExternalVulture(Role role) {
@@ -439,9 +452,31 @@ public final class GexpressRoleAssignment {
 
 	private static void resetStartingBalances(GameWorldComponent game, List<ServerPlayerEntity> players) {
 		for (ServerPlayerEntity player : players) {
-			int balance = game != null && game.canUseKillerFeatures(player) ? GameConstants.MONEY_START : 0;
-			PlayerShopComponent.KEY.get(player).setBalance(balance);
+			Role role = game == null ? null : game.getRole(player);
+			int balance = startingBalance(game, player, role);
+			PlayerShopComponent shop = PlayerShopComponent.KEY.get(player);
+			shop.setBalance(balance);
+			PlayerShopComponent.KEY.sync(player);
 		}
+	}
+
+	private static int startingBalance(GameWorldComponent game, ServerPlayerEntity player, Role role) {
+		if (role == null || role.identifier() == null) {
+			return game != null && game.canUseKillerFeatures(player) ? GameConstants.MONEY_START : 0;
+		}
+		Identifier id = role.identifier();
+		if (MapSelectRoles.GODFATHER_ID.equals(id)) return GexpressConfig.getGodfatherStartingGold();
+		if (MapSelectRoles.MAFIOSO_ID.equals(id)) return GexpressConfig.getMafiosoStartingGold();
+		if (MapSelectRoles.JANITOR_ID.equals(id)) return GexpressConfig.getJanitorStartingGold();
+		return game != null && game.canUseKillerFeatures(player) ? GameConstants.MONEY_START : 0;
+	}
+
+	private static boolean isMafiaRole(Role role) {
+		if (role == null || role.identifier() == null) return false;
+		Identifier id = role.identifier();
+		return MapSelectRoles.GODFATHER_ID.equals(id)
+			|| MapSelectRoles.MAFIOSO_ID.equals(id)
+			|| MapSelectRoles.JANITOR_ID.equals(id);
 	}
 
 	private static void sendModifierAnnouncements(WorldModifierComponent modifiers, List<ServerPlayerEntity> players) {

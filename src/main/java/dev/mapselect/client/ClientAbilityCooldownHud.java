@@ -56,6 +56,8 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_SCATTER = hudIcon("ability_masquerade");
 	private static final Identifier ICON_TRACKER = hudIcon("ability_warlock_mark");
 	private static final Identifier ICON_ALTRUIST = hudIcon("ability_medic_shield");
+	private static final Identifier ICON_MAFIA = hudIcon("ability_puppet_strings");
+	private static final Identifier ICON_JANITOR_CLEAN = hudIcon("ability_medic_shield");
 	private static final Map<String, SyncedCooldown> SYNCED = new HashMap<>();
 	private static Object syncedWorld;
 
@@ -84,6 +86,7 @@ public final class ClientAbilityCooldownHud {
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null || client.world == null || client.options.hudHidden) return;
+		if (!ClientRoleRevealState.canShowRoleHud(client)) return;
 		checkSyncedWorld(client);
 
 		List<AbilityBar> bars = barsFor(client);
@@ -147,6 +150,10 @@ public final class ClientAbilityCooldownHud {
 		} else if (MapSelectRoles.JUGGERNAUT_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.JUGGERNAUT_WEAPONS, ICON_JUGGERNAUT_WEAPONS,
 				GexpressConfig.getJuggernautInitialCooldownSeconds() * 20L, 0xFFFF7A42, 0xFF7A2418));
+			if (SYNCED.containsKey(AbilityCooldownPayload.JUGGERNAUT_SHIELD)) {
+				bars.add(syncedOrReady(AbilityCooldownPayload.JUGGERNAUT_SHIELD, ICON_MEDIC_SHIELD,
+					GexpressConfig.getJuggernautShieldRechargeSeconds() * 20L, 0xFF9DEBFF, 0xFF225B72));
+			}
 		} else if (MapSelectRoles.TIME_MASTER_ID.equals(roleId)) {
 			TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(client.world);
 			long rewindRemaining = comp == null ? 0L : comp.cooldownRemainingTicks(playerId);
@@ -162,10 +169,10 @@ public final class ClientAbilityCooldownHud {
 			bars.add(remaining > 0L
 				? draining(ICON_MASQUERADE, remaining, GexpressConfig.getTricksterSwapDurationSeconds() * 20L,
 					0xFF4BE4B1, 0xFF1B775A)
-				: cooldown(ICON_MASQUERADE, 0L, GexpressConfig.getTricksterSwapDurationSeconds() * 20L,
-					0xFF4BE4B1, 0xFF1B775A));
+				: syncedOrReady(AbilityCooldownPayload.HARLEQUIN_MASQUERADE, ICON_MASQUERADE,
+					GexpressConfig.getTricksterMasqueradeCooldownSeconds() * 20L, 0xFF4BE4B1, 0xFF1B775A));
 			bars.add(syncedOrReady(AbilityCooldownPayload.HARLEQUIN_DANCING_CARTS, ICON_DANCING_CARTS,
-				GexpressConfig.getTricksterSwapDurationSeconds() * 20L, 0xFFFFC857, 0xFF7A4D16));
+				GexpressConfig.getTricksterDancingCartsCooldownSeconds() * 20L, 0xFFFFC857, 0xFF7A4D16));
 		} else if (MapSelectRoles.PUPPETMASTER_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PUPPETMASTER_CONTROL, ICON_PUPPET_STRINGS,
 				GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L, 0xFFFF5368, 0xFF741323));
@@ -180,6 +187,18 @@ public final class ClientAbilityCooldownHud {
 				GexpressConfig.getTrackerCooldownSeconds() * 20L, 0xFF58B7FF, 0xFF1F4D7A));
 		} else if (MapSelectRoles.ALTRUIST_ID.equals(roleId)) {
 			bars.add(cooldown(ICON_ALTRUIST, 0L, 1L, 0xFFFFE5A3, 0xFF80642B));
+		} else if (MapSelectRoles.GODFATHER_ID.equals(roleId)) {
+			if (SYNCED.containsKey(AbilityCooldownPayload.GODFATHER_RECRUIT_MAFIOSO)) {
+				bars.add(syncedOrReady(AbilityCooldownPayload.GODFATHER_RECRUIT_MAFIOSO, ICON_MAFIA,
+					GexpressConfig.getMafiaReplacementCooldownSeconds() * 20L, 0xFFD0D0D0, 0xFF4F4F4F));
+			}
+			if (SYNCED.containsKey(AbilityCooldownPayload.GODFATHER_RECRUIT_JANITOR)) {
+				bars.add(syncedOrReady(AbilityCooldownPayload.GODFATHER_RECRUIT_JANITOR, ICON_JANITOR_CLEAN,
+					GexpressConfig.getMafiaReplacementCooldownSeconds() * 20L, 0xFFD0D0D0, 0xFF4F4F4F));
+			}
+		} else if (MapSelectRoles.JANITOR_ID.equals(roleId)) {
+			bars.add(syncedOrReady(AbilityCooldownPayload.JANITOR_CLEAN, ICON_JANITOR_CLEAN,
+				GexpressConfig.getJanitorCleanCooldownSeconds() * 20L, 0xFFD0D0D0, 0xFF4F4F4F));
 		}
 		return bars;
 	}

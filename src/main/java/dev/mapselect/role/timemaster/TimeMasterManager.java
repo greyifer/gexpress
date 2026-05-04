@@ -24,6 +24,7 @@ import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
 import dev.mapselect.role.juggernaut.JuggernautManager;
+import dev.mapselect.role.mafia.MafiaManager;
 import dev.mapselect.role.medic.MedicShieldComponent;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.silent.SilentShadowComponent;
@@ -783,6 +784,7 @@ public final class TimeMasterManager {
 			JuggernautManager.TimeState juggernaut, SnitchManager.TimeState snitch,
 			VultureManager.TimeState vulture, DancingCartsManager.TimeState dancingCarts,
 			BountyHunterManager.TimeState bountyHunter,
+			MafiaManager.TimeState mafia,
 			NbtCompound gameTime, NbtCompound timeMaster, NbtCompound c4Back, NbtCompound medicShield,
 			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute) {
 
@@ -816,6 +818,7 @@ public final class TimeMasterManager {
 				VultureManager.snapshotForTimeRewind(),
 				DancingCartsManager.snapshotForTimeRewind(world),
 				BountyHunterManager.snapshotForTimeRewind(),
+				MafiaManager.snapshotForTimeRewind(),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
 				writeComponent(TimeMasterComponent.KEY.getNullable(world), lookup),
 				writeComponent(C4BackComponent.KEY.getNullable(world), lookup),
@@ -869,11 +872,12 @@ public final class TimeMasterManager {
 			PuppetmasterManager.clearForTimeRewind(server);
 			VultureManager.clearForTimeRewind(world);
 			TricksterManager.clearForTimeRewind(world);
-			DancingCartsManager.restoreForTimeRewind(world, dancingCarts);
 			JuggernautManager.restoreForTimeRewind(juggernaut);
 			BountyHunterManager.restoreForTimeRewind(bountyHunter);
+			MafiaManager.restoreForTimeRewind(world, mafia);
 			SnitchManager.restoreForTimeRewind(world, snitch);
 			restoreBlocks(world, lookup);
+			DancingCartsManager.restoreForTimeRewind(world, dancingCarts);
 
 			Set<UUID> revived = new HashSet<>();
 			for (PlayerSnapshot snapshot : players.values()) {

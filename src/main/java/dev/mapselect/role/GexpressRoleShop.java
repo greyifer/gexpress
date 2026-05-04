@@ -20,6 +20,9 @@ import java.util.List;
  */
 public final class GexpressRoleShop {
 	private static final Identifier BOMB_SPECIALIST_ID = Identifier.of(MapSelect.MOD_ID, "bomb_specialist");
+	private static final Identifier GODFATHER_ID = Identifier.of(MapSelect.MOD_ID, "godfather");
+	private static final Identifier MAFIOSO_ID = Identifier.of(MapSelect.MOD_ID, "mafioso");
+	private static final Identifier JANITOR_ID = Identifier.of(MapSelect.MOD_ID, "janitor");
 
 	private GexpressRoleShop() {}
 
@@ -28,7 +31,20 @@ public final class GexpressRoleShop {
 		if (role == null) return GameConstants.SHOP_ENTRIES;
 		Identifier id = role.identifier();
 		if (BOMB_SPECIALIST_ID.equals(id)) return bombSpecialistList();
+		if (GODFATHER_ID.equals(id)) return godfatherList();
+		if (MAFIOSO_ID.equals(id)) return mafiosoList();
+		if (JANITOR_ID.equals(id)) return janitorList();
 		return GameConstants.SHOP_ENTRIES;
+	}
+
+	public static boolean hasCustomShop(PlayerEntity player) {
+		Role role = roleOf(player);
+		if (role == null) return false;
+		Identifier id = role.identifier();
+		return BOMB_SPECIALIST_ID.equals(id)
+			|| GODFATHER_ID.equals(id)
+			|| MAFIOSO_ID.equals(id)
+			|| JANITOR_ID.equals(id);
 	}
 
 	public static List<ShopEntry> bombSpecialistList() {
@@ -40,6 +56,35 @@ public final class GexpressRoleShop {
 			new ShopEntry(WatheItems.CROWBAR.getDefaultStack(), 25, ShopEntry.Type.TOOL),
 			new ShopEntry(WatheItems.NOTE.getDefaultStack(), 10, ShopEntry.Type.TOOL)
 		);
+	}
+
+	public static List<ShopEntry> godfatherList() {
+		return List.of(
+			customShopEntry(new ItemStack(MapSelectItems.BULLET), GexpressConfig.getGodfatherBulletPrice(), ShopEntry.Type.WEAPON)
+		);
+	}
+
+	public static List<ShopEntry> mafiosoList() {
+		return List.of(
+			customShopEntry(WatheItems.KNIFE.getDefaultStack(), 200, ShopEntry.Type.WEAPON),
+			customShopEntry(WatheItems.REVOLVER.getDefaultStack(), 350, ShopEntry.Type.WEAPON),
+			customShopEntry(WatheItems.GRENADE.getDefaultStack(), GexpressConfig.getGrenadePrice(), ShopEntry.Type.WEAPON)
+		);
+	}
+
+	public static List<ShopEntry> janitorList() {
+		return List.of(
+			customShopEntry(WatheItems.POISON_VIAL.getDefaultStack(), 100, ShopEntry.Type.POISON)
+		);
+	}
+
+	private static ShopEntry customShopEntry(ItemStack stack, int price, ShopEntry.Type type) {
+		return new ShopEntry(stack, price, type) {
+			@Override
+			public boolean onBuy(PlayerEntity player) {
+				return ShopEntry.insertStackInFreeSlot(player, this.stack().copy());
+			}
+		};
 	}
 
 	private static Role roleOf(PlayerEntity player) {

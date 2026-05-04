@@ -12,11 +12,14 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int silentShadowDurationSeconds, int silentShadowCooldownSeconds,
 		int warlockMarkCooldownSeconds, int warlockKillCooldownSeconds,
 		int juggernautInitialCooldownSeconds, int juggernautCooldownReductionSeconds,
-		int juggernautMinimumCooldownSeconds, int tricksterSwapDurationSeconds,
+		int juggernautMinimumCooldownSeconds, int juggernautShieldRechargeSeconds,
+		int tricksterSwapDurationSeconds, int tricksterMasqueradeCooldownSeconds,
+		int tricksterDancingCartsCooldownSeconds,
 		int tricksterDancingCartsMaxUses,
 		int puppetmasterControlDurationSeconds, int puppetmasterControlCooldownSeconds,
 		boolean puppetmasterRandomTarget, int puppetmasterControlRange,
-		int pelicanEatCooldownSeconds, int hungryFoodLimit, int thirstyDrinkLimit, int snitchTasksRequired,
+		int pelicanEatCooldownSeconds, int pelicanEatPercentage,
+		int hungryFoodLimit, int thirstyDrinkLimit, int snitchTasksRequired,
 		int snitchWarningTasksRemaining,
 		int timeMasterRewindSeconds, int timeMasterCooldownSeconds, int timeMasterMaxUses,
 		int timeMasterFreezeDurationSeconds, int timeMasterFreezeCooldownSeconds,
@@ -24,6 +27,11 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int scatterBrainCooldownSeconds, int trackerMaxTargets,
 		int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
 		int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold, int bountyHunterFailCooldownSeconds,
+		int godfatherBulletPrice, int godfatherStartingBullets, int godfatherMaxLoadedBullets, int mafiaStartingGold,
+		int mafiaMinimumPlayers, int godfatherStartingGold, int mafiosoStartingGold, int janitorStartingGold,
+		int mafiaRecruitRange, int mafiaReplacementCooldownSeconds, int mafiaRevolverKillCooldownSeconds,
+		int janitorCleanRange, int janitorCleanCooldownSeconds, int janitorRevolverCooldownAfterCleanSeconds,
+		int janitorCleanCooldownAfterKillSeconds,
 		boolean useCustomRoleCounts, int maxKillerAmount, int maxVigilanteAmount,
 		int playersPerKiller, int playersPerVigilante,
 		float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
@@ -54,13 +62,17 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.juggernautInitialCooldownSeconds());
 			buf.writeInt(payload.juggernautCooldownReductionSeconds());
 			buf.writeInt(payload.juggernautMinimumCooldownSeconds());
+			buf.writeInt(payload.juggernautShieldRechargeSeconds());
 			buf.writeInt(payload.tricksterSwapDurationSeconds());
+			buf.writeInt(payload.tricksterMasqueradeCooldownSeconds());
+			buf.writeInt(payload.tricksterDancingCartsCooldownSeconds());
 			buf.writeInt(payload.tricksterDancingCartsMaxUses());
 			buf.writeInt(payload.puppetmasterControlDurationSeconds());
 			buf.writeInt(payload.puppetmasterControlCooldownSeconds());
 			buf.writeBoolean(payload.puppetmasterRandomTarget());
 			buf.writeInt(payload.puppetmasterControlRange());
 			buf.writeInt(payload.pelicanEatCooldownSeconds());
+			buf.writeInt(payload.pelicanEatPercentage());
 			buf.writeInt(payload.hungryFoodLimit());
 			buf.writeInt(payload.thirstyDrinkLimit());
 			buf.writeInt(payload.snitchTasksRequired());
@@ -81,6 +93,21 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.bountyHunterBountyIntervalSeconds());
 			buf.writeInt(payload.bountyHunterRewardGold());
 			buf.writeInt(payload.bountyHunterFailCooldownSeconds());
+			buf.writeInt(payload.godfatherBulletPrice());
+			buf.writeInt(payload.godfatherStartingBullets());
+			buf.writeInt(payload.godfatherMaxLoadedBullets());
+			buf.writeInt(payload.mafiaStartingGold());
+			buf.writeInt(payload.mafiaMinimumPlayers());
+			buf.writeInt(payload.godfatherStartingGold());
+			buf.writeInt(payload.mafiosoStartingGold());
+			buf.writeInt(payload.janitorStartingGold());
+			buf.writeInt(payload.mafiaRecruitRange());
+			buf.writeInt(payload.mafiaReplacementCooldownSeconds());
+			buf.writeInt(payload.mafiaRevolverKillCooldownSeconds());
+			buf.writeInt(payload.janitorCleanRange());
+			buf.writeInt(payload.janitorCleanCooldownSeconds());
+			buf.writeInt(payload.janitorRevolverCooldownAfterCleanSeconds());
+			buf.writeInt(payload.janitorCleanCooldownAfterKillSeconds());
 			buf.writeBoolean(payload.useCustomRoleCounts());
 			buf.writeInt(payload.maxKillerAmount());
 			buf.writeInt(payload.maxVigilanteAmount());
@@ -118,13 +145,17 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // juggernautInitialCooldownSeconds
 			buf.readInt(), // juggernautCooldownReductionSeconds
 			buf.readInt(), // juggernautMinimumCooldownSeconds
+			buf.readInt(), // juggernautShieldRechargeSeconds
 			buf.readInt(), // tricksterSwapDurationSeconds
+			buf.readInt(), // tricksterMasqueradeCooldownSeconds
+			buf.readInt(), // tricksterDancingCartsCooldownSeconds
 			buf.readInt(), // tricksterDancingCartsMaxUses
 			buf.readInt(), // puppetmasterControlDurationSeconds
 			buf.readInt(), // puppetmasterControlCooldownSeconds
 			buf.readBoolean(), // puppetmasterRandomTarget
 			buf.readInt(), // puppetmasterControlRange
 			buf.readInt(), // pelicanEatCooldownSeconds
+			buf.readInt(), // pelicanEatPercentage
 			buf.readInt(), // hungryFoodLimit
 			buf.readInt(), // thirstyDrinkLimit
 			buf.readInt(), // snitchTasksRequired
@@ -145,6 +176,21 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // bountyHunterBountyIntervalSeconds
 			buf.readInt(), // bountyHunterRewardGold
 			buf.readInt(), // bountyHunterFailCooldownSeconds
+			buf.readInt(), // godfatherBulletPrice
+			buf.readInt(), // godfatherStartingBullets
+			buf.readInt(), // godfatherMaxLoadedBullets
+			buf.readInt(), // mafiaStartingGold
+			buf.readInt(), // mafiaMinimumPlayers
+			buf.readInt(), // godfatherStartingGold
+			buf.readInt(), // mafiosoStartingGold
+			buf.readInt(), // janitorStartingGold
+			buf.readInt(), // mafiaRecruitRange
+			buf.readInt(), // mafiaReplacementCooldownSeconds
+			buf.readInt(), // mafiaRevolverKillCooldownSeconds
+			buf.readInt(), // janitorCleanRange
+			buf.readInt(), // janitorCleanCooldownSeconds
+			buf.readInt(), // janitorRevolverCooldownAfterCleanSeconds
+			buf.readInt(), // janitorCleanCooldownAfterKillSeconds
 			buf.readBoolean(), // useCustomRoleCounts
 			buf.readInt(), // maxKillerAmount
 			buf.readInt(), // maxVigilanteAmount
