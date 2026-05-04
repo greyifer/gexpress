@@ -19,6 +19,7 @@
 		"PuppetmasterControlledActionsMixin",
 		"PuppetmasterControlledMovementMixin",
 		"PuppetmasterPronounsManagerMixin",
+		"RoomKeyCountMixin",
 		"ServerPlayerListNameMixin",
 		"ShopPurchaseMixin",
 		"SilentShadowFootstepMixin",

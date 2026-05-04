@@ -8,6 +8,7 @@ import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
+import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.preset.map.MapPreset;
@@ -91,10 +92,15 @@ public final class GexpressMapPresetsCategory {
 				v -> edit.defaultTrainPreset = (v == null || v.isEmpty()) ? null : v)
 			.controller(StringControllerBuilder::create)
 			.build());
+		visuals.option(Option.<Integer>createBuilder()
+			.name(fieldLabel("roomCount"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.map.roomCount.tooltip")))
+			.binding(MapPreset.DEFAULT_ROOM_COUNT, () -> MapPreset.normalizeRoomCount(edit.roomCount),
+				v -> edit.roomCount = MapPreset.normalizeRoomCount(v))
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt).range(MapPreset.MIN_ROOM_COUNT, MapPreset.MAX_ROOM_COUNT))
+			.build());
 		category.group(visuals.build());
 		category.group(buildSnapshotActions(name));
-		category.group(buildKeyDoorActions(name, edit));
-		category.group(buildKeyDoorsGroup(edit));
 
 		return category.build();
 	}
@@ -162,58 +168,6 @@ public final class GexpressMapPresetsCategory {
 			.build();
 	}
 
-	private static OptionGroup buildKeyDoorActions(String name, MapPreset edit) {
-		return OptionGroup.createBuilder()
-			.name(Text.translatable("gui.gexpress.config.group.map.keyDoors.actions").formatted(Formatting.YELLOW))
-			.option(ButtonOption.createBuilder()
-				.name(Text.translatable("gui.gexpress.config.maps.keyDoors.import"))
-				.text(Text.translatable("gui.gexpress.config.maps.keyDoors.import.action").formatted(Formatting.AQUA))
-				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.maps.keyDoors.import.tooltip")))
-				.action((screen, option) -> GexpressOptionsScreen.stageChatCommand("g setup map edit " + name + " keydoors snapshot"))
-				.build())
-			.option(ButtonOption.createBuilder()
-				.name(Text.translatable("gui.gexpress.config.maps.keyDoors.clear"))
-				.text(Text.translatable("gui.gexpress.config.maps.keyDoors.clear.action").formatted(Formatting.RED))
-				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.maps.keyDoors.clear.tooltip")))
-				.action((screen, option) -> {
-					edit.keyDoors = new ArrayList<>();
-					GexpressOptionsScreen.stageChatCommand("g setup map edit " + name + " keydoors clear");
-				})
-				.build())
-			.build();
-	}
-
-	private static ListOption<String> buildKeyDoorsGroup(MapPreset edit) {
-		return ListOption.<String>createBuilder()
-			.name(Text.translatable("gui.gexpress.config.group.map.keyDoors").formatted(Formatting.YELLOW))
-			.description(OptionDescription.of(
-				Text.translatable("gui.gexpress.config.group.map.keyDoors.tooltip").formatted(Formatting.GRAY)))
-			.binding(
-				List.of(),
-				() -> {
-					List<String> out = new ArrayList<>();
-					if (edit.keyDoors != null) {
-						for (MapPreset.KeyDoorData door : edit.keyDoors) {
-							String row = keyDoorToString(door);
-							if (row != null) out.add(row);
-						}
-					}
-					return out;
-				},
-				list -> {
-					List<MapPreset.KeyDoorData> parsed = new ArrayList<>();
-					for (String s : list) {
-						MapPreset.KeyDoorData door = parseKeyDoor(s);
-						if (door != null) parsed.add(door);
-					}
-					edit.keyDoors = parsed;
-				})
-			.controller(StringControllerBuilder::create)
-			.initial(GexpressMapPresetsCategory::currentPlayerKeyDoorString)
-			.collapsed(false)
-			.build();
-	}
-
 	private static MapPreset mutablePreset(String name, MapPreset original) {
 		MapPreset copy = pendingEdits.computeIfAbsent(name, k -> cloneShallow(original));
 		ensureNonNullShapes(copy);
@@ -234,17 +188,11 @@ public final class GexpressMapPresetsCategory {
 		copy.fogColor = src.fogColor;
 		copy.defaultTrainPreset = src.defaultTrainPreset;
 		copy.lobbyTrainCorner = cloneOffset(src.lobbyTrainCorner);
+		copy.roomCount = MapPreset.normalizeRoomCount(src.roomCount);
 		copy.randomSpawnPositions = new ArrayList<>();
 		if (src.randomSpawnPositions != null) {
 			for (MapPreset.PosData p : src.randomSpawnPositions) {
 				if (p != null) copy.randomSpawnPositions.add(clonePos(p));
-			}
-		}
-		copy.keyDoors = new ArrayList<>();
-		if (src.keyDoors != null) {
-			for (MapPreset.KeyDoorData door : src.keyDoors) {
-				MapPreset.KeyDoorData cloned = cloneKeyDoor(door);
-				if (cloned != null) copy.keyDoors.add(cloned);
 			}
 		}
 		return copy;
@@ -273,20 +221,10 @@ public final class GexpressMapPresetsCategory {
 		return d;
 	}
 
-	private static MapPreset.KeyDoorData cloneKeyDoor(MapPreset.KeyDoorData door) {
-		if (door == null) return null;
-		MapPreset.KeyDoorData d = new MapPreset.KeyDoorData();
-		d.keyName = door.keyName;
-		d.x = door.x;
-		d.y = door.y;
-		d.z = door.z;
-		return d;
-	}
-
 	private static void ensureNonNullShapes(MapPreset p) {
 		if (p.weather == null) p.weather = WeatherType.NONE;
+		p.roomCount = MapPreset.normalizeRoomCount(p.roomCount);
 		if (p.randomSpawnPositions == null) p.randomSpawnPositions = new ArrayList<>();
-		if (p.keyDoors == null) p.keyDoors = new ArrayList<>();
 	}
 
 	private static Option<String> boxOption(String key, Supplier<MapPreset.BoxData> getter, Consumer<MapPreset.BoxData> setter) {
@@ -376,33 +314,6 @@ public final class GexpressMapPresetsCategory {
 			+ fmt(MapPreset.snapRandomSpawnCoord(player.getZ())) + " "
 			+ fmt(player.getYaw()) + " "
 			+ fmt(player.getPitch());
-	}
-
-	private static String currentPlayerKeyDoorString() {
-		ClientPlayerEntity player = MinecraftClient.getInstance().player;
-		if (player == null) return "Room_1 0 0 0";
-		return "Room_1 " + player.getBlockPos().getX() + " " + player.getBlockPos().getY() + " " + player.getBlockPos().getZ();
-	}
-
-	private static String keyDoorToString(MapPreset.KeyDoorData door) {
-		if (door == null || door.keyName == null || door.keyName.isBlank()) return null;
-		return door.keyName.trim().replace(' ', '_') + " " + door.x + " " + door.y + " " + door.z;
-	}
-
-	private static MapPreset.KeyDoorData parseKeyDoor(String raw) {
-		if (raw == null) return null;
-		String[] parts = raw.trim().split("\\s+");
-		if (parts.length != 4) return null;
-		try {
-			MapPreset.KeyDoorData door = new MapPreset.KeyDoorData();
-			door.keyName = parts[0].trim();
-			door.x = Integer.parseInt(parts[1]);
-			door.y = Integer.parseInt(parts[2]);
-			door.z = Integer.parseInt(parts[3]);
-			return door.keyName.isEmpty() ? null : door;
-		} catch (NumberFormatException e) {
-			return null;
-		}
 	}
 
 	private static MapPreset.PosData parsePos(String s) {

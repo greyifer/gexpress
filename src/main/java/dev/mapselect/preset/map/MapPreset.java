@@ -4,11 +4,9 @@ import cat.rezelyn.watheextended.cca.WatheExtendedWorldComponent;
 import cat.rezelyn.watheextended.game.TeleportationSlot;
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent;
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent.PosWithOrientation;
-import dev.doctor4t.wathe.block_entity.DoorBlockEntity;
 import dev.mapselect.weather.WeatherType;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.Box;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
 
@@ -19,8 +17,10 @@ import java.util.Map;
 
 public class MapPreset {
 	private static final int MAX_RANDOM_SPAWNS = 256;
-	private static final int MAX_KEY_DOORS = 512;
 	private static final double MAX_BOX_SPAN = 10000.0D;
+	public static final int DEFAULT_ROOM_COUNT = 7;
+	public static final int MIN_ROOM_COUNT = 1;
+	public static final int MAX_ROOM_COUNT = 64;
 
 	public BoxData playArea;
 	public BoxData readyArea;
@@ -34,8 +34,8 @@ public class MapPreset {
 	public Integer fogColor;
 	public String defaultTrainPreset;
 	public OffsetData lobbyTrainCorner;
+	public int roomCount = DEFAULT_ROOM_COUNT;
 	public List<PosData> randomSpawnPositions = new ArrayList<>();
-	public List<KeyDoorData> keyDoors = new ArrayList<>();
 
 	public static MapPreset from(MapVariablesWorldComponent c) {
 		MapPreset p = new MapPreset();
@@ -53,7 +53,6 @@ public class MapPreset {
 		p.lobbyArea = BoxData.from(ext.getLobbyArea());
 		p.readyAreaSpawnPos = PosData.from(ext.getReadyAreaSpawnPos());
 		p.randomSpawnPositions = randomSpawnsFrom(world);
-		p.keyDoors = keyDoorsFrom(world, null);
 		return p;
 	}
 
@@ -75,37 +74,6 @@ public class MapPreset {
 		return out;
 	}
 
-	public static List<KeyDoorData> keyDoorsFrom(ServerWorld world, BoxData area) {
-		List<KeyDoorData> out = new ArrayList<>();
-		if (world == null) return out;
-		BoxData scanArea = normalizeBox(copyBox(area));
-		if (scanArea == null) {
-			return out;
-		}
-		int minX = (int) Math.floor(scanArea.minX);
-		int minY = (int) Math.floor(scanArea.minY);
-		int minZ = (int) Math.floor(scanArea.minZ);
-		int maxX = (int) Math.floor(scanArea.maxX);
-		int maxY = (int) Math.floor(scanArea.maxY);
-		int maxZ = (int) Math.floor(scanArea.maxZ);
-		Iterable<BlockPos> positions = BlockPos.iterate(minX, minY, minZ, maxX, maxY, maxZ);
-		for (BlockPos pos : positions) {
-			if (world.getBlockEntity(pos) instanceof DoorBlockEntity door) {
-				String keyName = door.getKeyName();
-				if (keyName != null && !keyName.isBlank()) {
-					KeyDoorData data = new KeyDoorData();
-					data.keyName = keyName;
-					data.x = pos.getX();
-					data.y = pos.getY();
-					data.z = pos.getZ();
-					out.add(data);
-					if (out.size() >= MAX_KEY_DOORS) break;
-				}
-			}
-		}
-		return out;
-	}
-
 	public void applyTo(MapVariablesWorldComponent c) {
 		normalize();
 		if (playArea != null) c.setPlayArea(playArea.toBox());
@@ -120,7 +88,6 @@ public class MapPreset {
 		WatheExtendedWorldComponent ext = WatheExtendedWorldComponent.KEY.get(world);
 		if (lobbyArea != null) ext.setLobbyArea(lobbyArea.toBox());
 		if (readyAreaSpawnPos != null) ext.setReadyAreaSpawnPos(readyAreaSpawnPos.toPosWithOrientation());
-		applyKeyDoorsTo(world);
 	}
 
 	public boolean applyRandomSpawnsTo(ServerWorld world) {
@@ -136,19 +103,6 @@ public class MapPreset {
 		return true;
 	}
 
-	public void applyKeyDoorsTo(ServerWorld world) {
-		normalize();
-		if (world == null || keyDoors == null || keyDoors.isEmpty()) return;
-		for (KeyDoorData keyDoor : keyDoors) {
-			if (keyDoor == null || keyDoor.keyName == null) continue;
-			BlockPos pos = new BlockPos(keyDoor.x, keyDoor.y, keyDoor.z);
-			if (world.getBlockEntity(pos) instanceof DoorBlockEntity door) {
-				door.setKeyName(keyDoor.keyName);
-				door.markDirty();
-			}
-		}
-	}
-
 	public void normalize() {
 		playArea = normalizeBox(playArea);
 		readyArea = normalizeBox(readyArea);
@@ -159,6 +113,7 @@ public class MapPreset {
 		readyAreaSpawnPos = normalizePos(readyAreaSpawnPos);
 
 		if (weather == null) weather = WeatherType.NONE;
+		roomCount = normalizeRoomCount(roomCount);
 		if (fogColor != null) fogColor = fogColor & 0xFFFFFF;
 		if (defaultTrainPreset != null) {
 			defaultTrainPreset = defaultTrainPreset.trim();
@@ -174,28 +129,11 @@ public class MapPreset {
 			}
 		}
 		randomSpawnPositions = normalizedSpawns;
-
-		List<KeyDoorData> normalizedKeys = new ArrayList<>();
-		if (keyDoors != null) {
-			for (KeyDoorData keyDoor : keyDoors) {
-				KeyDoorData normalized = normalizeKeyDoor(keyDoor);
-				if (normalized != null) normalizedKeys.add(normalized);
-				if (normalizedKeys.size() >= MAX_KEY_DOORS) break;
-			}
-		}
-		keyDoors = normalizedKeys;
 	}
 
-	private static BoxData copyBox(BoxData box) {
-		if (box == null) return null;
-		BoxData out = new BoxData();
-		out.minX = box.minX;
-		out.minY = box.minY;
-		out.minZ = box.minZ;
-		out.maxX = box.maxX;
-		out.maxY = box.maxY;
-		out.maxZ = box.maxZ;
-		return out;
+	public int normalizedRoomCount() {
+		normalize();
+		return roomCount;
 	}
 
 	private static BoxData normalizeBox(BoxData b) {
@@ -242,18 +180,6 @@ public class MapPreset {
 		return p;
 	}
 
-	private static KeyDoorData normalizeKeyDoor(KeyDoorData keyDoor) {
-		if (keyDoor == null || keyDoor.keyName == null) return null;
-		String name = keyDoor.keyName.trim();
-		if (name.isEmpty()) return null;
-		KeyDoorData out = new KeyDoorData();
-		out.keyName = name.length() > 64 ? name.substring(0, 64) : name;
-		out.x = keyDoor.x;
-		out.y = keyDoor.y;
-		out.z = keyDoor.z;
-		return out;
-	}
-
 	public static double snapRandomSpawnCoord(double v) {
 		if (Math.abs(v - Math.rint(v)) < 1.0E-6D) return Math.rint(v);
 		return Math.floor(v) + 0.5D;
@@ -261,6 +187,11 @@ public class MapPreset {
 
 	private static boolean finite(double v) {
 		return !Double.isNaN(v) && !Double.isInfinite(v);
+	}
+
+	public static int normalizeRoomCount(int value) {
+		if (value <= 0) return DEFAULT_ROOM_COUNT;
+		return Math.max(MIN_ROOM_COUNT, Math.min(MAX_ROOM_COUNT, value));
 	}
 
 	public static class PosData {
@@ -328,8 +259,4 @@ public class MapPreset {
 		}
 	}
 
-	public static class KeyDoorData {
-		public String keyName;
-		public int x, y, z;
-	}
 }

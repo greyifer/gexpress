@@ -191,21 +191,12 @@ public class MapSelectCommand {
 							.executes(MapSelectCommand::runEditRandomSpawnsSnapshot))
 						.then(CommandManager.literal("clear")
 							.executes(MapSelectCommand::runEditRandomSpawnsClear)))
-					.then(CommandManager.literal("keydoors")
-						.then(CommandManager.literal("snapshot")
-							.executes(MapSelectCommand::runEditKeyDoorsSnapshot))
-						.then(CommandManager.literal("clear")
-							.executes(MapSelectCommand::runEditKeyDoorsClear))
-						.then(CommandManager.literal("set")
-							.then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
-								.then(CommandManager.argument("keyName", StringArgumentType.greedyString())
-									.executes(ctx -> runEditKeyDoorSet(ctx,
-										BlockPosArgumentType.getBlockPos(ctx, "pos"),
-										StringArgumentType.getString(ctx, "keyName"))))))
-						.then(CommandManager.literal("remove")
-							.then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
-								.executes(ctx -> runEditKeyDoorRemove(ctx,
-									BlockPosArgumentType.getBlockPos(ctx, "pos"))))))))
+					.then(CommandManager.literal("rooms")
+						.then(CommandManager.argument("count", IntegerArgumentType.integer(MapPreset.MIN_ROOM_COUNT, MapPreset.MAX_ROOM_COUNT))
+							.suggests(suggestFromPreset(p -> Integer.toString(MapPreset.normalizeRoomCount(p.roomCount))))
+							.executes(ctx -> runEditRoomCount(ctx,
+								StringArgumentType.getString(ctx, "name"),
+								IntegerArgumentType.getInteger(ctx, "count")))))))
 			.then(CommandManager.literal("list")
 				.requires(OP_OR_HOST)
 				.executes(MapSelectCommand::runList))
@@ -371,7 +362,6 @@ public class MapSelectCommand {
 			} else {
 				preset = MapPreset.from(src.getWorld());
 				preset.wholeMapArea = newWholeMap;
-				preset.keyDoors = MapPreset.keyDoorsFrom(src.getWorld(), newWholeMap);
 				feedbackSuffix = " — no existing presets, snapshotted current WATHE values and RTP slots.";
 			}
 
@@ -480,18 +470,7 @@ public class MapSelectCommand {
 			ta.maxZ = neighbor.resetTemplateArea.maxZ + offsetShift;
 			preset.resetTemplateArea = ta;
 		}
-		if (neighbor.keyDoors != null) {
-			preset.keyDoors = new java.util.ArrayList<>();
-			for (MapPreset.KeyDoorData door : neighbor.keyDoors) {
-				if (door == null) continue;
-				MapPreset.KeyDoorData shifted = new MapPreset.KeyDoorData();
-				shifted.keyName = door.keyName;
-				shifted.x = door.x;
-				shifted.y = door.y;
-				shifted.z = (int) Math.round(door.z + areaShift);
-				preset.keyDoors.add(shifted);
-			}
-		}
+		preset.roomCount = MapPreset.normalizeRoomCount(neighbor.roomCount);
 		preset.weather = neighbor.weather == null ? WeatherType.NONE : neighbor.weather;
 		preset.fogColor = neighbor.fogColor;
 		return preset;
@@ -615,9 +594,9 @@ public class MapSelectCommand {
 			sendWeatherLine(src, "Weather", preset.weather);
 			sendFogLine(src, "Fog Color", preset.fogColor);
 			sendDefaultTrainLine(src, "Default Train", preset.defaultTrainPreset);
+			sendRoomCountLine(src, "Room Key Count", preset.roomCount);
 			sendOffsetLine(src, "Ready Train Corner", preset.lobbyTrainCorner);
 			sendRandomSpawnsLine(src, "Random Spawn Positions", preset.randomSpawnPositions);
-			sendKeyDoorsLine(src, "Keyed Doors", preset.keyDoors);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to load preset: " + e.getMessage()));
@@ -696,9 +675,9 @@ public class MapSelectCommand {
 		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
-	private static void sendKeyDoorsLine(ServerCommandSource src, String label, List<MapPreset.KeyDoorData> doors) {
-		int count = doors == null ? 0 : doors.size();
-		Text value = Text.literal(Integer.toString(count)).formatted(count == 0 ? Formatting.DARK_GRAY : Formatting.WHITE);
+	private static void sendRoomCountLine(ServerCommandSource src, String label, int roomCount) {
+		int count = MapPreset.normalizeRoomCount(roomCount);
+		Text value = Text.literal(Integer.toString(count)).formatted(Formatting.WHITE);
 		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
@@ -928,85 +907,17 @@ public class MapSelectCommand {
 		}
 	}
 
-	private static int runEditKeyDoorsSnapshot(CommandContext<ServerCommandSource> ctx) {
+	private static int runEditRoomCount(CommandContext<ServerCommandSource> ctx, String name, int roomCount) {
 		ServerCommandSource src = ctx.getSource();
-		String name = StringArgumentType.getString(ctx, "name");
 		try {
 			MapPreset preset = loadOrError(src, name);
 			if (preset == null) return 0;
-			preset.keyDoors = MapPreset.keyDoorsFrom(src.getWorld(), preset.wholeMapArea);
+			preset.roomCount = MapPreset.normalizeRoomCount(roomCount);
 			saveAndBroadcast(src, name, preset);
-			int count = preset.keyDoors == null ? 0 : preset.keyDoors.size();
-			src.sendFeedback(() -> Text.literal("Imported " + count + " keyed door(s) into '" + name + "'.").formatted(Formatting.GREEN), true);
+			src.sendFeedback(() -> Text.literal("Set room key count for '" + name + "' to " + preset.roomCount + ".").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
-			src.sendError(Text.literal("Failed to import keyed doors: " + e.getMessage()));
-			return 0;
-		}
-	}
-
-	private static int runEditKeyDoorsClear(CommandContext<ServerCommandSource> ctx) {
-		ServerCommandSource src = ctx.getSource();
-		String name = StringArgumentType.getString(ctx, "name");
-		try {
-			MapPreset preset = loadOrError(src, name);
-			if (preset == null) return 0;
-			int count = preset.keyDoors == null ? 0 : preset.keyDoors.size();
-			preset.keyDoors = new java.util.ArrayList<>();
-			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Cleared " + count + " keyed door(s) from '" + name + "'.").formatted(Formatting.YELLOW), true);
-			return 1;
-		} catch (IOException e) {
-			src.sendError(Text.literal("Failed to clear keyed doors: " + e.getMessage()));
-			return 0;
-		}
-	}
-
-	private static int runEditKeyDoorSet(CommandContext<ServerCommandSource> ctx, BlockPos pos, String keyName) {
-		ServerCommandSource src = ctx.getSource();
-		String name = StringArgumentType.getString(ctx, "name");
-		String normalizedName = keyName == null ? "" : keyName.trim();
-		if (normalizedName.isEmpty()) {
-			src.sendError(Text.literal("Key name cannot be empty."));
-			return 0;
-		}
-		try {
-			MapPreset preset = loadOrError(src, name);
-			if (preset == null) return 0;
-			if (preset.keyDoors == null) preset.keyDoors = new java.util.ArrayList<>();
-			preset.keyDoors.removeIf(k -> k != null && k.x == pos.getX() && k.y == pos.getY() && k.z == pos.getZ());
-			MapPreset.KeyDoorData data = new MapPreset.KeyDoorData();
-			data.keyName = normalizedName;
-			data.x = pos.getX();
-			data.y = pos.getY();
-			data.z = pos.getZ();
-			preset.keyDoors.add(data);
-			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Set keyed door at " + pos.toShortString() + " to '" + normalizedName + "' in '" + name + "'.").formatted(Formatting.GREEN), true);
-			return 1;
-		} catch (IOException e) {
-			src.sendError(Text.literal("Failed to set keyed door: " + e.getMessage()));
-			return 0;
-		}
-	}
-
-	private static int runEditKeyDoorRemove(CommandContext<ServerCommandSource> ctx, BlockPos pos) {
-		ServerCommandSource src = ctx.getSource();
-		String name = StringArgumentType.getString(ctx, "name");
-		try {
-			MapPreset preset = loadOrError(src, name);
-			if (preset == null) return 0;
-			boolean removed = preset.keyDoors != null
-				&& preset.keyDoors.removeIf(k -> k != null && k.x == pos.getX() && k.y == pos.getY() && k.z == pos.getZ());
-			if (!removed) {
-				src.sendError(Text.literal("No keyed door entry at " + pos.toShortString() + "."));
-				return 0;
-			}
-			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Removed keyed door at " + pos.toShortString() + " from '" + name + "'.").formatted(Formatting.YELLOW), true);
-			return 1;
-		} catch (IOException e) {
-			src.sendError(Text.literal("Failed to remove keyed door: " + e.getMessage()));
+			src.sendError(Text.literal("Failed to edit room key count: " + e.getMessage()));
 			return 0;
 		}
 	}
@@ -1048,11 +959,9 @@ public class MapSelectCommand {
 			preset.playAreaOffset = snap.playAreaOffset;
 			preset.resetTemplateArea = snap.resetTemplateArea;
 			preset.randomSpawnPositions = snap.randomSpawnPositions;
-			preset.keyDoors = MapPreset.keyDoorsFrom(src.getWorld(), preset.wholeMapArea);
 			saveAndBroadcast(src, name, preset);
 			int count = preset.randomSpawnPositions == null ? 0 : preset.randomSpawnPositions.size();
-			int keyCount = preset.keyDoors == null ? 0 : preset.keyDoors.size();
-			src.sendFeedback(() -> Text.literal("Snapshotted current Wathe values, " + count + " RTP slot(s), and " + keyCount + " keyed door(s) into '" + name + "'.").formatted(Formatting.GREEN), true);
+			src.sendFeedback(() -> Text.literal("Snapshotted current Wathe values and " + count + " RTP slot(s) into '" + name + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to snapshot preset: " + e.getMessage()));

@@ -1,3 +1,15 @@
+# Grey's Express 1.3.2
+
+## Added
+
+- Map presets now include a room key count for longer custom trains.
+- `/g setup map edit <name> rooms <count>` sets the range of Wathe keys assigned as `Room 1` through `Room <count>`.
+
+## Changed
+
+- Removed G'Express keyed-door preset storage, commands, and map UI in favor of Wathe's normal door setup and a per-map key range.
+- Map settings now import active Wathe areas, spawns, and RTP slots without touching door key names.
+
 # Grey's Express 1.3.1
 
 ## Added

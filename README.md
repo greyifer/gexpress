@@ -35,15 +35,12 @@ All G'Express commands are under `/g`.
 | `/g setup map edit <name> readytrain clear` | Clears the ready train preview position. |
 | `/g setup map edit <name> randomspawns snapshot` | Copies current RTP slots into the map preset as random spawns. |
 | `/g setup map edit <name> randomspawns clear` | Clears saved random spawns from the map preset. |
-| `/g setup map edit <name> keydoors snapshot` | Imports active Wathe keyed doors into the map preset. |
-| `/g setup map edit <name> keydoors clear` | Clears saved keyed doors from the map preset. |
-| `/g setup map edit <name> keydoors set <pos> <keyName>` | Adds or updates one keyed door entry. |
-| `/g setup map edit <name> keydoors remove <pos>` | Removes one keyed door entry. |
+| `/g setup map edit <name> rooms <count>` | Sets the highest Wathe room key number this map can assign, such as `15` for `Room 1` through `Room 15`. |
 | `/g setup map list` | Lists saved map presets. |
-| `/g setup map show <name>` | Shows a map preset's saved values, including keyed door count. |
+| `/g setup map show <name>` | Shows a map preset's saved values, including room key count. |
 | `/g setup map set <name> [trainPreset]` | Applies a map preset, optionally with a train preset. |
 | `/g setup map default <name> <trainPreset>` | Sets the default train preset for a map preset. |
-| `/g setup map snapshot <name>` | Snapshots active Wathe areas, spawns, RTP slots, and keyed doors into a preset. |
+| `/g setup map snapshot <name>` | Snapshots active Wathe areas, spawns, and RTP slots into a preset. |
 | `/g setup train preset save <name>` | Saves the current train reset template as a train preset. |
 | `/g setup train preset delete <name>` | Deletes a train preset. |
 | `/g setup train preset list` | Lists train presets. |
@@ -243,7 +240,7 @@ G'Express includes map tools for creating and managing custom Harpy Express maps
 - Sandstorm and snow visual support.
 - Ready-area train preview support.
 - Active Wathe area/spawn import helpers.
-- Wathe keyed-door preset support for longer custom trains.
+- Per-map Wathe room key count support for longer custom trains.
 
 ### Train & Host Tools
 
