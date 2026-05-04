@@ -250,14 +250,6 @@ Special thanks to [Rezelyn](https://modrinth.com/user/Rezelyn) for [The Harpy Ex
 
 G'Express is an addon for that ecosystem, not a replacement for it.
 
-<br>
-
-<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/jOjo3WRIMe8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-
-<br>
-
-<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/0Mee_7gmsmQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-
 ---
 
 ## License
