@@ -16,6 +16,7 @@ public final class OptionVisibility {
 
 	private static final Map<Option<?>, BooleanSupplier> HIDDEN_PREDICATES = new IdentityHashMap<>();
 	private static final Map<Option<?>, String> SEARCH_ALIASES = new IdentityHashMap<>();
+	private static final Map<Option<?>, Boolean> SEARCH_ALIAS_MATCHES = new IdentityHashMap<>();
 
 	public static void setHiddenWhen(Option<?> option, BooleanSupplier hiddenIf) {
 		HIDDEN_PREDICATES.put(option, hiddenIf);
@@ -39,6 +40,18 @@ public final class OptionVisibility {
 		return alias != null && alias.contains(query.toLowerCase(Locale.ROOT));
 	}
 
+	public static boolean updateSearchAliasMatch(Option<?> option, String query) {
+		boolean matches = matchesSearchAlias(option, query);
+		if (option != null) {
+			SEARCH_ALIAS_MATCHES.put(option, matches);
+		}
+		return matches;
+	}
+
+	public static boolean isSearchAliasMatched(Option<?> option) {
+		return Boolean.TRUE.equals(SEARCH_ALIAS_MATCHES.get(option));
+	}
+
 	public static MutableText dropdownName(Text name) {
 		String raw = name.getString().stripLeading();
 		if (raw.startsWith("\u2514")) return name.copy();
@@ -58,5 +71,6 @@ public final class OptionVisibility {
 	public static void clearAll() {
 		HIDDEN_PREDICATES.clear();
 		SEARCH_ALIASES.clear();
+		SEARCH_ALIAS_MATCHES.clear();
 	}
 }

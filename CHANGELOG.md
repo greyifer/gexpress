@@ -19,6 +19,7 @@
 - Night Vision should no longer flash from repeated effect add/remove timing.
 - Mafioso and Janitor pricing/starting money settings no longer appear under Godfather.
 - Map presets no longer need manual `lobbyArea`, `readyArea`, spawn, RTP, or keyed-door copying when importing active setup values.
+- Opening the G'Express options screen no longer crashes on YACL builds where search state lives on the parent entry class.
 
 # Grey's Express 1.3.0
 
