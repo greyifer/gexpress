@@ -17,7 +17,6 @@ import dev.mapselect.weather.MapWeatherComponent;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.block.BlockState;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -28,6 +27,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.io.IOException;
@@ -74,8 +74,8 @@ public final class ScatterBrainManager {
 
 		List<ServerPlayerEntity> players = world.getPlayers(player ->
 			!VultureManager.isStashed(player) && isPlayable(player, scatterBrain));
-		if (players.size() < 2) {
-			scatterBrain.sendMessage(Text.literal("Scatter needs at least two players."), true);
+		if (players.isEmpty()) {
+			scatterBrain.sendMessage(Text.literal("Scatter needs living players."), true);
 			return;
 		}
 
@@ -85,13 +85,20 @@ public final class ScatterBrainManager {
 			return;
 		}
 
+		int scattered = 0;
 		for (ServerPlayerEntity player : players) {
-			BlockPos pos = findSafePoint(world, player, points);
+			Vec3d pos = findSafePoint(world, player, points);
 			if (pos == null) continue;
-			player.teleport(world, pos.getX() + 0.5D, player.getY(), pos.getZ() + 0.5D,
+			player.teleport(world, pos.x, pos.y, pos.z,
 				player.getYaw(), player.getPitch());
 			player.setVelocity(0.0D, 0.0D, 0.0D);
 			player.velocityModified = true;
+			scattered++;
+		}
+
+		if (scattered == 0) {
+			scatterBrain.sendMessage(Text.literal("Scatter Brain could not find safe spots at this height."), true);
+			return;
 		}
 
 		long cooldown = (long) GexpressConfig.getScatterBrainCooldownSeconds() * 20L;
@@ -128,37 +135,65 @@ public final class ScatterBrainManager {
 		return points;
 	}
 
-	private static BlockPos findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points) {
+	private static Vec3d findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points) {
+		double y = player.getY();
 		for (int attempt = 0; attempt < 64; attempt++) {
 			TargetPoint target = points.get(RANDOM.nextInt(points.size()));
-			BlockPos origin = BlockPos.ofFloored(target.x(), player.getY(), target.z());
-			BlockPos safe = safeAround(world, origin);
+			BlockPos origin = BlockPos.ofFloored(target.x(), y, target.z());
+			Vec3d safe = safeAround(world, player, origin, y);
 			if (safe != null) return safe;
 		}
 		return null;
 	}
 
-	private static BlockPos safeAround(ServerWorld world, BlockPos origin) {
+	private static Vec3d safeAround(ServerWorld world, ServerPlayerEntity player, BlockPos origin, double y) {
 		for (int radius = 0; radius <= 8; radius++) {
 			for (int dx = -radius; dx <= radius; dx++) {
 				for (int dz = -radius; dz <= radius; dz++) {
 					if (Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
 					BlockPos pos = origin.add(dx, 0, dz);
-					if (isSafe(world, pos)) return pos;
+					double x = pos.getX() + 0.5D;
+					double z = pos.getZ() + 0.5D;
+					if (isSafe(world, player, x, y, z)) return new Vec3d(x, y, z);
 				}
 			}
 		}
 		return null;
 	}
 
-	private static boolean isSafe(ServerWorld world, BlockPos pos) {
-		BlockState feet = world.getBlockState(pos);
-		BlockState head = world.getBlockState(pos.up());
-		BlockState below = world.getBlockState(pos.down());
-		if (GOLD_LEDGE_ID.equals(Registries.BLOCK.getId(below.getBlock()))) return false;
-		return feet.getCollisionShape(world, pos).isEmpty()
-			&& head.getCollisionShape(world, pos.up()).isEmpty()
-			&& !below.getCollisionShape(world, pos.down()).isEmpty();
+	private static boolean isSafe(ServerWorld world, ServerPlayerEntity player, double x, double y, double z) {
+		Box current = player.getBoundingBox();
+		Box target = current.offset(x - player.getX(), y - player.getY(), z - player.getZ());
+		return world.isSpaceEmpty(player, target.contract(1.0E-7D)) && hasValidSupport(world, target);
+	}
+
+	private static boolean hasValidSupport(ServerWorld world, Box target) {
+		double supportY = target.minY - 0.08D;
+		double minX = target.minX + 0.05D;
+		double maxX = target.maxX - 0.05D;
+		double minZ = target.minZ + 0.05D;
+		double maxZ = target.maxZ - 0.05D;
+		double centerX = (target.minX + target.maxX) * 0.5D;
+		double centerZ = (target.minZ + target.maxZ) * 0.5D;
+
+		boolean supported = false;
+		double[][] samples = {
+			{ centerX, centerZ },
+			{ minX, minZ },
+			{ minX, maxZ },
+			{ maxX, minZ },
+			{ maxX, maxZ }
+		};
+		for (double[] sample : samples) {
+			BlockPos supportPos = BlockPos.ofFloored(sample[0], supportY, sample[1]);
+			if (GOLD_LEDGE_ID.equals(Registries.BLOCK.getId(world.getBlockState(supportPos).getBlock()))) {
+				return false;
+			}
+			if (!world.getBlockState(supportPos).getCollisionShape(world, supportPos).isEmpty()) {
+				supported = true;
+			}
+		}
+		return supported;
 	}
 
 	private static long cooldownRemaining(ServerPlayerEntity player) {

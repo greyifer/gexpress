@@ -10,6 +10,10 @@
 - Removed G'Express keyed-door preset storage, commands, and map UI in favor of Wathe's normal door setup and a per-map key range.
 - Map settings now import active Wathe areas, spawns, and RTP slots without touching door key names.
 
+## Fixed
+
+- Scatter Brain teleport now checks the player's real collision box, so valid train floors like carpets and slabs are no longer rejected.
+
 # Grey's Express 1.3.1
 
 ## Added
