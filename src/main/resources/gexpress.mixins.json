@@ -36,8 +36,6 @@
 		"client.WatheTrainSnowMixin",
 		"client.WatheExtendedOpMixin",
 		"client.ModsNamespaceMixin",
-		"client.NightVisionLightmapMixin",
-		"client.NightVisionStrengthMixin",
 		"client.BombSpecialistShopMixin",
 		"client.DevWeaponItemRendererMixin",
 		"client.C4ItemEntityRendererMixin",

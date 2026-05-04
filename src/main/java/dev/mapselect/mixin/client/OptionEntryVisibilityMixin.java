@@ -16,10 +16,21 @@ public abstract class OptionEntryVisibilityMixin {
 	@Shadow
 	public Option<?> option;
 
+	@Shadow
+	protected boolean searchQueryMatches;
+
 	@Inject(method = "isViewable", at = @At("HEAD"), cancellable = true)
 	private void gexpress$hideWhenPredicateMatches(CallbackInfoReturnable<Boolean> cir) {
 		if (OptionVisibility.isHidden(option)) {
 			cir.setReturnValue(false);
+		}
+	}
+
+	@Inject(method = "updateSearchQuery", at = @At("HEAD"), cancellable = true)
+	private void gexpress$matchDropdownParentSearch(String query, CallbackInfoReturnable<Boolean> cir) {
+		if (OptionVisibility.matchesSearchAlias(option, query)) {
+			this.searchQueryMatches = true;
+			cir.setReturnValue(true);
 		}
 	}
 }

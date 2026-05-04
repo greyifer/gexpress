@@ -12,11 +12,14 @@ import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
+import dev.mapselect.network.JuggernautStagePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -49,6 +52,7 @@ public final class JuggernautManager {
 	private JuggernautManager() {}
 
 	public static void register() {
+		PayloadTypeRegistry.playS2C().register(JuggernautStagePayload.ID, JuggernautStagePayload.CODEC);
 		GameEvents.ON_FINISH_INITIALIZE.register(JuggernautManager::onFinishInitialize);
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
 			removeAllLoadouts(world);
@@ -94,6 +98,7 @@ public final class JuggernautManager {
 		if (stage >= SHIELD_STAGE && !shieldRechargeUntil.containsKey(id)) {
 			AbilityCooldownSync.clear(juggernaut, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
 		}
+		syncStage(juggernaut);
 		juggernaut.sendMessage(Texts.stage(stage, cooldownTicks), true);
 		return true;
 	}
@@ -125,6 +130,7 @@ public final class JuggernautManager {
 				grantLoadout(player);
 			}
 			syncShieldCooldown(player);
+			syncStage(player);
 		}
 	}
 
@@ -146,6 +152,7 @@ public final class JuggernautManager {
 		equipped.add(player.getUuid());
 		applyWeaponCooldown(player, cooldownTicksAtStage(stageForKills(killCounts.getOrDefault(player.getUuid(), 0))));
 		syncShieldCooldown(player);
+		syncStage(player);
 		MapSelect.LOGGER.debug("Equipped Juggernaut {}", player.getName().getString());
 	}
 
@@ -180,6 +187,20 @@ public final class JuggernautManager {
 
 	private static int cooldownReductionSteps(int stage) {
 		return Math.min(3, (Math.min(MAX_STAGE, Math.max(0, stage)) + 1) / 2);
+	}
+
+	private static void syncStage(ServerPlayerEntity player) {
+		if (player == null || !ServerPlayNetworking.canSend(player, JuggernautStagePayload.ID)) return;
+		int stage = stageForKills(killCounts.getOrDefault(player.getUuid(), 0));
+		int reduction = cooldownReductionSteps(stage) * GexpressConfig.getJuggernautCooldownReductionSeconds();
+		ServerPlayNetworking.send(player, new JuggernautStagePayload(true, stage, MAX_STAGE, reduction,
+			stage >= SHIELD_STAGE, stage >= GUN_SHIELD_STAGE));
+	}
+
+	private static void clearStage(ServerPlayerEntity player) {
+		if (player != null && ServerPlayNetworking.canSend(player, JuggernautStagePayload.ID)) {
+			ServerPlayNetworking.send(player, JuggernautStagePayload.clear());
+		}
 	}
 
 	private static boolean tryBlockWithShield(ServerPlayerEntity juggernaut, Identifier reason) {
@@ -331,6 +352,7 @@ public final class JuggernautManager {
 		if (player instanceof ServerPlayerEntity serverPlayer) {
 			AbilityCooldownSync.clear(serverPlayer, AbilityCooldownPayload.JUGGERNAUT_WEAPONS);
 			AbilityCooldownSync.clear(serverPlayer, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
+			clearStage(serverPlayer);
 			serverPlayer.playerScreenHandler.syncState();
 		}
 	}

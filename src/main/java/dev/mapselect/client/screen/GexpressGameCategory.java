@@ -106,6 +106,7 @@ public final class GexpressGameCategory {
 		globalRoleOpts.add(maxVigilantes);
 		globalRoleOpts.add(playersPerKiller);
 		globalRoleOpts.add(playersPerVigilante);
+		globalRoleOpts.add(buildMafiaMinimumPlayersOption());
 		globalRoleOpts.add(buildLastDeathShieldOption());
 
 		Map<String, List<Option<?>>> modKeyToWeOpts = new LinkedHashMap<>();
@@ -323,6 +324,16 @@ public final class GexpressGameCategory {
 			.binding(1, GexpressConfig::getMaxVigilanteAmount, v -> GexpressConfig.maxVigilanteAmount = v)
 			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 				.range(GexpressConfig.MAX_VIGILANTE_AMOUNT_MIN, GexpressConfig.MAX_VIGILANTE_AMOUNT_MAX))
+			.build();
+	}
+
+	private static Option<Integer> buildMafiaMinimumPlayersOption() {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players"))
+			.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players.tooltip")))
+			.binding(15, GexpressConfig::getMafiaMinimumPlayers, v -> GexpressConfig.mafiaMinimumPlayers = v)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+				.range(GexpressConfig.MAFIA_MINIMUM_PLAYERS_MIN, GexpressConfig.MAFIA_MINIMUM_PLAYERS_MAX))
 			.build();
 	}
 
@@ -672,59 +683,54 @@ public final class GexpressGameCategory {
 				.build());
 			return out;
 		}
-		if (GODFATHER_ID.equals(roleId) || MAFIOSO_ID.equals(roleId)) {
+		if (GODFATHER_ID.equals(roleId)) {
 			List<Option<?>> out = new ArrayList<>();
-			if (GODFATHER_ID.equals(roleId)) {
-				out.add(Option.<Integer>createBuilder()
-					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_bullet_price")))
-					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_bullet_price.tooltip")))
-					.binding(75, GexpressConfig::getGodfatherBulletPrice, v -> GexpressConfig.godfatherBulletPrice = v)
-					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-						.range(GexpressConfig.GODFATHER_BULLET_PRICE_MIN, GexpressConfig.GODFATHER_BULLET_PRICE_MAX))
-					.build());
-				out.add(Option.<Integer>createBuilder()
-					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_bullets")))
-					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_bullets.tooltip")))
-					.binding(1, GexpressConfig::getGodfatherStartingBullets, v -> GexpressConfig.godfatherStartingBullets = v)
-					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-						.range(GexpressConfig.GODFATHER_STARTING_BULLETS_MIN, GexpressConfig.GODFATHER_STARTING_BULLETS_MAX))
-					.build());
-				out.add(Option.<Integer>createBuilder()
-					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_max_loaded_bullets")))
-					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_max_loaded_bullets.tooltip")))
-					.binding(3, GexpressConfig::getGodfatherMaxLoadedBullets, v -> GexpressConfig.godfatherMaxLoadedBullets = v)
-					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-						.range(GexpressConfig.GODFATHER_MAX_LOADED_BULLETS_MIN, GexpressConfig.GODFATHER_MAX_LOADED_BULLETS_MAX))
-					.build());
-				out.add(Option.<Integer>createBuilder()
-					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players")))
-					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players.tooltip")))
-					.binding(15, GexpressConfig::getMafiaMinimumPlayers, v -> GexpressConfig.mafiaMinimumPlayers = v)
-					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-						.range(GexpressConfig.MAFIA_MINIMUM_PLAYERS_MIN, GexpressConfig.MAFIA_MINIMUM_PLAYERS_MAX))
-					.build());
-				out.add(Option.<Integer>createBuilder()
-					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_gold")))
-					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_gold.tooltip")))
-					.binding(100, GexpressConfig::getGodfatherStartingGold, v -> GexpressConfig.godfatherStartingGold = v)
-					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-						.range(GexpressConfig.MAFIA_STARTING_GOLD_MIN, GexpressConfig.MAFIA_STARTING_GOLD_MAX))
-					.build());
-				out.add(Option.<Integer>createBuilder()
-					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range")))
-					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range.tooltip")))
-					.binding(16, GexpressConfig::getMafiaRecruitRange, v -> GexpressConfig.mafiaRecruitRange = v)
-					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-						.range(GexpressConfig.MAFIA_RECRUIT_RANGE_MIN, GexpressConfig.MAFIA_RECRUIT_RANGE_MAX))
-					.build());
-				out.add(Option.<Integer>createBuilder()
-					.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_replacement_cooldown")))
-					.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_replacement_cooldown.tooltip")))
-					.binding(120, GexpressConfig::getMafiaReplacementCooldownSeconds, v -> GexpressConfig.mafiaReplacementCooldownSeconds = v)
-					.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-						.range(GexpressConfig.MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MIN, GexpressConfig.MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MAX))
-					.build());
-			}
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_bullet_price")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_bullet_price.tooltip")))
+				.binding(75, GexpressConfig::getGodfatherBulletPrice, v -> GexpressConfig.godfatherBulletPrice = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.GODFATHER_BULLET_PRICE_MIN, GexpressConfig.GODFATHER_BULLET_PRICE_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_bullets")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_bullets.tooltip")))
+				.binding(1, GexpressConfig::getGodfatherStartingBullets, v -> GexpressConfig.godfatherStartingBullets = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.GODFATHER_STARTING_BULLETS_MIN, GexpressConfig.GODFATHER_STARTING_BULLETS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_max_loaded_bullets")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_max_loaded_bullets.tooltip")))
+				.binding(3, GexpressConfig::getGodfatherMaxLoadedBullets, v -> GexpressConfig.godfatherMaxLoadedBullets = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.GODFATHER_MAX_LOADED_BULLETS_MIN, GexpressConfig.GODFATHER_MAX_LOADED_BULLETS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_gold")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.godfather_starting_gold.tooltip")))
+				.binding(100, GexpressConfig::getGodfatherStartingGold, v -> GexpressConfig.godfatherStartingGold = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.MAFIA_STARTING_GOLD_MIN, GexpressConfig.MAFIA_STARTING_GOLD_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range.tooltip")))
+				.binding(16, GexpressConfig::getMafiaRecruitRange, v -> GexpressConfig.mafiaRecruitRange = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.MAFIA_RECRUIT_RANGE_MIN, GexpressConfig.MAFIA_RECRUIT_RANGE_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_replacement_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_replacement_cooldown.tooltip")))
+				.binding(120, GexpressConfig::getMafiaReplacementCooldownSeconds, v -> GexpressConfig.mafiaReplacementCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MIN, GexpressConfig.MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MAX))
+				.build());
+			return out;
+		}
+		if (MAFIOSO_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafioso_starting_gold")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafioso_starting_gold.tooltip")))
@@ -979,6 +985,7 @@ public final class GexpressGameCategory {
 		for (Option<?> sub : subOptions) {
 			OptionVisibility.setHiddenWhen(sub, () -> !Boolean.TRUE.equals(toggle.pendingValue()));
 			OptionVisibility.ensureDropdownName(sub);
+			OptionVisibility.addSearchAlias(sub, toggle.name().getString());
 		}
 
 		g.option(toggle);

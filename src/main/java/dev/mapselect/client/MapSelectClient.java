@@ -47,6 +47,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientTimeMasterRewindState.register();
 		ClientSilentShadowState.register();
 		ClientWarlockState.register();
+		ClientJuggernautState.register();
 		ClientTricksterState.register();
 		ClientPuppetmasterState.register();
 		ClientScatterBrainState.register();

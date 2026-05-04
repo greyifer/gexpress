@@ -9,19 +9,34 @@ import net.minecraft.util.Formatting;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
+import java.util.Locale;
 
 public final class OptionVisibility {
 	private OptionVisibility() {}
 
 	private static final Map<Option<?>, BooleanSupplier> HIDDEN_PREDICATES = new IdentityHashMap<>();
+	private static final Map<Option<?>, String> SEARCH_ALIASES = new IdentityHashMap<>();
 
 	public static void setHiddenWhen(Option<?> option, BooleanSupplier hiddenIf) {
 		HIDDEN_PREDICATES.put(option, hiddenIf);
 	}
 
+	public static void addSearchAlias(Option<?> option, String alias) {
+		if (option == null || alias == null || alias.isBlank()) return;
+		String normalized = alias.toLowerCase(Locale.ROOT);
+		String existing = SEARCH_ALIASES.get(option);
+		SEARCH_ALIASES.put(option, existing == null ? normalized : existing + " " + normalized);
+	}
+
 	public static boolean isHidden(Option<?> option) {
 		BooleanSupplier s = HIDDEN_PREDICATES.get(option);
 		return s != null && s.getAsBoolean();
+	}
+
+	public static boolean matchesSearchAlias(Option<?> option, String query) {
+		if (option == null || query == null || query.isBlank()) return false;
+		String alias = SEARCH_ALIASES.get(option);
+		return alias != null && alias.contains(query.toLowerCase(Locale.ROOT));
 	}
 
 	public static MutableText dropdownName(Text name) {
@@ -42,5 +57,6 @@ public final class OptionVisibility {
 
 	public static void clearAll() {
 		HIDDEN_PREDICATES.clear();
+		SEARCH_ALIASES.clear();
 	}
 }

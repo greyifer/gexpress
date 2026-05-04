@@ -1,3 +1,25 @@
+# Grey's Express 1.3.1
+
+## Added
+
+- Juggernaut now has an animated stage HUD that shows the current stage and cumulative stage bonuses.
+- Map presets can now save and reapply Wathe keyed-door data for longer custom trains.
+- Map settings now include import buttons for active Wathe areas, spawns, RTP slots, and keyed doors.
+- `/g setup map edit <name> keydoors ...` commands can snapshot, clear, set, and remove keyed door entries.
+
+## Changed
+
+- Mafia minimum player count is now shown with the global role assignment options instead of being hidden inside one role.
+- Godfather, Mafioso, and Janitor settings are separated under their own role sections.
+- Searching a role in the game options tab now keeps that role's child settings visible too.
+- Night Vision now uses vanilla Night Vision with hidden particles and hidden effect icon instead of custom lightmap mixins.
+
+## Fixed
+
+- Night Vision should no longer flash from repeated effect add/remove timing.
+- Mafioso and Janitor pricing/starting money settings no longer appear under Godfather.
+- Map presets no longer need manual `lobbyArea`, `readyArea`, spawn, RTP, or keyed-door copying when importing active setup values.
+
 # Grey's Express 1.3.0
 
 ## Added
