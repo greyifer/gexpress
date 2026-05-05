@@ -782,10 +782,12 @@ public final class TimeMasterManager {
 			Map<UUID, ItemEntitySnapshot> items, Map<UUID, BodyEntitySnapshot> bodies,
 			Map<BlockPos, BlockSnapshot> blocks,
 			JuggernautManager.TimeState juggernaut, SnitchManager.TimeState snitch,
-			VultureManager.TimeState vulture, DancingCartsManager.TimeState dancingCarts,
+			VultureManager.TimeState vulture, PuppetmasterManager.TimeState puppetmaster,
+			DancingCartsManager.TimeState dancingCarts,
 			BountyHunterManager.TimeState bountyHunter,
 			MafiaManager.TimeState mafia,
-			NbtCompound gameTime, NbtCompound timeMaster, NbtCompound c4Back, NbtCompound medicShield,
+			NbtCompound gameWorld, NbtCompound gameTime, NbtCompound timeMaster,
+			NbtCompound c4Back, NbtCompound medicShield,
 			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute) {
 
 		private static WorldSnapshot capture(ServerWorld world) {
@@ -816,9 +818,11 @@ public final class TimeMasterManager {
 				JuggernautManager.snapshotForTimeRewind(),
 				SnitchManager.snapshotForTimeRewind(),
 				VultureManager.snapshotForTimeRewind(),
+				PuppetmasterManager.snapshotForTimeRewind(),
 				DancingCartsManager.snapshotForTimeRewind(world),
 				BountyHunterManager.snapshotForTimeRewind(),
 				MafiaManager.snapshotForTimeRewind(),
+				writeComponent(GameWorldComponent.KEY.getNullable(world), lookup),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
 				writeComponent(TimeMasterComponent.KEY.getNullable(world), lookup),
 				writeComponent(C4BackComponent.KEY.getNullable(world), lookup),
@@ -873,6 +877,7 @@ public final class TimeMasterManager {
 			VultureManager.clearForTimeRewind(world);
 			TricksterManager.clearForTimeRewind(world);
 			JuggernautManager.restoreForTimeRewind(juggernaut);
+			PuppetmasterManager.restoreForTimeRewind(puppetmaster);
 			BountyHunterManager.restoreForTimeRewind(bountyHunter);
 			MafiaManager.restoreForTimeRewind(world, mafia);
 			SnitchManager.restoreForTimeRewind(world, snitch);
@@ -895,6 +900,7 @@ public final class TimeMasterManager {
 
 			restoreItems(world);
 			restoreBodies(world, revived);
+			readComponent(GameWorldComponent.KEY.getNullable(world), gameWorld, lookup);
 			readComponent(GameTimeComponent.KEY.getNullable(world), gameTime, lookup);
 			readComponent(TimeMasterComponent.KEY.getNullable(world), timeMaster, lookup);
 			readComponent(C4BackComponent.KEY.getNullable(world), c4Back, lookup);
@@ -904,6 +910,7 @@ public final class TimeMasterManager {
 			readComponent(VoiceMuteState.KEY.getNullable(world), voiceMute, lookup);
 			VultureManager.restoreForTimeRewind(world, vulture);
 
+			GameWorldComponent.KEY.sync(world);
 			GameTimeComponent.KEY.sync(world);
 			TimeMasterComponent.KEY.sync(world);
 			C4BackComponent.KEY.sync(world);

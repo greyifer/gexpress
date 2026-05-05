@@ -1,6 +1,7 @@
 package dev.mapselect.registry;
 
 import dev.mapselect.host.HostComponent;
+import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.host.TrustedComponent;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.medic.MedicShieldComponent;
@@ -18,6 +19,7 @@ public class MapSelectComponents implements WorldComponentInitializer {
 		registry.register(MapWeatherComponent.KEY, MapWeatherComponent::new);
 		registry.register(HostComponent.KEY, HostComponent::new);
 		registry.register(TrustedComponent.KEY, TrustedComponent::new);
+		registry.register(PlayerTagComponent.KEY, PlayerTagComponent::new);
 		registry.register(C4BackComponent.KEY, C4BackComponent::new);
 		registry.register(MedicShieldComponent.KEY, MedicShieldComponent::new);
 		registry.register(SilentShadowComponent.KEY, SilentShadowComponent::new);

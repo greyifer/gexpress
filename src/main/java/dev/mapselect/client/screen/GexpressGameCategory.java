@@ -642,6 +642,14 @@ public final class GexpressGameCategory {
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.PUPPETMASTER_CONTROL_RANGE_MIN, GexpressConfig.PUPPETMASTER_CONTROL_RANGE_MAX))
 				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.puppetmaster_max_uses")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.puppetmaster_max_uses.tooltip")))
+				.binding(3, GexpressConfig::getPuppetmasterMaxUses,
+					v -> GexpressConfig.puppetmasterMaxUses = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PUPPETMASTER_MAX_USES_MIN, GexpressConfig.PUPPETMASTER_MAX_USES_MAX))
+				.build());
 			out.add(Option.<Boolean>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.puppetmaster_self_kill")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.puppetmaster_self_kill.tooltip")))

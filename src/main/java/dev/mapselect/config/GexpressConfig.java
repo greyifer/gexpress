@@ -75,6 +75,8 @@ public final class GexpressConfig {
 	public static boolean puppetmasterCanKillOwnBody = false;
 	/** Maximum block range for Puppetmaster's target menu. */
 	public static int puppetmasterControlRange = 16;
+	/** Number of successful controls each Puppetmaster can start per round. */
+	public static int puppetmasterMaxUses = 3;
 	/** Seconds before the Pelican can swallow another player. */
 	public static int pelicanEatCooldownSeconds = 20;
 	/** Percent of the round lobby the Pelican must swallow to win. */
@@ -229,6 +231,8 @@ public final class GexpressConfig {
 	public static final int PUPPETMASTER_CONTROL_COOLDOWN_MAX = 600;
 	public static final int PUPPETMASTER_CONTROL_RANGE_MIN = 1;
 	public static final int PUPPETMASTER_CONTROL_RANGE_MAX = 64;
+	public static final int PUPPETMASTER_MAX_USES_MIN = 0;
+	public static final int PUPPETMASTER_MAX_USES_MAX = 10;
 	public static final int PELICAN_EAT_COOLDOWN_MIN = 0;
 	public static final int PELICAN_EAT_COOLDOWN_MAX = 600;
 	public static final int PELICAN_EAT_PERCENTAGE_MIN = 10;
@@ -434,6 +438,11 @@ public final class GexpressConfig {
 	public static int getPuppetmasterControlRange() {
 		return Math.max(PUPPETMASTER_CONTROL_RANGE_MIN,
 			Math.min(PUPPETMASTER_CONTROL_RANGE_MAX, puppetmasterControlRange));
+	}
+
+	public static int getPuppetmasterMaxUses() {
+		return Math.max(PUPPETMASTER_MAX_USES_MIN,
+			Math.min(PUPPETMASTER_MAX_USES_MAX, puppetmasterMaxUses));
 	}
 
 	public static int getPelicanEatCooldownSeconds() {
@@ -828,6 +837,7 @@ public final class GexpressConfig {
 			puppetmasterRandomTarget = snap.puppetmasterRandomTarget;
 			puppetmasterCanKillOwnBody = snap.puppetmasterCanKillOwnBody;
 			puppetmasterControlRange = snap.puppetmasterControlRange;
+			puppetmasterMaxUses = snap.puppetmasterMaxUses;
 			pelicanEatCooldownSeconds = snap.pelicanEatCooldownSeconds;
 			pelicanEatPercentage = snap.pelicanEatPercentage;
 			hungryFoodLimit = snap.hungryFoodLimit;
@@ -924,6 +934,7 @@ public final class GexpressConfig {
 			snap.puppetmasterRandomTarget = puppetmasterRandomTarget;
 			snap.puppetmasterCanKillOwnBody = puppetmasterCanKillOwnBody;
 			snap.puppetmasterControlRange = puppetmasterControlRange;
+			snap.puppetmasterMaxUses = puppetmasterMaxUses;
 			snap.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
 			snap.pelicanEatPercentage = pelicanEatPercentage;
 			snap.hungryFoodLimit = hungryFoodLimit;
@@ -1001,7 +1012,7 @@ public final class GexpressConfig {
 			int tricksterDancingCartsCooldownSeconds,
 			int tricksterDancingCartsMaxUses,
 			int puppetmasterControlDurationSeconds, int puppetmasterControlCooldownSeconds,
-			boolean puppetmasterRandomTarget, int puppetmasterControlRange,
+			boolean puppetmasterRandomTarget, int puppetmasterControlRange, int puppetmasterMaxUses,
 			int pelicanEatCooldownSeconds, int pelicanEatPercentage, int hungryFoodLimit, int thirstyDrinkLimit,
 			int snitchTasksRequired,
 			int snitchWarningTasksRemaining,
@@ -1050,6 +1061,7 @@ public final class GexpressConfig {
 		GexpressConfig.puppetmasterControlCooldownSeconds = puppetmasterControlCooldownSeconds;
 		GexpressConfig.puppetmasterRandomTarget = puppetmasterRandomTarget;
 		GexpressConfig.puppetmasterControlRange = puppetmasterControlRange;
+		GexpressConfig.puppetmasterMaxUses = puppetmasterMaxUses;
 		GexpressConfig.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
 		GexpressConfig.pelicanEatPercentage = pelicanEatPercentage;
 		GexpressConfig.hungryFoodLimit = hungryFoodLimit;
@@ -1133,6 +1145,7 @@ public final class GexpressConfig {
 		puppetmasterControlDurationSeconds = getPuppetmasterControlDurationSeconds();
 		puppetmasterControlCooldownSeconds = getPuppetmasterControlCooldownSeconds();
 		puppetmasterControlRange = getPuppetmasterControlRange();
+		puppetmasterMaxUses = getPuppetmasterMaxUses();
 		pelicanEatCooldownSeconds = getPelicanEatCooldownSeconds();
 		pelicanEatPercentage = getPelicanEatPercentage();
 		hungryFoodLimit = getHungryFoodLimit();
@@ -1275,6 +1288,7 @@ public final class GexpressConfig {
 		boolean puppetmasterRandomTarget = false;
 		boolean puppetmasterCanKillOwnBody = false;
 		int puppetmasterControlRange = 16;
+		int puppetmasterMaxUses = 3;
 		int pelicanEatCooldownSeconds = 20;
 		int pelicanEatPercentage = 80;
 		int hungryFoodLimit = 2;

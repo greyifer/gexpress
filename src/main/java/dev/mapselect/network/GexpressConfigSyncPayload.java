@@ -17,7 +17,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int tricksterDancingCartsCooldownSeconds,
 		int tricksterDancingCartsMaxUses,
 		int puppetmasterControlDurationSeconds, int puppetmasterControlCooldownSeconds,
-		boolean puppetmasterRandomTarget, int puppetmasterControlRange,
+		boolean puppetmasterRandomTarget, int puppetmasterControlRange, int puppetmasterMaxUses,
 		int pelicanEatCooldownSeconds, int pelicanEatPercentage,
 		int hungryFoodLimit, int thirstyDrinkLimit, int snitchTasksRequired,
 		int snitchWarningTasksRemaining,
@@ -71,6 +71,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.puppetmasterControlCooldownSeconds());
 			buf.writeBoolean(payload.puppetmasterRandomTarget());
 			buf.writeInt(payload.puppetmasterControlRange());
+			buf.writeInt(payload.puppetmasterMaxUses());
 			buf.writeInt(payload.pelicanEatCooldownSeconds());
 			buf.writeInt(payload.pelicanEatPercentage());
 			buf.writeInt(payload.hungryFoodLimit());
@@ -154,6 +155,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // puppetmasterControlCooldownSeconds
 			buf.readBoolean(), // puppetmasterRandomTarget
 			buf.readInt(), // puppetmasterControlRange
+			buf.readInt(), // puppetmasterMaxUses
 			buf.readInt(), // pelicanEatCooldownSeconds
 			buf.readInt(), // pelicanEatPercentage
 			buf.readInt(), // hungryFoodLimit

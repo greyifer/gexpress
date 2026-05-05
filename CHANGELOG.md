@@ -1,3 +1,25 @@
+# Grey's Express 1.3.3
+
+## Added
+
+- Puppetmaster now has a configurable max-use limit, defaulting to three controls per round.
+- Added a live Players tab with player heads, usernames, current tags, and tag management.
+- Added Passenger, Designer, and Builder tags; Builder can access map and train setup tools.
+- Added `/g group tag` commands for listing and managing non-dev player tags.
+
+## Changed
+
+- Scatter Brain now falls back through preset spawns, configured play/map areas, and nearby alive players to find valid teleport locations more reliably.
+- Time Master rewinds now restore more round state, including role/component snapshots and Puppetmaster usage state.
+- The Pliers item model now uses the smaller model file.
+
+## Fixed
+
+- Killing the Puppetmaster's abandoned body while they are controlling someone now kills the controlled player and ends the control.
+- Pelican-contained players no longer reveal hovered role names, and players released after the Pelican dies join the dead voice group.
+- Amnesiac role steals are rolled back properly by Time Master rewinds.
+- Time Master rewind-use displays now update when the configured max uses changes.
+
 # Grey's Express 1.3.2
 
 ## Added

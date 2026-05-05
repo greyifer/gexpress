@@ -27,6 +27,8 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 	private final Map<UUID, Long> freezeCooldownUntil = new LinkedHashMap<>();
 	private final Map<UUID, Integer> usesRemaining = new LinkedHashMap<>();
 	private final Map<UUID, Integer> freezeUsesRemaining = new LinkedHashMap<>();
+	private int initializedMaxUses = -1;
+	private int initializedFreezeMaxUses = -1;
 
 	public TimeMasterComponent(World world) {
 		this.world = world;
@@ -117,12 +119,22 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		if (playerId == null) return;
 		boolean changed = false;
 		int maxUses = GexpressConfig.getTimeMasterMaxUses();
+		if (initializedMaxUses != maxUses) {
+			usesRemaining.clear();
+			initializedMaxUses = maxUses;
+			changed = true;
+		}
 		Integer current = usesRemaining.get(playerId);
 		if (current == null || current > maxUses) {
 			usesRemaining.put(playerId, maxUses);
 			changed = true;
 		}
 		int maxFreezeUses = GexpressConfig.getTimeMasterFreezeMaxUses();
+		if (initializedFreezeMaxUses != maxFreezeUses) {
+			freezeUsesRemaining.clear();
+			initializedFreezeMaxUses = maxFreezeUses;
+			changed = true;
+		}
 		Integer currentFreeze = freezeUsesRemaining.get(playerId);
 		if (currentFreeze == null || currentFreeze > maxFreezeUses) {
 			freezeUsesRemaining.put(playerId, maxFreezeUses);
@@ -138,6 +150,8 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		freezeCooldownUntil.clear();
 		usesRemaining.clear();
 		freezeUsesRemaining.clear();
+		initializedMaxUses = -1;
+		initializedFreezeMaxUses = -1;
 		KEY.sync(world);
 		return true;
 	}
@@ -148,6 +162,12 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		freezeCooldownUntil.clear();
 		usesRemaining.clear();
 		freezeUsesRemaining.clear();
+		initializedMaxUses = tag.contains("initializedMaxUses", NbtElement.INT_TYPE)
+			? tag.getInt("initializedMaxUses")
+			: -1;
+		initializedFreezeMaxUses = tag.contains("initializedFreezeMaxUses", NbtElement.INT_TYPE)
+			? tag.getInt("initializedFreezeMaxUses")
+			: -1;
 		readCooldowns(tag.getList("cooldowns", NbtElement.COMPOUND_TYPE), cooldownUntil);
 		readCooldowns(tag.getList("freezeCooldowns", NbtElement.COMPOUND_TYPE), freezeCooldownUntil);
 		readUses(tag.getList("uses", NbtElement.COMPOUND_TYPE), usesRemaining);
@@ -158,6 +178,8 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 	public void writeToNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		tag.put("cooldowns", writeCooldowns(cooldownUntil));
 		tag.put("freezeCooldowns", writeCooldowns(freezeCooldownUntil));
+		tag.putInt("initializedMaxUses", initializedMaxUses);
+		tag.putInt("initializedFreezeMaxUses", initializedFreezeMaxUses);
 
 		tag.put("uses", writeUses(usesRemaining));
 		tag.put("freezeUses", writeUses(freezeUsesRemaining));

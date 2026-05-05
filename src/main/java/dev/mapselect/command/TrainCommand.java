@@ -25,8 +25,8 @@ import java.util.function.Predicate;
 
 public class TrainCommand {
 
-	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseAdminCommands;
-	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseHostCommands;
+	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseSetupCommands;
+	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseSetupCommands;
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		SuggestionProvider<ServerCommandSource> trainNames = TrainCommand::suggestTrainNames;

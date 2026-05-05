@@ -21,7 +21,7 @@ import java.util.function.Predicate;
 
 public class RtpCommand {
 
-	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseAdminCommands;
+	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseSetupCommands;
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("rtp")

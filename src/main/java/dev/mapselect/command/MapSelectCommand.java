@@ -35,8 +35,8 @@ import java.util.function.Predicate;
 
 public class MapSelectCommand {
 
-	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseAdminCommands;
-	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseHostCommands;
+	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseSetupCommands;
+	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseSetupCommands;
 
 	private enum BoxKind {
 		WHOLE_MAP("whole map area"),

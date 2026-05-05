@@ -76,6 +76,7 @@ public final class GexpressOptionsScreen {
 	private static Screen buildScreen(Screen parent) {
 		boolean isOp = canEditOptions();
 		boolean canEditGame = isOp;
+		boolean canEditSetup = canEditSetupOptions();
 		BiConsumer<String, Screen> stage = GexpressOptionsScreen::stage;
 
 		YetAnotherConfigLib.Builder builder = YetAnotherConfigLib.createBuilder()
@@ -91,6 +92,14 @@ public final class GexpressOptionsScreen {
 		if (isDevPlayer()) {
 			builder.category(GexpressDevCategory.build(parent));
 			idx++;
+		}
+
+		if (canEditGame) {
+			builder.category(GexpressPlayersCategory.build(parent));
+			idx++;
+		}
+
+		if (isDevPlayer() || canEditSetup) {
 			ConfigCategory trainCarts = (selectedTrainCartMap == null)
 				? GexpressTrainCartsScreen.buildListCategory(parent)
 				: GexpressTrainCartsScreen.buildDetailCategory(parent, selectedTrainCartMap);
@@ -102,6 +111,9 @@ public final class GexpressOptionsScreen {
 		if (canEditGame) {
 			builder.category(GexpressGameCategory.build(parent, stage));
 			idx++;
+		}
+
+		if (canEditSetup) {
 			ConfigCategory maps = (selectedMapPreset == null)
 				? GexpressMapScreen.buildListCategory(parent)
 				: GexpressMapDetailScreen.buildDetailCategory(parent, selectedMapPreset);
@@ -243,6 +255,7 @@ public final class GexpressOptionsScreen {
 			GexpressConfig.getPuppetmasterControlCooldownSeconds(),
 			GexpressConfig.isPuppetmasterRandomTarget(),
 			GexpressConfig.getPuppetmasterControlRange(),
+			GexpressConfig.getPuppetmasterMaxUses(),
 			GexpressConfig.getPelicanEatCooldownSeconds(),
 			GexpressConfig.getPelicanEatPercentage(),
 			GexpressConfig.getHungryFoodLimit(),
@@ -341,6 +354,11 @@ public final class GexpressOptionsScreen {
 	private static boolean canEditOptions() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canEditGameOptions(mc.player);
+	}
+
+	private static boolean canEditSetupOptions() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canEditSetupOptions(mc.player);
 	}
 
 	private static boolean isDevPlayer() {

@@ -6,6 +6,7 @@ import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.AbilityCooldownPayload;
@@ -169,7 +170,7 @@ public final class VultureManager {
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (victim instanceof ServerPlayerEntity vulture && isVulture(vulture)) {
-			releaseAllForVulture(vulture.getUuid(), vulture.getServer(), ReleasePoint.from(vulture), true);
+			releaseAllForVulture(vulture.getUuid(), vulture.getServer(), ReleasePoint.from(vulture), true, true);
 		}
 		return true;
 	}
@@ -355,14 +356,24 @@ public final class VultureManager {
 	}
 
 	private static void releaseAllForVulture(UUID vultureId, MinecraftServer server, ReleasePoint point, boolean notify) {
+		releaseAllForVulture(vultureId, server, point, notify, false);
+	}
+
+	private static void releaseAllForVulture(UUID vultureId, MinecraftServer server, ReleasePoint point,
+			boolean notify, boolean releaseAsDead) {
 		Deque<UUID> belly = stashedByVulture.get(vultureId);
 		if (belly == null || belly.isEmpty()) return;
 		for (UUID targetId : new ArrayList<>(belly)) {
-			releasePlayer(targetId, server, point, notify);
+			releasePlayer(targetId, server, point, notify, releaseAsDead);
 		}
 	}
 
 	private static void releasePlayer(UUID targetId, MinecraftServer server, ReleasePoint point, boolean notify) {
+		releasePlayer(targetId, server, point, notify, false);
+	}
+
+	private static void releasePlayer(UUID targetId, MinecraftServer server, ReleasePoint point,
+			boolean notify, boolean releaseAsDead) {
 		if (targetId == null) return;
 		StashedState state = stashedStates.remove(targetId);
 		UUID vultureId = vultureByStashed.remove(targetId);
@@ -385,14 +396,22 @@ public final class VultureManager {
 		ReleasePoint releasePoint = point != null ? point : ReleasePoint.from(target);
 		ServerWorld releaseWorld = releasePoint.world(server);
 		if (releaseWorld == null) releaseWorld = target.getServerWorld();
-		target.changeGameMode(state != null ? state.previousGameMode : GameMode.SURVIVAL);
-		target.setInvisible(state != null && state.previousInvisible());
+		if (releaseAsDead) {
+			target.changeGameMode(GameMode.SPECTATOR);
+			target.setInvisible(false);
+			TrainVoicePlugin.addPlayer(target.getUuid());
+		} else {
+			target.changeGameMode(state != null ? state.previousGameMode : GameMode.SURVIVAL);
+			target.setInvisible(state != null && state.previousInvisible());
+		}
 		target.teleport(releaseWorld, releasePoint.x, releasePoint.y, releasePoint.z,
 			releasePoint.yaw, releasePoint.pitch);
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(target));
 		ServerPlayNetworking.send(target, VultureStatePayload.clear());
 		if (notify) {
-			target.sendMessage(Text.literal("The Pelican spat you out."), true);
+			target.sendMessage(Text.literal(releaseAsDead
+				? "The Pelican died and spat you out."
+				: "The Pelican spat you out."), true);
 		}
 		if (server != null && vultureId != null) {
 			ServerPlayerEntity vulture = server.getPlayerManager().getPlayer(vultureId);

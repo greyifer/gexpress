@@ -1,6 +1,8 @@
 package dev.mapselect.permissions;
 
 import dev.mapselect.host.HostComponent;
+import dev.mapselect.host.PlayerTag;
+import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.host.TrustedComponent;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
@@ -11,6 +13,7 @@ import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.minecraft.util.Formatting;
+import net.minecraft.world.World;
 
 import java.util.Locale;
 import java.util.UUID;
@@ -20,6 +23,9 @@ public final class GexpressPermissions {
 	public static final UUID DEV_UUID = UUID.fromString("4eaa64ee-f4a5-4fb5-868e-2580327543fd");
 	public static final int DEV_COLOR = 0xCBFF2E;
 	public static final int TRUSTED_COLOR = 0xF2C94C;
+	public static final int PASSENGER_COLOR = 0x3C8AC9;
+	public static final int DESIGNER_COLOR = 0x781419;
+	public static final int BUILDER_COLOR = 0xFC552B;
 
 	private GexpressPermissions() {}
 
@@ -52,6 +58,10 @@ public final class GexpressPermissions {
 		return TrustedComponent.isTrusted(player);
 	}
 
+	public static boolean isBuilder(PlayerEntity player) {
+		return effectiveTag(player) == PlayerTag.BUILDER;
+	}
+
 	public static boolean canUseAdminCommands(ServerCommandSource source) {
 		return source.hasPermissionLevel(2) || isDev(source.getPlayer());
 	}
@@ -60,11 +70,20 @@ public final class GexpressPermissions {
 		return source.hasPermissionLevel(2) || isHostOrDev(source.getPlayer());
 	}
 
+	public static boolean canUseSetupCommands(ServerCommandSource source) {
+		ServerPlayerEntity player = source.getPlayer();
+		return canUseHostCommands(source) || isBuilder(player);
+	}
+
 	public static boolean canEditGameOptions(PlayerEntity player) {
 		if (player instanceof ServerPlayerEntity serverPlayer && serverPlayer.hasPermissionLevel(2)) {
 			return true;
 		}
 		return player != null && (player.hasPermissionLevel(2) || isHostOrDev(player));
+	}
+
+	public static boolean canEditSetupOptions(PlayerEntity player) {
+		return canEditGameOptions(player) || isBuilder(player);
 	}
 
 	public static boolean bypassesSupporterGates(PlayerEntity player) {
@@ -83,7 +102,8 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean hasBadge(PlayerEntity player) {
-		return isDev(player) || isTrusted(player) || HostComponent.isHost(player);
+		PlayerTag tag = effectiveTag(player);
+		return tag != null && tag != PlayerTag.PASSENGER;
 	}
 
 	public static MutableText displayName(PlayerEntity player) {
@@ -94,20 +114,54 @@ public final class GexpressPermissions {
 	}
 
 	private static Text badgeFor(PlayerEntity player) {
-		if (isDev(player)) return devBadge();
-		if (isTrusted(player)) return trustedBadge();
-		return hostBadge();
+		return tagBadge(effectiveTag(player));
+	}
+
+	public static PlayerTag effectiveTag(PlayerEntity player) {
+		if (player == null) return PlayerTag.PASSENGER;
+		return effectiveTag(player.getWorld(), player.getUuid(), player.getGameProfile().getName());
+	}
+
+	public static PlayerTag effectiveTag(World world, UUID uuid, String name) {
+		if (isDevUuid(uuid) || isDevName(name)) return PlayerTag.DEV;
+		if (world != null) {
+			HostComponent hosts = HostComponent.KEY.getNullable(world);
+			if (hosts != null && hosts.isHost(uuid)) return PlayerTag.HOST;
+			TrustedComponent trusted = TrustedComponent.KEY.getNullable(world);
+			if (trusted != null && trusted.isTrusted(uuid)) return PlayerTag.TRUSTED;
+			PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(world);
+			PlayerTag explicit = tags == null ? null : tags.getTag(uuid);
+			if (explicit != null) return explicit;
+		}
+		return PlayerTag.PASSENGER;
+	}
+
+	public static Text tagBadge(PlayerTag tag) {
+		if (tag == null) return passengerBadge();
+		return tag.text();
 	}
 
 	public static Text hostBadge() {
-		return Text.literal("Host").formatted(Formatting.BLUE);
+		return PlayerTag.HOST.text();
 	}
 
 	public static Text devBadge() {
-		return Text.literal("Dev").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(DEV_COLOR)));
+		return PlayerTag.DEV.text();
 	}
 
 	public static Text trustedBadge() {
-		return Text.literal("Trusted").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(TRUSTED_COLOR)));
+		return PlayerTag.TRUSTED.text();
+	}
+
+	public static Text passengerBadge() {
+		return PlayerTag.PASSENGER.text();
+	}
+
+	public static Text designerBadge() {
+		return PlayerTag.DESIGNER.text();
+	}
+
+	public static Text builderBadge() {
+		return PlayerTag.BUILDER.text();
 	}
 }

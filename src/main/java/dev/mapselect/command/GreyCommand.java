@@ -22,6 +22,7 @@ public class GreyCommand {
 			.then(CommandManager.literal("group")
 				.then(HostCommand.buildTree())
 				.then(TrustedCommand.buildTree())
+				.then(TagCommand.buildTree())
 				.then(VoiceCommand.buildTree()))
 			.then(CommandManager.literal("admin")
 				.then(DevCommand.buildTree())));

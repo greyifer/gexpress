@@ -117,6 +117,7 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.puppetmasterControlCooldownSeconds(),
 				payload.puppetmasterRandomTarget(),
 				payload.puppetmasterControlRange(),
+				payload.puppetmasterMaxUses(),
 				payload.pelicanEatCooldownSeconds(),
 				payload.pelicanEatPercentage(),
 				payload.hungryFoodLimit(),

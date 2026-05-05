@@ -1,6 +1,7 @@
 package dev.mapselect.role.puppetmaster;
 
 import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
@@ -59,6 +60,7 @@ public final class PuppetmasterManager {
 	private static final Map<UUID, ControlSession> sessionsByController = new HashMap<>();
 	private static final Map<UUID, UUID> controllerByTarget = new HashMap<>();
 	private static final Map<UUID, Long> cooldownUntilByController = new HashMap<>();
+	private static final Map<UUID, Integer> usesRemainingByController = new HashMap<>();
 	private static final Random RANDOM = new Random();
 
 	private PuppetmasterManager() {}
@@ -94,9 +96,16 @@ public final class PuppetmasterManager {
 			server.execute(() -> endForDisconnectedPlayer(handler.player, server)));
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
 			if (entity instanceof ServerPlayerEntity player) {
-				endForPlayer(player.getUuid(), player.getServer());
+				ControlSession controllerSession = sessionsByController.get(player.getUuid());
+				if (controllerSession != null) {
+					killControlledTargetForControllerHit(player, controllerSession);
+				} else {
+					endForPlayer(player.getUuid(), player.getServer());
+				}
 			}
 		});
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> resetRoundLimits());
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> resetRoundLimits());
 	}
 
 	private static void onUse(ServerPlayerEntity puppetmaster) {
@@ -110,6 +119,10 @@ public final class PuppetmasterManager {
 			AbilityCooldownSync.send(puppetmaster, AbilityCooldownPayload.PUPPETMASTER_CONTROL, cooldown,
 				(long) GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L, false);
 			puppetmaster.sendMessage(Text.literal("Puppetmaster cooldown: " + Math.ceil(cooldown / 20.0D) + "s."), true);
+			return;
+		}
+		if (remainingUses(puppetmaster) <= 0) {
+			puppetmaster.sendMessage(Text.literal("No controls left."), true);
 			return;
 		}
 		if (GexpressConfig.isPuppetmasterRandomTarget()) {
@@ -156,6 +169,10 @@ public final class PuppetmasterManager {
 			puppetmaster.sendMessage(Text.literal("That puppet is no longer available."), true);
 			return;
 		}
+		if (!consumeUse(puppetmaster)) {
+			puppetmaster.sendMessage(Text.literal("No controls left."), true);
+			return;
+		}
 
 		endControl(puppetmaster.getUuid(), server, false);
 		UUID oldController = controllerByTarget.get(target.getUuid());
@@ -194,6 +211,8 @@ public final class PuppetmasterManager {
 			SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.75F, 0.55F);
 		AbilityCooldownSync.send(puppetmaster, AbilityCooldownPayload.PUPPETMASTER_CONTROL, durationTicks, durationTicks, true);
 		puppetmaster.sendMessage(Text.literal("Pulling " + target.getName().getString() + "'s strings."), true);
+		puppetmaster.sendMessage(Text.literal("Controls left: " + remainingUses(puppetmaster) + "/"
+			+ GexpressConfig.getPuppetmasterMaxUses()), false);
 		target.sendMessage(Text.literal("You are being controlled."), true);
 	}
 
@@ -329,6 +348,19 @@ public final class PuppetmasterManager {
 		}
 		controllerByTarget.clear();
 		cooldownUntilByController.clear();
+		usesRemainingByController.clear();
+	}
+
+	public static TimeState snapshotForTimeRewind() {
+		return new TimeState(Map.copyOf(cooldownUntilByController), Map.copyOf(usesRemainingByController));
+	}
+
+	public static void restoreForTimeRewind(TimeState state) {
+		cooldownUntilByController.clear();
+		usesRemainingByController.clear();
+		if (state == null) return;
+		cooldownUntilByController.putAll(state.cooldownUntilByController());
+		usesRemainingByController.putAll(state.usesRemainingByController());
 	}
 
 	private static boolean allowDamage(ServerPlayerEntity player, DamageSource damageSource, float damageAmount) {
@@ -485,6 +517,29 @@ public final class PuppetmasterManager {
 		return remaining;
 	}
 
+	private static int remainingUses(ServerPlayerEntity player) {
+		if (player == null) return 0;
+		int maxUses = GexpressConfig.getPuppetmasterMaxUses();
+		Integer current = usesRemainingByController.get(player.getUuid());
+		if (current == null || current > maxUses) {
+			current = maxUses;
+			usesRemainingByController.put(player.getUuid(), current);
+		}
+		return current;
+	}
+
+	private static boolean consumeUse(ServerPlayerEntity player) {
+		if (player == null) return false;
+		int remaining = remainingUses(player);
+		if (remaining <= 0) return false;
+		usesRemainingByController.put(player.getUuid(), remaining - 1);
+		return true;
+	}
+
+	private static void resetRoundLimits() {
+		usesRemainingByController.clear();
+	}
+
 	private static boolean isActiveGame(World world) {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		return game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
@@ -633,5 +688,8 @@ public final class PuppetmasterManager {
 
 	private record PuppetInput(float sideways, float forward, boolean jumping, boolean sneaking, boolean sprinting,
 			boolean using, float yaw, float pitch, int selectedSlot) {}
+
+	public record TimeState(Map<UUID, Long> cooldownUntilByController,
+			Map<UUID, Integer> usesRemainingByController) {}
 
 }

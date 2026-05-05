@@ -30,6 +30,7 @@
 			"gexpress:map_weather",
 			"gexpress:hosts",
 			"gexpress:trusted",
+			"gexpress:player_tags",
 			"gexpress:c4_back",
 			"gexpress:medic_shield",
 			"gexpress:silent_shadow",

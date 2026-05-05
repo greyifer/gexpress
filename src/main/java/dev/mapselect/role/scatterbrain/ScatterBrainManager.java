@@ -115,10 +115,14 @@ public final class ScatterBrainManager {
 		if (currentMap != null && !currentMap.isBlank()) {
 			try {
 				MapPreset preset = PresetStorage.load(world.getServer(), currentMap);
-				if (preset != null && preset.randomSpawnPositions != null) {
-					for (MapPreset.PosData spawn : preset.randomSpawnPositions) {
-						points.add(new TargetPoint(spawn.x, spawn.z));
+				if (preset != null) {
+					if (preset.randomSpawnPositions != null) {
+						for (MapPreset.PosData spawn : preset.randomSpawnPositions) {
+							points.add(new TargetPoint(spawn.x, spawn.z));
+						}
 					}
+					if (points.isEmpty() && preset.playArea != null) addBoxPoints(points, preset.playArea.toBox(), 128);
+					if (points.isEmpty() && preset.wholeMapArea != null) addBoxPoints(points, preset.wholeMapArea.toBox(), 128);
 				}
 			} catch (IOException ignored) {
 			}
@@ -126,13 +130,34 @@ public final class ScatterBrainManager {
 		if (!points.isEmpty()) return points;
 
 		Box playArea = MapVariablesWorldComponent.KEY.get(world).getPlayArea();
-		if (playArea == null) return points;
-		for (int i = 0; i < 96; i++) {
-			double x = playArea.minX + RANDOM.nextDouble() * Math.max(1.0D, playArea.maxX - playArea.minX);
-			double z = playArea.minZ + RANDOM.nextDouble() * Math.max(1.0D, playArea.maxZ - playArea.minZ);
-			points.add(new TargetPoint(x, z));
+		if (playArea != null) {
+			addBoxPoints(points, playArea, 128);
+			return points;
+		}
+
+		for (ServerPlayerEntity player : world.getPlayers(GameFunctions::isPlayerAliveAndSurvival)) {
+			for (int i = 0; i < 16; i++) {
+				double angle = RANDOM.nextDouble() * Math.PI * 2.0D;
+				double distance = 8.0D + RANDOM.nextDouble() * 56.0D;
+				points.add(new TargetPoint(
+					player.getX() + Math.cos(angle) * distance,
+					player.getZ() + Math.sin(angle) * distance
+				));
+			}
 		}
 		return points;
+	}
+
+	private static void addBoxPoints(List<TargetPoint> points, Box area, int count) {
+		if (area == null) return;
+		double width = Math.max(1.0D, area.maxX - area.minX);
+		double depth = Math.max(1.0D, area.maxZ - area.minZ);
+		for (int i = 0; i < count; i++) {
+			points.add(new TargetPoint(
+				area.minX + RANDOM.nextDouble() * width,
+				area.minZ + RANDOM.nextDouble() * depth
+			));
+		}
 	}
 
 	private static Vec3d findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points) {

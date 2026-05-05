@@ -197,7 +197,7 @@ public final class GexpressPresetsSyncHandler {
 	}
 
 	private static boolean canEdit(ServerPlayerEntity player) {
-		return GexpressPermissions.canEditGameOptions(player);
+		return GexpressPermissions.canEditSetupOptions(player);
 	}
 
 	private static void sanitizePreset(MinecraftServer server, MapPreset preset) {
