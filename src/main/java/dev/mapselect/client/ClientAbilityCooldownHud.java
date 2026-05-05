@@ -183,8 +183,13 @@ public final class ClientAbilityCooldownHud {
 			bars.add(syncedOrReady(AbilityCooldownPayload.SKINCRAWLER_STEAL, ICON_MASQUERADE,
 				GexpressConfig.getSkincrawlerCooldownSeconds() * 20L, 0xFFB05A66, 0xFF4D161D));
 		} else if (MapSelectRoles.SPY_ID.equals(roleId)) {
-			bars.add(cooldown(ICON_TRACKER, 0L, 1L, 0xFF77C7FF, 0xFF234F7A,
-				GexpressConfig.getSpyBugCost() + "g"));
+			long active = ClientSpyState.activeRemainingTicks();
+			if (active > 0L) {
+				bars.add(draining(ICON_TRACKER, active, GexpressConfig.getSpyBugDurationSeconds() * 20L,
+					0xFF77C7FF, 0xFF234F7A));
+			} else {
+				bars.add(cooldown(ICON_TRACKER, 0L, 1L, 0xFF77C7FF, 0xFF234F7A));
+			}
 		} else if (MapSelectRoles.VULTURE_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PELICAN_SWALLOW, ICON_PELICAN_SWALLOW,
 				GexpressConfig.getPelicanEatCooldownSeconds() * 20L, 0xFFC5DF5C, 0xFF607421));

@@ -17,12 +17,14 @@ public final class MapSelectItems {
 	public static final C4DetonatorItem C4_DETONATOR = new C4DetonatorItem(new Item.Settings().maxCount(1));
 	public static final PliersItem PLIERS = new PliersItem(new Item.Settings().maxCount(1));
 	public static final BulletItem BULLET = new BulletItem(new Item.Settings().maxCount(3));
+	public static final Item SPY_BUG = new Item(new Item.Settings().maxCount(1));
 
 	public static void register() {
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "c4"), C4);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "c4_detonator"), C4_DETONATOR);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "pliers"), PLIERS);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "bullet"), BULLET);
+		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "spy_bug"), SPY_BUG);
 
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(entries -> entries.add(C4));
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(entries -> entries.add(C4_DETONATOR));

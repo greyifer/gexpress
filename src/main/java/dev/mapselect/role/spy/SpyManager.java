@@ -8,6 +8,7 @@ import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.SpyFeedPayload;
+import dev.mapselect.network.SpyStatusPayload;
 import dev.mapselect.network.SpyUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.vulture.VultureManager;
@@ -33,7 +34,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class SpyManager {
-	private static final double LOOK_RADIUS_SQUARED = 1.2D;
 	private static final Map<UUID, Bug> bugsBySpy = new ConcurrentHashMap<>();
 	private static final Map<String, Long> nextLineTick = new ConcurrentHashMap<>();
 	private static int tickGate;
@@ -43,6 +43,7 @@ public final class SpyManager {
 	public static void register() {
 		PayloadTypeRegistry.playC2S().register(SpyUsePayload.ID, SpyUsePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(SpyFeedPayload.ID, SpyFeedPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SpyStatusPayload.ID, SpyStatusPayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(SpyUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryBug(context.player())));
 		ServerTickEvents.END_WORLD_TICK.register(SpyManager::tick);
@@ -52,14 +53,20 @@ public final class SpyManager {
 			}
 			return ActionResult.PASS;
 		});
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clear());
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear());
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clear(world));
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear(world));
 	}
 
 	private static void tryBug(ServerPlayerEntity spy) {
 		if (spy == null || !(spy.getWorld() instanceof ServerWorld world)) return;
 		if (VultureManager.isStashed(spy) || !isSpy(spy) || !canUseHere(world, spy)
 				|| !GameFunctions.isPlayerAliveAndSurvival(spy)) return;
+		Bug activeBug = bugsBySpy.get(spy.getUuid());
+		if (activeBug != null && activeBug.expiresAtTick() > world.getTime()) {
+			sendStatus(spy, activeBug, world.getTime());
+			spy.sendMessage(Text.literal("Your current bug is still active."), true);
+			return;
+		}
 		ServerPlayerEntity target = findTarget(spy);
 		if (target == null) {
 			spy.sendMessage(Text.literal("No living player close enough to bug."), true);
@@ -76,7 +83,10 @@ public final class SpyManager {
 			PlayerShopComponent.KEY.sync(spy);
 		}
 		long expires = world.getTime() + (long) GexpressConfig.getSpyBugDurationSeconds() * 20L;
-		bugsBySpy.put(spy.getUuid(), new Bug(target.getUuid(), expires, target.getName().getString()));
+		Bug bug = new Bug(target.getUuid(), expires, target.getName().getString());
+		bugsBySpy.put(spy.getUuid(), bug);
+		syncVisuals(world);
+		sendStatus(spy, bug, world.getTime());
 		send(spy, "Bug planted on " + target.getName().getString() + ".");
 	}
 
@@ -97,6 +107,8 @@ public final class SpyManager {
 				iterator.remove();
 			}
 		}
+		syncVisuals(world);
+		syncStatuses(world);
 		nextLineTick.entrySet().removeIf(entry -> entry.getValue() <= now - 20L * 10L);
 	}
 
@@ -136,17 +148,17 @@ public final class SpyManager {
 		double range = GexpressConfig.getSpyBugRange();
 		Vec3d eye = spy.getEyePos();
 		Vec3d look = spy.getRotationVec(1.0F).normalize();
+		Vec3d end = eye.add(look.multiply(range));
 		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
+		double bestDistanceSq = Double.MAX_VALUE;
 		for (ServerPlayerEntity candidate : spy.getServerWorld().getPlayers()) {
 			if (candidate == spy || VultureManager.isStashed(candidate) || !isPlayable(candidate, spy)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > range || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > LOOK_RADIUS_SQUARED || !spy.canSee(candidate)) continue;
+			var hit = candidate.getBoundingBox().expand(0.25D).raycast(eye, end);
+			if (hit.isEmpty() || !spy.canSee(candidate)) continue;
+			double distanceSq = eye.squaredDistanceTo(hit.get());
+			if (distanceSq >= bestDistanceSq) continue;
 			best = candidate;
-			bestAlong = along;
+			bestDistanceSq = distanceSq;
 		}
 		return best;
 	}
@@ -155,6 +167,22 @@ public final class SpyManager {
 		if (spy != null && ServerPlayNetworking.canSend(spy, SpyFeedPayload.ID)) {
 			ServerPlayNetworking.send(spy, new SpyFeedPayload(line));
 		}
+	}
+
+	private static void syncStatuses(ServerWorld world) {
+		long now = world.getTime();
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			if (!isSpy(player)) continue;
+			Bug bug = bugsBySpy.get(player.getUuid());
+			sendStatus(player, bug, now);
+		}
+	}
+
+	private static void sendStatus(ServerPlayerEntity spy, Bug bug, long now) {
+		if (spy == null || !ServerPlayNetworking.canSend(spy, SpyStatusPayload.ID)) return;
+		int remaining = bug == null ? 0 : (int) Math.max(0L, bug.expiresAtTick() - now);
+		String targetName = remaining > 0 ? bug.targetName() : "";
+		ServerPlayNetworking.send(spy, new SpyStatusPayload(remaining, targetName));
 	}
 
 	private static boolean isSpy(PlayerEntity player) {
@@ -177,6 +205,26 @@ public final class SpyManager {
 		bugsBySpy.clear();
 		nextLineTick.clear();
 		tickGate = 0;
+	}
+
+	private static void clear(World world) {
+		clear();
+		if (world instanceof ServerWorld serverWorld) {
+			SpyBugComponent.KEY.get(serverWorld).clearAll();
+			for (ServerPlayerEntity player : serverWorld.getPlayers()) {
+				sendStatus(player, null, serverWorld.getTime());
+			}
+		}
+	}
+
+	private static void syncVisuals(ServerWorld world) {
+		Map<UUID, Long> targets = new LinkedHashMap<>();
+		long now = world.getTime();
+		for (Bug bug : bugsBySpy.values()) {
+			if (bug == null || bug.expiresAtTick() <= now) continue;
+			targets.merge(bug.targetId(), bug.expiresAtTick(), Math::max);
+		}
+		SpyBugComponent.KEY.get(world).replaceAll(targets);
 	}
 
 	public static TimeState snapshotForTimeRewind() {

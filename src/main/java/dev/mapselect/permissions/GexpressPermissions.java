@@ -26,8 +26,6 @@ public final class GexpressPermissions {
 	public static final int TRUSTED_COLOR = 0xF2C94C;
 	public static final int STAFF_COLOR = 0x79B9A9;
 	public static final int PASSENGER_COLOR = 0x3C8AC9;
-	public static final int DESIGNER_COLOR = 0x781419;
-	public static final int BUILDER_COLOR = 0xFC552B;
 
 	private GexpressPermissions() {}
 
@@ -62,7 +60,7 @@ public final class GexpressPermissions {
 
 	public static boolean isBuilder(PlayerEntity player) {
 		PlayerTag tag = effectiveTag(player);
-		return tag == PlayerTag.BUILDER || tag == PlayerTag.OWNER || tag == PlayerTag.DEV || tag == PlayerTag.STAFF;
+		return tag == PlayerTag.OWNER || tag == PlayerTag.DEV || tag == PlayerTag.STAFF;
 	}
 
 	public static boolean isStaff(PlayerEntity player) {
@@ -176,14 +174,6 @@ public final class GexpressPermissions {
 
 	public static Text passengerBadge() {
 		return PlayerTag.PASSENGER.text();
-	}
-
-	public static Text designerBadge() {
-		return PlayerTag.DESIGNER.text();
-	}
-
-	public static Text builderBadge() {
-		return PlayerTag.BUILDER.text();
 	}
 
 	public static Text ownerBadge() {

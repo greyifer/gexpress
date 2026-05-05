@@ -1,3 +1,22 @@
+# Grey's Express 1.3.6
+
+## Added
+
+- Added the visible Spy Bug model on bugged players, with Dev-tab transform controls for sizing and placement.
+- Added live Spy bug status syncing so the Spy HUD can show the active bug timer.
+
+## Changed
+
+- Removed the Builder and Designer tags from player tags, tag commands, and the Players tab.
+- The map preset editor now exposes multiple Fresh Air areas directly, with each row including its sanity reward percentage.
+- Spy bug planting now targets the player directly under your crosshair instead of nearby players in a loose cone.
+- Spy can only keep one active bug at a time.
+
+## Fixed
+
+- Spy now shows their coin balance on screen with the coin icon.
+- Spy ability bars no longer show the bug cost beside the cooldown bar; active bugs now display a timer instead.
+
 # Grey's Express 1.3.5
 
 ## Added

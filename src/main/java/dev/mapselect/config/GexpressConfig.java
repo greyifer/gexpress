@@ -180,6 +180,15 @@ public final class GexpressConfig {
 	public static float c4BackRotationZ = 0.0F;
 	public static float c4BackSlant = 0.0F;
 	public static float c4BackScale = 0.42F;
+	/** Synced Spy bug model tuning. */
+	public static float spyBugOffsetX = 0.0F;
+	public static float spyBugOffsetY = 0.16F;
+	public static float spyBugOffsetZ = 0.31F;
+	public static float spyBugRotationX = 0.0F;
+	public static float spyBugRotationY = 0.0F;
+	public static float spyBugRotationZ = 0.0F;
+	public static float spyBugSlant = 0.0F;
+	public static float spyBugScale = 0.28F;
 	public static List<String> c4PlacementPresets = new ArrayList<>();
 	/** Per-role guidebook description overrides, keyed by role path (for example bomb_specialist). */
 	public static Map<String, String> roleDescriptionOverrides = new LinkedHashMap<>();
@@ -748,6 +757,51 @@ public final class GexpressConfig {
 		return clampFloat(c4BackScale, C4_BACK_SCALE_MIN, C4_BACK_SCALE_MAX, 0.42F);
 	}
 
+	public static float getSpyBugOffsetX() {
+		return clampFloat(spyBugOffsetX, C4_BACK_OFFSET_MIN, C4_BACK_OFFSET_MAX, 0.0F);
+	}
+
+	public static float getSpyBugOffsetY() {
+		return clampFloat(spyBugOffsetY, C4_BACK_OFFSET_MIN, C4_BACK_OFFSET_MAX, 0.16F);
+	}
+
+	public static float getSpyBugOffsetZ() {
+		return clampFloat(spyBugOffsetZ, C4_BACK_OFFSET_MIN, C4_BACK_OFFSET_MAX, 0.31F);
+	}
+
+	public static float getSpyBugRotationX() {
+		return clampFloat(spyBugRotationX, C4_BACK_ROTATION_MIN, C4_BACK_ROTATION_MAX, 0.0F);
+	}
+
+	public static float getSpyBugRotationY() {
+		return clampFloat(spyBugRotationY, C4_BACK_ROTATION_MIN, C4_BACK_ROTATION_MAX, 0.0F);
+	}
+
+	public static float getSpyBugRotationZ() {
+		return clampFloat(spyBugRotationZ, C4_BACK_ROTATION_MIN, C4_BACK_ROTATION_MAX, 0.0F);
+	}
+
+	public static float getSpyBugSlant() {
+		return clampFloat(spyBugSlant, C4_BACK_ROTATION_MIN, C4_BACK_ROTATION_MAX, 0.0F);
+	}
+
+	public static float getSpyBugScale() {
+		return clampFloat(spyBugScale, C4_BACK_SCALE_MIN, C4_BACK_SCALE_MAX, 0.28F);
+	}
+
+	public static C4PlacementPreset getSpyBugPlacementPreset() {
+		return new C4PlacementPreset(
+			getSpyBugOffsetX(),
+			getSpyBugOffsetY(),
+			getSpyBugOffsetZ(),
+			getSpyBugRotationX(),
+			getSpyBugRotationY(),
+			getSpyBugRotationZ(),
+			getSpyBugSlant(),
+			getSpyBugScale()
+		);
+	}
+
 	public static String getCurrentC4PlacementPresetString() {
 		return currentC4PlacementPreset().toConfigString();
 	}
@@ -969,6 +1023,14 @@ public final class GexpressConfig {
 			c4BackRotationZ = snap.c4BackRotationZ;
 			c4BackSlant = snap.c4BackSlant;
 			c4BackScale = snap.c4BackScale;
+			spyBugOffsetX = snap.spyBugOffsetX;
+			spyBugOffsetY = snap.spyBugOffsetY;
+			spyBugOffsetZ = snap.spyBugOffsetZ;
+			spyBugRotationX = snap.spyBugRotationX;
+			spyBugRotationY = snap.spyBugRotationY;
+			spyBugRotationZ = snap.spyBugRotationZ;
+			spyBugSlant = snap.spyBugSlant;
+			spyBugScale = snap.spyBugScale;
 			c4PlacementPresets = normalizeC4PresetStrings(snap.c4PlacementPresets, false);
 			roleDescriptionOverrides = normalizeRoleDescriptionOverrides(snap.roleDescriptionOverrides);
 			shortSightedFogRange = snap.shortSightedFogRange;
@@ -1076,6 +1138,14 @@ public final class GexpressConfig {
 			snap.c4BackRotationZ = c4BackRotationZ;
 			snap.c4BackSlant = c4BackSlant;
 			snap.c4BackScale = c4BackScale;
+			snap.spyBugOffsetX = spyBugOffsetX;
+			snap.spyBugOffsetY = spyBugOffsetY;
+			snap.spyBugOffsetZ = spyBugOffsetZ;
+			snap.spyBugRotationX = spyBugRotationX;
+			snap.spyBugRotationY = spyBugRotationY;
+			snap.spyBugRotationZ = spyBugRotationZ;
+			snap.spyBugSlant = spyBugSlant;
+			snap.spyBugScale = spyBugScale;
 			snap.c4PlacementPresets = normalizeC4PresetStrings(c4PlacementPresets, false);
 			snap.roleDescriptionOverrides = normalizeRoleDescriptionOverrides(roleDescriptionOverrides);
 			snap.shortSightedFogRange = shortSightedFogRange;
@@ -1127,7 +1197,10 @@ public final class GexpressConfig {
 			int maxKillerAmount, int maxVigilanteAmount, int playersPerKiller, int playersPerVigilante,
 			float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 			float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
-			float c4BackSlant, float c4BackScale, String c4PlacementPresets,
+			float c4BackSlant, float c4BackScale,
+			float spyBugOffsetX, float spyBugOffsetY, float spyBugOffsetZ,
+			float spyBugRotationX, float spyBugRotationY, float spyBugRotationZ,
+			float spyBugSlant, float spyBugScale, String c4PlacementPresets,
 			String roleDescriptionOverrides,
 			float shortSightedFogRange,
 			int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
@@ -1217,6 +1290,14 @@ public final class GexpressConfig {
 		GexpressConfig.c4BackRotationZ = c4BackRotationZ;
 		GexpressConfig.c4BackSlant = c4BackSlant;
 		GexpressConfig.c4BackScale = c4BackScale;
+		GexpressConfig.spyBugOffsetX = spyBugOffsetX;
+		GexpressConfig.spyBugOffsetY = spyBugOffsetY;
+		GexpressConfig.spyBugOffsetZ = spyBugOffsetZ;
+		GexpressConfig.spyBugRotationX = spyBugRotationX;
+		GexpressConfig.spyBugRotationY = spyBugRotationY;
+		GexpressConfig.spyBugRotationZ = spyBugRotationZ;
+		GexpressConfig.spyBugSlant = spyBugSlant;
+		GexpressConfig.spyBugScale = spyBugScale;
 		GexpressConfig.setC4PlacementPresetsSyncString(c4PlacementPresets);
 		GexpressConfig.setRoleDescriptionOverridesSyncString(roleDescriptionOverrides);
 		GexpressConfig.shortSightedFogRange = shortSightedFogRange;
@@ -1309,6 +1390,14 @@ public final class GexpressConfig {
 		c4BackRotationZ = getC4BackRotationZ();
 		c4BackSlant = getC4BackSlant();
 		c4BackScale = getC4BackScale();
+		spyBugOffsetX = getSpyBugOffsetX();
+		spyBugOffsetY = getSpyBugOffsetY();
+		spyBugOffsetZ = getSpyBugOffsetZ();
+		spyBugRotationX = getSpyBugRotationX();
+		spyBugRotationY = getSpyBugRotationY();
+		spyBugRotationZ = getSpyBugRotationZ();
+		spyBugSlant = getSpyBugSlant();
+		spyBugScale = getSpyBugScale();
 		shortSightedFogRange = getShortSightedFogRange();
 		medicShieldBlockFlashTicks = getMedicShieldBlockFlashTicks();
 		medicShieldBreakFlashTicks = getMedicShieldBreakFlashTicks();
@@ -1464,6 +1553,14 @@ public final class GexpressConfig {
 		float c4BackRotationZ = 0.0F;
 		float c4BackSlant = 0.0F;
 		float c4BackScale = 0.42F;
+		float spyBugOffsetX = 0.0F;
+		float spyBugOffsetY = 0.16F;
+		float spyBugOffsetZ = 0.31F;
+		float spyBugRotationX = 0.0F;
+		float spyBugRotationY = 0.0F;
+		float spyBugRotationZ = 0.0F;
+		float spyBugSlant = 0.0F;
+		float spyBugScale = 0.28F;
 		List<String> c4PlacementPresets = new ArrayList<>();
 		Map<String, String> roleDescriptionOverrides = new LinkedHashMap<>();
 		float shortSightedFogRange = 5.0F;

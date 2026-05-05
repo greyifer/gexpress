@@ -58,7 +58,7 @@ public final class GexpressMapPresetsCategory {
 		areas.option(boxOption("readyArea", () -> edit.readyArea, v -> edit.readyArea = v));
 		areas.option(boxOption("playArea", () -> edit.playArea, v -> edit.playArea = v));
 		areas.option(boxOption("resetTemplateArea", () -> edit.resetTemplateArea, v -> edit.resetTemplateArea = v));
-		areas.option(boxOption("freshAirArea", () -> edit.freshAirArea, v -> edit.freshAirArea = v));
+		areas.option(freshAirAreasOption(edit));
 		category.group(areas.build());
 
 		OptionGroup.Builder positions = OptionGroup.createBuilder()
@@ -181,6 +181,7 @@ public final class GexpressMapPresetsCategory {
 		copy.readyArea = cloneBox(src.readyArea);
 		copy.lobbyArea = cloneBox(src.lobbyArea);
 		copy.freshAirArea = cloneBox(src.freshAirArea);
+		copy.freshAirAreas = cloneFreshAirAreas(src);
 		copy.spectatorSpawnPos = clonePos(src.spectatorSpawnPos);
 		copy.readyAreaSpawnPos = clonePos(src.readyAreaSpawnPos);
 		copy.playAreaOffset = cloneOffset(src.playAreaOffset);
@@ -208,6 +209,32 @@ public final class GexpressMapPresetsCategory {
 		return d;
 	}
 
+	private static List<MapPreset.FreshAirAreaData> cloneFreshAirAreas(MapPreset src) {
+		List<MapPreset.FreshAirAreaData> out = new ArrayList<>();
+		if (src == null) return out;
+		if (src.freshAirAreas != null) {
+			for (MapPreset.FreshAirAreaData entry : src.freshAirAreas) {
+				MapPreset.FreshAirAreaData copy = cloneFreshAirArea(entry);
+				if (copy != null) out.add(copy);
+			}
+		}
+		if (out.isEmpty() && src.freshAirArea != null) {
+			MapPreset.FreshAirAreaData legacy = new MapPreset.FreshAirAreaData();
+			legacy.area = cloneBox(src.freshAirArea);
+			legacy.sanityPercent = 100;
+			out.add(legacy);
+		}
+		return out;
+	}
+
+	private static MapPreset.FreshAirAreaData cloneFreshAirArea(MapPreset.FreshAirAreaData entry) {
+		if (entry == null || entry.area == null) return null;
+		MapPreset.FreshAirAreaData copy = new MapPreset.FreshAirAreaData();
+		copy.area = cloneBox(entry.area);
+		copy.sanityPercent = clampPercent(entry.sanityPercent);
+		return copy;
+	}
+
 	private static MapPreset.PosData clonePos(MapPreset.PosData p) {
 		if (p == null) return null;
 		MapPreset.PosData d = new MapPreset.PosData();
@@ -227,6 +254,38 @@ public final class GexpressMapPresetsCategory {
 		if (p.weather == null) p.weather = WeatherType.NONE;
 		p.roomCount = MapPreset.normalizeRoomCount(p.roomCount);
 		if (p.randomSpawnPositions == null) p.randomSpawnPositions = new ArrayList<>();
+		if (p.freshAirAreas == null) p.freshAirAreas = new ArrayList<>();
+	}
+
+	private static ListOption<String> freshAirAreasOption(MapPreset edit) {
+		return ListOption.<String>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.map.freshAirAreas").formatted(Formatting.YELLOW))
+			.description(OptionDescription.of(
+				Text.translatable("gui.gexpress.config.group.map.freshAirAreas.tooltip").formatted(Formatting.GRAY)))
+			.binding(
+				List.of(),
+				() -> {
+					List<String> rows = new ArrayList<>();
+					if (edit.freshAirAreas != null) {
+						for (MapPreset.FreshAirAreaData entry : edit.freshAirAreas) {
+							if (entry != null && entry.area != null) rows.add(freshAirAreaToString(entry));
+						}
+					}
+					return rows;
+				},
+				rows -> {
+					List<MapPreset.FreshAirAreaData> parsed = new ArrayList<>();
+					for (String row : rows) {
+						MapPreset.FreshAirAreaData entry = parseFreshAirArea(row);
+						if (entry != null) parsed.add(entry);
+					}
+					edit.freshAirAreas = parsed;
+					edit.freshAirArea = parsed.isEmpty() ? null : parsed.getFirst().area;
+				})
+			.controller(StringControllerBuilder::create)
+			.initial(() -> "0 0 0 0 0 0 100")
+			.collapsed(false)
+			.build();
 	}
 
 	private static Option<String> boxOption(String key, Supplier<MapPreset.BoxData> getter, Consumer<MapPreset.BoxData> setter) {
@@ -269,6 +328,28 @@ public final class GexpressMapPresetsCategory {
 		if (b == null) return "0 0 0 0 0 0";
 		return fmt(b.minX) + " " + fmt(b.minY) + " " + fmt(b.minZ) + " "
 			+ fmt(b.maxX) + " " + fmt(b.maxY) + " " + fmt(b.maxZ);
+	}
+
+	private static String freshAirAreaToString(MapPreset.FreshAirAreaData entry) {
+		if (entry == null || entry.area == null) return "0 0 0 0 0 0 100";
+		return boxToString(entry.area) + " " + clampPercent(entry.sanityPercent);
+	}
+
+	private static MapPreset.FreshAirAreaData parseFreshAirArea(String s) {
+		if (s == null) return null;
+		String[] parts = s.trim().split("\\s+");
+		if (parts.length != 7) return null;
+		MapPreset.BoxData box = parseBox(String.join(" ",
+			parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]));
+		if (box == null) return null;
+		try {
+			MapPreset.FreshAirAreaData entry = new MapPreset.FreshAirAreaData();
+			entry.area = box;
+			entry.sanityPercent = clampPercent(Integer.parseInt(parts[6]));
+			return entry;
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	private static MapPreset.BoxData parseBox(String s) {
@@ -384,6 +465,10 @@ public final class GexpressMapPresetsCategory {
 		String s = new BigDecimal(Float.toString(v)).setScale(2, RoundingMode.DOWN).toPlainString();
 		s = s.replaceAll("0+$", "").replaceAll("\\.$", "");
 		return s;
+	}
+
+	private static int clampPercent(int percent) {
+		return Math.max(0, Math.min(100, percent));
 	}
 
 	private static Text fieldLabel(String key) {

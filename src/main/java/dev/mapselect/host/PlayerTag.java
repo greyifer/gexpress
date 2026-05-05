@@ -13,8 +13,6 @@ public enum PlayerTag {
 	HOST("host", "Host", 0x559CFF, true),
 	TRUSTED("trusted", "Trusted", 0xF2C94C, true),
 	STAFF("staff", "Staff", 0x79B9A9, true),
-	DESIGNER("designer", "Designer", 0x781419, true),
-	BUILDER("builder", "Builder", 0xFC552B, true),
 	DEV("dev", "Dev", 0xCBFF2E, false);
 
 	private final String id;

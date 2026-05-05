@@ -27,6 +27,7 @@ public final class GexpressDevCategory {
 			.name(Text.translatable("gui.gexpress.config.category.dev"))
 			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
 			.group(c4BackModelGroup())
+			.group(spyBugModelGroup())
 			.group(c4PlacementPresetsOption())
 			.group(roleDescriptionsGroup())
 			.group(shortSightedGroup())
@@ -70,6 +71,30 @@ public final class GexpressDevCategory {
 			.controller(StringControllerBuilder::create)
 			.initial(GexpressConfig::getCurrentC4PlacementPresetString)
 			.collapsed(false)
+			.build();
+	}
+
+	private static OptionGroup spyBugModelGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.spy_bug_model"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.spy_bug_model.tooltip")))
+			.collapsed(false)
+			.option(floatOption("spy_bug_offset_x", 0.0F, GexpressConfig::getSpyBugOffsetX,
+				v -> GexpressConfig.spyBugOffsetX = v, GexpressConfig.C4_BACK_OFFSET_MIN, GexpressConfig.C4_BACK_OFFSET_MAX))
+			.option(floatOption("spy_bug_offset_y", 0.16F, GexpressConfig::getSpyBugOffsetY,
+				v -> GexpressConfig.spyBugOffsetY = v, GexpressConfig.C4_BACK_OFFSET_MIN, GexpressConfig.C4_BACK_OFFSET_MAX))
+			.option(floatOption("spy_bug_offset_z", 0.31F, GexpressConfig::getSpyBugOffsetZ,
+				v -> GexpressConfig.spyBugOffsetZ = v, GexpressConfig.C4_BACK_OFFSET_MIN, GexpressConfig.C4_BACK_OFFSET_MAX))
+			.option(floatOption("spy_bug_rotation_x", 0.0F, GexpressConfig::getSpyBugRotationX,
+				v -> GexpressConfig.spyBugRotationX = v, GexpressConfig.C4_BACK_ROTATION_MIN, GexpressConfig.C4_BACK_ROTATION_MAX))
+			.option(floatOption("spy_bug_rotation_y", 0.0F, GexpressConfig::getSpyBugRotationY,
+				v -> GexpressConfig.spyBugRotationY = v, GexpressConfig.C4_BACK_ROTATION_MIN, GexpressConfig.C4_BACK_ROTATION_MAX))
+			.option(floatOption("spy_bug_rotation_z", 0.0F, GexpressConfig::getSpyBugRotationZ,
+				v -> GexpressConfig.spyBugRotationZ = v, GexpressConfig.C4_BACK_ROTATION_MIN, GexpressConfig.C4_BACK_ROTATION_MAX))
+			.option(floatOption("spy_bug_slant", 0.0F, GexpressConfig::getSpyBugSlant,
+				v -> GexpressConfig.spyBugSlant = v, GexpressConfig.C4_BACK_ROTATION_MIN, GexpressConfig.C4_BACK_ROTATION_MAX))
+			.option(floatOption("spy_bug_scale", 0.28F, GexpressConfig::getSpyBugScale,
+				v -> GexpressConfig.spyBugScale = v, GexpressConfig.C4_BACK_SCALE_MIN, GexpressConfig.C4_BACK_SCALE_MAX))
 			.build();
 	}
 

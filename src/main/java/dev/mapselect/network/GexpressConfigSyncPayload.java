@@ -40,7 +40,10 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int playersPerKiller, int playersPerVigilante,
 		float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 		float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
-		float c4BackSlant, float c4BackScale, String c4PlacementPresets,
+		float c4BackSlant, float c4BackScale,
+		float spyBugOffsetX, float spyBugOffsetY, float spyBugOffsetZ,
+		float spyBugRotationX, float spyBugRotationY, float spyBugRotationZ,
+		float spyBugSlant, float spyBugScale, String c4PlacementPresets,
 		String roleDescriptionOverrides,
 		float shortSightedFogRange,
 		int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
@@ -136,6 +139,14 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeFloat(payload.c4BackRotationZ());
 			buf.writeFloat(payload.c4BackSlant());
 			buf.writeFloat(payload.c4BackScale());
+			buf.writeFloat(payload.spyBugOffsetX());
+			buf.writeFloat(payload.spyBugOffsetY());
+			buf.writeFloat(payload.spyBugOffsetZ());
+			buf.writeFloat(payload.spyBugRotationX());
+			buf.writeFloat(payload.spyBugRotationY());
+			buf.writeFloat(payload.spyBugRotationZ());
+			buf.writeFloat(payload.spyBugSlant());
+			buf.writeFloat(payload.spyBugScale());
 			buf.writeString(payload.c4PlacementPresets());
 			buf.writeString(payload.roleDescriptionOverrides());
 			buf.writeFloat(payload.shortSightedFogRange());
@@ -230,6 +241,14 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readFloat(), // c4BackRotationZ
 			buf.readFloat(), // c4BackSlant
 			buf.readFloat(), // c4BackScale
+			buf.readFloat(), // spyBugOffsetX
+			buf.readFloat(), // spyBugOffsetY
+			buf.readFloat(), // spyBugOffsetZ
+			buf.readFloat(), // spyBugRotationX
+			buf.readFloat(), // spyBugRotationY
+			buf.readFloat(), // spyBugRotationZ
+			buf.readFloat(), // spyBugSlant
+			buf.readFloat(), // spyBugScale
 			buf.readString(), // c4PlacementPresets
 			buf.readString(), // roleDescriptionOverrides
 			buf.readFloat(), // shortSightedFogRange

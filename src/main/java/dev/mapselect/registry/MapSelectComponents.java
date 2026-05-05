@@ -6,6 +6,7 @@ import dev.mapselect.host.TrustedComponent;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.medic.MedicShieldComponent;
 import dev.mapselect.role.silent.SilentShadowComponent;
+import dev.mapselect.role.spy.SpyBugComponent;
 import dev.mapselect.role.timemaster.TimeMasterComponent;
 import dev.mapselect.role.warlock.WarlockComponent;
 import dev.mapselect.voice.VoiceMuteState;
@@ -21,6 +22,7 @@ public class MapSelectComponents implements WorldComponentInitializer {
 		registry.register(TrustedComponent.KEY, TrustedComponent::new);
 		registry.register(PlayerTagComponent.KEY, PlayerTagComponent::new);
 		registry.register(C4BackComponent.KEY, C4BackComponent::new);
+		registry.register(SpyBugComponent.KEY, SpyBugComponent::new);
 		registry.register(MedicShieldComponent.KEY, MedicShieldComponent::new);
 		registry.register(SilentShadowComponent.KEY, SilentShadowComponent::new);
 		registry.register(WarlockComponent.KEY, WarlockComponent::new);

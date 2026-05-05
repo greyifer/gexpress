@@ -74,6 +74,7 @@ public class MapSelectClient implements ClientModInitializer {
 				FeatureRendererContext<AbstractClientPlayerEntity, PlayerEntityModel<AbstractClientPlayerEntity>> ctx =
 					(FeatureRendererContext<AbstractClientPlayerEntity, PlayerEntityModel<AbstractClientPlayerEntity>>) (FeatureRendererContext<?, ?>) per;
 				registrationHelper.register(new C4BackFeatureRenderer(ctx));
+				registrationHelper.register(new SpyBugFeatureRenderer(ctx));
 			}
 		});
 
@@ -180,6 +181,14 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.c4BackRotationZ(),
 				payload.c4BackSlant(),
 				payload.c4BackScale(),
+				payload.spyBugOffsetX(),
+				payload.spyBugOffsetY(),
+				payload.spyBugOffsetZ(),
+				payload.spyBugRotationX(),
+				payload.spyBugRotationY(),
+				payload.spyBugRotationZ(),
+				payload.spyBugSlant(),
+				payload.spyBugScale(),
 				payload.c4PlacementPresets(),
 				payload.roleDescriptionOverrides(),
 				payload.shortSightedFogRange(),
