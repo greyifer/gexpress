@@ -19,6 +19,8 @@ public record AbilityCooldownPayload(String key, int remainingTicks, int totalTi
 	public static final String GODFATHER_RECRUIT_MAFIOSO = "godfather_recruit_mafioso";
 	public static final String GODFATHER_RECRUIT_JANITOR = "godfather_recruit_janitor";
 	public static final String JANITOR_CLEAN = "janitor_clean";
+	public static final String SKINCRAWLER_STEAL = "skincrawler_steal";
+	public static final String SPY_BUG = "spy_bug";
 
 	public static final CustomPayload.Id<AbilityCooldownPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "ability_cooldown"));

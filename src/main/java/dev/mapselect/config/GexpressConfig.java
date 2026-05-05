@@ -119,6 +119,16 @@ public final class GexpressConfig {
 	public static int bountyHunterRewardGold = 200;
 	/** Weapon cooldown penalty in seconds when a Bounty Hunter misses their bounty window. */
 	public static int bountyHunterFailCooldownSeconds = 90;
+	public static int skincrawlerBodyMaxAgeSeconds = 90;
+	public static int skincrawlerCooldownSeconds = 90;
+	public static int skincrawlerStunSeconds = 5;
+	public static int skincrawlerRange = 4;
+	public static int spyBugCost = 100;
+	public static int spyBugDurationSeconds = 120;
+	public static int spyBugRange = 16;
+	public static int squeakerPitchPercent = 135;
+	public static int masqueradePitchMinPercent = 80;
+	public static int masqueradePitchMaxPercent = 145;
 	/** Coins paid by the Godfather for one Bullet. */
 	public static int godfatherBulletPrice = 75;
 	/** Bullets a Godfather starts with. */
@@ -275,6 +285,22 @@ public final class GexpressConfig {
 	public static final int BOUNTY_HUNTER_REWARD_GOLD_MAX = 9999;
 	public static final int BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MIN = 0;
 	public static final int BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MAX = 900;
+	public static final int SKINCRAWLER_BODY_MAX_AGE_SECONDS_MIN = 1;
+	public static final int SKINCRAWLER_BODY_MAX_AGE_SECONDS_MAX = 600;
+	public static final int SKINCRAWLER_COOLDOWN_SECONDS_MIN = 0;
+	public static final int SKINCRAWLER_COOLDOWN_SECONDS_MAX = 900;
+	public static final int SKINCRAWLER_STUN_SECONDS_MIN = 1;
+	public static final int SKINCRAWLER_STUN_SECONDS_MAX = 60;
+	public static final int SKINCRAWLER_RANGE_MIN = 1;
+	public static final int SKINCRAWLER_RANGE_MAX = 16;
+	public static final int SPY_BUG_COST_MIN = 0;
+	public static final int SPY_BUG_COST_MAX = 9999;
+	public static final int SPY_BUG_DURATION_SECONDS_MIN = 10;
+	public static final int SPY_BUG_DURATION_SECONDS_MAX = 900;
+	public static final int SPY_BUG_RANGE_MIN = 1;
+	public static final int SPY_BUG_RANGE_MAX = 64;
+	public static final int VOICE_PITCH_PERCENT_MIN = 50;
+	public static final int VOICE_PITCH_PERCENT_MAX = 200;
 	public static final int GODFATHER_BULLET_PRICE_MIN = 0;
 	public static final int GODFATHER_BULLET_PRICE_MAX = 9999;
 	public static final int GODFATHER_STARTING_BULLETS_MIN = 0;
@@ -544,6 +570,51 @@ public final class GexpressConfig {
 	public static int getBountyHunterFailCooldownSeconds() {
 		return Math.max(BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MIN,
 			Math.min(BOUNTY_HUNTER_FAIL_COOLDOWN_SECONDS_MAX, bountyHunterFailCooldownSeconds));
+	}
+
+	public static int getSkincrawlerBodyMaxAgeSeconds() {
+		return Math.max(SKINCRAWLER_BODY_MAX_AGE_SECONDS_MIN,
+			Math.min(SKINCRAWLER_BODY_MAX_AGE_SECONDS_MAX, skincrawlerBodyMaxAgeSeconds));
+	}
+
+	public static int getSkincrawlerCooldownSeconds() {
+		return Math.max(SKINCRAWLER_COOLDOWN_SECONDS_MIN,
+			Math.min(SKINCRAWLER_COOLDOWN_SECONDS_MAX, skincrawlerCooldownSeconds));
+	}
+
+	public static int getSkincrawlerStunSeconds() {
+		return Math.max(SKINCRAWLER_STUN_SECONDS_MIN,
+			Math.min(SKINCRAWLER_STUN_SECONDS_MAX, skincrawlerStunSeconds));
+	}
+
+	public static int getSkincrawlerRange() {
+		return Math.max(SKINCRAWLER_RANGE_MIN, Math.min(SKINCRAWLER_RANGE_MAX, skincrawlerRange));
+	}
+
+	public static int getSpyBugCost() {
+		return Math.max(SPY_BUG_COST_MIN, Math.min(SPY_BUG_COST_MAX, spyBugCost));
+	}
+
+	public static int getSpyBugDurationSeconds() {
+		return Math.max(SPY_BUG_DURATION_SECONDS_MIN,
+			Math.min(SPY_BUG_DURATION_SECONDS_MAX, spyBugDurationSeconds));
+	}
+
+	public static int getSpyBugRange() {
+		return Math.max(SPY_BUG_RANGE_MIN, Math.min(SPY_BUG_RANGE_MAX, spyBugRange));
+	}
+
+	public static int getSqueakerPitchPercent() {
+		return Math.max(VOICE_PITCH_PERCENT_MIN, Math.min(VOICE_PITCH_PERCENT_MAX, squeakerPitchPercent));
+	}
+
+	public static int getMasqueradePitchMinPercent() {
+		return Math.max(VOICE_PITCH_PERCENT_MIN, Math.min(VOICE_PITCH_PERCENT_MAX, masqueradePitchMinPercent));
+	}
+
+	public static int getMasqueradePitchMaxPercent() {
+		return Math.max(getMasqueradePitchMinPercent(),
+			Math.min(VOICE_PITCH_PERCENT_MAX, masqueradePitchMaxPercent));
 	}
 
 	public static int getGodfatherBulletPrice() {
@@ -859,6 +930,16 @@ public final class GexpressConfig {
 			bountyHunterBountyIntervalSeconds = snap.bountyHunterBountyIntervalSeconds;
 			bountyHunterRewardGold = snap.bountyHunterRewardGold;
 			bountyHunterFailCooldownSeconds = snap.bountyHunterFailCooldownSeconds;
+			skincrawlerBodyMaxAgeSeconds = snap.skincrawlerBodyMaxAgeSeconds;
+			skincrawlerCooldownSeconds = snap.skincrawlerCooldownSeconds;
+			skincrawlerStunSeconds = snap.skincrawlerStunSeconds;
+			skincrawlerRange = snap.skincrawlerRange;
+			spyBugCost = snap.spyBugCost;
+			spyBugDurationSeconds = snap.spyBugDurationSeconds;
+			spyBugRange = snap.spyBugRange;
+			squeakerPitchPercent = snap.squeakerPitchPercent;
+			masqueradePitchMinPercent = snap.masqueradePitchMinPercent;
+			masqueradePitchMaxPercent = snap.masqueradePitchMaxPercent;
 			godfatherBulletPrice = snap.godfatherBulletPrice;
 			godfatherStartingBullets = snap.godfatherStartingBullets;
 			godfatherMaxLoadedBullets = snap.godfatherMaxLoadedBullets;
@@ -956,6 +1037,16 @@ public final class GexpressConfig {
 			snap.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
 			snap.bountyHunterRewardGold = bountyHunterRewardGold;
 			snap.bountyHunterFailCooldownSeconds = bountyHunterFailCooldownSeconds;
+			snap.skincrawlerBodyMaxAgeSeconds = skincrawlerBodyMaxAgeSeconds;
+			snap.skincrawlerCooldownSeconds = skincrawlerCooldownSeconds;
+			snap.skincrawlerStunSeconds = skincrawlerStunSeconds;
+			snap.skincrawlerRange = skincrawlerRange;
+			snap.spyBugCost = spyBugCost;
+			snap.spyBugDurationSeconds = spyBugDurationSeconds;
+			snap.spyBugRange = spyBugRange;
+			snap.squeakerPitchPercent = squeakerPitchPercent;
+			snap.masqueradePitchMinPercent = masqueradePitchMinPercent;
+			snap.masqueradePitchMaxPercent = masqueradePitchMaxPercent;
 			snap.godfatherBulletPrice = godfatherBulletPrice;
 			snap.godfatherStartingBullets = godfatherStartingBullets;
 			snap.godfatherMaxLoadedBullets = godfatherMaxLoadedBullets;
@@ -1020,7 +1111,11 @@ public final class GexpressConfig {
 			int timeMasterFreezeDurationSeconds, int timeMasterFreezeCooldownSeconds,
 			int timeMasterFreezeMaxUses, int timeMasterFreezeRange,
 			int scatterBrainCooldownSeconds, int trackerMaxTargets,
-			int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
+			int trackerRange, int trackerCooldownSeconds, int altruistRange,
+			int skincrawlerBodyMaxAgeSeconds, int skincrawlerCooldownSeconds, int skincrawlerStunSeconds,
+			int skincrawlerRange, int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
+			int squeakerPitchPercent, int masqueradePitchMinPercent, int masqueradePitchMaxPercent,
+			boolean lastDeathShieldEnabled,
 			int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold,
 			int bountyHunterFailCooldownSeconds, int godfatherBulletPrice, int godfatherStartingBullets,
 			int godfatherMaxLoadedBullets, int mafiaStartingGold, int mafiaMinimumPlayers,
@@ -1080,6 +1175,16 @@ public final class GexpressConfig {
 		GexpressConfig.trackerRange = trackerRange;
 		GexpressConfig.trackerCooldownSeconds = trackerCooldownSeconds;
 		GexpressConfig.altruistRange = altruistRange;
+		GexpressConfig.skincrawlerBodyMaxAgeSeconds = skincrawlerBodyMaxAgeSeconds;
+		GexpressConfig.skincrawlerCooldownSeconds = skincrawlerCooldownSeconds;
+		GexpressConfig.skincrawlerStunSeconds = skincrawlerStunSeconds;
+		GexpressConfig.skincrawlerRange = skincrawlerRange;
+		GexpressConfig.spyBugCost = spyBugCost;
+		GexpressConfig.spyBugDurationSeconds = spyBugDurationSeconds;
+		GexpressConfig.spyBugRange = spyBugRange;
+		GexpressConfig.squeakerPitchPercent = squeakerPitchPercent;
+		GexpressConfig.masqueradePitchMinPercent = masqueradePitchMinPercent;
+		GexpressConfig.masqueradePitchMaxPercent = masqueradePitchMaxPercent;
 		GexpressConfig.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
 		GexpressConfig.bountyHunterRewardGold = bountyHunterRewardGold;
 		GexpressConfig.bountyHunterFailCooldownSeconds = bountyHunterFailCooldownSeconds;
@@ -1167,6 +1272,16 @@ public final class GexpressConfig {
 		bountyHunterBountyIntervalSeconds = getBountyHunterBountyIntervalSeconds();
 		bountyHunterRewardGold = getBountyHunterRewardGold();
 		bountyHunterFailCooldownSeconds = getBountyHunterFailCooldownSeconds();
+		skincrawlerBodyMaxAgeSeconds = getSkincrawlerBodyMaxAgeSeconds();
+		skincrawlerCooldownSeconds = getSkincrawlerCooldownSeconds();
+		skincrawlerStunSeconds = getSkincrawlerStunSeconds();
+		skincrawlerRange = getSkincrawlerRange();
+		spyBugCost = getSpyBugCost();
+		spyBugDurationSeconds = getSpyBugDurationSeconds();
+		spyBugRange = getSpyBugRange();
+		squeakerPitchPercent = getSqueakerPitchPercent();
+		masqueradePitchMinPercent = getMasqueradePitchMinPercent();
+		masqueradePitchMaxPercent = getMasqueradePitchMaxPercent();
 		godfatherBulletPrice = getGodfatherBulletPrice();
 		godfatherStartingBullets = getGodfatherStartingBullets();
 		godfatherMaxLoadedBullets = getGodfatherMaxLoadedBullets();
@@ -1310,6 +1425,16 @@ public final class GexpressConfig {
 		int bountyHunterBountyIntervalSeconds = 60;
 		int bountyHunterRewardGold = 200;
 		int bountyHunterFailCooldownSeconds = 90;
+		int skincrawlerBodyMaxAgeSeconds = 90;
+		int skincrawlerCooldownSeconds = 90;
+		int skincrawlerStunSeconds = 5;
+		int skincrawlerRange = 4;
+		int spyBugCost = 100;
+		int spyBugDurationSeconds = 120;
+		int spyBugRange = 16;
+		int squeakerPitchPercent = 135;
+		int masqueradePitchMinPercent = 80;
+		int masqueradePitchMaxPercent = 145;
 		int godfatherBulletPrice = 75;
 		int godfatherStartingBullets = 1;
 		int godfatherMaxLoadedBullets = 3;

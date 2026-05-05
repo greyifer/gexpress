@@ -17,6 +17,7 @@
 		"PassiveMoneyGraceMixin",
 		"PlayerCollisionMixin",
 		"PlayerEntityDisplayNameMixin",
+		"PlayerMoodTaskCompletionMixin",
 		"PuppetmasterControlledActionsMixin",
 		"PuppetmasterControlledMovementMixin",
 		"PuppetmasterPronounsManagerMixin",

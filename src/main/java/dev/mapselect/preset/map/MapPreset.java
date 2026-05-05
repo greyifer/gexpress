@@ -25,7 +25,9 @@ public class MapPreset {
 	public BoxData playArea;
 	public BoxData readyArea;
 	public BoxData lobbyArea;
+	/** Legacy single fresh-air area. Kept so existing presets keep loading. */
 	public BoxData freshAirArea;
+	public List<FreshAirAreaData> freshAirAreas = new ArrayList<>();
 	public PosData spectatorSpawnPos;
 	public PosData readyAreaSpawnPos;
 	public OffsetData playAreaOffset;
@@ -109,6 +111,8 @@ public class MapPreset {
 		readyArea = normalizeBox(readyArea);
 		lobbyArea = normalizeBox(lobbyArea);
 		freshAirArea = normalizeBox(freshAirArea);
+		freshAirAreas = normalizeFreshAirAreas(freshAirAreas, freshAirArea);
+		freshAirArea = freshAirAreas.isEmpty() ? freshAirArea : freshAirAreas.getFirst().area;
 		wholeMapArea = normalizeBox(wholeMapArea);
 		resetTemplateArea = normalizeBox(resetTemplateArea);
 		spectatorSpawnPos = normalizePos(spectatorSpawnPos);
@@ -196,6 +200,28 @@ public class MapPreset {
 		return Math.max(MIN_ROOM_COUNT, Math.min(MAX_ROOM_COUNT, value));
 	}
 
+	private static List<FreshAirAreaData> normalizeFreshAirAreas(List<FreshAirAreaData> areas, BoxData legacy) {
+		List<FreshAirAreaData> normalized = new ArrayList<>();
+		if (areas != null) {
+			for (FreshAirAreaData entry : areas) {
+				if (entry == null) continue;
+				BoxData area = normalizeBox(entry.area);
+				if (area == null) continue;
+				FreshAirAreaData out = new FreshAirAreaData();
+				out.area = area;
+				out.sanityPercent = Math.max(0, Math.min(100, entry.sanityPercent));
+				normalized.add(out);
+			}
+		}
+		if (normalized.isEmpty() && legacy != null) {
+			FreshAirAreaData out = new FreshAirAreaData();
+			out.area = legacy;
+			out.sanityPercent = 100;
+			normalized.add(out);
+		}
+		return normalized;
+	}
+
 	public static class PosData {
 		public double x, y, z;
 		public float yaw, pitch;
@@ -242,6 +268,11 @@ public class MapPreset {
 		public double sizeX() { return maxX - minX; }
 		public double sizeY() { return maxY - minY; }
 		public double sizeZ() { return maxZ - minZ; }
+	}
+
+	public static class FreshAirAreaData {
+		public BoxData area;
+		public int sanityPercent = 100;
 	}
 
 	public static class OffsetData {

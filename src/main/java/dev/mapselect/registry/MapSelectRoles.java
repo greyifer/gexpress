@@ -18,10 +18,12 @@ public final class MapSelectRoles {
 	public static final Identifier TRICKSTER_ID = Identifier.of(MapSelect.MOD_ID, "trickster");
 	public static final Identifier PUPPETMASTER_ID = Identifier.of(MapSelect.MOD_ID, "puppetmaster");
 	public static final Identifier BOUNTY_HUNTER_ID = Identifier.of(MapSelect.MOD_ID, "bounty_hunter");
+	public static final Identifier SKINCRAWLER_ID = Identifier.of(MapSelect.MOD_ID, "skincrawler");
 	public static final Identifier VULTURE_ID = Identifier.of(MapSelect.MOD_ID, "pelican");
 	public static final Identifier SCATTER_BRAIN_ID = Identifier.of(MapSelect.MOD_ID, "scatter_brain");
 	public static final Identifier TRACKER_ID = Identifier.of(MapSelect.MOD_ID, "tracker");
 	public static final Identifier ALTRUIST_ID = Identifier.of(MapSelect.MOD_ID, "altruist");
+	public static final Identifier SPY_ID = Identifier.of(MapSelect.MOD_ID, "spy");
 	public static final Identifier GODFATHER_ID = Identifier.of(MapSelect.MOD_ID, "godfather");
 	public static final Identifier MAFIOSO_ID = Identifier.of(MapSelect.MOD_ID, "mafioso");
 	public static final Identifier JANITOR_ID = Identifier.of(MapSelect.MOD_ID, "janitor");
@@ -37,10 +39,12 @@ public final class MapSelectRoles {
 	public static Role TRICKSTER;
 	public static Role PUPPETMASTER;
 	public static Role BOUNTY_HUNTER;
+	public static Role SKINCRAWLER;
 	public static Role VULTURE;
 	public static Role SCATTER_BRAIN;
 	public static Role TRACKER;
 	public static Role ALTRUIST;
+	public static Role SPY;
 	public static Role GODFATHER;
 	public static Role MAFIOSO;
 	public static Role JANITOR;
@@ -159,6 +163,16 @@ public final class MapSelectRoles {
 			true
 		));
 
+		SKINCRAWLER = WatheRoles.registerRole(new Role(
+			SKINCRAWLER_ID,
+			0x4D161D,
+			false,
+			true,
+			Role.MoodType.FAKE,
+			-1,
+			true
+		));
+
 		SCATTER_BRAIN = WatheRoles.registerRole(new Role(
 			SCATTER_BRAIN_ID,
 			0xE36A2E,
@@ -192,6 +206,16 @@ public final class MapSelectRoles {
 		ALTRUIST = WatheRoles.registerRole(new Role(
 			ALTRUIST_ID,
 			0xF0D38C,
+			true,
+			false,
+			Role.MoodType.REAL,
+			GameConstants.getInTicks(0, 10),
+			false
+		));
+
+		SPY = WatheRoles.registerRole(new Role(
+			SPY_ID,
+			0x2E6F9E,
 			true,
 			false,
 			Role.MoodType.REAL,

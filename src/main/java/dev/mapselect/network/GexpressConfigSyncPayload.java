@@ -25,7 +25,11 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int timeMasterFreezeDurationSeconds, int timeMasterFreezeCooldownSeconds,
 		int timeMasterFreezeMaxUses, int timeMasterFreezeRange,
 		int scatterBrainCooldownSeconds, int trackerMaxTargets,
-		int trackerRange, int trackerCooldownSeconds, int altruistRange, boolean lastDeathShieldEnabled,
+		int trackerRange, int trackerCooldownSeconds, int altruistRange,
+		int skincrawlerBodyMaxAgeSeconds, int skincrawlerCooldownSeconds, int skincrawlerStunSeconds,
+		int skincrawlerRange, int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
+		int squeakerPitchPercent, int masqueradePitchMinPercent, int masqueradePitchMaxPercent,
+		boolean lastDeathShieldEnabled,
 		int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold, int bountyHunterFailCooldownSeconds,
 		int godfatherBulletPrice, int godfatherStartingBullets, int godfatherMaxLoadedBullets, int mafiaStartingGold,
 		int mafiaMinimumPlayers, int godfatherStartingGold, int mafiosoStartingGold, int janitorStartingGold,
@@ -90,6 +94,16 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.trackerRange());
 			buf.writeInt(payload.trackerCooldownSeconds());
 			buf.writeInt(payload.altruistRange());
+			buf.writeInt(payload.skincrawlerBodyMaxAgeSeconds());
+			buf.writeInt(payload.skincrawlerCooldownSeconds());
+			buf.writeInt(payload.skincrawlerStunSeconds());
+			buf.writeInt(payload.skincrawlerRange());
+			buf.writeInt(payload.spyBugCost());
+			buf.writeInt(payload.spyBugDurationSeconds());
+			buf.writeInt(payload.spyBugRange());
+			buf.writeInt(payload.squeakerPitchPercent());
+			buf.writeInt(payload.masqueradePitchMinPercent());
+			buf.writeInt(payload.masqueradePitchMaxPercent());
 			buf.writeBoolean(payload.lastDeathShieldEnabled());
 			buf.writeInt(payload.bountyHunterBountyIntervalSeconds());
 			buf.writeInt(payload.bountyHunterRewardGold());
@@ -174,6 +188,16 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // trackerRange
 			buf.readInt(), // trackerCooldownSeconds
 			buf.readInt(), // altruistRange
+			buf.readInt(), // skincrawlerBodyMaxAgeSeconds
+			buf.readInt(), // skincrawlerCooldownSeconds
+			buf.readInt(), // skincrawlerStunSeconds
+			buf.readInt(), // skincrawlerRange
+			buf.readInt(), // spyBugCost
+			buf.readInt(), // spyBugDurationSeconds
+			buf.readInt(), // spyBugRange
+			buf.readInt(), // squeakerPitchPercent
+			buf.readInt(), // masqueradePitchMinPercent
+			buf.readInt(), // masqueradePitchMaxPercent
 			buf.readBoolean(), // lastDeathShieldEnabled
 			buf.readInt(), // bountyHunterBountyIntervalSeconds
 			buf.readInt(), // bountyHunterRewardGold

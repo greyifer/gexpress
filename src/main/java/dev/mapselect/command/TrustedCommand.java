@@ -46,8 +46,7 @@ public class TrustedCommand {
 				if (online != null) {
 					online.sendMessage(Text.literal("You are now ").formatted(Formatting.GRAY)
 						.append(GexpressPermissions.trustedBadge()), false);
-					online.refreshPositionAndAngles(online.getX(), online.getY(), online.getZ(),
-						online.getYaw(), online.getPitch());
+					TagCommand.refreshPlayerListName(online);
 				}
 			}
 		}
@@ -68,6 +67,7 @@ public class TrustedCommand {
 				ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(profile.getId());
 				if (online != null) {
 					online.sendMessage(Text.literal("You are no longer Trusted.").formatted(Formatting.GRAY), false);
+					TagCommand.refreshPlayerListName(online);
 				}
 			}
 		}

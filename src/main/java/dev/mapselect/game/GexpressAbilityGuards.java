@@ -10,6 +10,8 @@ import dev.mapselect.network.PuppetmasterSelectPayload;
 import dev.mapselect.network.PuppetmasterUsePayload;
 import dev.mapselect.network.ScatterBrainUsePayload;
 import dev.mapselect.network.ShadowMarchUsePayload;
+import dev.mapselect.network.SkincrawlerUsePayload;
+import dev.mapselect.network.SpyUsePayload;
 import dev.mapselect.network.TimeMasterFreezeUsePayload;
 import dev.mapselect.network.TimeMasterUsePayload;
 import dev.mapselect.network.TrackerUsePayload;
@@ -37,6 +39,8 @@ public final class GexpressAbilityGuards {
 		PuppetmasterUsePayload.ID,
 		ScatterBrainUsePayload.ID,
 		ShadowMarchUsePayload.ID,
+		SkincrawlerUsePayload.ID,
+		SpyUsePayload.ID,
 		TimeMasterFreezeUsePayload.ID,
 		TimeMasterUsePayload.ID,
 		TrackerUsePayload.ID,

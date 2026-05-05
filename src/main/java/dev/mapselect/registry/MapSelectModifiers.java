@@ -36,6 +36,7 @@ public final class MapSelectModifiers {
 	public static final Identifier THIRSTY_ID         = Identifier.of(MapSelect.MOD_ID, "thirsty");
 	public static final Identifier MUTED_ID           = Identifier.of(MapSelect.MOD_ID, "muted");
 	public static final Identifier PARANOID_ID        = Identifier.of(MapSelect.MOD_ID, "paranoid");
+	public static final Identifier SQUEAKER_ID        = Identifier.of(MapSelect.MOD_ID, "squeaker");
 
 	public static Modifier EOD_SPECIALIST;
 	public static Modifier SHORT_SIGHTED;
@@ -44,6 +45,7 @@ public final class MapSelectModifiers {
 	public static Modifier THIRSTY;
 	public static Modifier MUTED;
 	public static Modifier PARANOID;
+	public static Modifier SQUEAKER;
 
 	public static void register() {
 		// Cool steely blue - reads as "tools / defusal" vs the Bomb Specialist's hot TNT-orange.
@@ -106,6 +108,15 @@ public final class MapSelectModifiers {
 		PARANOID = HMLModifiers.registerModifier(new Modifier(
 			PARANOID_ID,
 			0xA44CE2,
+			new ArrayList<>(),
+			new ArrayList<>(),
+			false,
+			false
+		));
+
+		SQUEAKER = HMLModifiers.registerModifier(new Modifier(
+			SQUEAKER_ID,
+			0xF2D94C,
 			new ArrayList<>(),
 			new ArrayList<>(),
 			false,

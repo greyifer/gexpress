@@ -28,7 +28,9 @@ import dev.mapselect.role.mafia.MafiaManager;
 import dev.mapselect.role.medic.MedicShieldComponent;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.silent.SilentShadowComponent;
+import dev.mapselect.role.skincrawler.SkincrawlerManager;
 import dev.mapselect.role.snitch.SnitchManager;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.trickster.DancingCartsManager;
 import dev.mapselect.role.trickster.TricksterManager;
 import dev.mapselect.role.vulture.VultureManager;
@@ -785,7 +787,8 @@ public final class TimeMasterManager {
 			VultureManager.TimeState vulture, PuppetmasterManager.TimeState puppetmaster,
 			DancingCartsManager.TimeState dancingCarts,
 			BountyHunterManager.TimeState bountyHunter,
-			MafiaManager.TimeState mafia,
+			MafiaManager.TimeState mafia, SkincrawlerManager.TimeState skincrawler,
+			SpyManager.TimeState spy,
 			NbtCompound gameWorld, NbtCompound gameTime, NbtCompound timeMaster,
 			NbtCompound c4Back, NbtCompound medicShield,
 			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute) {
@@ -822,6 +825,8 @@ public final class TimeMasterManager {
 				DancingCartsManager.snapshotForTimeRewind(world),
 				BountyHunterManager.snapshotForTimeRewind(),
 				MafiaManager.snapshotForTimeRewind(),
+				SkincrawlerManager.snapshotForTimeRewind(),
+				SpyManager.snapshotForTimeRewind(),
 				writeComponent(GameWorldComponent.KEY.getNullable(world), lookup),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
 				writeComponent(TimeMasterComponent.KEY.getNullable(world), lookup),
@@ -880,6 +885,8 @@ public final class TimeMasterManager {
 			PuppetmasterManager.restoreForTimeRewind(puppetmaster);
 			BountyHunterManager.restoreForTimeRewind(bountyHunter);
 			MafiaManager.restoreForTimeRewind(world, mafia);
+			SkincrawlerManager.restoreForTimeRewind(world, skincrawler);
+			SpyManager.restoreForTimeRewind(spy);
 			SnitchManager.restoreForTimeRewind(world, snitch);
 			restoreBlocks(world, lookup);
 			DancingCartsManager.restoreForTimeRewind(world, dancingCarts);

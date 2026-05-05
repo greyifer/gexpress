@@ -8,6 +8,7 @@ import net.minecraft.text.TextColor;
 import java.util.Locale;
 
 public enum PlayerTag {
+	OWNER("owner", "Owner", 0x196266, true),
 	PASSENGER("passenger", "Passenger", 0x3C8AC9, true),
 	HOST("host", "Host", 0x559CFF, true),
 	TRUSTED("trusted", "Trusted", 0xF2C94C, true),

@@ -20,7 +20,7 @@ import java.util.UUID;
 public final class GexpressPlayersScreen extends Screen {
 	private static final int ROW_HEIGHT = 36;
 	private static final int HEAD_SIZE = 24;
-	private static final int TAG_BUTTON_WIDTH = 72;
+	private static final int TAG_BUTTON_WIDTH = 68;
 	private static final int TAG_BUTTON_HEIGHT = 16;
 	private static final int TAG_BUTTON_GAP = 4;
 	private final Screen parent;
@@ -79,12 +79,13 @@ public final class GexpressPlayersScreen extends Screen {
 		}
 
 		PlayerTag[] tags = {
-			PlayerTag.PASSENGER,
+			PlayerTag.OWNER,
+			PlayerTag.STAFF,
 			PlayerTag.HOST,
 			PlayerTag.TRUSTED,
-			PlayerTag.STAFF,
+			PlayerTag.BUILDER,
 			PlayerTag.DESIGNER,
-			PlayerTag.BUILDER
+			PlayerTag.PASSENGER
 		};
 		int totalWidth = tags.length * TAG_BUTTON_WIDTH + (tags.length - 1) * TAG_BUTTON_GAP;
 		int bx = x + rowWidth - totalWidth - 6;

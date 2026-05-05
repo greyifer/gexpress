@@ -18,6 +18,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,12 +28,13 @@ import java.util.concurrent.CompletableFuture;
 
 public class TagCommand {
 	private static final List<String> ASSIGNABLE_TAGS = List.of(
-		PlayerTag.PASSENGER.id(),
+		PlayerTag.OWNER.id(),
+		PlayerTag.STAFF.id(),
 		PlayerTag.HOST.id(),
 		PlayerTag.TRUSTED.id(),
-		PlayerTag.STAFF.id(),
+		PlayerTag.BUILDER.id(),
 		PlayerTag.DESIGNER.id(),
-		PlayerTag.BUILDER.id()
+		PlayerTag.PASSENGER.id()
 	);
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
@@ -60,6 +62,11 @@ public class TagCommand {
 			src.sendError(Text.literal("Use one of: " + String.join(", ", ASSIGNABLE_TAGS)));
 			return 0;
 		}
+		if (tag == PlayerTag.OWNER && !src.hasPermissionLevel(2)
+				&& !GexpressPermissions.isOwner(src.getPlayer()) && !GexpressPermissions.isDev(src.getPlayer())) {
+			src.sendError(Text.literal("Only an Owner, Dev, or operator can assign Owner."));
+			return 0;
+		}
 
 		HostComponent hosts = HostComponent.KEY.get(src.getWorld());
 		TrustedComponent trusted = TrustedComponent.KEY.get(src.getWorld());
@@ -80,8 +87,7 @@ public class TagCommand {
 			if (online != null) {
 				online.sendMessage(Text.literal("Your G'Express tag is now ").formatted(Formatting.GRAY)
 					.append(GexpressPermissions.tagBadge(tag)), false);
-				online.refreshPositionAndAngles(online.getX(), online.getY(), online.getZ(),
-					online.getYaw(), online.getPitch());
+				refreshPlayerListName(online);
 			}
 		}
 
@@ -102,12 +108,20 @@ public class TagCommand {
 		boolean changed = false;
 		if (tag != PlayerTag.HOST) changed |= hosts.removeHost(uuid);
 		if (tag != PlayerTag.TRUSTED) changed |= trusted.removeTrusted(uuid);
-		if (tag != PlayerTag.STAFF && tag != PlayerTag.DESIGNER && tag != PlayerTag.BUILDER) changed |= tags.clearTag(uuid);
+		if (tag != PlayerTag.OWNER && tag != PlayerTag.STAFF && tag != PlayerTag.DESIGNER && tag != PlayerTag.BUILDER) changed |= tags.clearTag(uuid);
 
 		if (tag == PlayerTag.HOST) changed |= hosts.addHost(uuid);
 		else if (tag == PlayerTag.TRUSTED) changed |= trusted.addTrusted(uuid);
-		else if (tag == PlayerTag.STAFF || tag == PlayerTag.DESIGNER || tag == PlayerTag.BUILDER) changed |= tags.setTag(uuid, tag);
+		else if (tag == PlayerTag.OWNER || tag == PlayerTag.STAFF || tag == PlayerTag.DESIGNER || tag == PlayerTag.BUILDER) changed |= tags.setTag(uuid, tag);
 		return changed;
+	}
+
+	public static void refreshPlayerListName(ServerPlayerEntity player) {
+		if (player == null || player.getServer() == null) return;
+		PlayerListS2CPacket packet = new PlayerListS2CPacket(PlayerListS2CPacket.Action.UPDATE_DISPLAY_NAME, player);
+		for (ServerPlayerEntity viewer : player.getServer().getPlayerManager().getPlayerList()) {
+			viewer.networkHandler.sendPacket(packet);
+		}
 	}
 
 	private static int runList(CommandContext<ServerCommandSource> ctx) {

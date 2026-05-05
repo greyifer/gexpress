@@ -179,6 +179,12 @@ public final class ClientAbilityCooldownHud {
 		} else if (MapSelectRoles.SCATTER_BRAIN_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, ICON_SCATTER,
 				GexpressConfig.getScatterBrainCooldownSeconds() * 20L, 0xFFFF8A4C, 0xFF8B2E16));
+		} else if (MapSelectRoles.SKINCRAWLER_ID.equals(roleId)) {
+			bars.add(syncedOrReady(AbilityCooldownPayload.SKINCRAWLER_STEAL, ICON_MASQUERADE,
+				GexpressConfig.getSkincrawlerCooldownSeconds() * 20L, 0xFFB05A66, 0xFF4D161D));
+		} else if (MapSelectRoles.SPY_ID.equals(roleId)) {
+			bars.add(cooldown(ICON_TRACKER, 0L, 1L, 0xFF77C7FF, 0xFF234F7A,
+				GexpressConfig.getSpyBugCost() + "g"));
 		} else if (MapSelectRoles.VULTURE_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PELICAN_SWALLOW, ICON_PELICAN_SWALLOW,
 				GexpressConfig.getPelicanEatCooldownSeconds() * 20L, 0xFFC5DF5C, 0xFF607421));

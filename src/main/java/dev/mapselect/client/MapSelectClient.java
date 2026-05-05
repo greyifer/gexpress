@@ -51,6 +51,8 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientTricksterState.register();
 		ClientPuppetmasterState.register();
 		ClientScatterBrainState.register();
+		ClientSkincrawlerState.register();
+		ClientSpyState.register();
 		ClientVultureState.register();
 		ClientTrackerState.register();
 		ClientAltruistState.register();
@@ -136,6 +138,16 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.trackerRange(),
 				payload.trackerCooldownSeconds(),
 				payload.altruistRange(),
+				payload.skincrawlerBodyMaxAgeSeconds(),
+				payload.skincrawlerCooldownSeconds(),
+				payload.skincrawlerStunSeconds(),
+				payload.skincrawlerRange(),
+				payload.spyBugCost(),
+				payload.spyBugDurationSeconds(),
+				payload.spyBugRange(),
+				payload.squeakerPitchPercent(),
+				payload.masqueradePitchMinPercent(),
+				payload.masqueradePitchMaxPercent(),
 				payload.lastDeathShieldEnabled(),
 				payload.bountyHunterBountyIntervalSeconds(),
 				payload.bountyHunterRewardGold(),

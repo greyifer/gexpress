@@ -45,7 +45,7 @@ public class HostCommand {
 				if (online != null) {
 					online.sendMessage(Text.literal("You are now a ").formatted(Formatting.GRAY)
 						.append(hostBadge()), false);
-					online.refreshPositionAndAngles(online.getX(), online.getY(), online.getZ(), online.getYaw(), online.getPitch());
+					TagCommand.refreshPlayerListName(online);
 				}
 			}
 		}
@@ -65,6 +65,7 @@ public class HostCommand {
 				ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(p.getId());
 				if (online != null) {
 					online.sendMessage(Text.literal("You are no longer a Host.").formatted(Formatting.GRAY), false);
+					TagCommand.refreshPlayerListName(online);
 				}
 			}
 		}

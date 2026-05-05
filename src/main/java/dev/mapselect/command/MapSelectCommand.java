@@ -30,6 +30,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -160,7 +161,7 @@ public class MapSelectCommand {
 													IntegerArgumentType.getInteger(ctx, "maxX"),
 													IntegerArgumentType.getInteger(ctx, "maxY"),
 													IntegerArgumentType.getInteger(ctx, "maxZ"))))))))))
-					.then(boxEditLiteral("freshair", p -> p.freshAirArea, BoxKind.FRESH_AIR))
+					.then(freshAirEditLiteral())
 					.then(CommandManager.literal("offset")
 						.then(intArg("x", p -> p.playAreaOffset == null ? null : Integer.toString(p.playAreaOffset.x),
 							intArg("y", p -> p.playAreaOffset == null ? null : Integer.toString(p.playAreaOffset.y),
@@ -312,6 +313,25 @@ public class MapSelectCommand {
 			.then(CommandManager.literal("clear")
 				.executes(ctx -> runClearBox(ctx, kind)))
 			.then(minX);
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> freshAirEditLiteral() {
+		var add = CommandManager.literal("add")
+			.then(CommandManager.argument("minX", IntegerArgumentType.integer())
+				.then(CommandManager.argument("minY", IntegerArgumentType.integer())
+					.then(CommandManager.argument("minZ", IntegerArgumentType.integer())
+						.then(CommandManager.argument("maxX", IntegerArgumentType.integer())
+							.then(CommandManager.argument("maxY", IntegerArgumentType.integer())
+								.then(CommandManager.argument("maxZ", IntegerArgumentType.integer())
+									.executes(ctx -> runAddFreshAirArea(ctx, 100))
+									.then(CommandManager.argument("sanityPercent", IntegerArgumentType.integer(0, 100))
+										.executes(ctx -> runAddFreshAirArea(ctx,
+											IntegerArgumentType.getInteger(ctx, "sanityPercent"))))))))));
+
+		return boxEditLiteral("freshair", p -> p.freshAirArea, BoxKind.FRESH_AIR)
+			.then(add)
+			.then(CommandManager.literal("list")
+				.executes(MapSelectCommand::runListFreshAirAreas));
 	}
 
 	private static SuggestionProvider<ServerCommandSource> suggestFromPreset(
@@ -489,6 +509,25 @@ public class MapSelectCommand {
 			fa.maxZ = neighbor.freshAirArea.maxZ + areaShift;
 			preset.freshAirArea = fa;
 		}
+		neighbor.normalize();
+		if (neighbor.freshAirAreas != null && !neighbor.freshAirAreas.isEmpty()) {
+			preset.freshAirAreas = new ArrayList<>();
+			for (MapPreset.FreshAirAreaData sourceArea : neighbor.freshAirAreas) {
+				if (sourceArea == null || sourceArea.area == null) continue;
+				MapPreset.FreshAirAreaData copied = new MapPreset.FreshAirAreaData();
+				MapPreset.BoxData box = new MapPreset.BoxData();
+				box.minX = sourceArea.area.minX;
+				box.minY = sourceArea.area.minY;
+				box.minZ = sourceArea.area.minZ + areaShift;
+				box.maxX = sourceArea.area.maxX;
+				box.maxY = sourceArea.area.maxY;
+				box.maxZ = sourceArea.area.maxZ + areaShift;
+				copied.area = box;
+				copied.sanityPercent = sourceArea.sanityPercent;
+				preset.freshAirAreas.add(copied);
+			}
+			if (!preset.freshAirAreas.isEmpty()) preset.freshAirArea = preset.freshAirAreas.getFirst().area;
+		}
 		if (neighbor.spectatorSpawnPos != null) {
 			MapPreset.PosData ss = new MapPreset.PosData();
 			ss.x = neighbor.spectatorSpawnPos.x;
@@ -570,6 +609,7 @@ public class MapSelectCommand {
 				preset.readyArea = derived.readyArea;
 				preset.lobbyArea = derived.lobbyArea;
 				preset.freshAirArea = derived.freshAirArea;
+				preset.freshAirAreas = derived.freshAirAreas;
 				preset.spectatorSpawnPos = derived.spectatorSpawnPos;
 				preset.readyAreaSpawnPos = derived.readyAreaSpawnPos;
 				preset.playAreaOffset = derived.playAreaOffset;
@@ -1043,7 +1083,13 @@ public class MapSelectCommand {
 				case WHOLE_MAP -> preset.wholeMapArea = box;
 				case PLAY_AREA -> preset.playArea = box;
 				case TEMPLATE -> preset.resetTemplateArea = box;
-				case FRESH_AIR -> preset.freshAirArea = box;
+				case FRESH_AIR -> {
+					preset.freshAirArea = box;
+					MapPreset.FreshAirAreaData area = new MapPreset.FreshAirAreaData();
+					area.area = box;
+					area.sanityPercent = 100;
+					preset.freshAirAreas = new ArrayList<>(List.of(area));
+				}
 			}
 			saveAndBroadcast(src, name, preset);
 			src.sendFeedback(() -> Text.literal("Updated " + kind.label + " for '" + name + "'.").formatted(Formatting.GREEN), true);
@@ -1064,13 +1110,79 @@ public class MapSelectCommand {
 				case WHOLE_MAP -> preset.wholeMapArea = null;
 				case PLAY_AREA -> preset.playArea = null;
 				case TEMPLATE -> preset.resetTemplateArea = null;
-				case FRESH_AIR -> preset.freshAirArea = null;
+				case FRESH_AIR -> {
+					preset.freshAirArea = null;
+					preset.freshAirAreas = new ArrayList<>();
+				}
 			}
 			saveAndBroadcast(src, name, preset);
 			src.sendFeedback(() -> Text.literal("Cleared " + kind.label + " for '" + name + "'.").formatted(Formatting.YELLOW), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runAddFreshAirArea(CommandContext<ServerCommandSource> ctx, int sanityPercent) {
+		ServerCommandSource src = ctx.getSource();
+		String name = StringArgumentType.getString(ctx, "name");
+		try {
+			MapPreset preset = loadOrError(src, name);
+			if (preset == null) return 0;
+			MapPreset.BoxData box = new MapPreset.BoxData();
+			int minX = IntegerArgumentType.getInteger(ctx, "minX");
+			int minY = IntegerArgumentType.getInteger(ctx, "minY");
+			int minZ = IntegerArgumentType.getInteger(ctx, "minZ");
+			int maxX = IntegerArgumentType.getInteger(ctx, "maxX");
+			int maxY = IntegerArgumentType.getInteger(ctx, "maxY");
+			int maxZ = IntegerArgumentType.getInteger(ctx, "maxZ");
+			box.minX = Math.min(minX, maxX);
+			box.maxX = Math.max(minX, maxX);
+			box.minY = Math.min(minY, maxY);
+			box.maxY = Math.max(minY, maxY);
+			box.minZ = Math.min(minZ, maxZ);
+			box.maxZ = Math.max(minZ, maxZ);
+			if (preset.freshAirAreas == null) preset.freshAirAreas = new ArrayList<>();
+			MapPreset.FreshAirAreaData area = new MapPreset.FreshAirAreaData();
+			area.area = box;
+			area.sanityPercent = Math.max(0, Math.min(100, sanityPercent));
+			preset.freshAirAreas.add(area);
+			if (preset.freshAirArea == null) preset.freshAirArea = box;
+			saveAndBroadcast(src, name, preset);
+			src.sendFeedback(() -> Text.literal("Added fresh air area for '" + name
+				+ "' (" + area.sanityPercent + "% sanity).").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runListFreshAirAreas(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		String name = StringArgumentType.getString(ctx, "name");
+		try {
+			MapPreset preset = loadOrError(src, name);
+			if (preset == null) return 0;
+			preset.normalize();
+			if (preset.freshAirAreas == null || preset.freshAirAreas.isEmpty()) {
+				src.sendFeedback(() -> Text.literal("No fresh air areas for '" + name + "'.").formatted(Formatting.GRAY), false);
+				return 0;
+			}
+			int i = 1;
+			for (MapPreset.FreshAirAreaData area : preset.freshAirAreas) {
+				int index = i++;
+				MapPreset.BoxData b = area.area;
+				String coords = b == null ? "(not set)" : "(" + fmt(b.minX) + ", " + fmt(b.minY) + ", " + fmt(b.minZ)
+					+ ") -> (" + fmt(b.maxX) + ", " + fmt(b.maxY) + ", " + fmt(b.maxZ) + ")";
+				src.sendFeedback(() -> Text.literal(index + ". ")
+					.append(Text.literal(coords).formatted(Formatting.WHITE))
+					.append(Text.literal(" (" + area.sanityPercent + "% sanity)")), false);
+			}
+			return preset.freshAirAreas.size();
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to show preset: " + e.getMessage()));
 			return 0;
 		}
 	}

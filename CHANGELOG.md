@@ -1,3 +1,26 @@
+# Grey's Express 1.3.5
+
+## Added
+
+- Added the Owner tag, colored `#196266`, with full built-in G'Express permissions.
+- Added tag hierarchy support: Owner, Dev, Staff, Host, Trusted, then Passenger.
+- Added Skincrawler, a killer role that steals fresh corpse skins and survives the first gunshot as a stun.
+- Added Spy, a civilian role that spends coins to bug a player and receives task/interact feed updates.
+- Added Squeaker, a modifier that raises the player's voice pitch.
+- Added configurable Skincrawler, Spy, Squeaker, and Masquerade pitch settings to the game options tab.
+- Fresh Air map presets now support multiple custom areas with per-area sanity reward percentages.
+
+## Changed
+
+- Harlequin Masquerade now warps living players' voice pitch instead of muting them.
+- Fresh Air area derivation now copies all configured custom areas when extending map presets from neighboring maps.
+- The Players tab and tab-list display now respect the new tag hierarchy and Owner tag.
+
+## Fixed
+
+- Fresh Air custom areas now apply their configured sanity reward when the Fresh Air task completes inside them.
+- Time Master rewinds now snapshot and restore Skincrawler and Spy state.
+
 # Grey's Express 1.3.4
 
 ## Added

@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class TricksterManager {
 	private static final Map<net.minecraft.registry.RegistryKey<World>, ActiveSwap> activeSwaps = new ConcurrentHashMap<>();
@@ -119,9 +120,10 @@ public final class TricksterManager {
 		}
 
 		Map<UUID, UUID> swaps = buildDerangement(players, previousSwaps.get(world.getRegistryKey()));
+		Map<UUID, Float> voicePitches = buildPitchMap(players);
 		previousSwaps.put(world.getRegistryKey(), swaps);
 		int durationTicks = GexpressConfig.getTricksterSwapDurationSeconds() * 20;
-		activeSwaps.put(world.getRegistryKey(), new ActiveSwap(world.getTime() + durationTicks, swaps));
+		activeSwaps.put(world.getRegistryKey(), new ActiveSwap(world.getTime() + durationTicks, swaps, voicePitches));
 		nextMasqueradeUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
 			.put(trickster.getUuid(), world.getTime() + durationTicks
 				+ (long) GexpressConfig.getTricksterMasqueradeCooldownSeconds() * 20L);
@@ -186,6 +188,19 @@ public final class TricksterManager {
 		return swaps;
 	}
 
+	private static Map<UUID, Float> buildPitchMap(List<ServerPlayerEntity> players) {
+		int min = GexpressConfig.getMasqueradePitchMinPercent();
+		int max = GexpressConfig.getMasqueradePitchMaxPercent();
+		if (max < min) max = min;
+		Map<UUID, Float> out = new HashMap<>();
+		ThreadLocalRandom random = ThreadLocalRandom.current();
+		for (ServerPlayerEntity player : players) {
+			int percent = min == max ? min : random.nextInt(min, max + 1);
+			out.put(player.getUuid(), percent / 100.0F);
+		}
+		return out;
+	}
+
 	private static void tick(ServerWorld world) {
 		clearNoellesMorphCyclesIfDue(world);
 
@@ -231,6 +246,13 @@ public final class TricksterManager {
 		if (world == null) return false;
 		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
 		return active != null && active.isActive(world);
+	}
+
+	public static float voicePitchFor(ServerWorld world, UUID playerId) {
+		if (world == null || playerId == null) return 1.0F;
+		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
+		if (active == null || !active.isActive(world)) return 1.0F;
+		return active.voicePitches().getOrDefault(playerId, 1.0F);
 	}
 
 	public static UUID replacementFor(UUID playerId) {
@@ -423,7 +445,7 @@ public final class TricksterManager {
 		}
 	}
 
-	private record ActiveSwap(long untilTick, Map<UUID, UUID> swaps) {
+	private record ActiveSwap(long untilTick, Map<UUID, UUID> swaps, Map<UUID, Float> voicePitches) {
 		private boolean isActive(ServerWorld world) {
 			return world != null && world.getTime() < untilTick;
 		}

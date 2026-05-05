@@ -2,6 +2,7 @@ package dev.mapselect.mixin.client;
 
 import dev.mapselect.client.ClientTricksterState;
 import dev.mapselect.client.ClientPuppetmasterState;
+import dev.mapselect.client.ClientSkincrawlerState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.util.SkinTextures;
@@ -25,8 +26,15 @@ public abstract class TricksterSkinTexturesMixin {
 
 		AbstractClientPlayerEntity self = (AbstractClientPlayerEntity) (Object) this;
 		UUID replacementId = ClientPuppetmasterState.replacementFor(self.getUuid());
+		if (replacementId == null) replacementId = ClientSkincrawlerState.replacementFor(self.getUuid());
 		if (replacementId == null) replacementId = ClientTricksterState.replacementFor(self.getUuid());
 		if (replacementId == null || replacementId.equals(self.getUuid())) return;
+
+		SkinTextures replacementTextures = ClientSkincrawlerState.replacementTextures(replacementId);
+		if (replacementTextures != null) {
+			cir.setReturnValue(replacementTextures);
+			return;
+		}
 
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.world == null) return;

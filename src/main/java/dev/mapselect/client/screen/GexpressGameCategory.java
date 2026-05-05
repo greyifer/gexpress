@@ -48,7 +48,9 @@ public final class GexpressGameCategory {
 	private static final String BOUNTY_HUNTER_ID = MapSelect.MOD_ID + ":bounty_hunter";
 	private static final String VULTURE_ID = MapSelect.MOD_ID + ":pelican";
 	private static final String SCATTER_BRAIN_ID = MapSelect.MOD_ID + ":scatter_brain";
+	private static final String SKINCRAWLER_ID = MapSelect.MOD_ID + ":skincrawler";
 	private static final String TRACKER_ID = MapSelect.MOD_ID + ":tracker";
+	private static final String SPY_ID = MapSelect.MOD_ID + ":spy";
 	private static final String ALTRUIST_ID = MapSelect.MOD_ID + ":altruist";
 	private static final String GODFATHER_ID = MapSelect.MOD_ID + ":godfather";
 	private static final String MAFIOSO_ID = MapSelect.MOD_ID + ":mafioso";
@@ -57,6 +59,7 @@ public final class GexpressGameCategory {
 	private static final String SHORT_SIGHTED_ID = MapSelect.MOD_ID + ":short_sighted";
 	private static final String HUNGRY_ID = MapSelect.MOD_ID + ":hungry";
 	private static final String THIRSTY_ID = MapSelect.MOD_ID + ":thirsty";
+	private static final String SQUEAKER_ID = MapSelect.MOD_ID + ":squeaker";
 	private static final String KILLER_ID = "wathe:killer";
 	private static final String VIGILANTE_ID = "wathe:vigilante";
 	private static final String CIVILIAN_ID = "wathe:civilian";
@@ -802,6 +805,44 @@ public final class GexpressGameCategory {
 				.build());
 			return out;
 		}
+		if (SKINCRAWLER_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_body_age")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_body_age.tooltip")))
+				.binding(90, GexpressConfig::getSkincrawlerBodyMaxAgeSeconds,
+					v -> GexpressConfig.skincrawlerBodyMaxAgeSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.SKINCRAWLER_BODY_MAX_AGE_SECONDS_MIN,
+						GexpressConfig.SKINCRAWLER_BODY_MAX_AGE_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_cooldown.tooltip")))
+				.binding(90, GexpressConfig::getSkincrawlerCooldownSeconds,
+					v -> GexpressConfig.skincrawlerCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.SKINCRAWLER_COOLDOWN_SECONDS_MIN,
+						GexpressConfig.SKINCRAWLER_COOLDOWN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_stun")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_stun.tooltip")))
+				.binding(5, GexpressConfig::getSkincrawlerStunSeconds,
+					v -> GexpressConfig.skincrawlerStunSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.SKINCRAWLER_STUN_SECONDS_MIN,
+						GexpressConfig.SKINCRAWLER_STUN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_range")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.skincrawler_range.tooltip")))
+				.binding(4, GexpressConfig::getSkincrawlerRange, v -> GexpressConfig.skincrawlerRange = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.SKINCRAWLER_RANGE_MIN, GexpressConfig.SKINCRAWLER_RANGE_MAX))
+				.build());
+			return out;
+		}
 		if (VULTURE_ID.equals(roleId)) {
 			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
@@ -844,6 +885,33 @@ public final class GexpressGameCategory {
 				.binding(10, GexpressConfig::getTrackerCooldownSeconds, v -> GexpressConfig.trackerCooldownSeconds = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.TRACKER_COOLDOWN_SECONDS_MIN, GexpressConfig.TRACKER_COOLDOWN_SECONDS_MAX))
+				.build());
+			return out;
+		}
+		if (SPY_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_cost")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_cost.tooltip")))
+				.binding(100, GexpressConfig::getSpyBugCost, v -> GexpressConfig.spyBugCost = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.SPY_BUG_COST_MIN, GexpressConfig.SPY_BUG_COST_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_duration")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_duration.tooltip")))
+				.binding(120, GexpressConfig::getSpyBugDurationSeconds,
+					v -> GexpressConfig.spyBugDurationSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.SPY_BUG_DURATION_SECONDS_MIN,
+						GexpressConfig.SPY_BUG_DURATION_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_range")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_range.tooltip")))
+				.binding(16, GexpressConfig::getSpyBugRange, v -> GexpressConfig.spyBugRange = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.SPY_BUG_RANGE_MIN, GexpressConfig.SPY_BUG_RANGE_MAX))
 				.build());
 			return out;
 		}
@@ -899,6 +967,34 @@ public final class GexpressGameCategory {
 				.binding(2, GexpressConfig::getThirstyDrinkLimit, v -> GexpressConfig.thirstyDrinkLimit = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.THIRSTY_DRINK_LIMIT_MIN, GexpressConfig.THIRSTY_DRINK_LIMIT_MAX))
+				.build());
+			return out;
+		}
+		if (SQUEAKER_ID.equals(modifierId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.squeaker_pitch")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.squeaker_pitch.tooltip")))
+				.binding(135, GexpressConfig::getSqueakerPitchPercent,
+					v -> GexpressConfig.squeakerPitchPercent = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.VOICE_PITCH_PERCENT_MIN, GexpressConfig.VOICE_PITCH_PERCENT_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_min")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_min.tooltip")))
+				.binding(80, GexpressConfig::getMasqueradePitchMinPercent,
+					v -> GexpressConfig.masqueradePitchMinPercent = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.VOICE_PITCH_PERCENT_MIN, GexpressConfig.VOICE_PITCH_PERCENT_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_max")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_max.tooltip")))
+				.binding(145, GexpressConfig::getMasqueradePitchMaxPercent,
+					v -> GexpressConfig.masqueradePitchMaxPercent = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.VOICE_PITCH_PERCENT_MIN, GexpressConfig.VOICE_PITCH_PERCENT_MAX))
 				.build());
 			return out;
 		}

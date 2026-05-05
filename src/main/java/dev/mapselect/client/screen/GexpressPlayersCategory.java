@@ -107,7 +107,7 @@ public final class GexpressPlayersCategory {
 	private static final class PlayersPanelWidget extends ClickableWidget {
 		private static final int ROW_HEIGHT = 38;
 		private static final int HEAD_SIZE = 24;
-		private static final int TAG_BUTTON_WIDTH = 72;
+		private static final int TAG_BUTTON_WIDTH = 68;
 		private static final int TAG_BUTTON_HEIGHT = 17;
 		private static final int TAG_BUTTON_GAP = 4;
 
@@ -173,12 +173,13 @@ public final class GexpressPlayersCategory {
 			}
 
 			PlayerTag[] tags = {
-				PlayerTag.PASSENGER,
+				PlayerTag.OWNER,
+				PlayerTag.STAFF,
 				PlayerTag.HOST,
 				PlayerTag.TRUSTED,
-				PlayerTag.STAFF,
+				PlayerTag.BUILDER,
 				PlayerTag.DESIGNER,
-				PlayerTag.BUILDER
+				PlayerTag.PASSENGER
 			};
 			int totalWidth = tags.length * TAG_BUTTON_WIDTH + (tags.length - 1) * TAG_BUTTON_GAP;
 			int bx = x + rowWidth - totalWidth - 6;

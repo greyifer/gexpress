@@ -21,6 +21,7 @@ import java.util.UUID;
 public final class GexpressPermissions {
 	public static final String DEV_USERNAME = "greyifer";
 	public static final UUID DEV_UUID = UUID.fromString("4eaa64ee-f4a5-4fb5-868e-2580327543fd");
+	public static final int OWNER_COLOR = 0x196266;
 	public static final int DEV_COLOR = 0xCBFF2E;
 	public static final int TRUSTED_COLOR = 0xF2C94C;
 	public static final int STAFF_COLOR = 0x79B9A9;
@@ -52,7 +53,7 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean isHostOrDev(PlayerEntity player) {
-		return isDev(player) || HostComponent.isHost(player) || isStaff(player);
+		return isOwner(player) || isDev(player) || HostComponent.isHost(player) || isStaff(player);
 	}
 
 	public static boolean isTrusted(PlayerEntity player) {
@@ -60,15 +61,20 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean isBuilder(PlayerEntity player) {
-		return effectiveTag(player) == PlayerTag.BUILDER;
+		PlayerTag tag = effectiveTag(player);
+		return tag == PlayerTag.BUILDER || tag == PlayerTag.OWNER || tag == PlayerTag.DEV || tag == PlayerTag.STAFF;
 	}
 
 	public static boolean isStaff(PlayerEntity player) {
 		return effectiveTag(player) == PlayerTag.STAFF;
 	}
 
+	public static boolean isOwner(PlayerEntity player) {
+		return effectiveTag(player) == PlayerTag.OWNER;
+	}
+
 	public static boolean canUseAdminCommands(ServerCommandSource source) {
-		return source.hasPermissionLevel(2) || isDev(source.getPlayer()) || isStaff(source.getPlayer());
+		return source.hasPermissionLevel(2) || isOwner(source.getPlayer()) || isDev(source.getPlayer()) || isStaff(source.getPlayer());
 	}
 
 	public static boolean canUseHostCommands(ServerCommandSource source) {
@@ -84,7 +90,7 @@ public final class GexpressPermissions {
 		if (player instanceof ServerPlayerEntity serverPlayer && serverPlayer.hasPermissionLevel(2)) {
 			return true;
 		}
-		return player != null && (player.hasPermissionLevel(2) || isHostOrDev(player));
+		return player != null && (player.hasPermissionLevel(2) || isOwner(player) || isHostOrDev(player));
 	}
 
 	public static boolean canEditSetupOptions(PlayerEntity player) {
@@ -102,8 +108,11 @@ public final class GexpressPermissions {
 		}
 		var cache = server.getUserCache();
 		var profile = cache == null ? null : cache.getByUuid(uuid).orElse(null);
-		return profile != null
-			&& (isDevName(profile.getName()) || server.getPlayerManager().isOperator(profile));
+		if (profile == null) return false;
+		if (isDevName(profile.getName()) || server.getPlayerManager().isOperator(profile)) return true;
+		World world = server.getWorld(World.OVERWORLD);
+		PlayerTagComponent tags = world == null ? null : PlayerTagComponent.KEY.getNullable(world);
+		return tags != null && tags.getTag(uuid) == PlayerTag.OWNER;
 	}
 
 	public static boolean hasBadge(PlayerEntity player) {
@@ -128,16 +137,19 @@ public final class GexpressPermissions {
 	}
 
 	public static PlayerTag effectiveTag(World world, UUID uuid, String name) {
-		if (isDevUuid(uuid) || isDevName(name)) return PlayerTag.DEV;
 		if (world != null) {
+			PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(world);
+			PlayerTag explicit = tags == null ? null : tags.getTag(uuid);
+			if (explicit == PlayerTag.OWNER) return PlayerTag.OWNER;
+			if (isDevUuid(uuid) || isDevName(name)) return PlayerTag.DEV;
+			if (explicit == PlayerTag.STAFF) return PlayerTag.STAFF;
 			HostComponent hosts = HostComponent.KEY.getNullable(world);
 			if (hosts != null && hosts.isHost(uuid)) return PlayerTag.HOST;
 			TrustedComponent trusted = TrustedComponent.KEY.getNullable(world);
 			if (trusted != null && trusted.isTrusted(uuid)) return PlayerTag.TRUSTED;
-			PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(world);
-			PlayerTag explicit = tags == null ? null : tags.getTag(uuid);
 			if (explicit != null) return explicit;
 		}
+		if (isDevUuid(uuid) || isDevName(name)) return PlayerTag.DEV;
 		return PlayerTag.PASSENGER;
 	}
 
@@ -172,5 +184,9 @@ public final class GexpressPermissions {
 
 	public static Text builderBadge() {
 		return PlayerTag.BUILDER.text();
+	}
+
+	public static Text ownerBadge() {
+		return PlayerTag.OWNER.text();
 	}
 }

@@ -112,11 +112,13 @@ All G'Express commands are under `/g`.
 | **Puppetmaster** | Killer | Takes control of another living player while leaving their own body vulnerable. |
 | **Bounty Hunter** | Killer | Receives a timed bounty target. Killing the bounty pays bonus gold; missing the timer applies weapon cooldowns. |
 | **Scatter Brain** | Killer | Scatters every living player, including themself, to safe random positions around the active map. |
+| **Skincrawler** | Killer | Steals the skin of a fresh dead body and leaves their previous skin on the corpse. The first gunshot stuns them; a second gunshot while stunned kills them. |
 | **Medic** | Civilian | Shields another player from danger and receives visual feedback when that shield is hit or broken. |
 | **Snitch** | Civilian | Completes tasks to expose the killers. Progress stays visible beside the mood HUD, and killers are warned/glow the Snitch once they are within the configured task threshold. |
 | **Seer** | Civilian | Receives a visual warning whenever someone dies. |
 | **Time Master** | Civilian | Can rewind the round, track remaining rewinds, and freeze a looked-at player in place. |
 | **Tracker** | Civilian | Can track multiple players at once, making those players glow for the Tracker. |
+| **Spy** | Civilian | Plants a paid bug on a looked-at player and receives feed updates when the target completes tasks or interacts with players. |
 | **Altruist** | Civilian | Sacrifices themself to revive a dead body. |
 | **Godfather** | Neutral | Recruits a Mafioso and Janitor, manages loaded bullets, and uses family instinct through the instinct key. |
 | **Mafioso** | Mafia | A recruited family role that fights for the Godfather with mafia weapon rules. |
@@ -137,6 +139,7 @@ All G'Express commands are under `/g`.
 | **Thirsty** | Civilian | Can carry a configurable number of drink items from trays. |
 | **Muted** | Any | Can hear voice chat but cannot speak. |
 | **Paranoid** | Civilian | Always sees players as if they are holding suspicious items. |
+| **Squeaker** | Any | Raises the player's voice pitch while speaking. |
 
 ---
 
@@ -201,9 +204,11 @@ Includes support for:
 - Bounty Hunter timer, reward, and failed-bounty cooldown.
 - Mafia lobby-size gate, role-specific starting gold, bullet limits, bullet price, and recruit replacement timing.
 - Snitch reveal-task count and killer-warning task threshold.
+- Skincrawler body age, cooldown, stun duration, and skin-steal range.
+- Spy bug cost, duration, and range.
 - Puppetmaster range and self-body kill behavior.
 - Time Master Freeze duration, cooldown, range, and per-round uses.
-- Scatter Brain cooldown, Tracker limits, Altruist range, Hungry/Thirsty carry limits, Pelican swallow percentage, and first-death shield.
+- Scatter Brain cooldown, Tracker limits, Altruist range, Hungry/Thirsty carry limits, Squeaker/Masquerade pitch, Pelican swallow percentage, and first-death shield.
 
 ### Ability HUD
 
@@ -213,7 +218,7 @@ G'Express adds an ability HUD for role abilities.
 - Roles with multiple active abilities can show multiple bars.
 - Ability icons appear beside the bars.
 - Time Master shows remaining rewinds beside the rewind bar.
-- Scatter Brain, Tracker, Altruist, Pelican, Harlequin, Juggernaut, Puppetmaster, Warlock, The Silent, Medic, and Time Master abilities are represented when their role needs a bar.
+- Scatter Brain, Skincrawler, Spy, Tracker, Altruist, Pelican, Harlequin, Juggernaut, Puppetmaster, Warlock, The Silent, Medic, and Time Master abilities are represented when their role needs a bar.
 - Pelican swallow progress renders as a dedicated top-corner counter.
 
 ### Tags & Custom Skins
@@ -221,8 +226,10 @@ G'Express adds an ability HUD for role abilities.
 G'Express adds server-side tags for community presentation and custom cosmetics.
 
 - Host and Trusted tags can be managed through `/g group host` and `/g group trusted`.
-- Staff, Designer, Builder, and Passenger tags can be managed through `/g group tag`.
+- Owner, Staff, Designer, Builder, and Passenger tags can be managed through `/g group tag`.
+- Tag hierarchy is Owner, Dev, Staff, Host, Trusted, then Passenger.
 - The Trusted tag is gold-yellow and gives Trusted players custom Coca-Cola Revolver and Chicken Stick Knife models.
+- The Owner tag is dark teal and has full built-in G'Express permissions.
 - The Staff tag is teal and can access most host/setup tools without granting creative mode.
 - Dev-tagged players can access supporter-gated skin options.
 
@@ -241,7 +248,7 @@ G'Express includes map tools for creating and managing custom Harpy Express maps
 
 - `/g setup map` tools for creating, editing, listing, applying, and snapshotting map presets.
 - Map-specific weather and fog overrides.
-- Fresh-air task areas for custom outdoor/interior-open sections.
+- Multiple fresh-air task areas for custom outdoor/interior-open sections, each with its own sanity reward percentage.
 - Sandstorm and snow visual support.
 - Ready-area train preview support.
 - Active Wathe area/spawn import helpers.

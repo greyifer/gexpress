@@ -38,7 +38,9 @@ import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.scatterbrain.ScatterBrainManager;
 import dev.mapselect.role.seer.SeerManager;
 import dev.mapselect.role.silent.SilentShadowManager;
+import dev.mapselect.role.skincrawler.SkincrawlerManager;
 import dev.mapselect.role.snitch.SnitchManager;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
 import dev.mapselect.role.tracker.TrackerManager;
 import dev.mapselect.role.trickster.TricksterManager;
@@ -80,6 +82,8 @@ public class MapSelect implements ModInitializer {
 		PuppetmasterManager.register();
 		BountyHunterManager.register();
 		ScatterBrainManager.register();
+		SkincrawlerManager.register();
+		SpyManager.register();
 		VultureManager.register();
 		SnitchManager.register();
 		SeerManager.register();
