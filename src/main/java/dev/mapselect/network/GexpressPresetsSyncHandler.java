@@ -8,6 +8,7 @@ import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
+import dev.mapselect.task.FreshAirAreaManager;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -70,6 +71,7 @@ public final class GexpressPresetsSyncHandler {
 						if (preset == null) { fail++; continue; }
 						sanitizePreset(server, preset);
 						PresetStorage.save(server, name, preset);
+						FreshAirAreaManager.clearCache(sender.getServerWorld());
 						ok++;
 					} catch (Throwable t) {
 						MapSelect.LOGGER.warn("Failed to save preset {}: {}", name, t.toString());

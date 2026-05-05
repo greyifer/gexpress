@@ -6,7 +6,12 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import dev.mapselect.MapSelect;
+import dev.mapselect.network.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
+import dev.mapselect.preset.map.MapPreset;
+import dev.mapselect.preset.map.PresetStorage;
+import dev.mapselect.weather.MapWeatherComponent;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -15,6 +20,7 @@ import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -61,7 +67,8 @@ public class RtpCommand {
 			src.sendError(Text.literal("'add' without coords requires a player. Use /g setup rtp add <x> <y> <z>."));
 			return 0;
 		}
-		int id = comp(src).addTeleportationSlot(new TeleportationSlot(p.getX(), p.getY(), p.getZ(), p.getYaw(), p.getPitch()));
+		int id = comp(src).addTeleportationSlot(new TeleportationSlot(p.getX(), p.getY(), p.getZ(), snapYaw90(p.getYaw()), 0.0F));
+		persistActiveMapRandomSpawns(src);
 		src.sendFeedback(() -> Text.literal("Added RTP slot #" + id + " at your position.").formatted(Formatting.GREEN), true);
 		return 1;
 	}
@@ -69,9 +76,10 @@ public class RtpCommand {
 	private static int runAddExplicit(CommandContext<ServerCommandSource> ctx, double x, double y, double z) {
 		ServerCommandSource src = ctx.getSource();
 		ServerPlayerEntity p = src.getPlayer();
-		float yaw = p != null ? p.getYaw() : 0f;
-		float pitch = p != null ? p.getPitch() : 0f;
+		float yaw = p != null ? snapYaw90(p.getYaw()) : 0f;
+		float pitch = 0f;
 		int id = comp(src).addTeleportationSlot(new TeleportationSlot(x, y, z, yaw, pitch));
+		persistActiveMapRandomSpawns(src);
 		src.sendFeedback(() -> Text.literal("Added RTP slot #" + id + " at (" + fmt(x) + ", " + fmt(y) + ", " + fmt(z) + ").").formatted(Formatting.GREEN), true);
 		return 1;
 	}
@@ -84,6 +92,7 @@ public class RtpCommand {
 			return 0;
 		}
 		src.sendFeedback(() -> Text.literal("Removed RTP slot #" + id + ".").formatted(Formatting.YELLOW), true);
+		persistActiveMapRandomSpawns(src);
 		return 1;
 	}
 
@@ -116,6 +125,7 @@ public class RtpCommand {
 		final double dist = Math.sqrt(bestDist);
 		c.removeTeleportationSlot(id);
 		src.sendFeedback(() -> Text.literal("Removed nearest RTP slot #" + id + " (" + fmt(dist) + " blocks away).").formatted(Formatting.YELLOW), true);
+		persistActiveMapRandomSpawns(src);
 		return 1;
 	}
 
@@ -152,6 +162,7 @@ public class RtpCommand {
 		int n = c.getTeleportationSlots() == null ? 0 : c.getTeleportationSlots().size();
 		c.setTeleportationSlots(new LinkedHashMap<>());
 		src.sendFeedback(() -> Text.literal("Cleared " + n + " RTP slot(s).").formatted(Formatting.YELLOW), true);
+		persistActiveMapRandomSpawns(src);
 		return 1;
 	}
 
@@ -170,5 +181,26 @@ public class RtpCommand {
 	private static String fmt(float f) {
 		if (f == Math.floor(f) && !Float.isInfinite(f)) return Integer.toString((int) f);
 		return String.format(java.util.Locale.ROOT, "%.1f", f);
+	}
+
+	private static float snapYaw90(float yaw) {
+		float snapped = Math.round(yaw / 90.0F) * 90.0F;
+		snapped = ((snapped + 180.0F) % 360.0F + 360.0F) % 360.0F - 180.0F;
+		return snapped == -180.0F ? 180.0F : snapped;
+	}
+
+	private static void persistActiveMapRandomSpawns(ServerCommandSource src) {
+		MapWeatherComponent weather = MapWeatherComponent.KEY.getNullable(src.getWorld());
+		String currentMap = weather == null ? null : weather.getCurrentMapName();
+		if (currentMap == null || currentMap.isBlank()) return;
+		try {
+			MapPreset preset = PresetStorage.load(src.getServer(), currentMap);
+			if (preset == null) return;
+			preset.randomSpawnPositions = MapPreset.randomSpawnsFrom(src.getWorld());
+			PresetStorage.save(src.getServer(), currentMap, preset);
+			GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
+		} catch (IOException e) {
+			MapSelect.LOGGER.warn("Failed to persist RTP slots into active map '{}': {}", currentMap, e.toString());
+		}
 	}
 }

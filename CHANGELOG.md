@@ -4,12 +4,15 @@
 
 - Puppetmaster now has a configurable max-use limit, defaulting to three controls per round.
 - Added a live Players tab with player heads, usernames, current tags, and tag management.
-- Added Passenger, Designer, and Builder tags; Builder can access map and train setup tools.
+- Added Passenger, Staff, Designer, and Builder tags; Staff is teal and Builder can access map and train setup tools.
 - Added `/g group tag` commands for listing and managing non-dev player tags.
+- Added per-map Fresh Air areas for custom train sections that should count for Wathe's fresh-air task.
 
 ## Changed
 
 - Scatter Brain now falls back through preset spawns, configured play/map areas, and nearby alive players to find valid teleport locations more reliably.
+- Players tag management now lives directly inside the Players tab instead of opening a separate screen.
+- RTP slots added with `/g setup rtp add` now snap yaw to the nearest 90 degrees and persist back into the active map preset.
 - Time Master rewinds now restore more round state, including role/component snapshots and Puppetmaster usage state.
 - The Pliers item model now uses the smaller model file.
 
@@ -19,6 +22,9 @@
 - Pelican-contained players no longer reveal hovered role names, and players released after the Pelican dies join the dead voice group.
 - Amnesiac role steals are rolled back properly by Time Master rewinds.
 - Time Master rewind-use displays now update when the configured max uses changes.
+- Removing test modifiers now refreshes player dimensions, fixing Tiny-sized players staying tiny.
+- Saving a train preset no longer wipes configured Dancing Carts regions when the live world snapshot has no cart list.
+- Saving a train preset no longer rolls the active map's ready-area spawn/RTP slots back to stale saved values.
 
 # Grey's Express 1.3.2
 

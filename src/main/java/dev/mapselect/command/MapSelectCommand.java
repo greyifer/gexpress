@@ -18,6 +18,7 @@ import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
 import dev.mapselect.preset.train.TrainPreview;
+import dev.mapselect.task.FreshAirAreaManager;
 import dev.mapselect.weather.MapWeatherComponent;
 import dev.mapselect.weather.WeatherType;
 import net.minecraft.command.argument.BlockPosArgumentType;
@@ -41,7 +42,8 @@ public class MapSelectCommand {
 	private enum BoxKind {
 		WHOLE_MAP("whole map area"),
 		PLAY_AREA("play area"),
-		TEMPLATE("template area");
+		TEMPLATE("template area"),
+		FRESH_AIR("fresh air area");
 
 		final String label;
 		BoxKind(String label) { this.label = label; }
@@ -158,6 +160,7 @@ public class MapSelectCommand {
 													IntegerArgumentType.getInteger(ctx, "maxX"),
 													IntegerArgumentType.getInteger(ctx, "maxY"),
 													IntegerArgumentType.getInteger(ctx, "maxZ"))))))))))
+					.then(boxEditLiteral("freshair", p -> p.freshAirArea, BoxKind.FRESH_AIR))
 					.then(CommandManager.literal("offset")
 						.then(intArg("x", p -> p.playAreaOffset == null ? null : Integer.toString(p.playAreaOffset.x),
 							intArg("y", p -> p.playAreaOffset == null ? null : Integer.toString(p.playAreaOffset.y),
@@ -271,6 +274,46 @@ public class MapSelectCommand {
 			.executes(exec);
 	}
 
+	private static LiteralArgumentBuilder<ServerCommandSource> boxEditLiteral(
+			String literal, java.util.function.Function<MapPreset, MapPreset.BoxData> extractor, BoxKind kind) {
+		var maxZ = intArgExec("maxZ", p -> {
+				MapPreset.BoxData b = extractor.apply(p);
+				return b == null ? null : fmtNum(b.maxZ);
+			},
+			ctx -> runEditBox(ctx, kind,
+				IntegerArgumentType.getInteger(ctx, "minX"),
+				IntegerArgumentType.getInteger(ctx, "minY"),
+				IntegerArgumentType.getInteger(ctx, "minZ"),
+				IntegerArgumentType.getInteger(ctx, "maxX"),
+				IntegerArgumentType.getInteger(ctx, "maxY"),
+				IntegerArgumentType.getInteger(ctx, "maxZ")));
+		var maxY = intArg("maxY", p -> {
+			MapPreset.BoxData b = extractor.apply(p);
+			return b == null ? null : fmtNum(b.maxY);
+		}, maxZ);
+		var maxX = intArg("maxX", p -> {
+			MapPreset.BoxData b = extractor.apply(p);
+			return b == null ? null : fmtNum(b.maxX);
+		}, maxY);
+		var minZ = intArg("minZ", p -> {
+			MapPreset.BoxData b = extractor.apply(p);
+			return b == null ? null : fmtNum(b.minZ);
+		}, maxX);
+		var minY = intArg("minY", p -> {
+			MapPreset.BoxData b = extractor.apply(p);
+			return b == null ? null : fmtNum(b.minY);
+		}, minZ);
+		var minX = intArg("minX", p -> {
+			MapPreset.BoxData b = extractor.apply(p);
+			return b == null ? null : fmtNum(b.minX);
+		}, minY);
+
+		return CommandManager.literal(literal)
+			.then(CommandManager.literal("clear")
+				.executes(ctx -> runClearBox(ctx, kind)))
+			.then(minX);
+	}
+
 	private static SuggestionProvider<ServerCommandSource> suggestFromPreset(
 			java.util.function.Function<MapPreset, String> extractor) {
 		return (ctx, b) -> {
@@ -331,6 +374,7 @@ public class MapSelectCommand {
 
 	private static void saveAndBroadcast(ServerCommandSource src, String name, MapPreset preset) throws IOException {
 		PresetStorage.save(src.getServer(), name, preset);
+		FreshAirAreaManager.clearCache(src.getWorld());
 		GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
 	}
 
@@ -435,6 +479,16 @@ public class MapSelectCommand {
 			la.maxZ = neighbor.lobbyArea.maxZ + areaShift;
 			preset.lobbyArea = la;
 		}
+		if (neighbor.freshAirArea != null) {
+			MapPreset.BoxData fa = new MapPreset.BoxData();
+			fa.minX = neighbor.freshAirArea.minX;
+			fa.minY = neighbor.freshAirArea.minY;
+			fa.minZ = neighbor.freshAirArea.minZ + areaShift;
+			fa.maxX = neighbor.freshAirArea.maxX;
+			fa.maxY = neighbor.freshAirArea.maxY;
+			fa.maxZ = neighbor.freshAirArea.maxZ + areaShift;
+			preset.freshAirArea = fa;
+		}
 		if (neighbor.spectatorSpawnPos != null) {
 			MapPreset.PosData ss = new MapPreset.PosData();
 			ss.x = neighbor.spectatorSpawnPos.x;
@@ -515,6 +569,7 @@ public class MapSelectCommand {
 				preset.playArea = derived.playArea;
 				preset.readyArea = derived.readyArea;
 				preset.lobbyArea = derived.lobbyArea;
+				preset.freshAirArea = derived.freshAirArea;
 				preset.spectatorSpawnPos = derived.spectatorSpawnPos;
 				preset.readyAreaSpawnPos = derived.readyAreaSpawnPos;
 				preset.playAreaOffset = derived.playAreaOffset;
@@ -588,6 +643,7 @@ public class MapSelectCommand {
 			sendBoxLine(src, "Ready Area", preset.readyArea);
 			sendBoxLine(src, "Play Area", preset.playArea);
 			sendBoxLine(src, "Template Area", preset.resetTemplateArea);
+			sendBoxLine(src, "Fresh Air Area", preset.freshAirArea);
 			sendOffsetLine(src, "Play Area Offset", preset.playAreaOffset);
 			sendPosLine(src, "Ready Area Spawn", preset.readyAreaSpawnPos);
 			sendPosLine(src, "Spectator Spawn", preset.spectatorSpawnPos);
@@ -987,9 +1043,31 @@ public class MapSelectCommand {
 				case WHOLE_MAP -> preset.wholeMapArea = box;
 				case PLAY_AREA -> preset.playArea = box;
 				case TEMPLATE -> preset.resetTemplateArea = box;
+				case FRESH_AIR -> preset.freshAirArea = box;
 			}
 			saveAndBroadcast(src, name, preset);
 			src.sendFeedback(() -> Text.literal("Updated " + kind.label + " for '" + name + "'.").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runClearBox(CommandContext<ServerCommandSource> ctx, BoxKind kind) {
+		ServerCommandSource src = ctx.getSource();
+		String name = StringArgumentType.getString(ctx, "name");
+		try {
+			MapPreset preset = loadOrError(src, name);
+			if (preset == null) return 0;
+			switch (kind) {
+				case WHOLE_MAP -> preset.wholeMapArea = null;
+				case PLAY_AREA -> preset.playArea = null;
+				case TEMPLATE -> preset.resetTemplateArea = null;
+				case FRESH_AIR -> preset.freshAirArea = null;
+			}
+			saveAndBroadcast(src, name, preset);
+			src.sendFeedback(() -> Text.literal("Cleared " + kind.label + " for '" + name + "'.").formatted(Formatting.YELLOW), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));

@@ -28,6 +28,8 @@ All G'Express commands are under `/g`.
 | `/g setup map edit <name> wholemap <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the full map bounds. |
 | `/g setup map edit <name> playarea <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the playable area bounds. |
 | `/g setup map edit <name> template <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the reset template bounds. |
+| `/g setup map edit <name> freshair <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Marks an area as valid for Wathe's fresh-air task. |
+| `/g setup map edit <name> freshair clear` | Clears the saved fresh-air task area. |
 | `/g setup map edit <name> offset <x> <y> <z>` | Sets the play area paste offset. |
 | `/g setup map edit <name> spectator <x> <y> <z> <yaw> <pitch>` | Sets the spectator spawn position. |
 | `/g setup map edit <name> readytrain here` | Sets the ready train preview position to your current position. |
@@ -37,7 +39,7 @@ All G'Express commands are under `/g`.
 | `/g setup map edit <name> randomspawns clear` | Clears saved random spawns from the map preset. |
 | `/g setup map edit <name> rooms <count>` | Sets the highest Wathe room key number this map can assign, such as `15` for `Room 1` through `Room 15`. |
 | `/g setup map list` | Lists saved map presets. |
-| `/g setup map show <name>` | Shows a map preset's saved values, including room key count. |
+| `/g setup map show <name>` | Shows a map preset's saved values, including fresh-air area and room key count. |
 | `/g setup map set <name> [trainPreset]` | Applies a map preset, optionally with a train preset. |
 | `/g setup map default <name> <trainPreset>` | Sets the default train preset for a map preset. |
 | `/g setup map snapshot <name>` | Snapshots active Wathe areas, spawns, and RTP slots into a preset. |
@@ -62,8 +64,8 @@ All G'Express commands are under `/g`.
 | `/g roles tuning modifier <id> amount <value>` | Alias for modifier max. |
 | `/g roles test role <role> [players]` | Assigns a test role. |
 | `/g roles test role clear [players]` | Clears test roles. |
-| `/g roles test modifier add <modifier> [players]` | Adds a test modifier. |
-| `/g roles test modifier remove <modifier> [players]` | Removes a test modifier. |
+| `/g roles test modifier add <modifier> [players]` / `/g roles test modifier add <players> <modifier>` | Adds a test modifier. Suggestions hide modifiers the selected player already has. |
+| `/g roles test modifier remove <modifier> [players]` / `/g roles test modifier remove <players> <modifier>` | Removes a test modifier. Suggestions show only modifiers the selected player has. |
 | `/g roles test modifier clear [players]` | Clears test modifiers. |
 | `/g roles pelican leave` | Lets a swallowed player climb out of the Pelican. |
 | `/g roles pelican release <players>` | Host command that releases selected players from Pelicans. |
@@ -219,7 +221,9 @@ G'Express adds an ability HUD for role abilities.
 G'Express adds server-side tags for community presentation and custom cosmetics.
 
 - Host and Trusted tags can be managed through `/g group host` and `/g group trusted`.
+- Staff, Designer, Builder, and Passenger tags can be managed through `/g group tag`.
 - The Trusted tag is gold-yellow and gives Trusted players custom Coca-Cola Revolver and Chicken Stick Knife models.
+- The Staff tag is teal and can access most host/setup tools without granting creative mode.
 - Dev-tagged players can access supporter-gated skin options.
 
 ### Amnesia Mode
@@ -237,6 +241,7 @@ G'Express includes map tools for creating and managing custom Harpy Express maps
 
 - `/g setup map` tools for creating, editing, listing, applying, and snapshotting map presets.
 - Map-specific weather and fog overrides.
+- Fresh-air task areas for custom outdoor/interior-open sections.
 - Sandstorm and snow visual support.
 - Ready-area train preview support.
 - Active Wathe area/spawn import helpers.

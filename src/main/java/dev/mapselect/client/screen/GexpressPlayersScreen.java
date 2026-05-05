@@ -20,7 +20,7 @@ import java.util.UUID;
 public final class GexpressPlayersScreen extends Screen {
 	private static final int ROW_HEIGHT = 36;
 	private static final int HEAD_SIZE = 24;
-	private static final int TAG_BUTTON_WIDTH = 58;
+	private static final int TAG_BUTTON_WIDTH = 72;
 	private static final int TAG_BUTTON_HEIGHT = 16;
 	private static final int TAG_BUTTON_GAP = 4;
 	private final Screen parent;
@@ -82,6 +82,7 @@ public final class GexpressPlayersScreen extends Screen {
 			PlayerTag.PASSENGER,
 			PlayerTag.HOST,
 			PlayerTag.TRUSTED,
+			PlayerTag.STAFF,
 			PlayerTag.DESIGNER,
 			PlayerTag.BUILDER
 		};

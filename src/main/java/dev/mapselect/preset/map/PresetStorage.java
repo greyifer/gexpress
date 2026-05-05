@@ -57,13 +57,12 @@ public class PresetStorage {
 	public static void save(MinecraftServer server, String name, MapPreset preset) throws IOException {
 		checkServer(server);
 		Path f = file(server, name);
-		boolean isNew = !Files.exists(f);
 		if (preset == null) throw new IOException("Preset is null.");
 		preset.normalize();
 		String json = GSON.toJson(preset);
 		writeAtomically(f, json);
 		cachedJson.put(name, json);
-		if (isNew) cachedList = null;
+		cachedList = null;
 	}
 
 	public static MapPreset load(MinecraftServer server, String name) throws IOException {

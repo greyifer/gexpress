@@ -3,6 +3,7 @@ package dev.mapselect.command;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.MapSelect;
@@ -20,11 +21,14 @@ import org.agmas.harpymodloader.commands.argument.RoleArgumentType;
 import org.agmas.harpymodloader.component.WorldModifierComponent;
 import org.agmas.harpymodloader.events.ModifierAssigned;
 import org.agmas.harpymodloader.events.ModifierRemoved;
+import org.agmas.harpymodloader.modifiers.HMLModifiers;
 import org.agmas.harpymodloader.modifiers.Modifier;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -48,13 +52,25 @@ public final class TestCommand {
 							EntityArgumentType.getPlayers(ctx, "players"))))))
 			.then(CommandManager.literal("modifier")
 				.then(CommandManager.literal("add")
+					.then(CommandManager.argument("players", EntityArgumentType.players())
+						.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+							.suggests(suggestAddModifiers("players"))
+							.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
+								EntityArgumentType.getPlayers(ctx, "players")))))
 					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+						.suggests(suggestAddModifiers(null))
 						.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
 						.then(CommandManager.argument("players", EntityArgumentType.players())
 							.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
 								EntityArgumentType.getPlayers(ctx, "players"))))))
 				.then(CommandManager.literal("remove")
+					.then(CommandManager.argument("players", EntityArgumentType.players())
+						.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+							.suggests(suggestRemoveModifiers("players"))
+							.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
+								EntityArgumentType.getPlayers(ctx, "players")))))
 					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+						.suggests(suggestRemoveModifiers(null))
 						.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
 						.then(CommandManager.argument("players", EntityArgumentType.players())
 							.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
@@ -67,6 +83,53 @@ public final class TestCommand {
 
 	private static Collection<ServerPlayerEntity> self(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
 		return List.of(ctx.getSource().getPlayerOrThrow());
+	}
+
+	private static SuggestionProvider<ServerCommandSource> suggestAddModifiers(String playersArg) {
+		return (ctx, builder) -> {
+			WorldModifierComponent mods = WorldModifierComponent.KEY.getNullable(ctx.getSource().getWorld());
+			if (mods == null) return builder.buildFuture();
+			Collection<ServerPlayerEntity> targets = suggestedTargets(ctx, playersArg);
+			String remaining = builder.getRemainingLowerCase();
+			HMLModifiers.MODIFIERS.stream()
+				.sorted(Comparator.comparing(m -> m.identifier().toString()))
+				.filter(modifier -> targets.isEmpty() || targets.stream().anyMatch(player -> !hasModifier(mods, player, modifier)))
+				.map(modifier -> modifier.identifier().toString())
+				.filter(id -> id.toLowerCase(Locale.ROOT).startsWith(remaining))
+				.forEach(builder::suggest);
+			return builder.buildFuture();
+		};
+	}
+
+	private static SuggestionProvider<ServerCommandSource> suggestRemoveModifiers(String playersArg) {
+		return (ctx, builder) -> {
+			WorldModifierComponent mods = WorldModifierComponent.KEY.getNullable(ctx.getSource().getWorld());
+			if (mods == null) return builder.buildFuture();
+			Collection<ServerPlayerEntity> targets = suggestedTargets(ctx, playersArg);
+			String remaining = builder.getRemainingLowerCase();
+			HMLModifiers.MODIFIERS.stream()
+				.sorted(Comparator.comparing(m -> m.identifier().toString()))
+				.filter(modifier -> !targets.isEmpty() && targets.stream().anyMatch(player -> hasModifier(mods, player, modifier)))
+				.map(modifier -> modifier.identifier().toString())
+				.filter(id -> id.toLowerCase(Locale.ROOT).startsWith(remaining))
+				.forEach(builder::suggest);
+			return builder.buildFuture();
+		};
+	}
+
+	private static Collection<ServerPlayerEntity> suggestedTargets(CommandContext<ServerCommandSource> ctx, String playersArg) {
+		try {
+			if (playersArg != null) return EntityArgumentType.getPlayers(ctx, playersArg);
+			ServerPlayerEntity player = ctx.getSource().getPlayer();
+			return player == null ? List.of() : List.of(player);
+		} catch (Exception ignored) {
+			return List.of();
+		}
+	}
+
+	private static boolean hasModifier(WorldModifierComponent mods, ServerPlayerEntity player, Modifier modifier) {
+		return mods.getModifiers(player.getUuid()).stream()
+			.anyMatch(current -> current == modifier || current.identifier().equals(modifier.identifier()));
 	}
 
 	private static int runSetRole(CommandContext<ServerCommandSource> ctx, Role role,
@@ -208,6 +271,8 @@ public final class TestCommand {
 	private static void safeRemoveModifier(ServerPlayerEntity player, Modifier modifier) {
 		try {
 			ModifierRemoved.EVENT.invoker().removeModifier(player, modifier);
+			player.calculateDimensions();
+			player.refreshPositionAndAngles(player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch());
 		} catch (Throwable t) {
 			MapSelect.LOGGER.warn("ModifierRemoved listener failed during /g roles test modifier remove for {} on {}.",
 				id(modifier), player.getName().getString(), t);

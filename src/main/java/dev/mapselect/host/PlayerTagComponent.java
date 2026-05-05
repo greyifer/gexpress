@@ -68,7 +68,8 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 				if (playerTag != null && playerTag.assignable()
 						&& playerTag != PlayerTag.PASSENGER
 						&& playerTag != PlayerTag.HOST
-						&& playerTag != PlayerTag.TRUSTED) {
+						&& playerTag != PlayerTag.TRUSTED
+						&& playerTag != PlayerTag.DEV) {
 					tags.put(uuid, playerTag);
 				}
 			} catch (IllegalArgumentException ignored) {

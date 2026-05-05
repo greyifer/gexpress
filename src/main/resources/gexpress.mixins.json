@@ -9,6 +9,7 @@
 		"HostConfigSaveMixin",
 		"GameRoundEndWinnerMixin",
 		"FoodPlatterHungryThirstyMixin",
+		"FreshAirAreaMixin",
 		"HmlRoleModifierTuningMixin",
 		"JuggernautDropMixin",
 		"JuggernautMurderWinMixin",

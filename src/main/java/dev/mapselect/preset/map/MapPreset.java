@@ -25,6 +25,7 @@ public class MapPreset {
 	public BoxData playArea;
 	public BoxData readyArea;
 	public BoxData lobbyArea;
+	public BoxData freshAirArea;
 	public PosData spectatorSpawnPos;
 	public PosData readyAreaSpawnPos;
 	public OffsetData playAreaOffset;
@@ -107,6 +108,7 @@ public class MapPreset {
 		playArea = normalizeBox(playArea);
 		readyArea = normalizeBox(readyArea);
 		lobbyArea = normalizeBox(lobbyArea);
+		freshAirArea = normalizeBox(freshAirArea);
 		wholeMapArea = normalizeBox(wholeMapArea);
 		resetTemplateArea = normalizeBox(resetTemplateArea);
 		spectatorSpawnPos = normalizePos(spectatorSpawnPos);

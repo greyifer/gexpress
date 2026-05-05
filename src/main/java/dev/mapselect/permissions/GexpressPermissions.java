@@ -23,6 +23,7 @@ public final class GexpressPermissions {
 	public static final UUID DEV_UUID = UUID.fromString("4eaa64ee-f4a5-4fb5-868e-2580327543fd");
 	public static final int DEV_COLOR = 0xCBFF2E;
 	public static final int TRUSTED_COLOR = 0xF2C94C;
+	public static final int STAFF_COLOR = 0x79B9A9;
 	public static final int PASSENGER_COLOR = 0x3C8AC9;
 	public static final int DESIGNER_COLOR = 0x781419;
 	public static final int BUILDER_COLOR = 0xFC552B;
@@ -51,7 +52,7 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean isHostOrDev(PlayerEntity player) {
-		return isDev(player) || HostComponent.isHost(player);
+		return isDev(player) || HostComponent.isHost(player) || isStaff(player);
 	}
 
 	public static boolean isTrusted(PlayerEntity player) {
@@ -62,8 +63,12 @@ public final class GexpressPermissions {
 		return effectiveTag(player) == PlayerTag.BUILDER;
 	}
 
+	public static boolean isStaff(PlayerEntity player) {
+		return effectiveTag(player) == PlayerTag.STAFF;
+	}
+
 	public static boolean canUseAdminCommands(ServerCommandSource source) {
-		return source.hasPermissionLevel(2) || isDev(source.getPlayer());
+		return source.hasPermissionLevel(2) || isDev(source.getPlayer()) || isStaff(source.getPlayer());
 	}
 
 	public static boolean canUseHostCommands(ServerCommandSource source) {
@@ -151,6 +156,10 @@ public final class GexpressPermissions {
 
 	public static Text trustedBadge() {
 		return PlayerTag.TRUSTED.text();
+	}
+
+	public static Text staffBadge() {
+		return PlayerTag.STAFF.text();
 	}
 
 	public static Text passengerBadge() {

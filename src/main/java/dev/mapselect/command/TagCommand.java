@@ -30,6 +30,7 @@ public class TagCommand {
 		PlayerTag.PASSENGER.id(),
 		PlayerTag.HOST.id(),
 		PlayerTag.TRUSTED.id(),
+		PlayerTag.STAFF.id(),
 		PlayerTag.DESIGNER.id(),
 		PlayerTag.BUILDER.id()
 	);
@@ -101,11 +102,11 @@ public class TagCommand {
 		boolean changed = false;
 		if (tag != PlayerTag.HOST) changed |= hosts.removeHost(uuid);
 		if (tag != PlayerTag.TRUSTED) changed |= trusted.removeTrusted(uuid);
-		if (tag != PlayerTag.DESIGNER && tag != PlayerTag.BUILDER) changed |= tags.clearTag(uuid);
+		if (tag != PlayerTag.STAFF && tag != PlayerTag.DESIGNER && tag != PlayerTag.BUILDER) changed |= tags.clearTag(uuid);
 
 		if (tag == PlayerTag.HOST) changed |= hosts.addHost(uuid);
 		else if (tag == PlayerTag.TRUSTED) changed |= trusted.addTrusted(uuid);
-		else if (tag == PlayerTag.DESIGNER || tag == PlayerTag.BUILDER) changed |= tags.setTag(uuid, tag);
+		else if (tag == PlayerTag.STAFF || tag == PlayerTag.DESIGNER || tag == PlayerTag.BUILDER) changed |= tags.setTag(uuid, tag);
 		return changed;
 	}
 

@@ -73,6 +73,13 @@ public class TrainCommand {
 		}
 		try {
 			TrainPreset preset = TrainPreset.from(src.getWorld());
+			TrainPreset existing = TrainPresetStorage.exists(src.getServer(), name)
+				? TrainPresetStorage.load(src.getServer(), name)
+				: null;
+			if ((preset.trainCarts == null || preset.trainCarts.isEmpty())
+					&& existing != null && existing.trainCarts != null && !existing.trainCarts.isEmpty()) {
+				preset.trainCarts = copyTrainCarts(existing.trainCarts);
+			}
 			if (preset.resetTemplateArea == null) {
 				src.sendError(Text.literal("resetTemplateArea is not set. Use /wathe mapVariables set resetTemplateArea first."));
 				return 0;
@@ -85,7 +92,10 @@ public class TrainCommand {
 			if (currentMap != null && PresetStorage.exists(src.getServer(), currentMap)) {
 				MapPreset mp = PresetStorage.load(src.getServer(), currentMap);
 				if (mp != null) {
+					MapPreset active = MapPreset.from(src.getWorld());
 					mp.defaultTrainPreset = name;
+					mp.readyAreaSpawnPos = active.readyAreaSpawnPos;
+					mp.randomSpawnPositions = active.randomSpawnPositions;
 					PresetStorage.save(src.getServer(), currentMap, mp);
 					GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
 					suffix = " — associated as default for map '" + currentMap + "'.";
@@ -204,6 +214,24 @@ public class TrainCommand {
 	private static String offsetStr(MapPreset.OffsetData o) {
 		if (o == null) return "(not set)";
 		return "(" + o.x + ", " + o.y + ", " + o.z + ")";
+	}
+
+	private static List<TrainPreset.CartData> copyTrainCarts(List<TrainPreset.CartData> carts) {
+		List<TrainPreset.CartData> out = new java.util.ArrayList<>();
+		if (carts == null) return out;
+		for (TrainPreset.CartData cart : carts) {
+			if (cart == null || cart.area == null) continue;
+			TrainPreset.CartData copy = new TrainPreset.CartData();
+			copy.area = new MapPreset.BoxData();
+			copy.area.minX = cart.area.minX;
+			copy.area.minY = cart.area.minY;
+			copy.area.minZ = cart.area.minZ;
+			copy.area.maxX = cart.area.maxX;
+			copy.area.maxY = cart.area.maxY;
+			copy.area.maxZ = cart.area.maxZ;
+			out.add(copy);
+		}
+		return out;
 	}
 
 	private static String fmt(double d) {

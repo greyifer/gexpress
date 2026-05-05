@@ -58,6 +58,7 @@ public final class GexpressMapPresetsCategory {
 		areas.option(boxOption("readyArea", () -> edit.readyArea, v -> edit.readyArea = v));
 		areas.option(boxOption("playArea", () -> edit.playArea, v -> edit.playArea = v));
 		areas.option(boxOption("resetTemplateArea", () -> edit.resetTemplateArea, v -> edit.resetTemplateArea = v));
+		areas.option(boxOption("freshAirArea", () -> edit.freshAirArea, v -> edit.freshAirArea = v));
 		category.group(areas.build());
 
 		OptionGroup.Builder positions = OptionGroup.createBuilder()
@@ -179,6 +180,7 @@ public final class GexpressMapPresetsCategory {
 		copy.playArea = cloneBox(src.playArea);
 		copy.readyArea = cloneBox(src.readyArea);
 		copy.lobbyArea = cloneBox(src.lobbyArea);
+		copy.freshAirArea = cloneBox(src.freshAirArea);
 		copy.spectatorSpawnPos = clonePos(src.spectatorSpawnPos);
 		copy.readyAreaSpawnPos = clonePos(src.readyAreaSpawnPos);
 		copy.playAreaOffset = cloneOffset(src.playAreaOffset);
