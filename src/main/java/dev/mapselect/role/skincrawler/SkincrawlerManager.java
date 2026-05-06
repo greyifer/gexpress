@@ -158,6 +158,10 @@ public final class SkincrawlerManager {
 		return role != null && MapSelectRoles.SKINCRAWLER_ID.equals(role.identifier());
 	}
 
+	public static UUID replacementFor(UUID playerId) {
+		return playerId == null ? null : skinSwaps.get(playerId);
+	}
+
 	private static boolean canUseHere(World world, PlayerEntity player) {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		return (game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE)

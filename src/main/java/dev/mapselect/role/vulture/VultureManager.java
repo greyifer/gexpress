@@ -170,7 +170,7 @@ public final class VultureManager {
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (victim instanceof ServerPlayerEntity vulture && isVulture(vulture)) {
-			releaseAllForVulture(vulture.getUuid(), vulture.getServer(), ReleasePoint.from(vulture), true, true);
+			releaseAllForVulture(vulture.getUuid(), vulture.getServer(), ReleasePoint.from(vulture), true, false);
 		}
 		return true;
 	}
@@ -401,8 +401,11 @@ public final class VultureManager {
 			target.setInvisible(false);
 			TrainVoicePlugin.addPlayer(target.getUuid());
 		} else {
-			target.changeGameMode(state != null ? state.previousGameMode : GameMode.SURVIVAL);
+			GameMode restoreMode = state != null && state.previousGameMode != GameMode.SPECTATOR
+				? state.previousGameMode : GameMode.SURVIVAL;
+			target.changeGameMode(restoreMode);
 			target.setInvisible(state != null && state.previousInvisible());
+			TrainVoicePlugin.resetPlayer(target.getUuid());
 		}
 		target.teleport(releaseWorld, releasePoint.x, releasePoint.y, releasePoint.z,
 			releasePoint.yaw, releasePoint.pitch);

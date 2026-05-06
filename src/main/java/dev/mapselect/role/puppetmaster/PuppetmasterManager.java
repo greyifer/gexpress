@@ -329,6 +329,21 @@ public final class PuppetmasterManager {
 		copyHotbar(copyHotbar(from), to);
 	}
 
+	private static ItemStack[] copyInventory(ServerPlayerEntity player) {
+		ItemStack[] inventory = new ItemStack[player.getInventory().size()];
+		for (int slot = 0; slot < inventory.length; slot++) {
+			inventory[slot] = player.getInventory().getStack(slot).copy();
+		}
+		return inventory;
+	}
+
+	private static void copyInventory(ItemStack[] inventory, ServerPlayerEntity to) {
+		if (inventory == null || to == null) return;
+		for (int slot = 0; slot < to.getInventory().size() && slot < inventory.length; slot++) {
+			to.getInventory().setStack(slot, inventory[slot].copy());
+		}
+	}
+
 	private static void copyHotbar(ItemStack[] hotbar, ServerPlayerEntity to) {
 		if (hotbar == null || to == null) return;
 		for (int slot = 0; slot < 9 && slot < hotbar.length; slot++) {
@@ -436,7 +451,7 @@ public final class PuppetmasterManager {
 			target.teleport(targetWorld, controlledX, controlledY, controlledZ, controlledYaw, controlledPitch);
 			controller.teleport(controllerWorld, session.controllerHomeX, session.controllerHomeY, session.controllerHomeZ,
 				session.controllerHomeYaw, session.controllerHomePitch);
-			copyHotbar(session.controllerHotbar, controller);
+			copyInventory(session.controllerInventory, controller);
 			copyHotbar(controlledHotbar, target);
 			controller.getInventory().selectedSlot = session.controllerSelectedSlot;
 			target.getInventory().selectedSlot = session.targetSelectedSlot;
@@ -648,6 +663,7 @@ public final class PuppetmasterManager {
 		private final double targetStartZ;
 		private final float targetStartYaw;
 		private final float targetStartPitch;
+		private final ItemStack[] controllerInventory;
 		private final ItemStack[] controllerHotbar;
 		private final ItemStack[] targetHotbar;
 		private final ArrayList<Modifier> controllerModifiers;
@@ -673,6 +689,7 @@ public final class PuppetmasterManager {
 			this.targetStartZ = target.getZ();
 			this.targetStartYaw = target.getYaw();
 			this.targetStartPitch = target.getPitch();
+			this.controllerInventory = copyInventory(controller);
 			this.controllerHotbar = copyHotbar(controller);
 			this.targetHotbar = copyHotbar(target);
 			this.controllerModifiers = copyModifiers(controller.getWorld(), controller.getUuid());

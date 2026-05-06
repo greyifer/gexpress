@@ -347,7 +347,6 @@ public final class GexpressRoleAssignment {
 			if (!passes(RoleModifierTuningConfig.getModifierChance(modifier.identifier().toString()))) continue;
 
 			if (isLoversModifier(modifier)) {
-				assignLoversPair(game, modifiers, players, modifier);
 				continue;
 			}
 
@@ -360,14 +359,6 @@ public final class GexpressRoleAssignment {
 				addModifier(modifiers, player, modifier);
 			}
 		}
-	}
-
-	private static void assignLoversPair(GameWorldComponent game, WorldModifierComponent modifiers,
-			List<ServerPlayerEntity> players, Modifier modifier) {
-		if (modifiers.getAllWithModifier(modifier).size() >= 2) return;
-		ServerPlayerEntity player = randomModifierCandidate(game, modifiers, players, modifier);
-		if (player == null) return;
-		addModifier(modifiers, player, modifier);
 	}
 
 	private static boolean isModifierDisabled(Modifier modifier) {

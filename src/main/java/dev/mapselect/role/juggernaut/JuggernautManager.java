@@ -204,8 +204,8 @@ public final class JuggernautManager {
 	}
 
 	private static boolean tryBlockWithShield(ServerPlayerEntity juggernaut, Identifier reason) {
-		boolean knife = dev.doctor4t.wathe.game.GameConstants.DeathReasons.KNIFE.equals(reason);
-		boolean gun = dev.doctor4t.wathe.game.GameConstants.DeathReasons.GUN.equals(reason);
+		boolean knife = isKnifeDeath(reason);
+		boolean gun = isGunDeath(reason);
 		if (!knife && !gun) return false;
 
 		int stage = stageForKills(killCounts.getOrDefault(juggernaut.getUuid(), 0));
@@ -225,6 +225,18 @@ public final class JuggernautManager {
 			SoundCategory.PLAYERS, 0.9F, 0.85F);
 		juggernaut.sendMessage(Text.literal("Juggernaut shield blocked the hit."), true);
 		return true;
+	}
+
+	private static boolean isKnifeDeath(Identifier reason) {
+		if (dev.doctor4t.wathe.game.GameConstants.DeathReasons.KNIFE.equals(reason)) return true;
+		String path = reason == null ? "" : reason.getPath().toLowerCase(java.util.Locale.ROOT);
+		return path.contains("knife") || path.contains("stab");
+	}
+
+	private static boolean isGunDeath(Identifier reason) {
+		if (dev.doctor4t.wathe.game.GameConstants.DeathReasons.GUN.equals(reason)) return true;
+		String path = reason == null ? "" : reason.getPath().toLowerCase(java.util.Locale.ROOT);
+		return path.contains("gun") || path.contains("revolver") || path.contains("shot") || path.contains("bullet");
 	}
 
 	private static long shieldRechargeRemainingTicks(ServerPlayerEntity player) {

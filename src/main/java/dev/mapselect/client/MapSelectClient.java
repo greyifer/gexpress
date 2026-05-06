@@ -8,6 +8,7 @@ import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
 import dev.mapselect.network.PuppetmasterConfigPayload;
+import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import dev.mapselect.registry.MapSelectBlockEntities;
 import dev.mapselect.registry.MapSelectBlocks;
 import dev.mapselect.registry.MapSelectParticles;
@@ -33,6 +34,7 @@ public class MapSelectClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		GexpressRoleAnnouncementTexts.register();
 		registerConfigReceiver();
 		ClientAbilityKeys.register();
 		ClientShortSightedState.register();

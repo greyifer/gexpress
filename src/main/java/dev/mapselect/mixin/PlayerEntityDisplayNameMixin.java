@@ -2,6 +2,8 @@ package dev.mapselect.mixin;
 
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
+import dev.mapselect.role.skincrawler.SkincrawlerManager;
+import dev.mapselect.role.trickster.TricksterManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -21,8 +23,22 @@ public abstract class PlayerEntityDisplayNameMixin {
 				cir.setReturnValue(puppetName);
 				return;
 			}
+			Text disguiseName = disguiseNameFor(serverPlayer);
+			if (disguiseName != null) {
+				cir.setReturnValue(disguiseName);
+				return;
+			}
 		}
 		if (!GexpressPermissions.hasBadge(self)) return;
 		cir.setReturnValue(GexpressPermissions.displayName(self));
+	}
+
+	private static Text disguiseNameFor(ServerPlayerEntity player) {
+		if (player == null || player.getServer() == null) return null;
+		java.util.UUID replacement = TricksterManager.replacementFor(player.getUuid());
+		if (replacement == null) replacement = SkincrawlerManager.replacementFor(player.getUuid());
+		if (replacement == null || replacement.equals(player.getUuid())) return null;
+		ServerPlayerEntity replacementPlayer = player.getServer().getPlayerManager().getPlayer(replacement);
+		return replacementPlayer == null ? null : Text.literal(replacementPlayer.getName().getString());
 	}
 }

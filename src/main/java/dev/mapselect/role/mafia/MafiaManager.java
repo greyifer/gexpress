@@ -448,6 +448,14 @@ public final class MafiaManager {
 		return isGodfather(player) || isMafioso(player) || isJanitor(player);
 	}
 
+	public static boolean isMafiaRole(Role role) {
+		if (role == null || role.identifier() == null) return false;
+		Identifier id = role.identifier();
+		return MapSelectRoles.GODFATHER_ID.equals(id)
+			|| MapSelectRoles.MAFIOSO_ID.equals(id)
+			|| MapSelectRoles.JANITOR_ID.equals(id);
+	}
+
 	public static boolean isGodfather(PlayerEntity player) {
 		Role role = currentRole(player);
 		return role != null && MapSelectRoles.GODFATHER_ID.equals(role.identifier());

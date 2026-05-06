@@ -1,4 +1,9 @@
 {
+  "announcement.role.gexpress.mafia": "Mafia",
+  "announcement.title.gexpress.mafia": "Mafia",
+  "announcement.goal.gexpress.mafia": "Protect the family.",
+  "announcement.goals.gexpress.mafia": "Protect the family.",
+  "announcement.win.gexpress.mafia": "The Mafia Wins!",
 	"block.gexpress.sand_layer": "Sand Layer",
 	"block.gexpress.red_sand_layer": "Red Sand Layer",
 	"block.gexpress.greyifer_plush": "Greyifer Plush",
@@ -15,6 +20,7 @@
 	"subtitles.gexpress.greyifer_plush_honk": "Greyifer Plush honks",
 	"subtitles.gexpress.jevil_laugh": "Harlequin laughs",
 	"subtitles.gexpress.mafia": "Mafia theme plays",
+	"gui.gexpress.end_section.neutrals": "Neutrals",
 
 	"announcement.role.gexpress.bomb_specialist": "Bomb Specialist",
 	"announcement.title.gexpress.bomb_specialist": "Bomb Specialists",

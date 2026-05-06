@@ -1,3 +1,24 @@
+# Grey's Express 1.3.9.1
+
+## Added
+
+- Added a Mafia column to the round-end results screen.
+- Fresh Air areas now apply a live `gexpress_fresh_air_area` command tag while players stand inside them.
+
+## Changed
+
+- Fresh Air area checks now treat configured corners as inclusive block areas, making small or single-block selections work reliably.
+- Pelican death releases swallowed players back alive and resets their voice group.
+
+## Fixed
+
+- Fixed Mafia round-end data not syncing after it was recategorized.
+- Fixed Puppetmaster controllers keeping inventory pickups made while controlling another player.
+- Fixed Skincrawler disguises not carrying the stolen player's visible name and pronouns.
+- Fixed role hover text still appearing while controlled or inside the Pelican.
+- Fixed Juggernaut shield detection for knife and gun deaths and removed G'Express Lovers runtime logic.
+- Suppressed the recursive unknown disconnect-packet error after disconnect encoding failures.
+
 # Grey's Express 1.3.9
 
 ## Added

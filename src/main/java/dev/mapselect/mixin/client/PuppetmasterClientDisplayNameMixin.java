@@ -1,6 +1,7 @@
 package dev.mapselect.mixin.client;
 
 import dev.mapselect.client.ClientPuppetmasterState;
+import dev.mapselect.client.ClientSkincrawlerState;
 import dev.mapselect.client.ClientTricksterState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
@@ -18,6 +19,9 @@ public abstract class PuppetmasterClientDisplayNameMixin {
 	private void gexpress$puppetmasterDisplayName(CallbackInfoReturnable<Text> cir) {
 		PlayerEntity self = (PlayerEntity) (Object) this;
 		UUID replacementId = ClientPuppetmasterState.replacementFor(self.getUuid());
+		if (replacementId == null) {
+			replacementId = ClientSkincrawlerState.replacementFor(self.getUuid());
+		}
 		if (replacementId == null) {
 			replacementId = ClientTricksterState.replacementFor(self.getUuid());
 		}
