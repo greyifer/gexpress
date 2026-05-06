@@ -18,6 +18,6 @@ public abstract class PassiveMoneyGraceMixin {
 	)
 	private Object gexpress$skipOpeningPassiveMoney(Function<Long, Integer> function, Object tick,
 			ServerWorld world, GameWorldComponent game) {
-		return PassiveMoney.value(world);
+		return 0;
 	}
 }

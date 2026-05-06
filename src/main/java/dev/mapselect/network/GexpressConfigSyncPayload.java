@@ -8,7 +8,9 @@ import net.minecraft.util.Identifier;
 
 /** Bidirectional snapshot of live G'Express settings. */
 public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4FirstBeepSeconds, int wrongWirePercent,
-		int grenadePrice, int medicShieldCooldownSeconds, boolean medicShieldKnifeBreaks,
+		int grenadePrice, int passiveIncomeKiller, int passiveIncomeCivilian, int passiveIncomeNeutral,
+		int passiveIncomeVigilante, int passiveIncomeMafia,
+		int medicShieldCooldownSeconds, boolean medicShieldKnifeBreaks,
 		int silentShadowDurationSeconds, int silentShadowCooldownSeconds,
 		int warlockMarkCooldownSeconds, int warlockKillCooldownSeconds,
 		int juggernautInitialCooldownSeconds, int juggernautCooldownReductionSeconds,
@@ -60,6 +62,11 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.c4FirstBeepSeconds());
 			buf.writeInt(payload.wrongWirePercent());
 			buf.writeInt(payload.grenadePrice());
+			buf.writeInt(payload.passiveIncomeKiller());
+			buf.writeInt(payload.passiveIncomeCivilian());
+			buf.writeInt(payload.passiveIncomeNeutral());
+			buf.writeInt(payload.passiveIncomeVigilante());
+			buf.writeInt(payload.passiveIncomeMafia());
 			buf.writeInt(payload.medicShieldCooldownSeconds());
 			buf.writeBoolean(payload.medicShieldKnifeBreaks());
 			buf.writeInt(payload.silentShadowDurationSeconds());
@@ -162,6 +169,11 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // c4FirstBeepSeconds
 			buf.readInt(), // wrongWirePercent
 			buf.readInt(), // grenadePrice
+			buf.readInt(), // passiveIncomeKiller
+			buf.readInt(), // passiveIncomeCivilian
+			buf.readInt(), // passiveIncomeNeutral
+			buf.readInt(), // passiveIncomeVigilante
+			buf.readInt(), // passiveIncomeMafia
 			buf.readInt(), // medicShieldCooldownSeconds
 			buf.readBoolean(), // medicShieldKnifeBreaks
 			buf.readInt(), // silentShadowDurationSeconds

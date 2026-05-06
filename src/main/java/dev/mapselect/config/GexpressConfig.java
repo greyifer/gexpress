@@ -37,6 +37,16 @@ public final class GexpressConfig {
 	public static int wrongWirePercent = 20;
 	/** Cost in coins for a Grenade in the Bomb Specialist's shop. */
 	public static int grenadePrice = 150;
+	/** Coins paid every Wathe passive-income tick to killer-team roles. */
+	public static int passiveIncomeKiller = 5;
+	/** Coins paid every Wathe passive-income tick to civilian roles. */
+	public static int passiveIncomeCivilian = 0;
+	/** Coins paid every Wathe passive-income tick to neutral roles. */
+	public static int passiveIncomeNeutral = 5;
+	/** Coins paid every Wathe passive-income tick to Vigilantes. */
+	public static int passiveIncomeVigilante = 0;
+	/** Coins paid every Wathe passive-income tick to Mafia family roles. */
+	public static int passiveIncomeMafia = 5;
 	/** Seconds before a Medic can move or re-apply their protective shield. */
 	public static int medicShieldCooldownSeconds = 90;
 	/** Whether a blocked knife hit consumes a Medic shield. */
@@ -218,6 +228,8 @@ public final class GexpressConfig {
 	public static final int WRONG_WIRE_MAX = 100;
 	public static final int GRENADE_PRICE_MIN = 0;
 	public static final int GRENADE_PRICE_MAX = 9999;
+	public static final int PASSIVE_INCOME_MIN = 0;
+	public static final int PASSIVE_INCOME_MAX = 9999;
 	public static final int MEDIC_SHIELD_COOLDOWN_MIN = 0;
 	public static final int MEDIC_SHIELD_COOLDOWN_MAX = 600;
 	public static final int SILENT_SHADOW_DURATION_MIN = 1;
@@ -381,6 +393,26 @@ public final class GexpressConfig {
 
 	public static int getGrenadePrice() {
 		return Math.max(GRENADE_PRICE_MIN, Math.min(GRENADE_PRICE_MAX, grenadePrice));
+	}
+
+	public static int getPassiveIncomeKiller() {
+		return Math.max(PASSIVE_INCOME_MIN, Math.min(PASSIVE_INCOME_MAX, passiveIncomeKiller));
+	}
+
+	public static int getPassiveIncomeCivilian() {
+		return Math.max(PASSIVE_INCOME_MIN, Math.min(PASSIVE_INCOME_MAX, passiveIncomeCivilian));
+	}
+
+	public static int getPassiveIncomeNeutral() {
+		return Math.max(PASSIVE_INCOME_MIN, Math.min(PASSIVE_INCOME_MAX, passiveIncomeNeutral));
+	}
+
+	public static int getPassiveIncomeVigilante() {
+		return Math.max(PASSIVE_INCOME_MIN, Math.min(PASSIVE_INCOME_MAX, passiveIncomeVigilante));
+	}
+
+	public static int getPassiveIncomeMafia() {
+		return Math.max(PASSIVE_INCOME_MIN, Math.min(PASSIVE_INCOME_MAX, passiveIncomeMafia));
 	}
 
 	public static int getMedicShieldCooldownSeconds() {
@@ -943,6 +975,11 @@ public final class GexpressConfig {
 			c4FirstBeepSeconds = snap.c4FirstBeepSeconds;
 			wrongWirePercent = snap.wrongWirePercent;
 			grenadePrice = snap.grenadePrice;
+			passiveIncomeKiller = snap.passiveIncomeKiller;
+			passiveIncomeCivilian = snap.passiveIncomeCivilian;
+			passiveIncomeNeutral = snap.passiveIncomeNeutral;
+			passiveIncomeVigilante = snap.passiveIncomeVigilante;
+			passiveIncomeMafia = snap.passiveIncomeMafia;
 			medicShieldCooldownSeconds = snap.medicShieldCooldownSeconds;
 			medicShieldKnifeBreaks = snap.medicShieldKnifeBreaks;
 			silentShadowDurationSeconds = snap.silentShadowDurationSeconds;
@@ -989,6 +1026,7 @@ public final class GexpressConfig {
 			skincrawlerStunSeconds = snap.skincrawlerStunSeconds;
 			skincrawlerRange = snap.skincrawlerRange;
 			spyBugCost = snap.spyBugCost;
+			if (spyBugCost == 200) spyBugCost = 100;
 			spyBugDurationSeconds = snap.spyBugDurationSeconds;
 			spyBugRange = snap.spyBugRange;
 			squeakerPitchPercent = snap.squeakerPitchPercent;
@@ -1058,6 +1096,11 @@ public final class GexpressConfig {
 			snap.c4FirstBeepSeconds = c4FirstBeepSeconds;
 			snap.wrongWirePercent = wrongWirePercent;
 			snap.grenadePrice = grenadePrice;
+			snap.passiveIncomeKiller = passiveIncomeKiller;
+			snap.passiveIncomeCivilian = passiveIncomeCivilian;
+			snap.passiveIncomeNeutral = passiveIncomeNeutral;
+			snap.passiveIncomeVigilante = passiveIncomeVigilante;
+			snap.passiveIncomeMafia = passiveIncomeMafia;
 			snap.medicShieldCooldownSeconds = medicShieldCooldownSeconds;
 			snap.medicShieldKnifeBreaks = medicShieldKnifeBreaks;
 			snap.silentShadowDurationSeconds = silentShadowDurationSeconds;
@@ -1164,7 +1207,9 @@ public final class GexpressConfig {
 	}
 
 	public static void apply(int c4Price, int c4FuseSeconds, int c4FirstBeepSeconds, int wrongWirePercent,
-			int grenadePrice, int medicShieldCooldownSeconds, boolean medicShieldKnifeBreaks,
+			int grenadePrice, int passiveIncomeKiller, int passiveIncomeCivilian, int passiveIncomeNeutral,
+			int passiveIncomeVigilante, int passiveIncomeMafia,
+			int medicShieldCooldownSeconds, boolean medicShieldKnifeBreaks,
 			int silentShadowDurationSeconds, int silentShadowCooldownSeconds,
 			int warlockMarkCooldownSeconds, int warlockKillCooldownSeconds,
 			int juggernautInitialCooldownSeconds, int juggernautCooldownReductionSeconds,
@@ -1211,6 +1256,11 @@ public final class GexpressConfig {
 		GexpressConfig.c4FirstBeepSeconds = c4FirstBeepSeconds;
 		GexpressConfig.wrongWirePercent = wrongWirePercent;
 		GexpressConfig.grenadePrice = grenadePrice;
+		GexpressConfig.passiveIncomeKiller = passiveIncomeKiller;
+		GexpressConfig.passiveIncomeCivilian = passiveIncomeCivilian;
+		GexpressConfig.passiveIncomeNeutral = passiveIncomeNeutral;
+		GexpressConfig.passiveIncomeVigilante = passiveIncomeVigilante;
+		GexpressConfig.passiveIncomeMafia = passiveIncomeMafia;
 		GexpressConfig.medicShieldCooldownSeconds = medicShieldCooldownSeconds;
 		GexpressConfig.medicShieldKnifeBreaks = medicShieldKnifeBreaks;
 		GexpressConfig.silentShadowDurationSeconds = silentShadowDurationSeconds;
@@ -1315,6 +1365,11 @@ public final class GexpressConfig {
 		c4FirstBeepSeconds = getC4FirstBeepSeconds();
 		wrongWirePercent = getWrongWirePercent();
 		grenadePrice = getGrenadePrice();
+		passiveIncomeKiller = getPassiveIncomeKiller();
+		passiveIncomeCivilian = getPassiveIncomeCivilian();
+		passiveIncomeNeutral = getPassiveIncomeNeutral();
+		passiveIncomeVigilante = getPassiveIncomeVigilante();
+		passiveIncomeMafia = getPassiveIncomeMafia();
 		medicShieldCooldownSeconds = getMedicShieldCooldownSeconds();
 		silentShadowDurationSeconds = getSilentShadowDurationSeconds();
 		silentShadowCooldownSeconds = getSilentShadowCooldownSeconds();
@@ -1473,6 +1528,11 @@ public final class GexpressConfig {
 		int c4FirstBeepSeconds = 3;
 		int wrongWirePercent = 20;
 		int grenadePrice = 150;
+		int passiveIncomeKiller = 5;
+		int passiveIncomeCivilian = 0;
+		int passiveIncomeNeutral = 5;
+		int passiveIncomeVigilante = 0;
+		int passiveIncomeMafia = 5;
 		int medicShieldCooldownSeconds = 90;
 		boolean medicShieldKnifeBreaks = false;
 		int silentShadowDurationSeconds = 8;

@@ -29,6 +29,7 @@ import dev.mapselect.role.bombspecialist.PliersDefuseManager;
 import dev.mapselect.role.medic.MedicShieldManager;
 import dev.mapselect.role.KillerRoleInfoManager;
 import dev.mapselect.role.NeutralWinManager;
+import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.role.RoleModifierTuningBridge;
 import dev.mapselect.role.altruist.AltruistManager;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
@@ -100,6 +101,7 @@ public class MapSelect implements ModInitializer {
 		NightVisionManager.register();
 		ShortSightedTracker.register();
 		AbilityCooldownSync.register();
+		PassiveMoney.register();
 		GexpressConfigSyncHandler.register();
 		GexpressPresetsSyncHandler.register();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->

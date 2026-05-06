@@ -19,7 +19,6 @@ public abstract class ServerPlayerListNameMixin {
 			cir.setReturnValue(puppetName);
 			return;
 		}
-		if (!GexpressPermissions.hasBadge(self)) return;
 		cir.setReturnValue(GexpressPermissions.displayName(self));
 	}
 }

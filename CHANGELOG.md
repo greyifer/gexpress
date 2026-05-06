@@ -1,3 +1,20 @@
+# Grey's Express 1.3.8
+
+## Added
+
+- Added faction-specific passive income settings for Killers, Civilians, Neutrals, Vigilantes, and Mafia.
+
+## Changed
+
+- Passive income now runs through one G'Express-managed path instead of role managers granting it separately.
+- Spy now shows its bug price on the standard ability bar as coins, matching the rest of the HUD.
+
+## Fixed
+
+- Spy bug cost is corrected back to 100 coins when an older saved config still has it at 200.
+- Spy test-role usage now works outside a normal active survival round.
+- Passenger tags now appear in the server tab list instead of falling back to plain usernames.
+
 # Grey's Express 1.3.7
 
 ## Changed

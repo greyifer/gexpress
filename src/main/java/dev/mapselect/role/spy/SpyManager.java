@@ -60,7 +60,7 @@ public final class SpyManager {
 	private static void tryBug(ServerPlayerEntity spy) {
 		if (spy == null || !(spy.getWorld() instanceof ServerWorld world)) return;
 		if (VultureManager.isStashed(spy) || !isSpy(spy) || !canUseHere(world, spy)
-				|| !GameFunctions.isPlayerAliveAndSurvival(spy)) return;
+				|| !isPlayable(spy, spy)) return;
 		Bug activeBug = bugsBySpy.get(spy.getUuid());
 		if (activeBug != null && activeBug.expiresAtTick() > world.getTime()) {
 			sendStatus(spy, activeBug, world.getTime());

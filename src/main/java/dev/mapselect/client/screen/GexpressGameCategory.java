@@ -111,6 +111,16 @@ public final class GexpressGameCategory {
 		globalRoleOpts.add(playersPerVigilante);
 		globalRoleOpts.add(buildMafiaMinimumPlayersOption());
 		globalRoleOpts.add(buildLastDeathShieldOption());
+		globalRoleOpts.add(buildPassiveIncomeOption("killer", 5,
+			GexpressConfig::getPassiveIncomeKiller, v -> GexpressConfig.passiveIncomeKiller = v));
+		globalRoleOpts.add(buildPassiveIncomeOption("civilian", 0,
+			GexpressConfig::getPassiveIncomeCivilian, v -> GexpressConfig.passiveIncomeCivilian = v));
+		globalRoleOpts.add(buildPassiveIncomeOption("neutral", 5,
+			GexpressConfig::getPassiveIncomeNeutral, v -> GexpressConfig.passiveIncomeNeutral = v));
+		globalRoleOpts.add(buildPassiveIncomeOption("vigilante", 0,
+			GexpressConfig::getPassiveIncomeVigilante, v -> GexpressConfig.passiveIncomeVigilante = v));
+		globalRoleOpts.add(buildPassiveIncomeOption("mafia", 5,
+			GexpressConfig::getPassiveIncomeMafia, v -> GexpressConfig.passiveIncomeMafia = v));
 
 		Map<String, List<Option<?>>> modKeyToWeOpts = new LinkedHashMap<>();
 		List<Option<?>> globalModOpts = new ArrayList<>();
@@ -347,6 +357,17 @@ public final class GexpressGameCategory {
 			.binding(false, GexpressConfig::isLastDeathShieldEnabled, v -> GexpressConfig.lastDeathShieldEnabled = v)
 			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
 				.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+			.build();
+	}
+
+	private static Option<Integer> buildPassiveIncomeOption(String key, int defaultValue, Supplier<Integer> getter,
+			Consumer<Integer> setter) {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.passive_income_" + key))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.passive_income_" + key + ".tooltip")))
+			.binding(defaultValue, getter, setter)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+				.range(GexpressConfig.PASSIVE_INCOME_MIN, GexpressConfig.PASSIVE_INCOME_MAX))
 			.build();
 	}
 

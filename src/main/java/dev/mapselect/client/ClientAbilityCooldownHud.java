@@ -3,6 +3,7 @@ package dev.mapselect.client;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.MapSelect;
+import dev.mapselect.client.screen.WeIcons;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -188,7 +189,8 @@ public final class ClientAbilityCooldownHud {
 				bars.add(draining(ICON_TRACKER, active, GexpressConfig.getSpyBugDurationSeconds() * 20L,
 					0xFF77C7FF, 0xFF234F7A));
 			} else {
-				bars.add(cooldown(ICON_TRACKER, 0L, 1L, 0xFF77C7FF, 0xFF234F7A));
+				bars.add(cooldown(ICON_TRACKER, 0L, 1L, 0xFF77C7FF, 0xFF234F7A,
+					GexpressConfig.getSpyBugCost() + " " + WeIcons.COIN));
 			}
 		} else if (MapSelectRoles.VULTURE_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PELICAN_SWALLOW, ICON_PELICAN_SWALLOW,
