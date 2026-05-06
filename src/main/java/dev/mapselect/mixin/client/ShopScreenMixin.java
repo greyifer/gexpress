@@ -7,8 +7,8 @@ import dev.mapselect.role.GexpressRoleShop;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import org.spongepowered.asm.mixin.Dynamic;
 import org.objectweb.asm.Opcodes;
+import org.spongepowered.asm.mixin.Dynamic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -16,13 +16,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import java.util.List;
 
 /**
- * Replaces the global killer shop list with the Bomb Specialist's custom six-slot loadout
- * when the viewing player is a Bomb Specialist. Targets the GETSTATIC of
- * GameConstants.SHOP_ENTRIES inside the screen's init (method_25426) — the sole read in that
- * method, used to build the widget grid.
- *
- * Pairs with ShopPurchaseMixin on the server side; both must resolve the same list or slot
- * indices will refer to different items on the two sides and purchases will get scrambled.
+ * Replaces Wathe's static killer shop entries with the active role's custom list.
+ * The server-side purchase mixin must resolve the same list, or slot indices will drift.
  */
 @Mixin(value = LimitedInventoryScreen.class, remap = false)
 public abstract class ShopScreenMixin {

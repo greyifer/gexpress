@@ -20,7 +20,7 @@ import java.util.UUID;
 public final class ClientBountyHunterState {
 	private static UUID targetId;
 	private static String targetName = "";
-	private static int rewardGold;
+	private static int rewardCoins;
 	private static long remainingTicks;
 	private static boolean active;
 	private static float alpha;
@@ -38,7 +38,7 @@ public final class ClientBountyHunterState {
 		active = payload.active();
 		targetId = payload.targetId();
 		targetName = payload.targetName();
-		rewardGold = Math.max(0, payload.rewardGold());
+		rewardCoins = Math.max(0, payload.rewardGold());
 		remainingTicks = Math.max(0L, payload.remainingTicks());
 	}
 
@@ -83,7 +83,7 @@ public final class ClientBountyHunterState {
 		drawHead(context, client, targetId, x + width / 2 - 18, y + 49, a);
 		drawCentered(context, text, trimToWidth(text, targetName, width - 12), x, y + 82, width, ink);
 		drawCentered(context, text, "REWARD", x, y + 99, width, inkSoft);
-		drawCentered(context, text, rewardGold + " gold", x, y + 111, width, ink);
+		drawCentered(context, text, rewardCoins + " coins", x, y + 111, width, ink);
 		if (remainingTicks > 0L) {
 			String seconds = Math.max(1L, (remainingTicks + 19L) / 20L) + "s left";
 			drawCentered(context, text, seconds, x, y + 124, width, withAlpha(0x5A2F12, a));

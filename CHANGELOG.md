@@ -1,3 +1,19 @@
+# Grey's Express 1.3.7
+
+## Changed
+
+- Spy now uses Wathe's normal StoreRenderer coin HUD instead of drawing a separate G'Express balance in the corner.
+- Spy active bug timing now stays in the standard G'Express ability bar instead of adding a second custom timer line.
+- Bounty Hunter and Mafia option text now consistently uses coins instead of mixing gold/coins wording.
+
+## Removed
+
+- Removed the old standalone Players screen now that player tags live directly inside the Players tab.
+
+## Fixed
+
+- Custom-shop and money-HUD checks are now separate, so Spy gets Wathe's coin display without being treated like a custom-shop role.
+
 # Grey's Express 1.3.6
 
 ## Added

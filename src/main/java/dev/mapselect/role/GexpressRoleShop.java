@@ -23,6 +23,7 @@ public final class GexpressRoleShop {
 	private static final Identifier GODFATHER_ID = Identifier.of(MapSelect.MOD_ID, "godfather");
 	private static final Identifier MAFIOSO_ID = Identifier.of(MapSelect.MOD_ID, "mafioso");
 	private static final Identifier JANITOR_ID = Identifier.of(MapSelect.MOD_ID, "janitor");
+	private static final Identifier SPY_ID = Identifier.of(MapSelect.MOD_ID, "spy");
 
 	private GexpressRoleShop() {}
 
@@ -40,7 +41,17 @@ public final class GexpressRoleShop {
 	public static boolean hasCustomShop(PlayerEntity player) {
 		Role role = roleOf(player);
 		if (role == null) return false;
+		return roleHasCustomShop(role.identifier());
+	}
+
+	public static boolean showsMoneyHud(PlayerEntity player) {
+		Role role = roleOf(player);
+		if (role == null) return false;
 		Identifier id = role.identifier();
+		return roleHasCustomShop(id) || SPY_ID.equals(id);
+	}
+
+	private static boolean roleHasCustomShop(Identifier id) {
 		return BOMB_SPECIALIST_ID.equals(id)
 			|| GODFATHER_ID.equals(id)
 			|| MAFIOSO_ID.equals(id)

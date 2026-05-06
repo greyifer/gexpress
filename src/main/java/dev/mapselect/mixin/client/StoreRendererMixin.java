@@ -19,6 +19,6 @@ public abstract class StoreRendererMixin {
 		remap = false
 	)
 	private static boolean gexpress$showMoneyForCustomShopRoles(GameWorldComponent game, PlayerEntity player) {
-		return game.canUseKillerFeatures(player) || GexpressRoleShop.hasCustomShop(player);
+		return game.canUseKillerFeatures(player) || GexpressRoleShop.showsMoneyHud(player);
 	}
 }

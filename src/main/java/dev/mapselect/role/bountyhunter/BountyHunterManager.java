@@ -148,7 +148,7 @@ public final class BountyHunterManager {
 			PlayerShopComponent.KEY.get(hunter).addToBalance(reward);
 			PlayerShopComponent.KEY.sync(hunter);
 		}
-		hunter.sendMessage(Text.literal("Bounty claimed: +" + reward + " gold.").formatted(Formatting.GOLD), true);
+		hunter.sendMessage(Text.literal("Bounty claimed: +" + reward + " coins.").formatted(Formatting.GOLD), true);
 		clearHunter(hunter.getUuid());
 		sendClear(hunter);
 		return true;
