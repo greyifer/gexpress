@@ -54,14 +54,17 @@ public final class PassiveMoney {
 		if (MafiaManager.isMafiaRole(player)) return GexpressConfig.getPassiveIncomeMafia();
 		Role role = game.getRole(player);
 		if (role == null) return 0;
-		if (role == WatheRoles.VIGILANTE) return GexpressConfig.getPassiveIncomeVigilante();
+		if (role == WatheRoles.VIGILANTE) return GexpressConfig.getPassiveIncomeCivilian();
 		Identifier id = role.identifier();
 		if (MapSelectRoles.JUGGERNAUT_ID.equals(id) || MapSelectRoles.VULTURE_ID.equals(id)
 				|| MapSelectRoles.GODFATHER_ID.equals(id)) {
 			return GexpressConfig.getPassiveIncomeNeutral();
 		}
 		if (game.canUseKillerFeatures(player)) return GexpressConfig.getPassiveIncomeKiller();
-		return role.isInnocent() ? GexpressConfig.getPassiveIncomeCivilian() : GexpressConfig.getPassiveIncomeNeutral();
+		if (role.isInnocent()) {
+			return GexpressRoleShop.showsMoneyHud(player) ? GexpressConfig.getPassiveIncomeCivilian() : 0;
+		}
+		return GexpressConfig.getPassiveIncomeNeutral();
 	}
 
 	private static boolean isOpeningGrace(ServerWorld world) {

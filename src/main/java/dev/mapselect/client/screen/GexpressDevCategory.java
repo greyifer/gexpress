@@ -104,7 +104,9 @@ public final class GexpressDevCategory {
 			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.role_descriptions.tooltip")))
 			.collapsed(true);
 		for (String role : List.of("bomb_specialist", "medic", "snitch", "seer", "time_master",
-				"the_silent", "warlock", "juggernaut", "trickster", "puppetmaster", "pelican")) {
+				"the_silent", "warlock", "juggernaut", "trickster", "puppetmaster", "bounty_hunter",
+				"pelican", "scatter_brain", "skincrawler", "tracker", "spy", "altruist",
+				"godfather", "mafioso", "janitor")) {
 			group.option(roleDescriptionOption(role));
 		}
 		return group.build();

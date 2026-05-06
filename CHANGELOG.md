@@ -1,3 +1,20 @@
+# Grey's Express 1.3.9
+
+## Added
+
+- Added a dedicated Mafia section in the Game tab.
+- Added a dedicated Mafia section in the Wathe Extended guidebook.
+- Added the newer G'Express roles to the Dev role-description override editor.
+
+## Changed
+
+- Vigilantes now use the Civilian passive-income bucket instead of a separate vigilante-only income setting.
+
+## Fixed
+
+- Fixed the Maps screen crash caused by Fresh Air Areas being added as a normal option instead of a list group.
+- Civilian roles that do not use G'Express money HUD/shop handling no longer receive passive income by mistake.
+
 # Grey's Express 1.3.8
 
 ## Added

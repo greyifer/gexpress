@@ -52,6 +52,7 @@
 		"client.GuidebookPageContentMixin",
 		"client.GameRendererAccessor",
 		"client.GodfatherRevolverUseMixin",
+		"client.MafiaGuidebookCategoryMixin",
 		"client.MafiaRiserSoundMixin",
 		"client.MafiaSkyFlashMixin",
 		"client.MafiaWeatherWorldMixin",

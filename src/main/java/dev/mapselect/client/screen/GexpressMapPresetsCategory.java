@@ -58,8 +58,8 @@ public final class GexpressMapPresetsCategory {
 		areas.option(boxOption("readyArea", () -> edit.readyArea, v -> edit.readyArea = v));
 		areas.option(boxOption("playArea", () -> edit.playArea, v -> edit.playArea = v));
 		areas.option(boxOption("resetTemplateArea", () -> edit.resetTemplateArea, v -> edit.resetTemplateArea = v));
-		areas.option(freshAirAreasOption(edit));
 		category.group(areas.build());
+		category.group(freshAirAreasOption(edit));
 
 		OptionGroup.Builder positions = OptionGroup.createBuilder()
 			.name(Text.translatable("gui.gexpress.config.group.map.positions").formatted(Formatting.YELLOW));

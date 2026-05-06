@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -55,6 +56,7 @@ public final class GexpressGameCategory {
 	private static final String GODFATHER_ID = MapSelect.MOD_ID + ":godfather";
 	private static final String MAFIOSO_ID = MapSelect.MOD_ID + ":mafioso";
 	private static final String JANITOR_ID = MapSelect.MOD_ID + ":janitor";
+	private static final Set<String> MAFIA_ROLE_IDS = Set.of(GODFATHER_ID, MAFIOSO_ID, JANITOR_ID);
 	private static final String EOD_SPECIALIST_ID = MapSelect.MOD_ID + ":eod_specialist";
 	private static final String SHORT_SIGHTED_ID = MapSelect.MOD_ID + ":short_sighted";
 	private static final String HUNGRY_ID = MapSelect.MOD_ID + ":hungry";
@@ -117,8 +119,6 @@ public final class GexpressGameCategory {
 			GexpressConfig::getPassiveIncomeCivilian, v -> GexpressConfig.passiveIncomeCivilian = v));
 		globalRoleOpts.add(buildPassiveIncomeOption("neutral", 5,
 			GexpressConfig::getPassiveIncomeNeutral, v -> GexpressConfig.passiveIncomeNeutral = v));
-		globalRoleOpts.add(buildPassiveIncomeOption("vigilante", 0,
-			GexpressConfig::getPassiveIncomeVigilante, v -> GexpressConfig.passiveIncomeVigilante = v));
 		globalRoleOpts.add(buildPassiveIncomeOption("mafia", 5,
 			GexpressConfig::getPassiveIncomeMafia, v -> GexpressConfig.passiveIncomeMafia = v));
 
@@ -209,9 +209,14 @@ public final class GexpressGameCategory {
 		bySide.put(RolesDisplay.Side.KILLER, new ArrayList<>());
 		bySide.put(RolesDisplay.Side.INNOCENT, new ArrayList<>());
 		bySide.put(RolesDisplay.Side.NEUTRAL, new ArrayList<>());
+		List<String> mafiaRoles = new ArrayList<>();
 
 		for (Map.Entry<String, RolesDisplay.RoleDisplay> e : display.entrySet()) {
 			if (isBuiltinNonConfigRole(e.getKey()) || isRetiredExternalVulture(e.getKey())) continue;
+			if (isMafiaRoleId(e.getKey())) {
+				mafiaRoles.add(e.getKey());
+				continue;
+			}
 			RolesDisplay.RoleDisplay rd = e.getValue();
 			RolesDisplay.Side side = rd != null ? rd.side() : RolesDisplay.Side.NEUTRAL;
 			if (JUGGERNAUT_ID.equals(e.getKey()) || VULTURE_ID.equals(e.getKey())) side = RolesDisplay.Side.NEUTRAL;
@@ -230,14 +235,24 @@ public final class GexpressGameCategory {
 			if (roleIds.isEmpty()) continue;
 			groups.add(buildRoleSideGroup(side, roleIds, display, weOptsByRole));
 		}
+		if (!mafiaRoles.isEmpty()) {
+			groups.add(buildRoleGroup(Text.translatable("gui.gexpress.config.group.roles.mafia").formatted(Formatting.DARK_GRAY),
+				mafiaRoles, display, weOptsByRole));
+		}
 		return groups;
 	}
 
 	private static OptionGroup buildRoleSideGroup(RolesDisplay.Side side, List<String> roleIds,
 	                                                Map<String, RolesDisplay.RoleDisplay> display,
 	                                                Map<String, List<Option<?>>> weOptsByRole) {
+		return buildRoleGroup(sideTitle(side), roleIds, display, weOptsByRole);
+	}
+
+	private static OptionGroup buildRoleGroup(Text title, List<String> roleIds,
+	                                                Map<String, RolesDisplay.RoleDisplay> display,
+	                                                Map<String, List<Option<?>>> weOptsByRole) {
 		OptionGroup.Builder g = OptionGroup.createBuilder()
-			.name(sideTitle(side))
+			.name(title)
 			.collapsed(false);
 
 		for (String id : roleIds) {
@@ -1336,6 +1351,10 @@ public final class GexpressGameCategory {
 			case INNOCENT -> Text.translatable("gui.gexpress.config.group.roles.civilians").formatted(Formatting.AQUA);
 			case NEUTRAL -> Text.translatable("gui.gexpress.config.group.roles.neutrals").formatted(Formatting.GRAY);
 		};
+	}
+
+	private static boolean isMafiaRoleId(String roleId) {
+		return roleId != null && MAFIA_ROLE_IDS.contains(roleId);
 	}
 
 	private static OptionGroup errorGroup(String langKey) {

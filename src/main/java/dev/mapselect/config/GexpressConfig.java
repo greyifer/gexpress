@@ -43,7 +43,7 @@ public final class GexpressConfig {
 	public static int passiveIncomeCivilian = 0;
 	/** Coins paid every Wathe passive-income tick to neutral roles. */
 	public static int passiveIncomeNeutral = 5;
-	/** Coins paid every Wathe passive-income tick to Vigilantes. */
+	/** Legacy synced value; Vigilantes now use the civilian passive-income bucket. */
 	public static int passiveIncomeVigilante = 0;
 	/** Coins paid every Wathe passive-income tick to Mafia family roles. */
 	public static int passiveIncomeMafia = 5;
@@ -408,7 +408,7 @@ public final class GexpressConfig {
 	}
 
 	public static int getPassiveIncomeVigilante() {
-		return Math.max(PASSIVE_INCOME_MIN, Math.min(PASSIVE_INCOME_MAX, passiveIncomeVigilante));
+		return getPassiveIncomeCivilian();
 	}
 
 	public static int getPassiveIncomeMafia() {
