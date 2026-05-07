@@ -1,3 +1,15 @@
+# Grey's Express 1.4.2
+
+## Changed
+
+- Config sync now uses a versioned network channel so future setting changes do not decode against an older packet layout.
+
+## Fixed
+
+- Fixed clients crashing on join when a server sent the older `gexpress:config_sync` packet layout.
+- Fixed the Guardian Angel setting shifting the legacy config sync packet bytes before the bounty hunter settings.
+- Fixed servers sending the new config sync packet to clients that have not advertised support for the new channel.
+
 # Grey's Express 1.4.1
 
 ## Added

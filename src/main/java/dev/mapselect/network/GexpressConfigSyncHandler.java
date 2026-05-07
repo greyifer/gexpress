@@ -21,6 +21,7 @@ public final class GexpressConfigSyncHandler {
 		PayloadTypeRegistry.playC2S().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.LEGACY_ID, GexpressConfigSyncPayload.LEGACY_CODEC);
 		PayloadTypeRegistry.playS2C().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
@@ -169,13 +170,16 @@ public final class GexpressConfigSyncHandler {
 	public static void broadcastConfig(MinecraftServer server) {
 		GexpressConfigSyncPayload payload = currentPayload();
 		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			if (!ServerPlayNetworking.canSend(player, GexpressConfigSyncPayload.ID)) continue;
 			ServerPlayNetworking.send(player, payload);
 		}
 		broadcastPuppetmasterConfig(server);
 	}
 
 	private static void sendConfigTo(ServerPlayerEntity player) {
-		ServerPlayNetworking.send(player, currentPayload());
+		if (ServerPlayNetworking.canSend(player, GexpressConfigSyncPayload.ID)) {
+			ServerPlayNetworking.send(player, currentPayload());
+		}
 		sendPuppetmasterConfigTo(player);
 	}
 

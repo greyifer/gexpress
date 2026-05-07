@@ -100,8 +100,15 @@ public class MapSelectClient implements ClientModInitializer {
 
 	private static void registerConfigReceiver() {
 		ClientPlayNetworking.registerGlobalReceiver(GexpressConfigSyncPayload.ID, (payload, context) ->
-			context.client().execute(() -> {
-				GexpressConfig.apply(
+			context.client().execute(() -> applyConfigPayload(payload)));
+		ClientPlayNetworking.registerGlobalReceiver(GexpressConfigSyncPayload.LEGACY_ID, (payload, context) ->
+			context.client().execute(() -> applyConfigPayload(payload)));
+		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID, (payload, context) ->
+			context.client().execute(() -> GexpressConfig.puppetmasterCanKillOwnBody = payload.canKillOwnBody()));
+	}
+
+	private static void applyConfigPayload(GexpressConfigSyncPayload payload) {
+		GexpressConfig.apply(
 				payload.c4Price(),
 				payload.c4FuseSeconds(),
 				payload.c4FirstBeepSeconds(),
@@ -209,9 +216,6 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.medicShieldBreakFlashAlpha(),
 				payload.silentShadowAlpha()
 				);
-				GuidebookScreen.invalidateIfOpen();
-			}));
-		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID, (payload, context) ->
-			context.client().execute(() -> GexpressConfig.puppetmasterCanKillOwnBody = payload.canKillOwnBody()));
+		GuidebookScreen.invalidateIfOpen();
 	}
 }

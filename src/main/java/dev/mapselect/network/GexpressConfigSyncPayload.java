@@ -52,119 +52,157 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
 		float silentShadowAlpha) implements CustomPayload {
 
+	private static final int WIRE_VERSION = 2;
+
 	public static final CustomPayload.Id<GexpressConfigSyncPayload> ID =
+		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "config_sync_v2"));
+	public static final CustomPayload.Id<GexpressConfigSyncPayload> LEGACY_ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "config_sync"));
 
 	public static final PacketCodec<PacketByteBuf, GexpressConfigSyncPayload> CODEC = PacketCodec.of(
 		(payload, buf) -> {
-			buf.writeInt(payload.c4Price());
-			buf.writeInt(payload.c4FuseSeconds());
-			buf.writeInt(payload.c4FirstBeepSeconds());
-			buf.writeInt(payload.wrongWirePercent());
-			buf.writeInt(payload.grenadePrice());
-			buf.writeInt(payload.passiveIncomeKiller());
-			buf.writeInt(payload.passiveIncomeCivilian());
-			buf.writeInt(payload.passiveIncomeNeutral());
-			buf.writeInt(payload.passiveIncomeVigilante());
-			buf.writeInt(payload.passiveIncomeMafia());
-			buf.writeInt(payload.medicShieldCooldownSeconds());
-			buf.writeBoolean(payload.medicShieldKnifeBreaks());
-			buf.writeInt(payload.silentShadowDurationSeconds());
-			buf.writeInt(payload.silentShadowCooldownSeconds());
-			buf.writeInt(payload.warlockMarkCooldownSeconds());
-			buf.writeInt(payload.warlockKillCooldownSeconds());
-			buf.writeInt(payload.juggernautInitialCooldownSeconds());
-			buf.writeInt(payload.juggernautCooldownReductionSeconds());
-			buf.writeInt(payload.juggernautMinimumCooldownSeconds());
-			buf.writeInt(payload.juggernautShieldRechargeSeconds());
-			buf.writeInt(payload.tricksterSwapDurationSeconds());
-			buf.writeInt(payload.tricksterMasqueradeCooldownSeconds());
-			buf.writeInt(payload.tricksterDancingCartsCooldownSeconds());
-			buf.writeInt(payload.tricksterDancingCartsMaxUses());
-			buf.writeInt(payload.puppetmasterControlDurationSeconds());
-			buf.writeInt(payload.puppetmasterControlCooldownSeconds());
-			buf.writeBoolean(payload.puppetmasterRandomTarget());
-			buf.writeInt(payload.puppetmasterControlRange());
-			buf.writeInt(payload.puppetmasterMaxUses());
-			buf.writeInt(payload.pelicanEatCooldownSeconds());
-			buf.writeInt(payload.pelicanEatPercentage());
-			buf.writeInt(payload.hungryFoodLimit());
-			buf.writeInt(payload.thirstyDrinkLimit());
-			buf.writeInt(payload.snitchTasksRequired());
-			buf.writeInt(payload.snitchWarningTasksRemaining());
-			buf.writeInt(payload.timeMasterRewindSeconds());
-			buf.writeInt(payload.timeMasterCooldownSeconds());
-			buf.writeInt(payload.timeMasterMaxUses());
-			buf.writeInt(payload.timeMasterFreezeDurationSeconds());
-			buf.writeInt(payload.timeMasterFreezeCooldownSeconds());
-			buf.writeInt(payload.timeMasterFreezeMaxUses());
-			buf.writeInt(payload.timeMasterFreezeRange());
-			buf.writeInt(payload.scatterBrainCooldownSeconds());
-			buf.writeInt(payload.trackerMaxTargets());
-			buf.writeInt(payload.trackerRange());
-			buf.writeInt(payload.trackerCooldownSeconds());
-			buf.writeInt(payload.altruistRange());
-			buf.writeInt(payload.skincrawlerBodyMaxAgeSeconds());
-			buf.writeInt(payload.skincrawlerCooldownSeconds());
-			buf.writeInt(payload.skincrawlerStunSeconds());
-			buf.writeInt(payload.skincrawlerRange());
-			buf.writeInt(payload.spyBugCost());
-			buf.writeInt(payload.spyBugDurationSeconds());
-			buf.writeInt(payload.spyBugRange());
-			buf.writeInt(payload.squeakerPitchPercent());
-			buf.writeInt(payload.masqueradePitchMinPercent());
-			buf.writeInt(payload.masqueradePitchMaxPercent());
-			buf.writeBoolean(payload.lastDeathShieldEnabled());
-			buf.writeBoolean(payload.guardianAngelAllowNonInnocents());
-			buf.writeInt(payload.bountyHunterBountyIntervalSeconds());
-			buf.writeInt(payload.bountyHunterRewardGold());
-			buf.writeInt(payload.bountyHunterFailCooldownSeconds());
-			buf.writeInt(payload.godfatherBulletPrice());
-			buf.writeInt(payload.godfatherStartingBullets());
-			buf.writeInt(payload.godfatherMaxLoadedBullets());
-			buf.writeInt(payload.mafiaStartingGold());
-			buf.writeInt(payload.mafiaMinimumPlayers());
-			buf.writeInt(payload.godfatherStartingGold());
-			buf.writeInt(payload.mafiosoStartingGold());
-			buf.writeInt(payload.janitorStartingGold());
-			buf.writeInt(payload.mafiaRecruitRange());
-			buf.writeInt(payload.mafiaReplacementCooldownSeconds());
-			buf.writeInt(payload.mafiaRevolverKillCooldownSeconds());
-			buf.writeInt(payload.janitorCleanRange());
-			buf.writeInt(payload.janitorCleanCooldownSeconds());
-			buf.writeInt(payload.janitorRevolverCooldownAfterCleanSeconds());
-			buf.writeInt(payload.janitorCleanCooldownAfterKillSeconds());
-			buf.writeBoolean(payload.useCustomRoleCounts());
-			buf.writeInt(payload.maxKillerAmount());
-			buf.writeInt(payload.maxVigilanteAmount());
-			buf.writeInt(payload.playersPerKiller());
-			buf.writeInt(payload.playersPerVigilante());
-			buf.writeFloat(payload.c4BackOffsetX());
-			buf.writeFloat(payload.c4BackOffsetY());
-			buf.writeFloat(payload.c4BackOffsetZ());
-			buf.writeFloat(payload.c4BackRotationX());
-			buf.writeFloat(payload.c4BackRotationY());
-			buf.writeFloat(payload.c4BackRotationZ());
-			buf.writeFloat(payload.c4BackSlant());
-			buf.writeFloat(payload.c4BackScale());
-			buf.writeFloat(payload.spyBugOffsetX());
-			buf.writeFloat(payload.spyBugOffsetY());
-			buf.writeFloat(payload.spyBugOffsetZ());
-			buf.writeFloat(payload.spyBugRotationX());
-			buf.writeFloat(payload.spyBugRotationY());
-			buf.writeFloat(payload.spyBugRotationZ());
-			buf.writeFloat(payload.spyBugSlant());
-			buf.writeFloat(payload.spyBugScale());
-			buf.writeString(payload.c4PlacementPresets());
-			buf.writeString(payload.roleDescriptionOverrides());
-			buf.writeFloat(payload.shortSightedFogRange());
-			buf.writeInt(payload.medicShieldBlockFlashTicks());
-			buf.writeInt(payload.medicShieldBreakFlashTicks());
-			buf.writeInt(payload.medicShieldBlockFlashAlpha());
-			buf.writeInt(payload.medicShieldBreakFlashAlpha());
-			buf.writeFloat(payload.silentShadowAlpha());
+			buf.writeVarInt(WIRE_VERSION);
+			encodeFields(payload, buf);
 		},
-		buf -> new GexpressConfigSyncPayload(
+		GexpressConfigSyncPayload::decodeVersioned
+	);
+
+	public static final PacketCodec<PacketByteBuf, GexpressConfigSyncPayload> LEGACY_CODEC = PacketCodec.of(
+		GexpressConfigSyncPayload::encodeFields,
+		GexpressConfigSyncPayload::decodeLegacy
+	);
+
+	private static void encodeFields(GexpressConfigSyncPayload payload, PacketByteBuf buf) {
+		buf.writeInt(payload.c4Price());
+		buf.writeInt(payload.c4FuseSeconds());
+		buf.writeInt(payload.c4FirstBeepSeconds());
+		buf.writeInt(payload.wrongWirePercent());
+		buf.writeInt(payload.grenadePrice());
+		buf.writeInt(payload.passiveIncomeKiller());
+		buf.writeInt(payload.passiveIncomeCivilian());
+		buf.writeInt(payload.passiveIncomeNeutral());
+		buf.writeInt(payload.passiveIncomeVigilante());
+		buf.writeInt(payload.passiveIncomeMafia());
+		buf.writeInt(payload.medicShieldCooldownSeconds());
+		buf.writeBoolean(payload.medicShieldKnifeBreaks());
+		buf.writeInt(payload.silentShadowDurationSeconds());
+		buf.writeInt(payload.silentShadowCooldownSeconds());
+		buf.writeInt(payload.warlockMarkCooldownSeconds());
+		buf.writeInt(payload.warlockKillCooldownSeconds());
+		buf.writeInt(payload.juggernautInitialCooldownSeconds());
+		buf.writeInt(payload.juggernautCooldownReductionSeconds());
+		buf.writeInt(payload.juggernautMinimumCooldownSeconds());
+		buf.writeInt(payload.juggernautShieldRechargeSeconds());
+		buf.writeInt(payload.tricksterSwapDurationSeconds());
+		buf.writeInt(payload.tricksterMasqueradeCooldownSeconds());
+		buf.writeInt(payload.tricksterDancingCartsCooldownSeconds());
+		buf.writeInt(payload.tricksterDancingCartsMaxUses());
+		buf.writeInt(payload.puppetmasterControlDurationSeconds());
+		buf.writeInt(payload.puppetmasterControlCooldownSeconds());
+		buf.writeBoolean(payload.puppetmasterRandomTarget());
+		buf.writeInt(payload.puppetmasterControlRange());
+		buf.writeInt(payload.puppetmasterMaxUses());
+		buf.writeInt(payload.pelicanEatCooldownSeconds());
+		buf.writeInt(payload.pelicanEatPercentage());
+		buf.writeInt(payload.hungryFoodLimit());
+		buf.writeInt(payload.thirstyDrinkLimit());
+		buf.writeInt(payload.snitchTasksRequired());
+		buf.writeInt(payload.snitchWarningTasksRemaining());
+		buf.writeInt(payload.timeMasterRewindSeconds());
+		buf.writeInt(payload.timeMasterCooldownSeconds());
+		buf.writeInt(payload.timeMasterMaxUses());
+		buf.writeInt(payload.timeMasterFreezeDurationSeconds());
+		buf.writeInt(payload.timeMasterFreezeCooldownSeconds());
+		buf.writeInt(payload.timeMasterFreezeMaxUses());
+		buf.writeInt(payload.timeMasterFreezeRange());
+		buf.writeInt(payload.scatterBrainCooldownSeconds());
+		buf.writeInt(payload.trackerMaxTargets());
+		buf.writeInt(payload.trackerRange());
+		buf.writeInt(payload.trackerCooldownSeconds());
+		buf.writeInt(payload.altruistRange());
+		buf.writeInt(payload.skincrawlerBodyMaxAgeSeconds());
+		buf.writeInt(payload.skincrawlerCooldownSeconds());
+		buf.writeInt(payload.skincrawlerStunSeconds());
+		buf.writeInt(payload.skincrawlerRange());
+		buf.writeInt(payload.spyBugCost());
+		buf.writeInt(payload.spyBugDurationSeconds());
+		buf.writeInt(payload.spyBugRange());
+		buf.writeInt(payload.squeakerPitchPercent());
+		buf.writeInt(payload.masqueradePitchMinPercent());
+		buf.writeInt(payload.masqueradePitchMaxPercent());
+		buf.writeBoolean(payload.lastDeathShieldEnabled());
+		buf.writeBoolean(payload.guardianAngelAllowNonInnocents());
+		buf.writeInt(payload.bountyHunterBountyIntervalSeconds());
+		buf.writeInt(payload.bountyHunterRewardGold());
+		buf.writeInt(payload.bountyHunterFailCooldownSeconds());
+		buf.writeInt(payload.godfatherBulletPrice());
+		buf.writeInt(payload.godfatherStartingBullets());
+		buf.writeInt(payload.godfatherMaxLoadedBullets());
+		buf.writeInt(payload.mafiaStartingGold());
+		buf.writeInt(payload.mafiaMinimumPlayers());
+		buf.writeInt(payload.godfatherStartingGold());
+		buf.writeInt(payload.mafiosoStartingGold());
+		buf.writeInt(payload.janitorStartingGold());
+		buf.writeInt(payload.mafiaRecruitRange());
+		buf.writeInt(payload.mafiaReplacementCooldownSeconds());
+		buf.writeInt(payload.mafiaRevolverKillCooldownSeconds());
+		buf.writeInt(payload.janitorCleanRange());
+		buf.writeInt(payload.janitorCleanCooldownSeconds());
+		buf.writeInt(payload.janitorRevolverCooldownAfterCleanSeconds());
+		buf.writeInt(payload.janitorCleanCooldownAfterKillSeconds());
+		buf.writeBoolean(payload.useCustomRoleCounts());
+		buf.writeInt(payload.maxKillerAmount());
+		buf.writeInt(payload.maxVigilanteAmount());
+		buf.writeInt(payload.playersPerKiller());
+		buf.writeInt(payload.playersPerVigilante());
+		buf.writeFloat(payload.c4BackOffsetX());
+		buf.writeFloat(payload.c4BackOffsetY());
+		buf.writeFloat(payload.c4BackOffsetZ());
+		buf.writeFloat(payload.c4BackRotationX());
+		buf.writeFloat(payload.c4BackRotationY());
+		buf.writeFloat(payload.c4BackRotationZ());
+		buf.writeFloat(payload.c4BackSlant());
+		buf.writeFloat(payload.c4BackScale());
+		buf.writeFloat(payload.spyBugOffsetX());
+		buf.writeFloat(payload.spyBugOffsetY());
+		buf.writeFloat(payload.spyBugOffsetZ());
+		buf.writeFloat(payload.spyBugRotationX());
+		buf.writeFloat(payload.spyBugRotationY());
+		buf.writeFloat(payload.spyBugRotationZ());
+		buf.writeFloat(payload.spyBugSlant());
+		buf.writeFloat(payload.spyBugScale());
+		buf.writeString(payload.c4PlacementPresets());
+		buf.writeString(payload.roleDescriptionOverrides());
+		buf.writeFloat(payload.shortSightedFogRange());
+		buf.writeInt(payload.medicShieldBlockFlashTicks());
+		buf.writeInt(payload.medicShieldBreakFlashTicks());
+		buf.writeInt(payload.medicShieldBlockFlashAlpha());
+		buf.writeInt(payload.medicShieldBreakFlashAlpha());
+		buf.writeFloat(payload.silentShadowAlpha());
+	}
+
+	private static GexpressConfigSyncPayload decodeVersioned(PacketByteBuf buf) {
+		int version = buf.readVarInt();
+		if (version != WIRE_VERSION) {
+			throw new IllegalArgumentException("Unsupported G'Express config sync version " + version);
+		}
+		return decodeFields(buf, true);
+	}
+
+	private static GexpressConfigSyncPayload decodeLegacy(PacketByteBuf buf) {
+		int start = buf.readerIndex();
+		try {
+			GexpressConfigSyncPayload payload = decodeFields(buf, true);
+			if (buf.readableBytes() == 0) return payload;
+		} catch (RuntimeException ignored) {
+			// Fall back to the pre-Guardian-Angel wire layout below.
+		}
+		buf.readerIndex(start);
+		return decodeFields(buf, false);
+	}
+
+	private static GexpressConfigSyncPayload decodeFields(PacketByteBuf buf, boolean includesGuardianAngelSetting) {
+		return new GexpressConfigSyncPayload(
 			buf.readInt(), // c4Price
 			buf.readInt(), // c4FuseSeconds
 			buf.readInt(), // c4FirstBeepSeconds
@@ -223,7 +261,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // masqueradePitchMinPercent
 			buf.readInt(), // masqueradePitchMaxPercent
 			buf.readBoolean(), // lastDeathShieldEnabled
-			buf.readBoolean(), // guardianAngelAllowNonInnocents
+			includesGuardianAngelSetting ? buf.readBoolean() : false, // guardianAngelAllowNonInnocents
 			buf.readInt(), // bountyHunterBountyIntervalSeconds
 			buf.readInt(), // bountyHunterRewardGold
 			buf.readInt(), // bountyHunterFailCooldownSeconds
@@ -271,8 +309,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // medicShieldBlockFlashAlpha
 			buf.readInt(), // medicShieldBreakFlashAlpha
 			buf.readFloat() // silentShadowAlpha
-		)
-	);
+		);
+	}
 
 	@Override
 	public CustomPayload.Id<? extends CustomPayload> getId() {
