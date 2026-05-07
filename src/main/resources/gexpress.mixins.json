@@ -19,6 +19,7 @@
 		"PassiveMoneyGraceMixin",
 		"PlayerCollisionMixin",
 		"PlayerEntityDisplayNameMixin",
+		"PlayerMoodOutsideTaskFreshAirMixin",
 		"PlayerMoodTaskCompletionMixin",
 		"PuppetmasterControlledActionsMixin",
 		"PuppetmasterControlledMovementMixin",

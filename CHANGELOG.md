@@ -1,3 +1,20 @@
+# Grey's Express 1.4.3
+
+## Added
+
+- Added a dev-only End Screen Layout preview that lets devs drag round-end role section anchors on a small grid.
+
+## Changed
+
+- Mafia round-end results now use the old grouped layout style again, with the Mafia section placed below the main role sections instead of squeezed into the top row.
+- Map setup box commands now use Minecraft block-position arguments, so targeted block coordinate suggestions work like `setblock`.
+- Fresh Air area setup now accepts two block-position corners directly on `freshair add`.
+
+## Fixed
+
+- Fixed Mafia end-screen role labels overlapping and pushing the results into a broken single-row layout.
+- Fixed custom Fresh Air areas not reliably completing Wathe's Outside task by ticking Wathe's actual outside-task timer when the player is inside a configured Fresh Air area.
+
 # Grey's Express 1.4.2
 
 ## Changed

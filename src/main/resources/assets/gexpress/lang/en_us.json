@@ -492,5 +492,13 @@
 	"gui.gexpress.config.option.map.weather.tooltip": "Weather to apply while this preset is active.",
 	"gui.gexpress.config.option.map.fogColor.tooltip": "Fog color as #RRGGBB, 0xRRGGBB, or 'clear'.",
 	"gui.gexpress.config.option.map.defaultTrainPreset.tooltip": "Name of the train preset that loads with this map. Empty = none.",
-	"gui.gexpress.config.option.map.roomCount.tooltip": "Highest Wathe room key number this map can assign. A value of 15 gives Room 1 through Room 15 keys."
+	"gui.gexpress.config.option.map.roomCount.tooltip": "Highest Wathe room key number this map can assign. A value of 15 gives Room 1 through Room 15 keys.",
+	"gui.gexpress.config.group.dev.end_screen_layout": "End Screen Layout",
+	"gui.gexpress.config.group.dev.end_screen_layout.tooltip": "Open a local preview for moving the round-end role sections on a grid.",
+	"gui.gexpress.config.option.dev.end_screen_layout": "Layout Preview",
+	"gui.gexpress.config.option.dev.end_screen_layout.tooltip": "Dev-only local editor for the round-end role section anchors.",
+	"gui.gexpress.config.option.dev.end_screen_layout.open": "Open",
+	"gui.gexpress.end_layout.title": "End Screen Layout",
+	"gui.gexpress.end_layout.subtitle": "Drag section anchors; positions snap to the grid.",
+	"gui.gexpress.end_layout.reset": "Reset"
 }

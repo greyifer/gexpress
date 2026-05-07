@@ -23,6 +23,7 @@ import dev.mapselect.task.FreshAirAreaManager;
 import dev.mapselect.weather.MapWeatherComponent;
 import dev.mapselect.weather.WeatherType;
 import net.minecraft.command.argument.BlockPosArgumentType;
+import net.minecraft.command.argument.PosArgument;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.Text;
@@ -276,44 +277,27 @@ public class MapSelectCommand {
 			.executes(exec);
 	}
 
+	private static RequiredArgumentBuilder<ServerCommandSource, PosArgument> blockPosArg(
+			String name, com.mojang.brigadier.builder.ArgumentBuilder<ServerCommandSource, ?> next) {
+		return CommandManager.argument(name, BlockPosArgumentType.blockPos()).then(next);
+	}
+
+	private static RequiredArgumentBuilder<ServerCommandSource, PosArgument> blockPosArgExec(
+			String name, Command<ServerCommandSource> exec) {
+		return CommandManager.argument(name, BlockPosArgumentType.blockPos()).executes(exec);
+	}
+
 	private static LiteralArgumentBuilder<ServerCommandSource> boxEditLiteral(
 			String literal, java.util.function.Function<MapPreset, MapPreset.BoxData> extractor, BoxKind kind) {
-		var maxZ = intArgExec("maxZ", p -> {
-				MapPreset.BoxData b = extractor.apply(p);
-				return b == null ? null : fmtNum(b.maxZ);
-			},
-			ctx -> runEditBox(ctx, kind,
-				IntegerArgumentType.getInteger(ctx, "minX"),
-				IntegerArgumentType.getInteger(ctx, "minY"),
-				IntegerArgumentType.getInteger(ctx, "minZ"),
-				IntegerArgumentType.getInteger(ctx, "maxX"),
-				IntegerArgumentType.getInteger(ctx, "maxY"),
-				IntegerArgumentType.getInteger(ctx, "maxZ")));
-		var maxY = intArg("maxY", p -> {
-			MapPreset.BoxData b = extractor.apply(p);
-			return b == null ? null : fmtNum(b.maxY);
-		}, maxZ);
-		var maxX = intArg("maxX", p -> {
-			MapPreset.BoxData b = extractor.apply(p);
-			return b == null ? null : fmtNum(b.maxX);
-		}, maxY);
-		var minZ = intArg("minZ", p -> {
-			MapPreset.BoxData b = extractor.apply(p);
-			return b == null ? null : fmtNum(b.minZ);
-		}, maxX);
-		var minY = intArg("minY", p -> {
-			MapPreset.BoxData b = extractor.apply(p);
-			return b == null ? null : fmtNum(b.minY);
-		}, minZ);
-		var minX = intArg("minX", p -> {
-			MapPreset.BoxData b = extractor.apply(p);
-			return b == null ? null : fmtNum(b.minX);
-		}, minY);
+		var corner2 = blockPosArgExec("corner2", ctx -> runEditBox(ctx, kind,
+			BlockPosArgumentType.getBlockPos(ctx, "corner1"),
+			BlockPosArgumentType.getBlockPos(ctx, "corner2")));
+		var corner1 = blockPosArg("corner1", corner2);
 
 		return CommandManager.literal(literal)
 			.then(CommandManager.literal("clear")
 				.executes(ctx -> runClearBox(ctx, kind)))
-			.then(minX);
+			.then(corner1);
 	}
 
 	private static LiteralArgumentBuilder<ServerCommandSource> freshAirEditLiteral() {
@@ -328,16 +312,12 @@ public class MapSelectCommand {
 		var outsideOnly = CommandManager.argument("outsideSounds", BoolArgumentType.bool())
 			.executes(ctx -> runAddFreshAirArea(ctx, 100,
 				BoolArgumentType.getBool(ctx, "outsideSounds")));
-		var maxZ = CommandManager.argument("maxZ", IntegerArgumentType.integer())
+		var corner2 = CommandManager.argument("corner2", BlockPosArgumentType.blockPos())
 			.executes(ctx -> runAddFreshAirArea(ctx, 100))
 			.then(outsideOnly)
 			.then(sanity);
-		var maxY = CommandManager.argument("maxY", IntegerArgumentType.integer()).then(maxZ);
-		var maxX = CommandManager.argument("maxX", IntegerArgumentType.integer()).then(maxY);
-		var minZ = CommandManager.argument("minZ", IntegerArgumentType.integer()).then(maxX);
-		var minY = CommandManager.argument("minY", IntegerArgumentType.integer()).then(minZ);
-		var minX = CommandManager.argument("minX", IntegerArgumentType.integer()).then(minY);
-		var add = CommandManager.literal("add").then(minX);
+		var corner1 = CommandManager.argument("corner1", BlockPosArgumentType.blockPos()).then(corner2);
+		var add = CommandManager.literal("add").then(corner1);
 
 		return boxEditLiteral("freshair", p -> p.freshAirArea, BoxKind.FRESH_AIR)
 			.then(add)
@@ -1079,18 +1059,23 @@ public class MapSelectCommand {
 
 	private static int runEditBox(CommandContext<ServerCommandSource> ctx, BoxKind kind,
 			int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		return runEditBox(ctx, kind, new BlockPos(minX, minY, minZ), new BlockPos(maxX, maxY, maxZ));
+	}
+
+	private static int runEditBox(CommandContext<ServerCommandSource> ctx, BoxKind kind,
+			BlockPos corner1, BlockPos corner2) {
 		ServerCommandSource src = ctx.getSource();
 		String name = StringArgumentType.getString(ctx, "name");
 		try {
 			MapPreset preset = loadOrError(src, name);
 			if (preset == null) return 0;
 			MapPreset.BoxData box = new MapPreset.BoxData();
-			box.minX = Math.min(minX, maxX);
-			box.maxX = Math.max(minX, maxX);
-			box.minY = Math.min(minY, maxY);
-			box.maxY = Math.max(minY, maxY);
-			box.minZ = Math.min(minZ, maxZ);
-			box.maxZ = Math.max(minZ, maxZ);
+			box.minX = Math.min(corner1.getX(), corner2.getX());
+			box.maxX = Math.max(corner1.getX(), corner2.getX());
+			box.minY = Math.min(corner1.getY(), corner2.getY());
+			box.maxY = Math.max(corner1.getY(), corner2.getY());
+			box.minZ = Math.min(corner1.getZ(), corner2.getZ());
+			box.maxZ = Math.max(corner1.getZ(), corner2.getZ());
 			switch (kind) {
 				case WHOLE_MAP -> preset.wholeMapArea = box;
 				case PLAY_AREA -> preset.playArea = box;
@@ -1149,18 +1134,14 @@ public class MapSelectCommand {
 			MapPreset preset = loadOrError(src, name);
 			if (preset == null) return 0;
 			MapPreset.BoxData box = new MapPreset.BoxData();
-			int minX = IntegerArgumentType.getInteger(ctx, "minX");
-			int minY = IntegerArgumentType.getInteger(ctx, "minY");
-			int minZ = IntegerArgumentType.getInteger(ctx, "minZ");
-			int maxX = IntegerArgumentType.getInteger(ctx, "maxX");
-			int maxY = IntegerArgumentType.getInteger(ctx, "maxY");
-			int maxZ = IntegerArgumentType.getInteger(ctx, "maxZ");
-			box.minX = Math.min(minX, maxX);
-			box.maxX = Math.max(minX, maxX);
-			box.minY = Math.min(minY, maxY);
-			box.maxY = Math.max(minY, maxY);
-			box.minZ = Math.min(minZ, maxZ);
-			box.maxZ = Math.max(minZ, maxZ);
+			BlockPos corner1 = BlockPosArgumentType.getBlockPos(ctx, "corner1");
+			BlockPos corner2 = BlockPosArgumentType.getBlockPos(ctx, "corner2");
+			box.minX = Math.min(corner1.getX(), corner2.getX());
+			box.maxX = Math.max(corner1.getX(), corner2.getX());
+			box.minY = Math.min(corner1.getY(), corner2.getY());
+			box.maxY = Math.max(corner1.getY(), corner2.getY());
+			box.minZ = Math.min(corner1.getZ(), corner2.getZ());
+			box.maxZ = Math.max(corner1.getZ(), corner2.getZ());
 			if (preset.freshAirAreas == null) preset.freshAirAreas = new ArrayList<>();
 			MapPreset.FreshAirAreaData area = new MapPreset.FreshAirAreaData();
 			area.area = box;

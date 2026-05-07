@@ -11,6 +11,7 @@ import dev.doctor4t.wathe.client.gui.RoundTextRenderer;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.client.ClientNeutralWinState;
+import dev.mapselect.client.EndScreenLayoutConfig;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -83,12 +84,26 @@ public abstract class MafiaRoundEndRendererMixin {
 			else if (entry.role() != RoleAnnouncementTexts.BLANK) neutrals.add(entry);
 		}
 
-		drawColumn(context, renderer, RoleAnnouncementTexts.CIVILIAN.titleText, civilians, -96, 14, 3);
-		drawColumn(context, renderer, RoleAnnouncementTexts.VIGILANTE.titleText, vigilantes, -44, 14, 2);
+		EndScreenLayoutConfig.Section civilianLayout = EndScreenLayoutConfig.civilians();
+		EndScreenLayoutConfig.Section vigilanteLayout = EndScreenLayoutConfig.vigilantes();
+		EndScreenLayoutConfig.Section neutralLayout = EndScreenLayoutConfig.neutrals();
+		EndScreenLayoutConfig.Section killerLayout = EndScreenLayoutConfig.killers();
+		EndScreenLayoutConfig.Section mafiaLayout = EndScreenLayoutConfig.mafia();
+
+		drawColumn(context, renderer, RoleAnnouncementTexts.CIVILIAN.titleText, civilians,
+			civilianLayout.x, civilianLayout.y, civilianLayout.columns);
+		drawColumn(context, renderer, RoleAnnouncementTexts.VIGILANTE.titleText, vigilantes,
+			vigilanteLayout.x, vigilanteLayout.y, vigilanteLayout.columns);
 		drawColumn(context, renderer, Text.translatable("gui.gexpress.end_section.neutrals")
-			.withColor(0xFFAA00), neutrals, 0, 14, 2);
-		drawColumn(context, renderer, RoleAnnouncementTexts.KILLER.titleText, killers, 44, 14, 2);
-		drawColumn(context, renderer, GexpressRoleAnnouncementTexts.MAFIA.titleText, mafia, 88, 14, 2);
+			.withColor(0xFFAA00), neutrals, neutralLayout.x, neutralLayout.y, neutralLayout.columns);
+		drawColumn(context, renderer, RoleAnnouncementTexts.KILLER.titleText, killers,
+			killerLayout.x, killerLayout.y, killerLayout.columns);
+		int topBottom = Math.max(Math.max(bottom(civilians, civilianLayout),
+			bottom(vigilantes, vigilanteLayout)),
+			Math.max(bottom(neutrals, neutralLayout), bottom(killers, killerLayout)));
+		int mafiaY = Math.max(mafiaLayout.y, topBottom + 10);
+		drawColumn(context, renderer, GexpressRoleAnnouncementTexts.MAFIA.titleText, mafia,
+			mafiaLayout.x, mafiaY, mafiaLayout.columns);
 		context.getMatrices().pop();
 	}
 
@@ -108,6 +123,16 @@ public abstract class MafiaRoundEndRendererMixin {
 			int rowY = y + 10 + (i / columns) * 12;
 			drawHead(context, renderer, entries.get(i), x, rowY);
 		}
+	}
+
+	private static int rows(List<GameRoundEndComponent.RoundEndData> entries, int columns) {
+		if (entries.isEmpty()) return 0;
+		return (entries.size() + columns - 1) / columns;
+	}
+
+	private static int bottom(List<GameRoundEndComponent.RoundEndData> entries,
+			EndScreenLayoutConfig.Section layout) {
+		return layout.y + 20 + rows(entries, layout.columns) * 12;
 	}
 
 	private static void drawHead(DrawContext context, TextRenderer renderer,

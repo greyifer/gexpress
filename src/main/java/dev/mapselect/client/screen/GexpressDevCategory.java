@@ -1,6 +1,7 @@
 package dev.mapselect.client.screen;
 
 import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
+import dev.isxander.yacl3.api.ButtonOption;
 import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.ListOption;
 import dev.isxander.yacl3.api.Option;
@@ -9,6 +10,7 @@ import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.mapselect.config.GexpressConfig;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -33,6 +35,7 @@ public final class GexpressDevCategory {
 			.group(shortSightedGroup())
 			.group(medicShieldVisualsGroup())
 			.group(silentShadowVisualsGroup())
+			.group(endScreenLayoutGroup())
 			.build();
 	}
 
@@ -197,6 +200,21 @@ public final class GexpressDevCategory {
 			.option(floatOption("silent_shadow_alpha", 0.45F, GexpressConfig::getSilentShadowAlpha,
 				v -> GexpressConfig.silentShadowAlpha = v,
 				GexpressConfig.SILENT_SHADOW_ALPHA_MIN, GexpressConfig.SILENT_SHADOW_ALPHA_MAX))
+			.build();
+	}
+
+	private static OptionGroup endScreenLayoutGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.end_screen_layout"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.end_screen_layout.tooltip")))
+			.collapsed(false)
+			.option(ButtonOption.createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.dev.end_screen_layout"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.end_screen_layout.tooltip")))
+				.text(Text.translatable("gui.gexpress.config.option.dev.end_screen_layout.open"))
+				.action((screen, option) -> MinecraftClient.getInstance()
+					.setScreen(new GexpressEndScreenLayoutScreen(screen)))
+				.build())
 			.build();
 	}
 
