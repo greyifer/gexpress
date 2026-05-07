@@ -34,7 +34,7 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		renderBackground(context, mouseX, mouseY, delta);
+		context.fill(0, 0, width, height, 0x99000000);
 		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 16, 0xFFFFFF);
 		context.drawCenteredTextWithShadow(textRenderer,
 			Text.translatable("gui.gexpress.end_layout.subtitle").formatted(Formatting.GRAY),

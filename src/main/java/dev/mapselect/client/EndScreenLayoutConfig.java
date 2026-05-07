@@ -113,7 +113,7 @@ public final class EndScreenLayoutConfig {
 		value.vigilantes = section(-48, 14, 2);
 		value.neutrals = section(16, 14, 2);
 		value.killers = section(80, 14, 2);
-		value.mafia = section(32, 58, 2);
+		value.mafia = section(50, 70, 2);
 		return value;
 	}
 

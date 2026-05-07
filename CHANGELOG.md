@@ -6,13 +6,14 @@
 
 ## Changed
 
-- Mafia round-end results now use the old grouped layout style again, with the Mafia section placed below the main role sections instead of squeezed into the top row.
+- Mafia round-end results now leave Wathe and Wathe Extended's normal renderer in control, only adding the Mafia section to the existing result layout.
 - Map setup box commands now use Minecraft block-position arguments, so targeted block coordinate suggestions work like `setblock`.
 - Fresh Air area setup now accepts two block-position corners directly on `freshair add`.
 
 ## Fixed
 
 - Fixed Mafia end-screen role labels overlapping and pushing the results into a broken single-row layout.
+- Fixed the dev End Screen Layout preview using Minecraft's blurred screen background.
 - Fixed custom Fresh Air areas not reliably completing Wathe's Outside task by ticking Wathe's actual outside-task timer when the player is inside a configured Fresh Air area.
 
 # Grey's Express 1.4.2
