@@ -94,7 +94,7 @@ public final class ClientMafiaState {
 			&& client.player != null
 			&& WatheClient.instinctKeybind != null
 			&& WatheClient.instinctKeybind.isPressed()
-			&& ClientRoleRevealState.canShowRoleHud(client)
+			&& isRoundRunning(client)
 			&& !ClientVultureState.isLocalStashed(client)
 			&& GameFunctions.isPlayerAliveAndSurvival(client.player);
 	}
@@ -103,16 +103,11 @@ public final class ClientMafiaState {
 		if (introTicks > 0) introTicks--;
 		updateMafiaIntro(client);
 		updateMafiaWeather(client);
-		boolean revealReady = ClientRoleRevealState.canShowRoleHud(client);
-		boolean waitingForMafiaReveal = isRoundRunning(client) && isLocalMafia(client) && !revealReady
-			&& !ClientVultureState.isLocalStashed(client);
-		blackWhiteStrength = waitingForMafiaReveal
-			? 0.0F
-			: MathHelper.lerp(0.045F, blackWhiteStrength, shouldUseBlackWhite(client) ? 1.0F : 0.0F);
+		blackWhiteStrength = MathHelper.lerp(0.045F, blackWhiteStrength, shouldUseBlackWhite(client) ? 1.0F : 0.0F);
 		if (blackWhiteStrength < 0.01F) blackWhiteStrength = 0.0F;
 		if (blackWhiteStrength > 0.99F) blackWhiteStrength = 1.0F;
 		updateBlackWhiteShader(client);
-		ammoAlpha = revealReady ? MathHelper.lerp(0.22F, ammoAlpha, shouldShowAmmo(client) ? 1.0F : 0.0F) : 0.0F;
+		ammoAlpha = MathHelper.lerp(0.22F, ammoAlpha, shouldShowAmmo(client) ? 1.0F : 0.0F);
 		if (client == null || client.player == null || client.world == null
 				|| client.currentScreen != null || ClientVultureState.isLocalStashed(client)
 				|| !ClientRoleRevealState.canUseRoleAbility(client)) {
@@ -184,6 +179,9 @@ public final class ClientMafiaState {
 			shaderActive = false;
 			return;
 		}
+		if (shouldUseShader && shaderActive && client.gameRenderer.getPostProcessor() == null) {
+			shaderActive = false;
+		}
 		if (shouldUseShader == shaderActive) {
 			updateShaderStrength(client);
 			return;
@@ -231,7 +229,9 @@ public final class ClientMafiaState {
 
 	private static boolean shouldUseBlackWhite(MinecraftClient client) {
 		return ClientVultureState.isLocalStashed(client)
-			|| (isLocalMafia(client) && isRoundRunning(client) && ClientRoleRevealState.canShowRoleHud(client));
+			|| (isLocalMafia(client) && isRoundRunning(client) && client != null && client.player != null
+				&& !ClientVultureState.isLocalStashed(client)
+				&& GameFunctions.isPlayerAliveAndSurvival(client.player));
 	}
 
 	public static boolean shouldUseMafiaWeather() {
@@ -252,7 +252,9 @@ public final class ClientMafiaState {
 	}
 
 	private static boolean shouldUseMafiaWeather(MinecraftClient client) {
-		return isLocalMafia(client) && isRoundRunning(client) && ClientRoleRevealState.canShowRoleHud(client);
+		return isLocalMafia(client) && isRoundRunning(client) && client != null && client.player != null
+			&& !ClientVultureState.isLocalStashed(client)
+			&& GameFunctions.isPlayerAliveAndSurvival(client.player);
 	}
 
 	public static boolean shouldShowOutsideRain(MinecraftClient client) {
@@ -277,8 +279,10 @@ public final class ClientMafiaState {
 
 	private static boolean shouldShowAmmo(MinecraftClient client) {
 		return client != null && client.player != null && client.world != null
-			&& ClientRoleRevealState.canShowRoleHud(client)
-			&& MapSelectRoles.GODFATHER_ID.equals(localRoleId(client));
+			&& isRoundRunning(client)
+			&& MapSelectRoles.GODFATHER_ID.equals(localRoleId(client))
+			&& !ClientVultureState.isLocalStashed(client)
+			&& GameFunctions.isPlayerAliveAndSurvival(client.player);
 	}
 
 	private static void updateMafiaIntro(MinecraftClient client) {

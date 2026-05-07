@@ -36,6 +36,7 @@ import dev.mapselect.role.bountyhunter.BountyHunterManager;
 import dev.mapselect.role.guardian.GuardianAngelManager;
 import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
+import dev.mapselect.role.mafia.TakeoverManager;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.scatterbrain.ScatterBrainManager;
 import dev.mapselect.role.seer.SeerManager;
@@ -96,6 +97,7 @@ public class MapSelect implements ModInitializer {
 		TrackerManager.register();
 		AltruistManager.register();
 		GuardianAngelManager.register();
+		TakeoverManager.register();
 		MafiaManager.register();
 		KillerRoleInfoManager.register();
 		FurnaceDupeGuard.register();

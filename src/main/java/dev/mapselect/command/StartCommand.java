@@ -32,6 +32,7 @@ public final class StartCommand {
 			.requires(OP_OR_HOST)
 			.then(mode("modded", () -> Harpymodloader.MODDED_GAMEMODE))
 			.then(mode("amnesia", () -> GexpressGameModes.AMNESIA))
+			.then(mode("takeover", () -> GexpressGameModes.TAKEOVER))
 			.then(mode("discovery", () -> WatheGameModes.DISCOVERY))
 			.then(mode("loose_ends", () -> WatheGameModes.LOOSE_ENDS))
 			.then(mode("murder", () -> WatheGameModes.MURDER));

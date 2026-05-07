@@ -77,6 +77,8 @@ public final class ClientPuppetmasterState {
 			targetEntityId = -1;
 			puppetHotbar = List.of();
 			puppetSelectedSlot = 0;
+			hotbarInitialized = false;
+			hasControllerBodyPose = false;
 			hasPuppetLook = false;
 			if (client.player != null) client.setCameraEntity(client.player);
 			return;
@@ -171,7 +173,7 @@ public final class ClientPuppetmasterState {
 
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null) return;
+		if (client == null || client.player == null || client.options.hudHidden) return;
 		if (ClientRoleRevealState.canUseRoleAbility(client) && isLocalTarget(client)) {
 			int alpha = 88;
 			int color = (alpha << 24) | 0xB00018;

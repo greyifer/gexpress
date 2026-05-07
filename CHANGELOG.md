@@ -1,3 +1,24 @@
+# Grey's Express 1.4.1
+
+## Added
+
+- Added the `takeover` game mode.
+- Takeover spawns two opposing Godfathers, Lime side and Purple side.
+- Takeover end screens now announce which Mafia side won.
+
+## Changed
+
+- Takeover assigns no neutral or killer roles through normal role assignment, leaving the round to the two rival Mafia sides and the remaining passengers.
+- Mafia win handling now supports opposing Mafia families as separate sides instead of treating every Mafia player as one shared faction.
+
+## Fixed
+
+- Fixed Mafia black-and-white overlay behavior so it no longer depends on the short role-reveal HUD window.
+- Fixed Mafia visual state recovering if the post-processing shader is cleared mid-round.
+- Fixed Mafia family instinct and Mafia weather checks to stay tied to actual live round state.
+- Fixed Puppetmaster and Warlock overlays ignoring hidden-HUD state.
+- Fixed Puppetmaster local control cleanup leaving stale hotbar/body-pose state behind after control ends.
+
 # Grey's Express 1.4.0
 
 ## Added

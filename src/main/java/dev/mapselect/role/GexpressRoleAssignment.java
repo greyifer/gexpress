@@ -12,9 +12,11 @@ import dev.doctor4t.wathe.util.AnnounceWelcomePayload;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
+import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.mafia.TakeoverManager;
 import dev.mapselect.role.snitch.SnitchManager;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -69,8 +71,13 @@ public final class GexpressRoleAssignment {
 
 			List<ServerPlayerEntity> available = new ArrayList<>(players);
 			Map<Role, Integer> assignedCounts = new HashMap<>();
-			assignForcedRoles(game, available, assignedCounts);
-			assignConfiguredRoles(game, available, assignedCounts);
+			if (GexpressGameModes.isTakeover(game)) {
+				assignTakeoverRoles(game, available, assignedCounts);
+			} else {
+				TakeoverManager.clear();
+				assignForcedRoles(game, available, assignedCounts);
+				assignConfiguredRoles(game, available, assignedCounts);
+			}
 			grantVanillaRoleLoadouts(game, players);
 			resetStartingBalances(game, players);
 			game.sync();
@@ -92,6 +99,24 @@ public final class GexpressRoleAssignment {
 		} finally {
 			assignmentPlayerCount = 0;
 		}
+	}
+
+	private static void assignTakeoverRoles(GameWorldComponent game, List<ServerPlayerEntity> available,
+			Map<Role, Integer> assignedCounts) {
+		if (MapSelectRoles.GODFATHER == null || available.isEmpty()) {
+			TakeoverManager.assignSides(List.of());
+			return;
+		}
+		Collections.shuffle(available, RANDOM);
+		int count = Math.min(2, available.size());
+		List<ServerPlayerEntity> godfathers = new ArrayList<>(count);
+		for (int i = 0; i < count; i++) {
+			ServerPlayerEntity player = available.removeFirst();
+			assignRole(game, player, MapSelectRoles.GODFATHER);
+			assignedCounts.merge(MapSelectRoles.GODFATHER, 1, Integer::sum);
+			godfathers.add(player);
+		}
+		TakeoverManager.assignSides(godfathers);
 	}
 
 	private static void setNight(ServerWorld world) {

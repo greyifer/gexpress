@@ -15,6 +15,7 @@ import dev.doctor4t.wathe.index.WatheEntities;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.MafiaActionPayload;
@@ -190,8 +191,10 @@ public final class MafiaManager {
 		if (victim == null || victim.getWorld().isClient) return true;
 		if (killer instanceof ServerPlayerEntity attacker && victim instanceof ServerPlayerEntity target) {
 			if (isMafiaRole(attacker) && isMafiaRole(target) && !attacker.getUuid().equals(target.getUuid())) {
-				attacker.sendMessage(Text.literal("You cannot kill your own family.").formatted(Formatting.GRAY), true);
-				return false;
+				if (!canMafiaKillMafia(attacker, target)) {
+					attacker.sendMessage(Text.literal("You cannot kill your own family.").formatted(Formatting.GRAY), true);
+					return false;
+				}
 			}
 			if ((isMafioso(attacker) || isJanitor(attacker)) && GameConstants.DeathReasons.GUN.equals(reason)) {
 				pendingRevolverCooldown.put(attacker.getUuid(),
@@ -293,6 +296,10 @@ public final class MafiaManager {
 
 		PassiveMoney.grant(world, game);
 
+		if (GexpressGameModes.isTakeover(game)) {
+			return handleTakeoverTick(world, game, alive);
+		}
+
 		GameFunctions.WinStatus winStatus = GameFunctions.WinStatus.NONE;
 		if (!GameTimeComponent.KEY.get(world).hasTime()) {
 			winStatus = GameFunctions.WinStatus.TIME;
@@ -309,6 +316,47 @@ public final class MafiaManager {
 			GameFunctions.stopGame(world);
 		}
 		return true;
+	}
+
+	private static boolean handleTakeoverTick(ServerWorld world, GameWorldComponent game,
+			List<ServerPlayerEntity> alive) {
+		GameFunctions.WinStatus winStatus = GameFunctions.WinStatus.NONE;
+		if (!GameTimeComponent.KEY.get(world).hasTime()) {
+			winStatus = GameFunctions.WinStatus.TIME;
+		} else {
+			UUID winningGodfather = takeoverControllingGodfather(world, alive);
+			if (winningGodfather != null) {
+				ServerPlayerEntity godfather = world.getServer().getPlayerManager().getPlayer(winningGodfather);
+				TakeoverSide side = TakeoverManager.sideForGodfather(winningGodfather);
+				if (godfather != null && side != null && GameFunctions.isPlayerAliveAndSurvival(godfather)) {
+					game.setLooseEndWinner(winningGodfather);
+					NeutralWinManager.announce(world, godfather, side.winTranslationKey(), side.color());
+					winStatus = GameFunctions.WinStatus.LOOSE_END;
+				}
+			}
+		}
+
+		if (winStatus != GameFunctions.WinStatus.NONE) {
+			GameRoundEndComponent.KEY.get(world).setRoundEndData(world.getPlayers(), winStatus);
+			GameFunctions.stopGame(world);
+		}
+		return true;
+	}
+
+	private static UUID takeoverControllingGodfather(ServerWorld world, List<ServerPlayerEntity> alive) {
+		UUID winner = null;
+		for (ServerPlayerEntity player : alive) {
+			UUID root = familyRoot(player.getUuid());
+			if (root == null || !TakeoverManager.isTrackedGodfather(root)) return null;
+			if (winner == null) {
+				winner = root;
+			} else if (!winner.equals(root)) {
+				return null;
+			}
+		}
+		if (winner == null) return null;
+		ServerPlayerEntity godfather = world.getServer().getPlayerManager().getPlayer(winner);
+		return godfather != null && GameFunctions.isPlayerAliveAndSurvival(godfather) ? winner : null;
 	}
 
 	private static void tick(ServerWorld world) {
@@ -469,6 +517,30 @@ public final class MafiaManager {
 	public static boolean isJanitor(PlayerEntity player) {
 		Role role = currentRole(player);
 		return role != null && MapSelectRoles.JANITOR_ID.equals(role.identifier());
+	}
+
+	public static UUID familyRoot(UUID playerId) {
+		if (playerId == null) return null;
+		if (slotsByGodfather.containsKey(playerId)) return playerId;
+		return godfatherByMember.get(playerId);
+	}
+
+	public static boolean isSameFamily(UUID firstPlayerId, UUID secondPlayerId) {
+		UUID firstRoot = familyRoot(firstPlayerId);
+		UUID secondRoot = familyRoot(secondPlayerId);
+		return firstRoot != null && firstRoot.equals(secondRoot);
+	}
+
+	private static boolean canMafiaKillMafia(ServerPlayerEntity attacker, ServerPlayerEntity target) {
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(attacker.getWorld());
+		if (!GexpressGameModes.isTakeover(game)) return false;
+		UUID attackerRoot = familyRoot(attacker.getUuid());
+		UUID targetRoot = familyRoot(target.getUuid());
+		return attackerRoot != null
+			&& targetRoot != null
+			&& !attackerRoot.equals(targetRoot)
+			&& TakeoverManager.isTrackedGodfather(attackerRoot)
+			&& TakeoverManager.isTrackedGodfather(targetRoot);
 	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {

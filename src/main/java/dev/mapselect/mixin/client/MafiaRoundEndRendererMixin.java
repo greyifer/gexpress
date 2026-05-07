@@ -10,6 +10,7 @@ import dev.doctor4t.wathe.client.gui.RoleAnnouncementTexts;
 import dev.doctor4t.wathe.client.gui.RoundTextRenderer;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
+import dev.mapselect.client.ClientNeutralWinState;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -48,9 +49,12 @@ public abstract class MafiaRoundEndRendererMixin {
 		if (roundEnd.getWinStatus() == GameFunctions.WinStatus.NONE || !hasMafia(roundEnd)) return;
 
 		RoleAnnouncementTexts.RoleAnnouncementText role = RoundTextRendererAccessor.gexpress$getRole();
-		PlayerEntity winner = player.getWorld().getPlayerByUuid(game.getLooseEndWinner() == null
-			? UUID.randomUUID() : game.getLooseEndWinner());
-		Text endText = role.getEndText(roundEnd.getWinStatus(), winner == null ? Text.empty() : winner.getDisplayName());
+		UUID winnerId = game.getLooseEndWinner();
+		PlayerEntity winner = winnerId == null ? null : player.getWorld().getPlayerByUuid(winnerId);
+		Text endText = ClientNeutralWinState.endText(winnerId);
+		if (endText == null) {
+			endText = role.getEndText(roundEnd.getWinStatus(), winner == null ? Text.empty() : winner.getDisplayName());
+		}
 		if (endText == null) return;
 
 		ci.cancel();
@@ -62,7 +66,7 @@ public abstract class MafiaRoundEndRendererMixin {
 		context.getMatrices().pop();
 		context.getMatrices().push();
 		context.getMatrices().scale(1.2f, 1.2f, 1f);
-		MutableText winMessage = Text.translatable("game.win." + roundEnd.getWinStatus().name().toLowerCase().toLowerCase());
+		MutableText winMessage = Text.translatable("game.win." + roundEnd.getWinStatus().name().toLowerCase());
 		context.drawTextWithShadow(renderer, winMessage, -renderer.getWidth(winMessage) / 2, -4, 0xFFFFFF);
 		context.getMatrices().pop();
 

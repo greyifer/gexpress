@@ -67,6 +67,7 @@ public final class ClientWarlockState {
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null || client.world == null
+				|| client.options.hudHidden
 				|| ClientVultureState.isLocalStashed(client) || !ClientRoleRevealState.canUseRoleAbility(client)
 				|| !shouldHandleWarlock(client)) return;
 		if (!hasLocalMark(client)) return;
