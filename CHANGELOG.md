@@ -1,3 +1,16 @@
+# Grey's Express 1.4.4
+
+## Changed
+
+- Mafia round-end results now place the Mafia section centered under the Wathe and neutral-mod result groups.
+- Mafia end-screen text is brighter so it remains readable against normal round-end backgrounds.
+- The dev End Screen Layout preview now resets old saved layouts to the corrected Wathe-style default anchors.
+
+## Fixed
+
+- Fixed Mafia player heads not being translated into the Mafia section on the round-end screen.
+- Fixed the dev End Screen Layout preview still triggering Minecraft's screen blur through the inherited screen render path.
+
 # Grey's Express 1.4.3
 
 ## Added

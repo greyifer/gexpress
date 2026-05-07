@@ -62,6 +62,10 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 		super.render(context, mouseX, mouseY, delta);
 	}
 
+	@Override
+	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+	}
+
 	private void drawGrid(DrawContext context, int originX, int originY) {
 		int minX = originX - 190;
 		int maxX = originX + 190;

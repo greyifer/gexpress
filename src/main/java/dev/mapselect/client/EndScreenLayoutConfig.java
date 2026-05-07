@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public final class EndScreenLayoutConfig {
+	private static final int CONFIG_VERSION = 2;
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Path PATH = FabricLoader.getInstance().getConfigDir()
 		.resolve("gexpress_end_screen_layout.json");
@@ -81,6 +82,7 @@ public final class EndScreenLayoutConfig {
 	}
 
 	private static Layout normalize(Layout value) {
+		if (value.version != CONFIG_VERSION) return defaults();
 		Layout normalized = defaults();
 		normalized.civilians = normalize(value.civilians, normalized.civilians);
 		normalized.vigilantes = normalize(value.vigilantes, normalized.vigilantes);
@@ -109,11 +111,12 @@ public final class EndScreenLayoutConfig {
 
 	private static Layout defaults() {
 		Layout value = new Layout();
-		value.civilians = section(-120, 14, 4);
-		value.vigilantes = section(-48, 14, 2);
-		value.neutrals = section(16, 14, 2);
-		value.killers = section(80, 14, 2);
-		value.mafia = section(50, 70, 2);
+		value.version = CONFIG_VERSION;
+		value.civilians = section(-60, 14, 4);
+		value.vigilantes = section(50, 14, 2);
+		value.neutrals = section(-60, 58, 4);
+		value.killers = section(50, 46, 2);
+		value.mafia = section(0, 82, 2);
 		return value;
 	}
 
@@ -134,6 +137,7 @@ public final class EndScreenLayoutConfig {
 	}
 
 	public static final class Layout {
+		public int version;
 		public Section civilians;
 		public Section vigilantes;
 		public Section neutrals;

@@ -5,7 +5,7 @@ import dev.doctor4t.wathe.client.gui.RoleAnnouncementTexts;
 public final class GexpressRoleAnnouncementTexts {
 	public static final RoleAnnouncementTexts.RoleAnnouncementText MAFIA =
 		RoleAnnouncementTexts.registerRoleAnnouncementText(
-			new RoleAnnouncementTexts.RoleAnnouncementText("gexpress.mafia", 0x5A5A5A));
+			new RoleAnnouncementTexts.RoleAnnouncementText("gexpress.mafia", 0x8C8C8C));
 
 	private GexpressRoleAnnouncementTexts() {}
 

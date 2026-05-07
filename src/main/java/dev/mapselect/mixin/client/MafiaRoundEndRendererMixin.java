@@ -22,8 +22,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = RoundTextRenderer.class, remap = false, priority = 450)
 public abstract class MafiaRoundEndRendererMixin {
 	private static final int END_DURATION = 200;
+	private static int gexpress$civilianTotal;
 	private static int gexpress$vigilanteTotal;
 	private static int gexpress$killerTotal;
+	private static int gexpress$neutralTotal;
 	private static int gexpress$mafiaTotal;
 	private static int gexpress$mafiaRendered;
 	private static boolean gexpress$renderMafia;
@@ -47,12 +49,16 @@ public abstract class MafiaRoundEndRendererMixin {
 
 		for (GameRoundEndComponent.RoundEndData entry : roundEnd.getPlayers()) {
 			RoleAnnouncementTexts.RoleAnnouncementText role = entry.role();
-			if (role == RoleAnnouncementTexts.VIGILANTE) {
+			if (role == RoleAnnouncementTexts.CIVILIAN) {
+				gexpress$civilianTotal++;
+			} else if (role == RoleAnnouncementTexts.VIGILANTE) {
 				gexpress$vigilanteTotal++;
 			} else if (role == RoleAnnouncementTexts.KILLER) {
 				gexpress$killerTotal++;
 			} else if (role == GexpressRoleAnnouncementTexts.MAFIA) {
 				gexpress$mafiaTotal++;
+			} else if (role != RoleAnnouncementTexts.BLANK) {
+				gexpress$neutralTotal++;
 			}
 		}
 		gexpress$renderMafia = gexpress$mafiaTotal > 0;
@@ -72,11 +78,11 @@ public abstract class MafiaRoundEndRendererMixin {
 	}
 
 	@Inject(method = "renderHud", at = @At(value = "INVOKE",
-		target = "Ldev/doctor4t/wathe/cca/GameRoundEndComponent$RoundEndData;role()Ldev/doctor4t/wathe/client/gui/RoleAnnouncementTexts$RoleAnnouncementText;",
+		target = "Ljava/util/Map;get(Ljava/lang/Object;)Ljava/lang/Object;",
 		ordinal = 1))
 	private static void gexpress$translateMafiaPlayers(TextRenderer renderer, ClientPlayerEntity player,
 			DrawContext context, CallbackInfo ci,
-			@Local(name = "entry") GameRoundEndComponent.RoundEndData entry) {
+			@Local(ordinal = 0) GameRoundEndComponent.RoundEndData entry) {
 		if (!gexpress$renderMafia || entry.role() != GexpressRoleAnnouncementTexts.MAFIA) return;
 
 		EndScreenLayoutConfig.Section layout = EndScreenLayoutConfig.mafia();
@@ -96,12 +102,18 @@ public abstract class MafiaRoundEndRendererMixin {
 		int watheVigilanteTotal = 1 + gexpress$vigilanteTotal;
 		int killerTitleY = 14 + 16 + 24 * (watheVigilanteTotal / 2);
 		int killerRows = Math.max(1, (gexpress$killerTotal + 1) / 2);
-		return killerTitleY + 16 + 24 * killerRows;
+		int rightBottom = killerTitleY + 10 + killerRows * 12;
+		int civilianRows = Math.max(1, (gexpress$civilianTotal + 3) / 4);
+		int neutralRows = gexpress$neutralTotal == 0 ? 0 : (gexpress$neutralTotal + 3) / 4;
+		int leftBottom = 14 + civilianRows * 12 + (neutralRows == 0 ? 0 : 24 + neutralRows * 12);
+		return Math.max(leftBottom, rightBottom) + 8;
 	}
 
 	private static void gexpress$reset() {
+		gexpress$civilianTotal = 0;
 		gexpress$vigilanteTotal = 0;
 		gexpress$killerTotal = 0;
+		gexpress$neutralTotal = 0;
 		gexpress$mafiaTotal = 0;
 		gexpress$mafiaRendered = 0;
 		gexpress$renderMafia = false;
