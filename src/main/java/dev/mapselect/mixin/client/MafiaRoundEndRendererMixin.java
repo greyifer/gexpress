@@ -4,7 +4,6 @@ import com.llamalad7.mixinextras.sugar.Local;
 import dev.doctor4t.wathe.api.WatheGameModes;
 import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
-import dev.doctor4t.wathe.client.gui.RoleAnnouncementTexts;
 import dev.doctor4t.wathe.client.gui.RoundTextRenderer;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
@@ -22,10 +21,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = RoundTextRenderer.class, remap = false, priority = 450)
 public abstract class MafiaRoundEndRendererMixin {
 	private static final int END_DURATION = 200;
-	private static int gexpress$civilianTotal;
-	private static int gexpress$vigilanteTotal;
-	private static int gexpress$killerTotal;
-	private static int gexpress$neutralTotal;
 	private static int gexpress$mafiaTotal;
 	private static int gexpress$mafiaRendered;
 	private static boolean gexpress$renderMafia;
@@ -48,17 +43,8 @@ public abstract class MafiaRoundEndRendererMixin {
 		if (roundEnd.getWinStatus() == GameFunctions.WinStatus.NONE) return;
 
 		for (GameRoundEndComponent.RoundEndData entry : roundEnd.getPlayers()) {
-			RoleAnnouncementTexts.RoleAnnouncementText role = entry.role();
-			if (role == RoleAnnouncementTexts.CIVILIAN) {
-				gexpress$civilianTotal++;
-			} else if (role == RoleAnnouncementTexts.VIGILANTE) {
-				gexpress$vigilanteTotal++;
-			} else if (role == RoleAnnouncementTexts.KILLER) {
-				gexpress$killerTotal++;
-			} else if (role == GexpressRoleAnnouncementTexts.MAFIA) {
+			if (entry.role() == GexpressRoleAnnouncementTexts.MAFIA) {
 				gexpress$mafiaTotal++;
-			} else if (role != RoleAnnouncementTexts.BLANK) {
-				gexpress$neutralTotal++;
 			}
 		}
 		gexpress$renderMafia = gexpress$mafiaTotal > 0;
@@ -88,32 +74,17 @@ public abstract class MafiaRoundEndRendererMixin {
 		EndScreenLayoutConfig.Section layout = EndScreenLayoutConfig.mafia();
 		int columns = Math.max(1, layout.columns);
 		int index = gexpress$mafiaRendered++;
-		int startX = layout.x - (columns * 12) / 2;
-		int x = startX + (index % columns) * 12;
-		int y = gexpress$mafiaTitleY(layout) + 10 + (index / columns) * 12;
-		context.getMatrices().translate(x, y, 0);
+		int visualWidth = (columns - 1) * 24 + 16;
+		int visualX = layout.x - visualWidth / 2 + (index % columns) * 24;
+		int visualY = gexpress$mafiaTitleY(layout) + 14 + (index / columns) * 24;
+		context.getMatrices().translate(visualX / 2.0, visualY / 2.0, 0);
 	}
 
 	private static int gexpress$mafiaTitleY(EndScreenLayoutConfig.Section layout) {
-		return Math.max(layout.y, gexpress$defaultMafiaTitleY());
-	}
-
-	private static int gexpress$defaultMafiaTitleY() {
-		int watheVigilanteTotal = 1 + gexpress$vigilanteTotal;
-		int killerTitleY = 14 + 16 + 24 * (watheVigilanteTotal / 2);
-		int killerRows = Math.max(1, (gexpress$killerTotal + 1) / 2);
-		int rightBottom = killerTitleY + 10 + killerRows * 12;
-		int civilianRows = Math.max(1, (gexpress$civilianTotal + 3) / 4);
-		int neutralRows = gexpress$neutralTotal == 0 ? 0 : (gexpress$neutralTotal + 3) / 4;
-		int leftBottom = 14 + civilianRows * 12 + (neutralRows == 0 ? 0 : 24 + neutralRows * 12);
-		return Math.max(leftBottom, rightBottom) + 8;
+		return layout.y;
 	}
 
 	private static void gexpress$reset() {
-		gexpress$civilianTotal = 0;
-		gexpress$vigilanteTotal = 0;
-		gexpress$killerTotal = 0;
-		gexpress$neutralTotal = 0;
 		gexpress$mafiaTotal = 0;
 		gexpress$mafiaRendered = 0;
 		gexpress$renderMafia = false;

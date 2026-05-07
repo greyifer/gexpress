@@ -1,3 +1,19 @@
+# Grey's Express 1.4.5
+
+## Added
+
+- Added an explicit Save button to the dev End Screen Layout editor.
+
+## Changed
+
+- The dev End Screen Layout editor now previews the round-end text layout directly instead of showing a grid panel and placeholder head squares.
+- Dragging layout labels now preserves the grabbed mouse offset instead of snapping the label's anchor to the cursor.
+
+## Fixed
+
+- Fixed Mafia round-end player heads rendering far below the Mafia label because the custom offset was being applied inside Wathe's scaled head-render matrix.
+- Fixed saved end-screen layout edits not being able to move the Mafia section above the automatic fallback position.
+
 # Grey's Express 1.4.4
 
 ## Changed

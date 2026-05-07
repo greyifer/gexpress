@@ -38,6 +38,20 @@ public final class EndScreenLayoutConfig {
 		return layout.mafia;
 	}
 
+	public static Layout snapshot() {
+		return copy(layout);
+	}
+
+	public static Layout defaultsSnapshot() {
+		return copy(defaults());
+	}
+
+	public static void apply(Layout value) {
+		layout = normalize(value);
+		layout.version = CONFIG_VERSION;
+		save();
+	}
+
 	public static void set(Kind kind, int x, int y) {
 		Section section = section(kind);
 		section.x = snap(x);
@@ -51,12 +65,16 @@ public final class EndScreenLayoutConfig {
 	}
 
 	public static Section section(Kind kind) {
+		return section(layout, kind);
+	}
+
+	public static Section section(Layout value, Kind kind) {
 		return switch (kind) {
-			case CIVILIANS -> layout.civilians;
-			case VIGILANTES -> layout.vigilantes;
-			case NEUTRALS -> layout.neutrals;
-			case KILLERS -> layout.killers;
-			case MAFIA -> layout.mafia;
+			case CIVILIANS -> value.civilians;
+			case VIGILANTES -> value.vigilantes;
+			case NEUTRALS -> value.neutrals;
+			case KILLERS -> value.killers;
+			case MAFIA -> value.mafia;
 		};
 	}
 
@@ -90,6 +108,26 @@ public final class EndScreenLayoutConfig {
 		normalized.killers = normalize(value.killers, normalized.killers);
 		normalized.mafia = normalize(value.mafia, normalized.mafia);
 		return normalized;
+	}
+
+	private static Layout copy(Layout value) {
+		Layout copy = new Layout();
+		copy.version = CONFIG_VERSION;
+		copy.civilians = copy(value.civilians);
+		copy.vigilantes = copy(value.vigilantes);
+		copy.neutrals = copy(value.neutrals);
+		copy.killers = copy(value.killers);
+		copy.mafia = copy(value.mafia);
+		return normalize(copy);
+	}
+
+	private static Section copy(Section value) {
+		if (value == null) return null;
+		Section copy = new Section();
+		copy.x = value.x;
+		copy.y = value.y;
+		copy.columns = value.columns;
+		return copy;
 	}
 
 	private static Section normalize(Section value, Section fallback) {

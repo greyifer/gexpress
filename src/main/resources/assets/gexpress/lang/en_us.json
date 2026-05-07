@@ -500,5 +500,6 @@
 	"gui.gexpress.config.option.dev.end_screen_layout.open": "Open",
 	"gui.gexpress.end_layout.title": "End Screen Layout",
 	"gui.gexpress.end_layout.subtitle": "Drag section anchors; positions snap to the grid.",
-	"gui.gexpress.end_layout.reset": "Reset"
+	"gui.gexpress.end_layout.reset": "Reset",
+	"gui.gexpress.end_layout.save": "Save"
 }

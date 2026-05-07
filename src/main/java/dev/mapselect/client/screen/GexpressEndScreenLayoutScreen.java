@@ -12,7 +12,12 @@ import net.minecraft.util.Formatting;
 public final class GexpressEndScreenLayoutScreen extends Screen {
 	private static final int GRID = 4;
 	private final Screen parent;
+	private EndScreenLayoutConfig.Layout draft = EndScreenLayoutConfig.snapshot();
 	private EndScreenLayoutConfig.Kind dragging;
+	private ButtonWidget saveButton;
+	private int dragOffsetX;
+	private int dragOffsetY;
+	private boolean dirty;
 
 	public GexpressEndScreenLayoutScreen(Screen parent) {
 		super(Text.translatable("gui.gexpress.end_layout.title"));
@@ -23,18 +28,25 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 	protected void init() {
 		int buttonY = height - 28;
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.end_layout.reset"), button -> {
-				EndScreenLayoutConfig.reset();
+				draft = EndScreenLayoutConfig.defaultsSnapshot();
+				dirty = true;
+				updateSaveButton();
 			})
-			.dimensions(width / 2 - 104, buttonY, 96, 20)
+			.dimensions(width / 2 - 150, buttonY, 88, 20)
+			.build());
+		saveButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.end_layout.save"), button ->
+				saveDraft())
+			.dimensions(width / 2 - 44, buttonY, 88, 20)
 			.build());
 		addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> close())
-			.dimensions(width / 2 + 8, buttonY, 96, 20)
+			.dimensions(width / 2 + 62, buttonY, 88, 20)
 			.build());
+		updateSaveButton();
 	}
 
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		context.fill(0, 0, width, height, 0x99000000);
+		context.fill(0, 0, width, height, 0x66000000);
 		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 16, 0xFFFFFF);
 		context.drawCenteredTextWithShadow(textRenderer,
 			Text.translatable("gui.gexpress.end_layout.subtitle").formatted(Formatting.GRAY),
@@ -42,10 +54,9 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 
 		int originX = width / 2;
 		int originY = height / 2 - 40;
-		drawGrid(context, originX, originY);
-		context.drawCenteredTextWithShadow(textRenderer, Text.literal("Passengers Win!").formatted(Formatting.GREEN),
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal("The Mafia Wins!").formatted(Formatting.GRAY),
 			originX, originY - 31, 0xFFFFFF);
-		context.drawCenteredTextWithShadow(textRenderer, Text.literal("All killers were eliminated; the passengers win!"),
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal("They tied all of their loose ends!"),
 			originX, originY - 8, 0xFFFFFF);
 
 		drawSection(context, EndScreenLayoutConfig.Kind.CIVILIANS,
@@ -66,37 +77,18 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
 	}
 
-	private void drawGrid(DrawContext context, int originX, int originY) {
-		int minX = originX - 190;
-		int maxX = originX + 190;
-		int minY = originY - 24;
-		int maxY = originY + 154;
-		context.fill(minX, minY, maxX, maxY, 0x66000000);
-		for (int x = minX; x <= maxX; x += GRID) {
-			int color = x == originX ? 0x55FFFFFF : 0x18222222;
-			context.fill(x, minY, x + 1, maxY, color);
-		}
-		for (int y = minY; y <= maxY; y += GRID) {
-			int color = y == originY ? 0x55FFFFFF : 0x18222222;
-			context.fill(minX, y, maxX, y + 1, color);
-		}
-	}
-
 	private void drawSection(DrawContext context, EndScreenLayoutConfig.Kind kind, Text title,
 			int originX, int originY, int mouseX, int mouseY) {
-		EndScreenLayoutConfig.Section section = EndScreenLayoutConfig.section(kind);
+		EndScreenLayoutConfig.Section section = EndScreenLayoutConfig.section(draft, kind);
 		int x = originX + section.x;
 		int y = originY + section.y;
 		boolean hovered = hit(kind, mouseX, mouseY, originX, originY);
 		int width = Math.max(44, textRenderer.getWidth(title) + 8);
-		int color = dragging == kind ? 0xAA66CCFF : hovered ? 0x88FFFFFF : 0x66000000;
-		context.fill(x - width / 2, y - 3, x + width / 2, y + 20, color);
-		context.drawCenteredTextWithShadow(textRenderer, title, x, y, 0xFFFFFF);
-		for (int i = 0; i < Math.max(1, section.columns); i++) {
-			int px = x - section.columns * 6 + i * 12;
-			context.fill(px, y + 11, px + 8, y + 19, 0xFFBDBDBD);
-			context.fill(px + 1, y + 12, px + 7, y + 18, 0xFF5B6F8C);
+		if (dragging == kind || hovered) {
+			int color = dragging == kind ? 0xCC66CCFF : 0x99FFFFFF;
+			context.fill(x - width / 2, y + 10, x + width / 2, y + 11, color);
 		}
+		context.drawCenteredTextWithShadow(textRenderer, title, x, y, 0xFFFFFF);
 	}
 
 	@Override
@@ -106,8 +98,10 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 			int originY = height / 2 - 40;
 			for (EndScreenLayoutConfig.Kind kind : EndScreenLayoutConfig.Kind.values()) {
 				if (hit(kind, mouseX, mouseY, originX, originY)) {
+					EndScreenLayoutConfig.Section section = EndScreenLayoutConfig.section(draft, kind);
 					dragging = kind;
-					moveDragging(mouseX, mouseY);
+					dragOffsetX = (int) Math.round(mouseX) - (originX + section.x);
+					dragOffsetY = (int) Math.round(mouseY) - (originY + section.y);
 					return true;
 				}
 			}
@@ -138,13 +132,17 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 		if (dragging == null) return;
 		int originX = width / 2;
 		int originY = height / 2 - 40;
-		int x = (int) Math.round((mouseX - originX) / GRID) * GRID;
-		int y = (int) Math.round((mouseY - originY) / GRID) * GRID;
-		EndScreenLayoutConfig.set(dragging, x, y);
+		int x = snap(mouseX - dragOffsetX - originX);
+		int y = snap(mouseY - dragOffsetY - originY);
+		EndScreenLayoutConfig.Section section = EndScreenLayoutConfig.section(draft, dragging);
+		section.x = clamp(x, -180, 180);
+		section.y = clamp(y, -20, 150);
+		dirty = true;
+		updateSaveButton();
 	}
 
 	private boolean hit(EndScreenLayoutConfig.Kind kind, double mouseX, double mouseY, int originX, int originY) {
-		EndScreenLayoutConfig.Section section = EndScreenLayoutConfig.section(kind);
+		EndScreenLayoutConfig.Section section = EndScreenLayoutConfig.section(draft, kind);
 		Text title = switch (kind) {
 			case CIVILIANS -> Text.literal("Civilians");
 			case VIGILANTES -> Text.literal("Vigilantes");
@@ -156,11 +154,35 @@ public final class GexpressEndScreenLayoutScreen extends Screen {
 		int y = originY + section.y;
 		int w = Math.max(44, textRenderer.getWidth(title) + 8);
 		return mouseX >= x - w / 2.0 && mouseX <= x + w / 2.0
-			&& mouseY >= y - 4 && mouseY <= y + 22;
+			&& mouseY >= y - 5 && mouseY <= y + 13;
+	}
+
+	private void saveDraft() {
+		EndScreenLayoutConfig.apply(draft);
+		draft = EndScreenLayoutConfig.snapshot();
+		dirty = false;
+		updateSaveButton();
+	}
+
+	private void updateSaveButton() {
+		if (saveButton != null) {
+			saveButton.active = dirty;
+		}
+	}
+
+	private static int snap(double value) {
+		return (int) Math.round(value / GRID) * GRID;
+	}
+
+	private static int clamp(int value, int min, int max) {
+		return Math.max(min, Math.min(max, value));
 	}
 
 	@Override
 	public void close() {
+		if (dirty) {
+			saveDraft();
+		}
 		MinecraftClient.getInstance().setScreen(parent);
 	}
 }
