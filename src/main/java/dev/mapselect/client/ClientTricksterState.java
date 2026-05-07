@@ -16,6 +16,7 @@ import java.util.UUID;
 
 public final class ClientTricksterState {
 	private static Map<UUID, UUID> swaps = Map.of();
+	private static Map<UUID, Float> voicePitches = Map.of();
 	private static long expiresAtTick = 0L;
 	private static boolean wasAbilityDown;
 	private static boolean wasSecondaryDown;
@@ -39,6 +40,12 @@ public final class ClientTricksterState {
 		return Math.max(0L, expiresAtTick - client.world.getTime());
 	}
 
+	public static float localVoicePitch() {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client == null || client.player == null || !isActive()) return 1.0F;
+		return voicePitches.getOrDefault(client.player.getUuid(), 1.0F);
+	}
+
 	private static void apply(TricksterSkinSwapPayload payload) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.world == null || payload.durationTicks() <= 0 || payload.swaps().isEmpty()) {
@@ -46,6 +53,7 @@ public final class ClientTricksterState {
 			return;
 		}
 		swaps = Map.copyOf(payload.swaps());
+		voicePitches = Map.copyOf(payload.voicePitches());
 		expiresAtTick = client.world.getTime() + payload.durationTicks();
 	}
 
@@ -64,6 +72,7 @@ public final class ClientTricksterState {
 
 	private static void clear() {
 		swaps = Map.of();
+		voicePitches = Map.of();
 		expiresAtTick = 0L;
 	}
 

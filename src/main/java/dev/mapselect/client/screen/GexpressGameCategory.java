@@ -113,6 +113,7 @@ public final class GexpressGameCategory {
 		globalRoleOpts.add(playersPerVigilante);
 		globalRoleOpts.add(buildMafiaMinimumPlayersOption());
 		globalRoleOpts.add(buildLastDeathShieldOption());
+		globalRoleOpts.add(buildGuardianAngelAllowNonInnocentsOption());
 		globalRoleOpts.add(buildPassiveIncomeOption("killer", 5,
 			GexpressConfig::getPassiveIncomeKiller, v -> GexpressConfig.passiveIncomeKiller = v));
 		globalRoleOpts.add(buildPassiveIncomeOption("civilian", 0,
@@ -370,6 +371,17 @@ public final class GexpressGameCategory {
 			.name(Text.translatable("gui.watheextended.config.option.gexpress.last_death_shield"))
 			.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.last_death_shield.tooltip")))
 			.binding(false, GexpressConfig::isLastDeathShieldEnabled, v -> GexpressConfig.lastDeathShieldEnabled = v)
+			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
+				.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+			.build();
+	}
+
+	private static Option<Boolean> buildGuardianAngelAllowNonInnocentsOption() {
+		return Option.<Boolean>createBuilder()
+			.name(Text.translatable("gui.watheextended.config.option.gexpress.guardian_angel_allow_non_innocents"))
+			.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.guardian_angel_allow_non_innocents.tooltip")))
+			.binding(false, GexpressConfig::canGuardianAngelPickNonInnocents,
+				v -> GexpressConfig.guardianAngelAllowNonInnocents = v)
 			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
 				.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
 			.build();

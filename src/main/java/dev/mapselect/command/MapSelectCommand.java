@@ -1,6 +1,7 @@
 package dev.mapselect.command;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -316,17 +317,27 @@ public class MapSelectCommand {
 	}
 
 	private static LiteralArgumentBuilder<ServerCommandSource> freshAirEditLiteral() {
-		var add = CommandManager.literal("add")
-			.then(CommandManager.argument("minX", IntegerArgumentType.integer())
-				.then(CommandManager.argument("minY", IntegerArgumentType.integer())
-					.then(CommandManager.argument("minZ", IntegerArgumentType.integer())
-						.then(CommandManager.argument("maxX", IntegerArgumentType.integer())
-							.then(CommandManager.argument("maxY", IntegerArgumentType.integer())
-								.then(CommandManager.argument("maxZ", IntegerArgumentType.integer())
-									.executes(ctx -> runAddFreshAirArea(ctx, 100))
-									.then(CommandManager.argument("sanityPercent", IntegerArgumentType.integer(0, 100))
-										.executes(ctx -> runAddFreshAirArea(ctx,
-											IntegerArgumentType.getInteger(ctx, "sanityPercent"))))))))));
+		var outsideAfterSanity = CommandManager.argument("outsideSounds", BoolArgumentType.bool())
+			.executes(ctx -> runAddFreshAirArea(ctx,
+				IntegerArgumentType.getInteger(ctx, "sanityPercent"),
+				BoolArgumentType.getBool(ctx, "outsideSounds")));
+		var sanity = CommandManager.argument("sanityPercent", IntegerArgumentType.integer(0, 100))
+			.executes(ctx -> runAddFreshAirArea(ctx,
+				IntegerArgumentType.getInteger(ctx, "sanityPercent")))
+			.then(outsideAfterSanity);
+		var outsideOnly = CommandManager.argument("outsideSounds", BoolArgumentType.bool())
+			.executes(ctx -> runAddFreshAirArea(ctx, 100,
+				BoolArgumentType.getBool(ctx, "outsideSounds")));
+		var maxZ = CommandManager.argument("maxZ", IntegerArgumentType.integer())
+			.executes(ctx -> runAddFreshAirArea(ctx, 100))
+			.then(outsideOnly)
+			.then(sanity);
+		var maxY = CommandManager.argument("maxY", IntegerArgumentType.integer()).then(maxZ);
+		var maxX = CommandManager.argument("maxX", IntegerArgumentType.integer()).then(maxY);
+		var minZ = CommandManager.argument("minZ", IntegerArgumentType.integer()).then(maxX);
+		var minY = CommandManager.argument("minY", IntegerArgumentType.integer()).then(minZ);
+		var minX = CommandManager.argument("minX", IntegerArgumentType.integer()).then(minY);
+		var add = CommandManager.literal("add").then(minX);
 
 		return boxEditLiteral("freshair", p -> p.freshAirArea, BoxKind.FRESH_AIR)
 			.then(add)
@@ -524,6 +535,7 @@ public class MapSelectCommand {
 				box.maxZ = sourceArea.area.maxZ + areaShift;
 				copied.area = box;
 				copied.sanityPercent = sourceArea.sanityPercent;
+				copied.playOutsideAmbience = sourceArea.playOutsideAmbience;
 				preset.freshAirAreas.add(copied);
 			}
 			if (!preset.freshAirAreas.isEmpty()) preset.freshAirArea = preset.freshAirAreas.getFirst().area;
@@ -1088,6 +1100,7 @@ public class MapSelectCommand {
 					MapPreset.FreshAirAreaData area = new MapPreset.FreshAirAreaData();
 					area.area = box;
 					area.sanityPercent = 100;
+					area.playOutsideAmbience = false;
 					preset.freshAirAreas = new ArrayList<>(List.of(area));
 				}
 			}
@@ -1125,6 +1138,11 @@ public class MapSelectCommand {
 	}
 
 	private static int runAddFreshAirArea(CommandContext<ServerCommandSource> ctx, int sanityPercent) {
+		return runAddFreshAirArea(ctx, sanityPercent, false);
+	}
+
+	private static int runAddFreshAirArea(CommandContext<ServerCommandSource> ctx, int sanityPercent,
+			boolean outsideSounds) {
 		ServerCommandSource src = ctx.getSource();
 		String name = StringArgumentType.getString(ctx, "name");
 		try {
@@ -1147,11 +1165,13 @@ public class MapSelectCommand {
 			MapPreset.FreshAirAreaData area = new MapPreset.FreshAirAreaData();
 			area.area = box;
 			area.sanityPercent = Math.max(0, Math.min(100, sanityPercent));
+			area.playOutsideAmbience = outsideSounds;
 			preset.freshAirAreas.add(area);
 			if (preset.freshAirArea == null) preset.freshAirArea = box;
 			saveAndBroadcast(src, name, preset);
 			src.sendFeedback(() -> Text.literal("Added fresh air area for '" + name
-				+ "' (" + area.sanityPercent + "% sanity).").formatted(Formatting.GREEN), true);
+				+ "' (" + area.sanityPercent + "% sanity, outside sounds "
+				+ (area.playOutsideAmbience ? "on" : "off") + ").").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
@@ -1178,7 +1198,8 @@ public class MapSelectCommand {
 					+ ") -> (" + fmt(b.maxX) + ", " + fmt(b.maxY) + ", " + fmt(b.maxZ) + ")";
 				src.sendFeedback(() -> Text.literal(index + ". ")
 					.append(Text.literal(coords).formatted(Formatting.WHITE))
-					.append(Text.literal(" (" + area.sanityPercent + "% sanity)")), false);
+					.append(Text.literal(" (" + area.sanityPercent + "% sanity, outside sounds "
+						+ (area.playOutsideAmbience ? "on" : "off") + ")")), false);
 			}
 			return preset.freshAirAreas.size();
 		} catch (IOException e) {

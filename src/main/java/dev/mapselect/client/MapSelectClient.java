@@ -37,6 +37,8 @@ public class MapSelectClient implements ClientModInitializer {
 		GexpressRoleAnnouncementTexts.register();
 		registerConfigReceiver();
 		ClientAbilityKeys.register();
+		ClientDeadGuidebookKey.register();
+		ClientFreshAirAmbienceState.register();
 		ClientShortSightedState.register();
 		ClientNightVisionState.register();
 		ClientMedicShieldState.register();
@@ -61,6 +63,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientMafiaState.register();
 		ClientJanitorState.register();
 		ClientBountyHunterState.register();
+		ClientGuardianAngelState.register();
 		ClientAbilityCooldownHud.register();
 		ClientPresetCache.registerClient();
 		ClientTrainPresetCache.registerClient();
@@ -157,6 +160,7 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.masqueradePitchMinPercent(),
 				payload.masqueradePitchMaxPercent(),
 				payload.lastDeathShieldEnabled(),
+				payload.guardianAngelAllowNonInnocents(),
 				payload.bountyHunterBountyIntervalSeconds(),
 				payload.bountyHunterRewardGold(),
 				payload.bountyHunterFailCooldownSeconds(),

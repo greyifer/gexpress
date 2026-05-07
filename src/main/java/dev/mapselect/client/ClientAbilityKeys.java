@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 
 public final class ClientAbilityKeys {
 	private static KeyBinding secondaryBinding;
+	private static KeyBinding guidebookBinding;
 	private static Field boundKeyField;
 	private static boolean lookedUpBoundKeyField;
 
@@ -23,6 +24,12 @@ public final class ClientAbilityKeys {
 			GLFW.GLFW_KEY_B,
 			"category.gexpress"
 		));
+		guidebookBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+			"key.gexpress.guidebook",
+			InputUtil.Type.KEYSYM,
+			GLFW.GLFW_KEY_G,
+			"category.gexpress"
+		));
 	}
 
 	public static KeyBinding primaryBinding() {
@@ -33,6 +40,10 @@ public final class ClientAbilityKeys {
 
 	public static KeyBinding secondaryBinding() {
 		return secondaryBinding;
+	}
+
+	public static KeyBinding guidebookBinding() {
+		return guidebookBinding;
 	}
 
 	public static boolean isDown(MinecraftClient client, KeyBinding binding) {

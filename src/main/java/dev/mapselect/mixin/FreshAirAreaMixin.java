@@ -12,6 +12,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class FreshAirAreaMixin {
 	@Inject(method = "isSkyVisibleAdjacent", at = @At("HEAD"), cancellable = true)
 	private static void gexpress$freshAirAreaCountsAsOutside(Entity entity, CallbackInfoReturnable<Boolean> cir) {
+		if (entity != null && entity.getWorld().isClient) {
+			if (FreshAirAreaManager.hasFreshAirAmbienceTag(entity)
+					|| FreshAirAreaManager.shouldPlayClientFreshAirAmbience(entity)) {
+				cir.setReturnValue(true);
+			}
+			return;
+		}
 		if (FreshAirAreaManager.hasFreshAirTag(entity) || FreshAirAreaManager.countsAsFreshAir(entity)) {
 			cir.setReturnValue(true);
 		}

@@ -10,13 +10,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Server -> client skin replacement map for the Trickster's masquerade. */
-public record TricksterSkinSwapPayload(Map<UUID, UUID> swaps, int durationTicks) implements CustomPayload {
+/** Server -> client skin and voice replacement map for the Trickster's masquerade. */
+public record TricksterSkinSwapPayload(Map<UUID, UUID> swaps, Map<UUID, Float> voicePitches,
+		int durationTicks) implements CustomPayload {
 	public static final CustomPayload.Id<TricksterSkinSwapPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "trickster_skin_swap"));
 
 	public TricksterSkinSwapPayload {
 		swaps = swaps == null ? Map.of() : Map.copyOf(swaps);
+		voicePitches = voicePitches == null ? Map.of() : Map.copyOf(voicePitches);
 		durationTicks = Math.max(0, durationTicks);
 	}
 
@@ -28,6 +30,11 @@ public record TricksterSkinSwapPayload(Map<UUID, UUID> swaps, int durationTicks)
 				buf.writeUuid(entry.getKey());
 				buf.writeUuid(entry.getValue());
 			}
+			buf.writeInt(payload.voicePitches().size());
+			for (Map.Entry<UUID, Float> entry : payload.voicePitches().entrySet()) {
+				buf.writeUuid(entry.getKey());
+				buf.writeFloat(entry.getValue());
+			}
 		},
 		buf -> {
 			int durationTicks = buf.readInt();
@@ -36,7 +43,12 @@ public record TricksterSkinSwapPayload(Map<UUID, UUID> swaps, int durationTicks)
 			for (int i = 0; i < size; i++) {
 				swaps.put(buf.readUuid(), buf.readUuid());
 			}
-			return new TricksterSkinSwapPayload(swaps, durationTicks);
+			int pitchSize = Math.max(0, buf.readInt());
+			Map<UUID, Float> voicePitches = new LinkedHashMap<>();
+			for (int i = 0; i < pitchSize; i++) {
+				voicePitches.put(buf.readUuid(), buf.readFloat());
+			}
+			return new TricksterSkinSwapPayload(swaps, voicePitches, durationTicks);
 		}
 	);
 

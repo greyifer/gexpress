@@ -171,6 +171,8 @@ public final class GexpressConfig {
 	public static int janitorCleanCooldownAfterKillSeconds = 45;
 	/** Whether the player who died last round starts the next round with one breakable shield. */
 	public static boolean lastDeathShieldEnabled = false;
+	/** Whether guardian angel can be assigned to killer, neutral, or Mafia players. */
+	public static boolean guardianAngelAllowNonInnocents = false;
 	/** Whether G'Express uses fixed max Killer/Vigilante counts instead of per-player scaling. */
 	public static boolean useCustomRoleCounts = true;
 	/** Maximum number of normal killer-team players assigned by G'Express role assignment. */
@@ -736,6 +738,10 @@ public final class GexpressConfig {
 		return lastDeathShieldEnabled;
 	}
 
+	public static boolean canGuardianAngelPickNonInnocents() {
+		return guardianAngelAllowNonInnocents;
+	}
+
 	public static boolean useCustomRoleCounts() {
 		return useCustomRoleCounts;
 	}
@@ -1048,6 +1054,7 @@ public final class GexpressConfig {
 			janitorRevolverCooldownAfterCleanSeconds = snap.janitorRevolverCooldownAfterCleanSeconds;
 			janitorCleanCooldownAfterKillSeconds = snap.janitorCleanCooldownAfterKillSeconds;
 			lastDeathShieldEnabled = snap.lastDeathShieldEnabled;
+			guardianAngelAllowNonInnocents = snap.guardianAngelAllowNonInnocents;
 			useCustomRoleCounts = snap.useCustomRoleCounts;
 			maxKillerAmount = snap.maxKillerAmount;
 			maxVigilanteAmount = snap.maxVigilanteAmount;
@@ -1168,6 +1175,7 @@ public final class GexpressConfig {
 			snap.janitorRevolverCooldownAfterCleanSeconds = janitorRevolverCooldownAfterCleanSeconds;
 			snap.janitorCleanCooldownAfterKillSeconds = janitorCleanCooldownAfterKillSeconds;
 			snap.lastDeathShieldEnabled = lastDeathShieldEnabled;
+			snap.guardianAngelAllowNonInnocents = guardianAngelAllowNonInnocents;
 			snap.useCustomRoleCounts = useCustomRoleCounts;
 			snap.maxKillerAmount = maxKillerAmount;
 			snap.maxVigilanteAmount = maxVigilanteAmount;
@@ -1230,7 +1238,7 @@ public final class GexpressConfig {
 			int skincrawlerBodyMaxAgeSeconds, int skincrawlerCooldownSeconds, int skincrawlerStunSeconds,
 			int skincrawlerRange, int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
 			int squeakerPitchPercent, int masqueradePitchMinPercent, int masqueradePitchMaxPercent,
-			boolean lastDeathShieldEnabled,
+			boolean lastDeathShieldEnabled, boolean guardianAngelAllowNonInnocents,
 			int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold,
 			int bountyHunterFailCooldownSeconds, int godfatherBulletPrice, int godfatherStartingBullets,
 			int godfatherMaxLoadedBullets, int mafiaStartingGold, int mafiaMinimumPlayers,
@@ -1327,6 +1335,7 @@ public final class GexpressConfig {
 		GexpressConfig.janitorRevolverCooldownAfterCleanSeconds = janitorRevolverCooldownAfterCleanSeconds;
 		GexpressConfig.janitorCleanCooldownAfterKillSeconds = janitorCleanCooldownAfterKillSeconds;
 		GexpressConfig.lastDeathShieldEnabled = lastDeathShieldEnabled;
+		GexpressConfig.guardianAngelAllowNonInnocents = guardianAngelAllowNonInnocents;
 		GexpressConfig.useCustomRoleCounts = useCustomRoleCounts;
 		GexpressConfig.maxKillerAmount = maxKillerAmount;
 		GexpressConfig.maxVigilanteAmount = maxVigilanteAmount;
@@ -1600,6 +1609,7 @@ public final class GexpressConfig {
 		int janitorRevolverCooldownAfterCleanSeconds = 45;
 		int janitorCleanCooldownAfterKillSeconds = 45;
 		boolean lastDeathShieldEnabled = false;
+		boolean guardianAngelAllowNonInnocents = false;
 		boolean useCustomRoleCounts = true;
 		int maxKillerAmount = 64;
 		int maxVigilanteAmount = 1;

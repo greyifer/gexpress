@@ -4,6 +4,7 @@ import dev.mapselect.client.ClientMedicShieldState;
 import dev.mapselect.client.ClientMafiaState;
 import dev.mapselect.client.ClientSnitchState;
 import dev.mapselect.client.ClientJanitorState;
+import dev.mapselect.client.ClientGuardianAngelState;
 import dev.mapselect.client.ClientTimeMasterFreezeState;
 import dev.mapselect.client.ClientTrackerState;
 import net.minecraft.entity.Entity;
@@ -23,6 +24,7 @@ public abstract class MedicShieldEntityGlowMixin {
 				|| ((Object) this instanceof AbstractClientPlayerEntity player
 					&& (ClientTimeMasterFreezeState.shouldGlow(player)
 						|| ClientMafiaState.shouldGlow(player.getUuid())
+						|| ClientGuardianAngelState.shouldGlow(player)
 						|| ClientTrackerState.isTracked(player.getUuid())))) {
 			cir.setReturnValue(true);
 		}
@@ -51,6 +53,11 @@ public abstract class MedicShieldEntityGlowMixin {
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientMafiaState.shouldGlow(player.getUuid())) {
 			cir.setReturnValue(ClientMafiaState.glowColor());
+			return;
+		}
+		if ((Object) this instanceof AbstractClientPlayerEntity player
+				&& ClientGuardianAngelState.shouldGlow(player)) {
+			cir.setReturnValue(ClientGuardianAngelState.SHIELD_COLOR);
 			return;
 		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player

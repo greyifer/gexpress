@@ -1,3 +1,27 @@
+# Grey's Express 1.4.0
+
+## Added
+
+- Added a dead-player Guidebook keybind so spectators can open the guidebook while dead.
+- Added keyboard navigation support for the guidebook so dead players can browse it without the mouse.
+- Added Guardian Angel.
+- Added a host setting for allowing Guardian Angel to secretly select killer, neutral, or Mafia players instead of only innocent-side players.
+- Added dead-player voice group tracking and syncing for G'Express voice chat handling.
+- Added client/server fresh-air ambience syncing for custom Fresh Air areas.
+- Added voice-pitch support plumbing for G'Express voice effects.
+
+## Changed
+
+- Fresh Air custom areas now support both sanity reward percentages and whether Wathe outside ambience should play inside that area.
+- Dead-player guidebook access and Guardian Angel shield usage now work from the normal G'Express client key handling flow.
+
+## Fixed
+
+- Fixed players being incorrectly placed into the dead voice group without actually dying.
+- Fixed revived players staying stuck in the dead voice group after being brought back.
+- Fixed custom Fresh Air areas not applying the fresh-air state the same way normal open-sky fresh air does.
+- Fixed guidebook usage for dead spectators when no mouse interaction is available.
+
 # Grey's Express 1.3.9.1
 
 ## Added

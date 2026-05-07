@@ -23,6 +23,7 @@ import dev.mapselect.network.TimeMasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
+import dev.mapselect.role.guardian.GuardianAngelManager;
 import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
 import dev.mapselect.role.medic.MedicShieldComponent;
@@ -789,6 +790,7 @@ public final class TimeMasterManager {
 			BountyHunterManager.TimeState bountyHunter,
 			MafiaManager.TimeState mafia, SkincrawlerManager.TimeState skincrawler,
 			SpyManager.TimeState spy,
+			GuardianAngelManager.TimeState guardianAngel,
 			NbtCompound gameWorld, NbtCompound gameTime, NbtCompound timeMaster,
 			NbtCompound c4Back, NbtCompound medicShield,
 			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute) {
@@ -827,6 +829,7 @@ public final class TimeMasterManager {
 				MafiaManager.snapshotForTimeRewind(),
 				SkincrawlerManager.snapshotForTimeRewind(),
 				SpyManager.snapshotForTimeRewind(),
+				GuardianAngelManager.snapshotForTimeRewind(),
 				writeComponent(GameWorldComponent.KEY.getNullable(world), lookup),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
 				writeComponent(TimeMasterComponent.KEY.getNullable(world), lookup),
@@ -916,6 +919,7 @@ public final class TimeMasterManager {
 			readComponent(WarlockComponent.KEY.getNullable(world), warlock, lookup);
 			readComponent(VoiceMuteState.KEY.getNullable(world), voiceMute, lookup);
 			VultureManager.restoreForTimeRewind(world, vulture);
+			GuardianAngelManager.restoreForTimeRewind(world, guardianAngel);
 
 			GameWorldComponent.KEY.sync(world);
 			GameTimeComponent.KEY.sync(world);

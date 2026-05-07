@@ -222,6 +222,7 @@ public final class GexpressMapPresetsCategory {
 			MapPreset.FreshAirAreaData legacy = new MapPreset.FreshAirAreaData();
 			legacy.area = cloneBox(src.freshAirArea);
 			legacy.sanityPercent = 100;
+			legacy.playOutsideAmbience = false;
 			out.add(legacy);
 		}
 		return out;
@@ -232,6 +233,7 @@ public final class GexpressMapPresetsCategory {
 		MapPreset.FreshAirAreaData copy = new MapPreset.FreshAirAreaData();
 		copy.area = cloneBox(entry.area);
 		copy.sanityPercent = clampPercent(entry.sanityPercent);
+		copy.playOutsideAmbience = entry.playOutsideAmbience;
 		return copy;
 	}
 
@@ -283,7 +285,7 @@ public final class GexpressMapPresetsCategory {
 					edit.freshAirArea = parsed.isEmpty() ? null : parsed.getFirst().area;
 				})
 			.controller(StringControllerBuilder::create)
-			.initial(() -> "0 0 0 0 0 0 100")
+			.initial(() -> "0 0 0 0 0 0 100 false")
 			.collapsed(false)
 			.build();
 	}
@@ -331,14 +333,15 @@ public final class GexpressMapPresetsCategory {
 	}
 
 	private static String freshAirAreaToString(MapPreset.FreshAirAreaData entry) {
-		if (entry == null || entry.area == null) return "0 0 0 0 0 0 100";
-		return boxToString(entry.area) + " " + clampPercent(entry.sanityPercent);
+		if (entry == null || entry.area == null) return "0 0 0 0 0 0 100 false";
+		return boxToString(entry.area) + " " + clampPercent(entry.sanityPercent)
+			+ " " + entry.playOutsideAmbience;
 	}
 
 	private static MapPreset.FreshAirAreaData parseFreshAirArea(String s) {
 		if (s == null) return null;
 		String[] parts = s.trim().split("\\s+");
-		if (parts.length != 7) return null;
+		if (parts.length != 7 && parts.length != 8) return null;
 		MapPreset.BoxData box = parseBox(String.join(" ",
 			parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]));
 		if (box == null) return null;
@@ -346,10 +349,20 @@ public final class GexpressMapPresetsCategory {
 			MapPreset.FreshAirAreaData entry = new MapPreset.FreshAirAreaData();
 			entry.area = box;
 			entry.sanityPercent = clampPercent(Integer.parseInt(parts[6]));
+			entry.playOutsideAmbience = parts.length >= 8 && parseBoolean(parts[7]);
 			return entry;
 		} catch (NumberFormatException e) {
 			return null;
 		}
+	}
+
+	private static boolean parseBoolean(String raw) {
+		if (raw == null) return false;
+		String normalized = raw.trim();
+		return "true".equalsIgnoreCase(normalized)
+			|| "yes".equalsIgnoreCase(normalized)
+			|| "on".equalsIgnoreCase(normalized)
+			|| "1".equals(normalized);
 	}
 
 	private static MapPreset.BoxData parseBox(String s) {

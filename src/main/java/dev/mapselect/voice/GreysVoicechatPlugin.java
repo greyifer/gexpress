@@ -2,7 +2,7 @@ package dev.mapselect.voice;
 
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.VoicechatPlugin;
-import de.maxhenkel.voicechat.api.VoicechatServerApi;
+import de.maxhenkel.voicechat.api.events.ClientSoundEvent;
 import de.maxhenkel.voicechat.api.events.CreateGroupEvent;
 import de.maxhenkel.voicechat.api.events.EntitySoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
@@ -10,27 +10,22 @@ import de.maxhenkel.voicechat.api.events.LocationalSoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.SoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.StaticSoundPacketEvent;
-import de.maxhenkel.voicechat.api.opus.OpusDecoder;
-import de.maxhenkel.voicechat.api.opus.OpusEncoder;
 import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
-import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.modifier.ModifierUtils;
 import dev.mapselect.registry.MapSelectModifiers;
-import dev.mapselect.role.trickster.TricksterManager;
 import dev.mapselect.role.vulture.VultureManager;
-import dev.doctor4t.wathe.game.GameFunctions;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.UUID;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class GreysVoicechatPlugin implements VoicechatPlugin {
-	private final Map<UUID, CodecPair> codecs = new ConcurrentHashMap<>();
+	private Method clientPitchMethod;
+	private boolean lookedUpClientPitchMethod;
 
 	@Override
 	public String getPluginId() {
@@ -39,6 +34,10 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 
 	@Override
 	public void registerEvents(EventRegistration registration) {
+		try {
+			registration.registerEvent(ClientSoundEvent.class, this::onClientSound);
+		} catch (Throwable ignored) {
+		}
 		registration.registerEvent(MicrophonePacketEvent.class, this::onMicrophonePacket);
 		registration.registerEvent(LocationalSoundPacketEvent.class, this::onSoundPacket);
 		registration.registerEvent(EntitySoundPacketEvent.class, this::onSoundPacket);
@@ -63,15 +62,6 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 			event.cancel();
 			return;
 		}
-		if (nativePlayer instanceof ServerPlayerEntity player && GameFunctions.isPlayerAliveAndSurvival(player)) {
-			float pitch = TricksterManager.voicePitchFor(world, senderId);
-			if (ModifierUtils.has(player, MapSelectModifiers.SQUEAKER_ID)) {
-				pitch *= GexpressConfig.getSqueakerPitchPercent() / 100.0F;
-			}
-			if (Math.abs(pitch - 1.0F) > 0.03F) {
-				pitchPacket(event, senderId, pitch);
-			}
-		}
 		Set<UUID> bellyReceivers = VultureManager.bellyVoiceReceivers(senderId);
 		if (!bellyReceivers.isEmpty()) {
 			StaticSoundPacket packet = event.getPacket().staticSoundPacketBuilder()
@@ -86,35 +76,6 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 				event.cancel();
 			}
 		}
-	}
-
-	private void pitchPacket(MicrophonePacketEvent event, UUID senderId, float pitch) {
-		try {
-			VoicechatServerApi api = event.getVoicechat();
-			CodecPair codec = codecs.computeIfAbsent(senderId,
-				id -> new CodecPair(api.createDecoder(), api.createEncoder()));
-			short[] decoded = codec.decoder().decode(event.getPacket().getOpusEncodedData());
-			if (decoded == null || decoded.length == 0) return;
-			short[] shifted = shiftPitch(decoded, Math.max(0.5F, Math.min(2.0F, pitch)));
-			event.getPacket().setOpusEncodedData(codec.encoder().encode(shifted));
-		} catch (Throwable ignored) {
-			codecs.remove(senderId);
-		}
-	}
-
-	private static short[] shiftPitch(short[] input, float pitch) {
-		short[] out = new short[input.length];
-		int max = input.length - 1;
-		if (max <= 0) return input.clone();
-		for (int i = 0; i < out.length; i++) {
-			double source = i * pitch;
-			while (source > max) source -= max;
-			int a = Math.max(0, Math.min(max, (int) source));
-			int b = Math.min(max, a + 1);
-			double t = source - a;
-			out[i] = (short) Math.round(input[a] * (1.0D - t) + input[b] * t);
-		}
-		return out;
 	}
 
 	private void onSoundPacket(SoundPacketEvent<?> event) {
@@ -139,5 +100,34 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		}
 	}
 
-	private record CodecPair(OpusDecoder decoder, OpusEncoder encoder) {}
+	private void onClientSound(ClientSoundEvent event) {
+		short[] raw = event.getRawAudio();
+		if (raw == null || raw.length == 0) return;
+		float pitch = localClientPitch();
+		if (Math.abs(pitch - 1.0F) <= 0.03F) return;
+		event.setRawAudio(VoicePitchShifter.shift(raw, pitch));
+	}
+
+	private float localClientPitch() {
+		try {
+			Method method = clientPitchMethod();
+			if (method == null) return 1.0F;
+			Object value = method.invoke(null);
+			return value instanceof Number number ? number.floatValue() : 1.0F;
+		} catch (Throwable ignored) {
+			return 1.0F;
+		}
+	}
+
+	private Method clientPitchMethod() {
+		if (lookedUpClientPitchMethod) return clientPitchMethod;
+		lookedUpClientPitchMethod = true;
+		try {
+			Class<?> bridge = Class.forName("dev.mapselect.client.ClientVoicePitchBridge");
+			clientPitchMethod = bridge.getMethod("currentPitch");
+		} catch (Throwable ignored) {
+			clientPitchMethod = null;
+		}
+		return clientPitchMethod;
+	}
 }

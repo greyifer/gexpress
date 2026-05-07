@@ -128,7 +128,7 @@ public final class TricksterManager {
 			.put(trickster.getUuid(), world.getTime() + durationTicks
 				+ (long) GexpressConfig.getTricksterMasqueradeCooldownSeconds() * 20L);
 
-		TricksterSkinSwapPayload payload = new TricksterSkinSwapPayload(swaps, durationTicks);
+		TricksterSkinSwapPayload payload = new TricksterSkinSwapPayload(swaps, voicePitches, durationTicks);
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			ServerPlayNetworking.send(player, payload);
 		}
@@ -218,7 +218,7 @@ public final class TricksterManager {
 	}
 
 	private static void broadcastClear(ServerWorld world) {
-		TricksterSkinSwapPayload clear = new TricksterSkinSwapPayload(Map.of(), 0);
+		TricksterSkinSwapPayload clear = new TricksterSkinSwapPayload(Map.of(), Map.of(), 0);
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			ServerPlayNetworking.send(player, clear);
 		}
@@ -238,7 +238,7 @@ public final class TricksterManager {
 		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
 		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
 		if (active == null || !active.isActive(world)) return;
-		ServerPlayNetworking.send(player, new TricksterSkinSwapPayload(active.swaps(),
+		ServerPlayNetworking.send(player, new TricksterSkinSwapPayload(active.swaps(), active.voicePitches(),
 			(int) Math.min(Integer.MAX_VALUE, active.remainingTicks(world))));
 	}
 

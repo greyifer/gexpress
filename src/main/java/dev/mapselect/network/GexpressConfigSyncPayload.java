@@ -31,7 +31,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int skincrawlerBodyMaxAgeSeconds, int skincrawlerCooldownSeconds, int skincrawlerStunSeconds,
 		int skincrawlerRange, int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
 		int squeakerPitchPercent, int masqueradePitchMinPercent, int masqueradePitchMaxPercent,
-		boolean lastDeathShieldEnabled,
+		boolean lastDeathShieldEnabled, boolean guardianAngelAllowNonInnocents,
 		int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold, int bountyHunterFailCooldownSeconds,
 		int godfatherBulletPrice, int godfatherStartingBullets, int godfatherMaxLoadedBullets, int mafiaStartingGold,
 		int mafiaMinimumPlayers, int godfatherStartingGold, int mafiosoStartingGold, int janitorStartingGold,
@@ -115,6 +115,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.writeInt(payload.masqueradePitchMinPercent());
 			buf.writeInt(payload.masqueradePitchMaxPercent());
 			buf.writeBoolean(payload.lastDeathShieldEnabled());
+			buf.writeBoolean(payload.guardianAngelAllowNonInnocents());
 			buf.writeInt(payload.bountyHunterBountyIntervalSeconds());
 			buf.writeInt(payload.bountyHunterRewardGold());
 			buf.writeInt(payload.bountyHunterFailCooldownSeconds());
@@ -222,6 +223,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // masqueradePitchMinPercent
 			buf.readInt(), // masqueradePitchMaxPercent
 			buf.readBoolean(), // lastDeathShieldEnabled
+			buf.readBoolean(), // guardianAngelAllowNonInnocents
 			buf.readInt(), // bountyHunterBountyIntervalSeconds
 			buf.readInt(), // bountyHunterRewardGold
 			buf.readInt(), // bountyHunterFailCooldownSeconds

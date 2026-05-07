@@ -210,6 +210,7 @@ public class MapPreset {
 				FreshAirAreaData out = new FreshAirAreaData();
 				out.area = area;
 				out.sanityPercent = Math.max(0, Math.min(100, entry.sanityPercent));
+				out.playOutsideAmbience = entry.playOutsideAmbience;
 				normalized.add(out);
 			}
 		}
@@ -273,6 +274,7 @@ public class MapPreset {
 	public static class FreshAirAreaData {
 		public BoxData area;
 		public int sanityPercent = 100;
+		public boolean playOutsideAmbience = false;
 	}
 
 	public static class OffsetData {

@@ -290,6 +290,7 @@ public final class GexpressOptionsScreen {
 			GexpressConfig.getMasqueradePitchMinPercent(),
 			GexpressConfig.getMasqueradePitchMaxPercent(),
 			GexpressConfig.isLastDeathShieldEnabled(),
+			GexpressConfig.canGuardianAngelPickNonInnocents(),
 			GexpressConfig.getBountyHunterBountyIntervalSeconds(),
 			GexpressConfig.getBountyHunterRewardGold(),
 			GexpressConfig.getBountyHunterFailCooldownSeconds(),

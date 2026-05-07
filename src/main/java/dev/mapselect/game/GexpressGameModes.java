@@ -14,14 +14,18 @@ public final class GexpressGameModes {
 	private GexpressGameModes() {}
 
 	public static void register() {
-		GameMode existing = WatheGameModes.GAME_MODES.get(AMNESIA_ID);
-		AMNESIA = existing == null
-			? WatheGameModes.registerGameMode(AMNESIA_ID, new ModdedMurderGameMode(AMNESIA_ID))
-			: existing;
+		AMNESIA = registerModdedMurderMode(AMNESIA_ID);
 	}
 
 	public static boolean isAmnesia(GameWorldComponent game) {
 		return game != null && game.getGameMode() != null
 			&& AMNESIA_ID.equals(game.getGameMode().identifier);
+	}
+
+	private static GameMode registerModdedMurderMode(Identifier id) {
+		GameMode existing = WatheGameModes.GAME_MODES.get(id);
+		return existing == null
+			? WatheGameModes.registerGameMode(id, new ModdedMurderGameMode(id))
+			: existing;
 	}
 }
