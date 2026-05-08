@@ -3,9 +3,14 @@ package dev.mapselect.command;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.cca.PlayerMoodComponent;
+import dev.doctor4t.wathe.game.GameConstants;
 import dev.mapselect.MapSelect;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.role.warlock.WarlockComponent;
@@ -30,6 +35,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 public final class TestCommand {
@@ -78,7 +84,18 @@ public final class TestCommand {
 				.then(CommandManager.literal("clear")
 					.executes(ctx -> runClearModifiers(ctx, self(ctx)))
 					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runClearModifiers(ctx, EntityArgumentType.getPlayers(ctx, "players"))))));
+						.executes(ctx -> runClearModifiers(ctx, EntityArgumentType.getPlayers(ctx, "players"))))))
+			.then(CommandManager.literal("task")
+				.then(CommandManager.literal("clear")
+					.executes(ctx -> runClearTasks(ctx, self(ctx)))
+					.then(CommandManager.argument("players", EntityArgumentType.players())
+						.executes(ctx -> runClearTasks(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
+				.then(CommandManager.argument("task", StringArgumentType.word())
+					.suggests(TestCommand::suggestTasks)
+					.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"), self(ctx)))
+					.then(CommandManager.argument("players", EntityArgumentType.players())
+						.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"),
+							EntityArgumentType.getPlayers(ctx, "players"))))));
 	}
 
 	private static Collection<ServerPlayerEntity> self(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
@@ -130,6 +147,15 @@ public final class TestCommand {
 	private static boolean hasModifier(WorldModifierComponent mods, ServerPlayerEntity player, Modifier modifier) {
 		return mods.getModifiers(player.getUuid()).stream()
 			.anyMatch(current -> current == modifier || current.identifier().equals(modifier.identifier()));
+	}
+
+	private static CompletableFuture<Suggestions> suggestTasks(CommandContext<ServerCommandSource> ctx,
+			SuggestionsBuilder builder) {
+		String remaining = builder.getRemainingLowerCase();
+		for (String task : List.of("outside", "sleep", "eat", "drink")) {
+			if (task.startsWith(remaining)) builder.suggest(task);
+		}
+		return builder.buildFuture();
 	}
 
 	private static int runSetRole(CommandContext<ServerCommandSource> ctx, Role role,
@@ -244,6 +270,67 @@ public final class TestCommand {
 		src.sendFeedback(() -> Text.literal("Cleared test modifiers for " + playerList(players) + ".")
 			.formatted(Formatting.YELLOW), true);
 		return players.size();
+	}
+
+	private static int runGiveTask(CommandContext<ServerCommandSource> ctx, String rawTask,
+			Collection<ServerPlayerEntity> players) {
+		ServerCommandSource src = ctx.getSource();
+		PlayerMoodComponent.Task task = parseTask(rawTask);
+		if (task == null) {
+			src.sendError(Text.literal("Unknown task '" + rawTask + "'. Use outside, sleep, eat, or drink."));
+			return 0;
+		}
+
+		for (ServerPlayerEntity player : players) {
+			PlayerMoodComponent mood = PlayerMoodComponent.KEY.getNullable(player);
+			if (mood == null) continue;
+			mood.tasks.clear();
+			mood.tasks.put(task, newTask(task));
+			mood.sync();
+		}
+
+		src.sendFeedback(() -> Text.literal("Forced task " + taskName(task) + " for " + playerList(players) + ".")
+			.formatted(Formatting.GREEN), true);
+		return players.size();
+	}
+
+	private static int runClearTasks(CommandContext<ServerCommandSource> ctx,
+			Collection<ServerPlayerEntity> players) {
+		ServerCommandSource src = ctx.getSource();
+		for (ServerPlayerEntity player : players) {
+			PlayerMoodComponent mood = PlayerMoodComponent.KEY.getNullable(player);
+			if (mood == null) continue;
+			mood.tasks.clear();
+			mood.sync();
+		}
+
+		src.sendFeedback(() -> Text.literal("Cleared tasks for " + playerList(players) + ".")
+			.formatted(Formatting.YELLOW), true);
+		return players.size();
+	}
+
+	private static PlayerMoodComponent.Task parseTask(String rawTask) {
+		if (rawTask == null) return null;
+		return switch (rawTask.toLowerCase(Locale.ROOT)) {
+			case "outside", "freshair", "fresh_air", "air" -> PlayerMoodComponent.Task.OUTSIDE;
+			case "sleep", "bed" -> PlayerMoodComponent.Task.SLEEP;
+			case "eat", "food" -> PlayerMoodComponent.Task.EAT;
+			case "drink", "cocktail" -> PlayerMoodComponent.Task.DRINK;
+			default -> null;
+		};
+	}
+
+	private static PlayerMoodComponent.TrainTask newTask(PlayerMoodComponent.Task task) {
+		return switch (task) {
+			case OUTSIDE -> new PlayerMoodComponent.OutsideTask(GameConstants.OUTSIDE_TASK_DURATION);
+			case SLEEP -> new PlayerMoodComponent.SleepTask(GameConstants.SLEEP_TASK_DURATION);
+			case EAT -> new PlayerMoodComponent.EatTask();
+			case DRINK -> new PlayerMoodComponent.DrinkTask();
+		};
+	}
+
+	private static String taskName(PlayerMoodComponent.Task task) {
+		return task == null ? "(none)" : task.name().toLowerCase(Locale.ROOT);
 	}
 
 	private static void sendApplied(ServerCommandSource src, String type, String value,

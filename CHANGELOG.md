@@ -1,3 +1,13 @@
+# Grey's Express 1.4.7
+
+## Added
+
+- Added `/g roles test task` commands for forcing or clearing Wathe mood tasks during testing.
+
+## Fixed
+
+- Fixed Harlequin's Dancing Carts using reset-template cart coordinates instead of the live pasted train copy.
+
 # Grey's Express 1.4.6
 
 ## Changed

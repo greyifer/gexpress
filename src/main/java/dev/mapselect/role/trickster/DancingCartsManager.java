@@ -192,9 +192,11 @@ public final class DancingCartsManager {
 		preset.normalize();
 		List<CartRegion> out = new ArrayList<>();
 		if (preset.trainCarts == null) return out;
+		Box resetTemplate = preset.resetTemplateArea == null ? null : preset.resetTemplateArea.toBox();
+		Vec3i pasteOffset = preset.resetPasteOffset == null ? null : preset.resetPasteOffset.toVec3i();
 		for (TrainPreset.CartData cart : preset.trainCarts) {
 			CartRegion region = CartRegion.from(cart);
-			if (region != null) out.add(region);
+			if (region != null) out.add(region.liveRegion(resetTemplate, pasteOffset));
 		}
 		return out;
 	}
@@ -468,6 +470,15 @@ public final class DancingCartsManager {
 		private Box entityBox() {
 			return new Box(min.getX(), min.getY(), min.getZ(),
 				max.getX() + 1.0D, max.getY() + 1.0D, max.getZ() + 1.0D);
+		}
+
+		private CartRegion liveRegion(Box resetTemplate, Vec3i pasteOffset) {
+			if (resetTemplate == null || pasteOffset == null
+					|| (pasteOffset.getX() == 0 && pasteOffset.getY() == 0 && pasteOffset.getZ() == 0)) {
+				return this;
+			}
+			if (!resetTemplate.expand(6.0D, 12.0D, 6.0D).intersects(entityBox())) return this;
+			return new CartRegion(min.add(pasteOffset), max.add(pasteOffset));
 		}
 
 		private void clear(ServerWorld world) {
