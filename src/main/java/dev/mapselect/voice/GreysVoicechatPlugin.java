@@ -2,12 +2,12 @@ package dev.mapselect.voice;
 
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.VoicechatPlugin;
-import de.maxhenkel.voicechat.api.events.ClientSoundEvent;
 import de.maxhenkel.voicechat.api.events.CreateGroupEvent;
 import de.maxhenkel.voicechat.api.events.EntitySoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.LocationalSoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
+import de.maxhenkel.voicechat.api.events.OpenALSoundEvent;
 import de.maxhenkel.voicechat.api.events.SoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.StaticSoundPacketEvent;
 import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
@@ -24,8 +24,8 @@ import java.util.Set;
 import java.util.UUID;
 
 public class GreysVoicechatPlugin implements VoicechatPlugin {
-	private Method clientPitchMethod;
-	private boolean lookedUpClientPitchMethod;
+	private Method clientPitchForMethod;
+	private boolean lookedUpClientPitchForMethod;
 
 	@Override
 	public String getPluginId() {
@@ -35,7 +35,7 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 	@Override
 	public void registerEvents(EventRegistration registration) {
 		try {
-			registration.registerEvent(ClientSoundEvent.class, this::onClientSound);
+			registration.registerEvent(OpenALSoundEvent.Post.class, this::onOpenALSound);
 		} catch (Throwable ignored) {
 		}
 		registration.registerEvent(MicrophonePacketEvent.class, this::onMicrophonePacket);
@@ -100,34 +100,36 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		}
 	}
 
-	private void onClientSound(ClientSoundEvent event) {
-		short[] raw = event.getRawAudio();
-		if (raw == null || raw.length == 0) return;
-		float pitch = localClientPitch();
-		if (Math.abs(pitch - 1.0F) <= 0.03F) return;
-		event.setRawAudio(VoicePitchShifter.shift(raw, pitch));
+	private void onOpenALSound(OpenALSoundEvent.Post event) {
+		float pitch = clientPitchFor(event.getChannelId());
+		if (Math.abs(pitch - 1.0F) <= 0.03F) pitch = 1.0F;
+		try {
+			org.lwjgl.openal.AL10.alSourcef(event.getSource(), org.lwjgl.openal.AL10.AL_PITCH, pitch);
+		} catch (Throwable ignored) {
+		}
 	}
 
-	private float localClientPitch() {
+	private float clientPitchFor(UUID playerId) {
+		if (playerId == null) return 1.0F;
 		try {
-			Method method = clientPitchMethod();
+			Method method = clientPitchForMethod();
 			if (method == null) return 1.0F;
-			Object value = method.invoke(null);
+			Object value = method.invoke(null, playerId);
 			return value instanceof Number number ? number.floatValue() : 1.0F;
 		} catch (Throwable ignored) {
 			return 1.0F;
 		}
 	}
 
-	private Method clientPitchMethod() {
-		if (lookedUpClientPitchMethod) return clientPitchMethod;
-		lookedUpClientPitchMethod = true;
+	private Method clientPitchForMethod() {
+		if (lookedUpClientPitchForMethod) return clientPitchForMethod;
+		lookedUpClientPitchForMethod = true;
 		try {
 			Class<?> bridge = Class.forName("dev.mapselect.client.ClientVoicePitchBridge");
-			clientPitchMethod = bridge.getMethod("currentPitch");
+			clientPitchForMethod = bridge.getMethod("pitchFor", UUID.class);
 		} catch (Throwable ignored) {
-			clientPitchMethod = null;
+			clientPitchForMethod = null;
 		}
-		return clientPitchMethod;
+		return clientPitchForMethod;
 	}
 }

@@ -49,6 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class VultureManager {
 	private static final double EAT_RANGE = 3.15D;
 	private static final double LOOK_RADIUS_SQUARED = 1.0D;
+	private static final int EAT_TIME_BONUS_TICKS = 30 * 20;
 	private static final Map<UUID, UUID> vultureByStashed = new ConcurrentHashMap<>();
 	private static final Map<UUID, Deque<UUID>> stashedByVulture = new ConcurrentHashMap<>();
 	private static final Map<UUID, Set<UUID>> eatenByVulture = new ConcurrentHashMap<>();
@@ -148,10 +149,21 @@ public final class VultureManager {
 
 		vulture.getWorld().playSound(null, vulture.getBlockPos(), SoundEvents.ENTITY_PLAYER_BURP,
 			SoundCategory.PLAYERS, 0.9F, 0.65F);
-		vulture.sendMessage(progressText(vulture), true);
+		boolean addedTime = addEatTimeBonus(vulture);
+		Text message = addedTime
+			? progressText(vulture).copy().append(Text.literal(" Timer +30s."))
+			: progressText(vulture);
+		vulture.sendMessage(message, true);
 		syncProgress(vulture, true);
 		target.sendMessage(Text.literal("You were swallowed by the Pelican."), true);
 		tryEndForVulture(vulture);
+		return true;
+	}
+
+	private static boolean addEatTimeBonus(ServerPlayerEntity vulture) {
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(vulture.getWorld());
+		if (game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) return false;
+		GameTimeComponent.KEY.get(vulture.getWorld()).addTime(EAT_TIME_BONUS_TICKS);
 		return true;
 	}
 

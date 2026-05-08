@@ -4,20 +4,24 @@ import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.network.FreshAirAmbienceStatePayload;
 import dev.mapselect.weather.MapWeatherComponent;
+import dev.doctor4t.wathe.cca.MapVariablesWorldComponent;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class FreshAirAreaManager {
@@ -26,31 +30,21 @@ public final class FreshAirAreaManager {
 	public static final String TAG = "gexpress_fresh_air_area";
 	public static final String AMBIENCE_TAG = "gexpress_fresh_air_ambience";
 	private static final Map<RegistryKey<World>, CachedArea> CACHE = new ConcurrentHashMap<>();
+	private static final Map<UUID, Boolean> LAST_AMBIENCE_BY_PLAYER = new ConcurrentHashMap<>();
 	private static volatile boolean clientLocalFreshAirAmbience;
 	private static int tickDelay;
 
 	public static void register() {
 		PayloadTypeRegistry.playS2C().register(FreshAirAmbienceStatePayload.ID, FreshAirAmbienceStatePayload.CODEC);
 		ServerTickEvents.END_WORLD_TICK.register(FreshAirAreaManager::tick);
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
+			LAST_AMBIENCE_BY_PLAYER.remove(handler.player.getUuid()));
 	}
 
 	public static boolean countsAsFreshAir(Entity entity) {
 		if (entity == null || !(entity.getWorld() instanceof ServerWorld world)) return false;
 		if (hasFreshAirTag(entity)) return true;
-		MapWeatherComponent weather = MapWeatherComponent.KEY.getNullable(world);
-		String currentMap = weather == null ? null : weather.getCurrentMapName();
-		if (currentMap == null || currentMap.isBlank()) currentMap = "*";
-
-		CachedArea cached = CACHE.get(world.getRegistryKey());
-		if (cached == null || !currentMap.equals(cached.mapName())) {
-			cached = "*".equals(currentMap) ? loadAllAreas(world) : loadArea(world, currentMap);
-			CACHE.put(world.getRegistryKey(), cached);
-		}
-
-		if (cached.areas().isEmpty() && !"*".equals(currentMap)) {
-			cached = loadAllAreas(world);
-			CACHE.put(world.getRegistryKey(), new CachedArea(currentMap, cached.areas()));
-		}
+		CachedArea cached = cachedArea(world, currentMapName(world));
 		if (cached.areas().isEmpty()) return false;
 		for (FreshAirArea area : cached.areas()) {
 			if (matches(area, entity)) {
@@ -78,14 +72,7 @@ public final class FreshAirAreaManager {
 
 	public static int sanityPercent(Entity entity) {
 		if (entity == null || !(entity.getWorld() instanceof ServerWorld world)) return 100;
-		MapWeatherComponent weather = MapWeatherComponent.KEY.getNullable(world);
-		String currentMap = weather == null ? null : weather.getCurrentMapName();
-		if (currentMap == null || currentMap.isBlank()) currentMap = "*";
-		CachedArea cached = CACHE.get(world.getRegistryKey());
-		if (cached == null || !currentMap.equals(cached.mapName())) {
-			cached = "*".equals(currentMap) ? loadAllAreas(world) : loadArea(world, currentMap);
-			CACHE.put(world.getRegistryKey(), cached);
-		}
+		CachedArea cached = cachedArea(world, currentMapName(world));
 		for (FreshAirArea area : cached.areas()) {
 			if (matches(area, entity)) {
 				return area.sanityPercent();
@@ -122,18 +109,15 @@ public final class FreshAirAreaManager {
 
 	private static void syncAmbience(ServerPlayerEntity player, boolean playOutsideAmbience) {
 		if (player == null || !ServerPlayNetworking.canSend(player, FreshAirAmbienceStatePayload.ID)) return;
+		Boolean previous = LAST_AMBIENCE_BY_PLAYER.get(player.getUuid());
+		if (previous != null && previous == playOutsideAmbience) return;
+		LAST_AMBIENCE_BY_PLAYER.put(player.getUuid(), playOutsideAmbience);
 		ServerPlayNetworking.send(player, new FreshAirAmbienceStatePayload(playOutsideAmbience));
 	}
 
 	private static FreshAirArea matchingArea(Entity entity) {
 		if (entity == null || !(entity.getWorld() instanceof ServerWorld world)) return null;
-		MapWeatherComponent weather = MapWeatherComponent.KEY.getNullable(world);
-		String currentMap = weather == null ? null : weather.getCurrentMapName();
-		if (currentMap == null || currentMap.isBlank()) currentMap = "*";
-		CachedArea cached = "*".equals(currentMap) ? loadAllAreas(world) : loadArea(world, currentMap);
-		if (cached.areas().isEmpty() && !"*".equals(currentMap)) {
-			cached = loadAllAreas(world);
-		}
+		CachedArea cached = cachedArea(world, currentMapName(world));
 		if (cached.areas().isEmpty()) return null;
 		for (FreshAirArea area : cached.areas()) {
 			if (matches(area, entity)) {
@@ -141,6 +125,27 @@ public final class FreshAirAreaManager {
 			}
 		}
 		return null;
+	}
+
+	private static String currentMapName(ServerWorld world) {
+		MapWeatherComponent weather = MapWeatherComponent.KEY.getNullable(world);
+		String currentMap = weather == null ? null : weather.getCurrentMapName();
+		if (currentMap == null || currentMap.isBlank()) currentMap = "*";
+		return currentMap;
+	}
+
+	private static CachedArea cachedArea(ServerWorld world, String currentMap) {
+		CachedArea cached = CACHE.get(world.getRegistryKey());
+		if (cached == null || !currentMap.equals(cached.mapName())) {
+			cached = "*".equals(currentMap) ? loadAllAreas(world) : loadArea(world, currentMap);
+			CACHE.put(world.getRegistryKey(), cached);
+		}
+		if (cached.areas().isEmpty() && !"*".equals(currentMap)) {
+			CachedArea fallback = loadAllAreas(world);
+			cached = new CachedArea(currentMap, fallback.areas());
+			CACHE.put(world.getRegistryKey(), cached);
+		}
+		return cached;
 	}
 
 	private static boolean matches(FreshAirArea area, Entity entity) {
@@ -174,7 +179,7 @@ public final class FreshAirAreaManager {
 	private static CachedArea loadArea(ServerWorld world, String mapName) {
 		try {
 			MapPreset preset = PresetStorage.load(world.getServer(), mapName);
-			return new CachedArea(mapName, areasFrom(preset));
+			return new CachedArea(mapName, areasFrom(world, preset));
 		} catch (IOException e) {
 			return new CachedArea(mapName, List.of());
 		}
@@ -185,25 +190,42 @@ public final class FreshAirAreaManager {
 		try {
 			for (String name : PresetStorage.list(world.getServer())) {
 				MapPreset preset = PresetStorage.load(world.getServer(), name);
-				areas.addAll(areasFrom(preset));
+				areas.addAll(areasFrom(world, preset));
 			}
 		} catch (IOException ignored) {
 		}
 		return new CachedArea("*", List.copyOf(areas));
 	}
 
-	private static List<FreshAirArea> areasFrom(MapPreset preset) {
+	private static List<FreshAirArea> areasFrom(ServerWorld world, MapPreset preset) {
 		if (preset == null) return List.of();
 		preset.normalize();
 		List<FreshAirArea> out = new ArrayList<>();
 		if (preset.freshAirAreas != null) {
 			for (MapPreset.FreshAirAreaData entry : preset.freshAirAreas) {
 				if (entry == null || entry.area == null) continue;
-				out.add(new FreshAirArea(entry.area.toBox(), Math.max(0, Math.min(100, entry.sanityPercent)),
-					entry.playOutsideAmbience));
+				int sanityPercent = Math.max(0, Math.min(100, entry.sanityPercent));
+				Box area = entry.area.toBox();
+				out.add(new FreshAirArea(area, sanityPercent, entry.playOutsideAmbience));
+				Box pastedArea = pastedResetTemplateCopy(world, preset, area);
+				if (pastedArea != null) {
+					out.add(new FreshAirArea(pastedArea, sanityPercent, entry.playOutsideAmbience));
+				}
 			}
 		}
 		return List.copyOf(out);
+	}
+
+	private static Box pastedResetTemplateCopy(ServerWorld world, MapPreset preset, Box area) {
+		if (world == null || preset == null || preset.resetTemplateArea == null || area == null) return null;
+		MapVariablesWorldComponent variables = MapVariablesWorldComponent.KEY.getNullable(world);
+		if (variables == null || variables.getResetPasteOffset() == null) return null;
+		Vec3i offset = variables.getResetPasteOffset();
+		if (offset.getX() == 0 && offset.getY() == 0 && offset.getZ() == 0) return null;
+
+		Box template = usableBox(preset.resetTemplateArea.toBox()).expand(6.0D, 12.0D, 6.0D);
+		if (!template.intersects(usableBox(area))) return null;
+		return area.offset(offset.getX(), offset.getY(), offset.getZ());
 	}
 
 	private record CachedArea(String mapName, List<FreshAirArea> areas) {}

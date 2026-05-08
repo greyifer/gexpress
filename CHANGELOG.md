@@ -1,3 +1,16 @@
+# Grey's Express 1.4.6
+
+## Changed
+
+- Pelican swallows now add 30 seconds to the active round timer.
+- Voice pitch effects now use playback-side OpenAL pitch per speaker instead of rewriting microphone PCM.
+
+## Fixed
+
+- Fixed Fresh Air areas placed on the reset-template train not counting after Wathe copies that train to the playable position.
+- Fixed Fresh Air outside ambience state being resent every few ticks even when nothing changed.
+- Fixed Trickster/Squeaker voice pitch causing glitchy microphone pops from packet-local resampling.
+
 # Grey's Express 1.4.5
 
 ## Added

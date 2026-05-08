@@ -40,10 +40,9 @@ public final class ClientTricksterState {
 		return Math.max(0L, expiresAtTick - client.world.getTime());
 	}
 
-	public static float localVoicePitch() {
-		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null || !isActive()) return 1.0F;
-		return voicePitches.getOrDefault(client.player.getUuid(), 1.0F);
+	public static float voicePitchFor(UUID playerId) {
+		if (playerId == null || !isActive()) return 1.0F;
+		return voicePitches.getOrDefault(playerId, 1.0F);
 	}
 
 	private static void apply(TricksterSkinSwapPayload payload) {

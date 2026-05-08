@@ -49,7 +49,8 @@ public class MapWeatherComponent implements AutoSyncedComponent {
 	}
 
 	public void setCurrentMapName(String name) {
-		this.currentMapName = name;
+		this.currentMapName = name == null || name.isBlank() ? null : name;
+		KEY.sync(this.world);
 	}
 
 	@Override

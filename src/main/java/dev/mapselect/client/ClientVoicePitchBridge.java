@@ -5,15 +5,17 @@ import dev.mapselect.modifier.ModifierUtils;
 import dev.mapselect.registry.MapSelectModifiers;
 import net.minecraft.client.MinecraftClient;
 
+import java.util.UUID;
+
 public final class ClientVoicePitchBridge {
 	private ClientVoicePitchBridge() {}
 
-	public static float currentPitch() {
+	public static float pitchFor(UUID playerId) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null || client.world == null) return 1.0F;
+		if (client == null || client.world == null || playerId == null) return 1.0F;
 
-		float pitch = ClientTricksterState.localVoicePitch();
-		if (ModifierUtils.has(client.player, MapSelectModifiers.SQUEAKER_ID)) {
+		float pitch = ClientTricksterState.voicePitchFor(playerId);
+		if (ModifierUtils.has(client.world, playerId, MapSelectModifiers.SQUEAKER_ID)) {
 			pitch *= GexpressConfig.getSqueakerPitchPercent() / 100.0F;
 		}
 		return Math.max(0.5F, Math.min(2.0F, pitch));
