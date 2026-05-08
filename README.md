@@ -59,14 +59,16 @@ All G'Express commands are under `/g`.
 | `/g roles tuning role <id> chance <value>` | Sets a role assignment chance. |
 | `/g roles tuning role <id> max <value>` | Sets a role assignment maximum. |
 | `/g roles tuning role <id> amount <value>` | Alias for role max. |
-| `/g roles tuning modifier <id> chance <value>` | Sets a modifier assignment chance. |
-| `/g roles tuning modifier <id> max <value>` | Sets a modifier assignment maximum. |
-| `/g roles tuning modifier <id> amount <value>` | Alias for modifier max. |
 | `/g roles test role <role> [players]` | Assigns a test role. |
 | `/g roles test role clear [players]` | Clears test roles. |
-| `/g roles test modifier add <modifier> [players]` / `/g roles test modifier add <players> <modifier>` | Adds a test modifier. Suggestions hide modifiers the selected player already has. |
-| `/g roles test modifier remove <modifier> [players]` / `/g roles test modifier remove <players> <modifier>` | Removes a test modifier. Suggestions show only modifiers the selected player has. |
-| `/g roles test modifier clear [players]` | Clears test modifiers. |
+| `/g modifiers tuning modifier <id> chance <value>` | Sets a modifier assignment chance. |
+| `/g modifiers tuning modifier <id> max <value>` | Sets a modifier assignment maximum. |
+| `/g modifiers tuning modifier <id> amount <value>` | Alias for modifier max. |
+| `/g modifiers test add <modifier> [players]` / `/g modifiers test add <players> <modifier>` | Adds a test modifier. Suggestions hide modifiers the selected player already has. |
+| `/g modifiers test remove <modifier> [players]` / `/g modifiers test remove <players> <modifier>` | Removes a test modifier. Suggestions show only modifiers the selected player has. |
+| `/g modifiers test clear [players]` | Clears test modifiers. |
+| `/g tasks test <outside|sleep|eat|drink|conversation> [players]` | Forces a task for testing. |
+| `/g tasks test clear [players]` | Clears current tasks. |
 | `/g roles pelican leave` | Lets a swallowed player climb out of the Pelican. |
 | `/g roles pelican release <players>` | Host command that releases selected players from Pelicans. |
 | `/g group host add <players>` | Adds host permission to players. |

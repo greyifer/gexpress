@@ -11,6 +11,7 @@ import java.lang.reflect.Field;
 public final class ClientAbilityKeys {
 	private static KeyBinding secondaryBinding;
 	private static KeyBinding guidebookBinding;
+	private static KeyBinding guidebookTabBinding;
 	private static Field boundKeyField;
 	private static boolean lookedUpBoundKeyField;
 
@@ -30,6 +31,12 @@ public final class ClientAbilityKeys {
 			GLFW.GLFW_KEY_G,
 			"category.gexpress"
 		));
+		guidebookTabBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+			"key.gexpress.guidebook_tab",
+			InputUtil.Type.KEYSYM,
+			GLFW.GLFW_KEY_TAB,
+			"category.gexpress"
+		));
 	}
 
 	public static KeyBinding primaryBinding() {
@@ -44,6 +51,20 @@ public final class ClientAbilityKeys {
 
 	public static KeyBinding guidebookBinding() {
 		return guidebookBinding;
+	}
+
+	public static KeyBinding guidebookTabBinding() {
+		return guidebookTabBinding;
+	}
+
+	public static boolean matches(KeyBinding binding, int keyCode, int scanCode) {
+		if (binding == null) return false;
+		InputUtil.Key key = boundKey(binding);
+		if (key == null) return keyCode == GLFW.GLFW_KEY_TAB && binding == guidebookTabBinding;
+		InputUtil.Type type = key.getCategory();
+		if (type == InputUtil.Type.KEYSYM) return key.getCode() == keyCode;
+		if (type == InputUtil.Type.SCANCODE) return key.getCode() == scanCode;
+		return false;
 	}
 
 	public static boolean isDown(MinecraftClient client, KeyBinding binding) {

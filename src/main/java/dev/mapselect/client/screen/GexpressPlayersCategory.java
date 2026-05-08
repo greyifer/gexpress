@@ -110,8 +110,18 @@ public final class GexpressPlayersCategory {
 		private static final int TAG_BUTTON_WIDTH = 76;
 		private static final int TAG_BUTTON_HEIGHT = 17;
 		private static final int TAG_BUTTON_GAP = 4;
+		private static final int CHANGE_BUTTON_WIDTH = 92;
+		private static final PlayerTag[] EDITABLE_TAGS = {
+			PlayerTag.OWNER,
+			PlayerTag.STAFF,
+			PlayerTag.HOST,
+			PlayerTag.TRUSTED,
+			PlayerTag.PASSENGER
+		};
 
 		private final List<TagButton> tagButtons = new ArrayList<>();
+		private final List<ChangeButton> changeButtons = new ArrayList<>();
+		private UUID expandedPlayer;
 		private int scroll;
 
 		private PlayersPanelWidget(int x, int y, int width, int height) {
@@ -131,8 +141,11 @@ public final class GexpressPlayersCategory {
 				getX() + width / 2, getY() + 21, 0xA0A0A0);
 
 			tagButtons.clear();
+			changeButtons.clear();
 			List<PlayerListEntry> entries = onlinePlayers();
 			if (entries.isEmpty()) {
+				scroll = 0;
+				expandedPlayer = null;
 				context.drawCenteredTextWithShadow(client.textRenderer,
 					Text.translatable("gui.gexpress.config.players.empty").formatted(Formatting.DARK_GRAY),
 					getX() + width / 2, getY() + height / 2, 0x777777);
@@ -143,24 +156,27 @@ public final class GexpressPlayersCategory {
 			int listWidth = width - 24;
 			int top = getY() + 44;
 			int bottom = getY() + height - 6;
+			scroll = clampScroll(scroll, entries, listWidth, bottom - top);
 			int y = top - scroll;
 			for (PlayerListEntry entry : entries) {
-				if (y + ROW_HEIGHT >= top && y <= bottom) {
-					drawPlayerRow(context, client, entry, listX, y, listWidth, mouseX, mouseY);
+				int rowHeight = rowHeight(entry, listWidth);
+				if (y + rowHeight >= top && y <= bottom) {
+					drawPlayerRow(context, client, entry, listX, y, listWidth, rowHeight, mouseX, mouseY);
 				}
-				y += ROW_HEIGHT;
+				y += rowHeight;
 			}
-			scroll = Math.max(0, Math.min(scroll, Math.max(0, entries.size() * ROW_HEIGHT - (bottom - top))));
 		}
 
 		private void drawPlayerRow(DrawContext context, MinecraftClient client, PlayerListEntry entry, int x, int y,
-				int rowWidth, int mouseX, int mouseY) {
+				int rowWidth, int rowHeight, int mouseX, int mouseY) {
 			UUID id = entry.getProfile().getId();
 			String name = entry.getProfile().getName();
 			PlayerTag tag = currentTag(entry);
 			boolean dev = tag == PlayerTag.DEV;
-			boolean hovered = mouseY >= y && mouseY < y + ROW_HEIGHT && mouseX >= x && mouseX < x + rowWidth;
-			context.fill(x, y, x + rowWidth, y + ROW_HEIGHT - 4, hovered ? 0x44222222 : 0x33111111);
+			boolean expanded = id.equals(expandedPlayer) && !dev;
+			boolean hovered = mouseY >= y && mouseY < y + Math.min(rowHeight, ROW_HEIGHT)
+				&& mouseX >= x && mouseX < x + rowWidth;
+			context.fill(x, y, x + rowWidth, y + rowHeight - 4, hovered || expanded ? 0x44222222 : 0x33111111);
 			drawHead(context, entry, x + 6, y + 6);
 			context.drawTextWithShadow(client.textRenderer, Text.literal(name), x + 38, y + 7, 0xFFFFFFFF);
 			context.drawTextWithShadow(client.textRenderer, GexpressPermissions.tagBadge(tag), x + 38, y + 21, 0xFFFFFFFF);
@@ -172,19 +188,41 @@ public final class GexpressPlayersCategory {
 				return;
 			}
 
-			PlayerTag[] tags = {
-				PlayerTag.OWNER,
-				PlayerTag.STAFF,
-				PlayerTag.HOST,
-				PlayerTag.TRUSTED,
-				PlayerTag.PASSENGER
-			};
-			int totalWidth = tags.length * TAG_BUTTON_WIDTH + (tags.length - 1) * TAG_BUTTON_GAP;
-			int bx = x + rowWidth - totalWidth - 6;
-			int by = y + 10;
-			for (PlayerTag option : tags) {
-				drawTagButton(context, client, id, name, option, tag == option, bx, by, mouseX, mouseY);
-				bx += TAG_BUTTON_WIDTH + TAG_BUTTON_GAP;
+			drawChangeButton(context, client, id, x + rowWidth - CHANGE_BUTTON_WIDTH - 6, y + 10, mouseX, mouseY);
+			if (expanded) {
+				drawTagDropdown(context, client, id, name, tag, x + 38, y + ROW_HEIGHT - 2,
+					rowWidth - 44, mouseX, mouseY);
+			}
+		}
+
+		private void drawChangeButton(DrawContext context, MinecraftClient client, UUID playerId,
+				int x, int y, int mouseX, int mouseY) {
+			boolean hovered = mouseX >= x && mouseX < x + CHANGE_BUTTON_WIDTH
+				&& mouseY >= y && mouseY < y + TAG_BUTTON_HEIGHT;
+			boolean expanded = playerId.equals(expandedPlayer);
+			context.fill(x, y, x + CHANGE_BUTTON_WIDTH, y + TAG_BUTTON_HEIGHT,
+				expanded ? 0xAA222222 : hovered ? 0x77333333 : 0x55222222);
+			String label = client.textRenderer.trimToWidth(
+				Text.translatable("gui.gexpress.config.players.change_tag").getString(), CHANGE_BUTTON_WIDTH - 8);
+			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(label),
+				x + CHANGE_BUTTON_WIDTH / 2, y + 4, 0xFFFFFFFF);
+			changeButtons.add(new ChangeButton(x, y, CHANGE_BUTTON_WIDTH, TAG_BUTTON_HEIGHT, playerId));
+		}
+
+		private void drawTagDropdown(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
+				PlayerTag current, int x, int y, int dropdownWidth, int mouseX, int mouseY) {
+			int columns = dropdownColumns(dropdownWidth);
+			int bx = x;
+			int by = y + 4;
+			for (int i = 0; i < EDITABLE_TAGS.length; i++) {
+				PlayerTag option = EDITABLE_TAGS[i];
+				drawTagButton(context, client, playerId, playerName, option, current == option, bx, by, mouseX, mouseY);
+				if ((i + 1) % columns == 0) {
+					bx = x;
+					by += TAG_BUTTON_HEIGHT + TAG_BUTTON_GAP;
+				} else {
+					bx += TAG_BUTTON_WIDTH + TAG_BUTTON_GAP;
+				}
 			}
 		}
 
@@ -232,6 +270,14 @@ public final class GexpressPlayersCategory {
 			for (TagButton tagButton : tagButtons) {
 				if (!tagButton.contains(mouseX, mouseY)) continue;
 				sendTagCommand(tagButton.playerName(), tagButton.tag());
+				expandedPlayer = null;
+				scroll = clampScroll(scroll);
+				return true;
+			}
+			for (ChangeButton changeButton : changeButtons) {
+				if (!changeButton.contains(mouseX, mouseY)) continue;
+				expandedPlayer = changeButton.playerId().equals(expandedPlayer) ? null : changeButton.playerId();
+				scroll = clampScroll(scroll);
 				return true;
 			}
 			return super.mouseClicked(mouseX, mouseY, button);
@@ -242,8 +288,39 @@ public final class GexpressPlayersCategory {
 			if (mouseX < getX() || mouseX >= getX() + width || mouseY < getY() || mouseY >= getY() + height) {
 				return false;
 			}
-			scroll = Math.max(0, scroll - (int) Math.round(verticalAmount * 18.0D));
+			scroll = clampScroll(scroll - (int) Math.round(verticalAmount * 18.0D));
 			return true;
+		}
+
+		private int rowHeight(PlayerListEntry entry, int rowWidth) {
+			PlayerTag tag = currentTag(entry);
+			if (tag == PlayerTag.DEV || entry == null || entry.getProfile() == null
+					|| !entry.getProfile().getId().equals(expandedPlayer)) {
+				return ROW_HEIGHT;
+			}
+			int rows = (EDITABLE_TAGS.length + dropdownColumns(rowWidth - 44) - 1) / dropdownColumns(rowWidth - 44);
+			return ROW_HEIGHT + 8 + rows * TAG_BUTTON_HEIGHT + Math.max(0, rows - 1) * TAG_BUTTON_GAP;
+		}
+
+		private int dropdownColumns(int dropdownWidth) {
+			return Math.max(1, Math.min(EDITABLE_TAGS.length,
+				(dropdownWidth + TAG_BUTTON_GAP) / (TAG_BUTTON_WIDTH + TAG_BUTTON_GAP)));
+		}
+
+		private int clampScroll(int requested) {
+			List<PlayerListEntry> entries = onlinePlayers();
+			int listWidth = width - 24;
+			int viewportHeight = Math.max(0, height - 50);
+			return clampScroll(requested, entries, listWidth, viewportHeight);
+		}
+
+		private int clampScroll(int requested, List<PlayerListEntry> entries, int rowWidth, int viewportHeight) {
+			int contentHeight = 0;
+			for (PlayerListEntry entry : entries) {
+				contentHeight += rowHeight(entry, rowWidth);
+			}
+			int maxScroll = Math.max(0, contentHeight - Math.max(0, viewportHeight));
+			return Math.max(0, Math.min(requested, maxScroll));
 		}
 
 		private void sendTagCommand(String playerName, PlayerTag tag) {
@@ -260,6 +337,12 @@ public final class GexpressPlayersCategory {
 	}
 
 	private record TagButton(int x, int y, int width, int height, UUID playerId, String playerName, PlayerTag tag) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record ChangeButton(int x, int y, int width, int height, UUID playerId) {
 		private boolean contains(double mouseX, double mouseY) {
 			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
 		}

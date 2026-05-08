@@ -93,6 +93,7 @@ public final class GexpressGameCategory {
 		if (gamerules != null) category.group(gamerules);
 		OptionGroup watheOptions = weGroupByKey.get(WE_OPTIONS_KEY);
 		if (watheOptions != null) category.group(watheOptions);
+		category.group(buildTasksGroup());
 
 		Map<String, List<Option<?>>> roleKeyToWeOpts = new LinkedHashMap<>();
 		List<Option<?>> globalRoleOpts = new ArrayList<>();
@@ -151,6 +152,51 @@ public final class GexpressGameCategory {
 		}
 
 		return category.build();
+	}
+
+	private static OptionGroup buildTasksGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.tasks"))
+			.collapsed(false)
+			.option(Option.<Boolean>createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.task.conversation_enabled"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.task.conversation_enabled.tooltip")))
+				.binding(true, GexpressConfig::isConversationTaskEnabled,
+					v -> GexpressConfig.conversationTaskEnabled = v)
+				.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
+					.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+				.build())
+			.option(taskIntOption("conversation_chance", 20,
+				GexpressConfig::getConversationTaskChancePercent,
+				v -> GexpressConfig.conversationTaskChancePercent = v,
+				GexpressConfig.CONVERSATION_TASK_CHANCE_MIN,
+				GexpressConfig.CONVERSATION_TASK_CHANCE_MAX))
+			.option(taskIntOption("conversation_duration", 8,
+				GexpressConfig::getConversationTaskDurationSeconds,
+				v -> GexpressConfig.conversationTaskDurationSeconds = v,
+				GexpressConfig.CONVERSATION_TASK_DURATION_MIN,
+				GexpressConfig.CONVERSATION_TASK_DURATION_MAX))
+			.option(taskIntOption("conversation_radius", 3,
+				GexpressConfig::getConversationTaskRadiusBlocks,
+				v -> GexpressConfig.conversationTaskRadiusBlocks = v,
+				GexpressConfig.CONVERSATION_TASK_RADIUS_MIN,
+				GexpressConfig.CONVERSATION_TASK_RADIUS_MAX))
+			.option(taskIntOption("conversation_vertical_tolerance", 1,
+				GexpressConfig::getConversationTaskVerticalToleranceBlocks,
+				v -> GexpressConfig.conversationTaskVerticalToleranceBlocks = v,
+				GexpressConfig.CONVERSATION_TASK_VERTICAL_TOLERANCE_MIN,
+				GexpressConfig.CONVERSATION_TASK_VERTICAL_TOLERANCE_MAX))
+			.build();
+	}
+
+	private static Option<Integer> taskIntOption(String key, int defaultValue, Supplier<Integer> getter,
+			Consumer<Integer> setter, int min, int max) {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.task." + key))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.task." + key + ".tooltip")))
+			.binding(defaultValue, getter, setter)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt).range(min, max))
+			.build();
 	}
 
 	private static List<OptionGroup> tryBuildWeGroups(Screen parent, BiConsumer<String, Screen> stage) {

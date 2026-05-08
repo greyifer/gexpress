@@ -12,6 +12,7 @@ import dev.mapselect.network.SpyStatusPayload;
 import dev.mapselect.network.SpyUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.task.ConversationTask;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
@@ -121,6 +122,16 @@ public final class SpyManager {
 			case DRINK -> "drank";
 		};
 		sendToSpies(target, target.getName().getString() + " " + action + ".");
+	}
+
+	public static void recordTask(PlayerEntity player, PlayerMoodComponent.TrainTask task) {
+		if (ConversationTask.isConversation(task)) {
+			if (player instanceof ServerPlayerEntity target) {
+				sendToSpies(target, target.getName().getString() + " made small talk.");
+			}
+			return;
+		}
+		if (task != null) recordTask(player, task.getType());
 	}
 
 	private static void recordInteraction(ServerPlayerEntity actor, Entity entity) {

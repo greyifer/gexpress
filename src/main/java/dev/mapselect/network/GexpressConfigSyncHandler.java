@@ -19,9 +19,11 @@ public final class GexpressConfigSyncHandler {
 
 	public static void register() {
 		PayloadTypeRegistry.playC2S().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(GexpressTaskConfigPayload.ID, GexpressTaskConfigPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.LEGACY_ID, GexpressConfigSyncPayload.LEGACY_CODEC);
+		PayloadTypeRegistry.playS2C().register(GexpressTaskConfigPayload.ID, GexpressTaskConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
@@ -143,6 +145,36 @@ public final class GexpressConfigSyncHandler {
 					broadcastConfig(server);
 				});
 			});
+		ServerPlayNetworking.registerGlobalReceiver(GexpressTaskConfigPayload.ID,
+			(payload, context) -> {
+				ServerPlayerEntity sender = context.player();
+				if (!GexpressPermissions.canEditGameOptions(sender)) {
+					MapSelect.LOGGER.warn("Ignoring gexpress task config sync from {} (not OP/host/dev)",
+						sender.getName().getString());
+					return;
+				}
+
+				MinecraftServer server = sender.getServer();
+				if (server == null) return;
+				server.execute(() -> {
+					GexpressTaskConfigPayload before = currentTaskPayload();
+					GexpressConfig.applyTaskConfig(payload.conversationEnabled(),
+						payload.conversationChancePercent(), payload.conversationDurationSeconds(),
+						payload.conversationRadiusBlocks(), payload.conversationVerticalToleranceBlocks());
+					GexpressTaskConfigPayload after = currentTaskPayload();
+					if (after.equals(before)) return;
+
+					GexpressConfig.save();
+					MapSelect.LOGGER.info("G'Express task config updated by {}: conversation=[enabled {}, chance {}%, duration {}s, radius {}, vertical {}]",
+						sender.getName().getString(),
+						GexpressConfig.isConversationTaskEnabled(),
+						GexpressConfig.getConversationTaskChancePercent(),
+						GexpressConfig.getConversationTaskDurationSeconds(),
+						GexpressConfig.getConversationTaskRadiusBlocks(),
+						GexpressConfig.getConversationTaskVerticalToleranceBlocks());
+					broadcastTaskConfig(server);
+				});
+			});
 		ServerPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID,
 			(payload, context) -> {
 				ServerPlayerEntity sender = context.player();
@@ -173,6 +205,7 @@ public final class GexpressConfigSyncHandler {
 			if (!ServerPlayNetworking.canSend(player, GexpressConfigSyncPayload.ID)) continue;
 			ServerPlayNetworking.send(player, payload);
 		}
+		broadcastTaskConfig(server);
 		broadcastPuppetmasterConfig(server);
 	}
 
@@ -180,7 +213,22 @@ public final class GexpressConfigSyncHandler {
 		if (ServerPlayNetworking.canSend(player, GexpressConfigSyncPayload.ID)) {
 			ServerPlayNetworking.send(player, currentPayload());
 		}
+		sendTaskConfigTo(player);
 		sendPuppetmasterConfigTo(player);
+	}
+
+	private static void broadcastTaskConfig(MinecraftServer server) {
+		GexpressTaskConfigPayload payload = currentTaskPayload();
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			if (ServerPlayNetworking.canSend(player, GexpressTaskConfigPayload.ID)) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
+	private static void sendTaskConfigTo(ServerPlayerEntity player) {
+		if (!ServerPlayNetworking.canSend(player, GexpressTaskConfigPayload.ID)) return;
+		ServerPlayNetworking.send(player, currentTaskPayload());
 	}
 
 	private static void broadcastPuppetmasterConfig(MinecraftServer server) {
@@ -307,6 +355,16 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getMedicShieldBlockFlashAlpha(),
 			GexpressConfig.getMedicShieldBreakFlashAlpha(),
 			GexpressConfig.getSilentShadowAlpha()
+		);
+	}
+
+	private static GexpressTaskConfigPayload currentTaskPayload() {
+		return new GexpressTaskConfigPayload(
+			GexpressConfig.isConversationTaskEnabled(),
+			GexpressConfig.getConversationTaskChancePercent(),
+			GexpressConfig.getConversationTaskDurationSeconds(),
+			GexpressConfig.getConversationTaskRadiusBlocks(),
+			GexpressConfig.getConversationTaskVerticalToleranceBlocks()
 		);
 	}
 }

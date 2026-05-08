@@ -34,7 +34,24 @@ public class TuningCommand {
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("tuning")
 			.requires(GexpressPermissions::canUseHostCommands)
-			.then(CommandManager.literal("role")
+			.then(roleBranch())
+			.then(modifierBranch());
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildRoleTree() {
+		return CommandManager.literal("tuning")
+			.requires(GexpressPermissions::canUseHostCommands)
+			.then(roleBranch());
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildModifierTree() {
+		return CommandManager.literal("tuning")
+			.requires(GexpressPermissions::canUseHostCommands)
+			.then(modifierBranch());
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> roleBranch() {
+		return CommandManager.literal("role")
 				.then(CommandManager.argument("id", IdentifierArgumentType.identifier())
 					.suggests(ROLE_SUGGESTIONS)
 					.then(CommandManager.literal("chance")
@@ -54,8 +71,11 @@ public class TuningCommand {
 								RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
 							.executes(ctx -> setRoleMax(ctx,
 								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value")))))))
-			.then(CommandManager.literal("modifier")
+								IntegerArgumentType.getInteger(ctx, "value"))))));
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> modifierBranch() {
+		return CommandManager.literal("modifier")
 				.then(CommandManager.argument("id", IdentifierArgumentType.identifier())
 					.suggests(MODIFIER_SUGGESTIONS)
 					.then(CommandManager.literal("chance")
@@ -75,7 +95,7 @@ public class TuningCommand {
 								RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
 							.executes(ctx -> setModifierMax(ctx,
 								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value")))))));
+								IntegerArgumentType.getInteger(ctx, "value"))))));
 	}
 
 	private static int setRoleChance(CommandContext<ServerCommandSource> ctx, String id, int value) {

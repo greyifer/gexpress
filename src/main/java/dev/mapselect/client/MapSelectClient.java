@@ -7,6 +7,7 @@ import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
+import dev.mapselect.network.GexpressTaskConfigPayload;
 import dev.mapselect.network.PuppetmasterConfigPayload;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import dev.mapselect.registry.MapSelectBlockEntities;
@@ -103,6 +104,10 @@ public class MapSelectClient implements ClientModInitializer {
 			context.client().execute(() -> applyConfigPayload(payload)));
 		ClientPlayNetworking.registerGlobalReceiver(GexpressConfigSyncPayload.LEGACY_ID, (payload, context) ->
 			context.client().execute(() -> applyConfigPayload(payload)));
+		ClientPlayNetworking.registerGlobalReceiver(GexpressTaskConfigPayload.ID, (payload, context) ->
+			context.client().execute(() -> GexpressConfig.applyTaskConfig(payload.conversationEnabled(),
+				payload.conversationChancePercent(), payload.conversationDurationSeconds(),
+				payload.conversationRadiusBlocks(), payload.conversationVerticalToleranceBlocks())));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID, (payload, context) ->
 			context.client().execute(() -> GexpressConfig.puppetmasterCanKillOwnBody = payload.canKillOwnBody()));
 	}

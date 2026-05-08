@@ -95,6 +95,16 @@ public final class GexpressConfig {
 	public static int hungryFoodLimit = 2;
 	/** Drink items a Thirsty player may carry from trays at once. */
 	public static int thirstyDrinkLimit = 2;
+	/** Whether the custom Conversation task can be generated. */
+	public static boolean conversationTaskEnabled = true;
+	/** Percent chance a newly generated task becomes Conversation. */
+	public static int conversationTaskChancePercent = 20;
+	/** Seconds a Conversation task needs nearby-player progress before completion. */
+	public static int conversationTaskDurationSeconds = 8;
+	/** Horizontal block radius for Conversation task progress. */
+	public static int conversationTaskRadiusBlocks = 3;
+	/** Vertical block tolerance for Conversation task progress. */
+	public static int conversationTaskVerticalToleranceBlocks = 1;
 	/** Number of task completions before a Snitch learns the killer roster. */
 	public static int snitchTasksRequired = 3;
 	/** Remaining tasks at which killers are warned and shown the Snitch. 0 disables the warning. */
@@ -274,6 +284,14 @@ public final class GexpressConfig {
 	public static final int HUNGRY_FOOD_LIMIT_MAX = 9;
 	public static final int THIRSTY_DRINK_LIMIT_MIN = 1;
 	public static final int THIRSTY_DRINK_LIMIT_MAX = 9;
+	public static final int CONVERSATION_TASK_CHANCE_MIN = 0;
+	public static final int CONVERSATION_TASK_CHANCE_MAX = 100;
+	public static final int CONVERSATION_TASK_DURATION_MIN = 1;
+	public static final int CONVERSATION_TASK_DURATION_MAX = 60;
+	public static final int CONVERSATION_TASK_RADIUS_MIN = 1;
+	public static final int CONVERSATION_TASK_RADIUS_MAX = 16;
+	public static final int CONVERSATION_TASK_VERTICAL_TOLERANCE_MIN = 0;
+	public static final int CONVERSATION_TASK_VERTICAL_TOLERANCE_MAX = 8;
 	public static final int SNITCH_TASKS_REQUIRED_MIN = 1;
 	public static final int SNITCH_TASKS_REQUIRED_MAX = 25;
 	public static final int SNITCH_WARNING_TASKS_REMAINING_MIN = 0;
@@ -530,6 +548,30 @@ public final class GexpressConfig {
 
 	public static int getThirstyDrinkLimit() {
 		return Math.max(THIRSTY_DRINK_LIMIT_MIN, Math.min(THIRSTY_DRINK_LIMIT_MAX, thirstyDrinkLimit));
+	}
+
+	public static boolean isConversationTaskEnabled() {
+		return conversationTaskEnabled;
+	}
+
+	public static int getConversationTaskChancePercent() {
+		return Math.max(CONVERSATION_TASK_CHANCE_MIN,
+			Math.min(CONVERSATION_TASK_CHANCE_MAX, conversationTaskChancePercent));
+	}
+
+	public static int getConversationTaskDurationSeconds() {
+		return Math.max(CONVERSATION_TASK_DURATION_MIN,
+			Math.min(CONVERSATION_TASK_DURATION_MAX, conversationTaskDurationSeconds));
+	}
+
+	public static int getConversationTaskRadiusBlocks() {
+		return Math.max(CONVERSATION_TASK_RADIUS_MIN,
+			Math.min(CONVERSATION_TASK_RADIUS_MAX, conversationTaskRadiusBlocks));
+	}
+
+	public static int getConversationTaskVerticalToleranceBlocks() {
+		return Math.max(CONVERSATION_TASK_VERTICAL_TOLERANCE_MIN,
+			Math.min(CONVERSATION_TASK_VERTICAL_TOLERANCE_MAX, conversationTaskVerticalToleranceBlocks));
 	}
 
 	public static int getSnitchTasksRequired() {
@@ -1010,6 +1052,11 @@ public final class GexpressConfig {
 			pelicanEatPercentage = snap.pelicanEatPercentage;
 			hungryFoodLimit = snap.hungryFoodLimit;
 			thirstyDrinkLimit = snap.thirstyDrinkLimit;
+			conversationTaskEnabled = snap.conversationTaskEnabled;
+			conversationTaskChancePercent = snap.conversationTaskChancePercent;
+			conversationTaskDurationSeconds = snap.conversationTaskDurationSeconds;
+			conversationTaskRadiusBlocks = snap.conversationTaskRadiusBlocks;
+			conversationTaskVerticalToleranceBlocks = snap.conversationTaskVerticalToleranceBlocks;
 			snitchTasksRequired = snap.snitchTasksRequired;
 			snitchWarningTasksRemaining = snap.snitchWarningTasksRemaining;
 			timeMasterRewindSeconds = snap.timeMasterRewindSeconds;
@@ -1132,6 +1179,11 @@ public final class GexpressConfig {
 			snap.pelicanEatPercentage = pelicanEatPercentage;
 			snap.hungryFoodLimit = hungryFoodLimit;
 			snap.thirstyDrinkLimit = thirstyDrinkLimit;
+			snap.conversationTaskEnabled = conversationTaskEnabled;
+			snap.conversationTaskChancePercent = conversationTaskChancePercent;
+			snap.conversationTaskDurationSeconds = conversationTaskDurationSeconds;
+			snap.conversationTaskRadiusBlocks = conversationTaskRadiusBlocks;
+			snap.conversationTaskVerticalToleranceBlocks = conversationTaskVerticalToleranceBlocks;
 			snap.snitchTasksRequired = snitchTasksRequired;
 			snap.snitchWarningTasksRemaining = snitchWarningTasksRemaining;
 			snap.timeMasterRewindSeconds = timeMasterRewindSeconds;
@@ -1368,6 +1420,17 @@ public final class GexpressConfig {
 		clampInPlace();
 	}
 
+	public static void applyTaskConfig(boolean conversationTaskEnabled, int conversationTaskChancePercent,
+			int conversationTaskDurationSeconds, int conversationTaskRadiusBlocks,
+			int conversationTaskVerticalToleranceBlocks) {
+		GexpressConfig.conversationTaskEnabled = conversationTaskEnabled;
+		GexpressConfig.conversationTaskChancePercent = conversationTaskChancePercent;
+		GexpressConfig.conversationTaskDurationSeconds = conversationTaskDurationSeconds;
+		GexpressConfig.conversationTaskRadiusBlocks = conversationTaskRadiusBlocks;
+		GexpressConfig.conversationTaskVerticalToleranceBlocks = conversationTaskVerticalToleranceBlocks;
+		clampInPlace();
+	}
+
 	private static void clampInPlace() {
 		c4Price = getC4Price();
 		c4FuseSeconds = getC4FuseSeconds();
@@ -1400,6 +1463,10 @@ public final class GexpressConfig {
 		pelicanEatPercentage = getPelicanEatPercentage();
 		hungryFoodLimit = getHungryFoodLimit();
 		thirstyDrinkLimit = getThirstyDrinkLimit();
+		conversationTaskChancePercent = getConversationTaskChancePercent();
+		conversationTaskDurationSeconds = getConversationTaskDurationSeconds();
+		conversationTaskRadiusBlocks = getConversationTaskRadiusBlocks();
+		conversationTaskVerticalToleranceBlocks = getConversationTaskVerticalToleranceBlocks();
 		snitchTasksRequired = getSnitchTasksRequired();
 		snitchWarningTasksRemaining = getSnitchWarningTasksRemaining();
 		timeMasterRewindSeconds = getTimeMasterRewindSeconds();
@@ -1566,6 +1633,11 @@ public final class GexpressConfig {
 		int pelicanEatPercentage = 80;
 		int hungryFoodLimit = 2;
 		int thirstyDrinkLimit = 2;
+		boolean conversationTaskEnabled = true;
+		int conversationTaskChancePercent = 20;
+		int conversationTaskDurationSeconds = 8;
+		int conversationTaskRadiusBlocks = 3;
+		int conversationTaskVerticalToleranceBlocks = 1;
 		int snitchTasksRequired = 3;
 		int snitchWarningTasksRemaining = 1;
 		int timeMasterRewindSeconds = 10;

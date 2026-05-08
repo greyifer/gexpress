@@ -13,6 +13,7 @@ import dev.doctor4t.wathe.cca.PlayerMoodComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.mapselect.MapSelect;
 import dev.mapselect.permissions.GexpressPermissions;
+import dev.mapselect.task.ConversationTask;
 import dev.mapselect.role.warlock.WarlockComponent;
 import dev.mapselect.testing.GexpressTestState;
 import net.minecraft.command.argument.EntityArgumentType;
@@ -44,6 +45,10 @@ public final class TestCommand {
 	private TestCommand() {}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
+		return buildRoleTestTree();
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildRoleTestTree() {
 		return CommandManager.literal("test")
 			.requires(OP)
 			.then(CommandManager.literal("role")
@@ -55,47 +60,55 @@ public final class TestCommand {
 					.executes(ctx -> runSetRole(ctx, RoleArgumentType.getRole(ctx, "role"), self(ctx)))
 					.then(CommandManager.argument("players", EntityArgumentType.players())
 						.executes(ctx -> runSetRole(ctx, RoleArgumentType.getRole(ctx, "role"),
-							EntityArgumentType.getPlayers(ctx, "players"))))))
-			.then(CommandManager.literal("modifier")
-				.then(CommandManager.literal("add")
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.then(CommandManager.argument("modifier", ModifierArgumentType.create())
-							.suggests(suggestAddModifiers("players"))
-							.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
-								EntityArgumentType.getPlayers(ctx, "players")))))
-					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
-						.suggests(suggestAddModifiers(null))
-						.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
-						.then(CommandManager.argument("players", EntityArgumentType.players())
-							.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
-								EntityArgumentType.getPlayers(ctx, "players"))))))
-				.then(CommandManager.literal("remove")
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.then(CommandManager.argument("modifier", ModifierArgumentType.create())
-							.suggests(suggestRemoveModifiers("players"))
-							.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
-								EntityArgumentType.getPlayers(ctx, "players")))))
-					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
-						.suggests(suggestRemoveModifiers(null))
-						.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
-						.then(CommandManager.argument("players", EntityArgumentType.players())
-							.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
-								EntityArgumentType.getPlayers(ctx, "players"))))))
-				.then(CommandManager.literal("clear")
-					.executes(ctx -> runClearModifiers(ctx, self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runClearModifiers(ctx, EntityArgumentType.getPlayers(ctx, "players"))))))
-			.then(CommandManager.literal("task")
-				.then(CommandManager.literal("clear")
-					.executes(ctx -> runClearTasks(ctx, self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runClearTasks(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
-				.then(CommandManager.argument("task", StringArgumentType.word())
-					.suggests(TestCommand::suggestTasks)
-					.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"), self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"),
 							EntityArgumentType.getPlayers(ctx, "players"))))));
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildModifierTestTree() {
+		return CommandManager.literal("test")
+			.requires(OP)
+			.then(CommandManager.literal("add")
+				.then(CommandManager.argument("players", EntityArgumentType.players())
+					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+						.suggests(suggestAddModifiers("players"))
+						.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
+							EntityArgumentType.getPlayers(ctx, "players")))))
+				.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+					.suggests(suggestAddModifiers(null))
+					.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
+					.then(CommandManager.argument("players", EntityArgumentType.players())
+						.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
+							EntityArgumentType.getPlayers(ctx, "players"))))))
+			.then(CommandManager.literal("remove")
+				.then(CommandManager.argument("players", EntityArgumentType.players())
+					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+						.suggests(suggestRemoveModifiers("players"))
+						.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
+							EntityArgumentType.getPlayers(ctx, "players")))))
+				.then(CommandManager.argument("modifier", ModifierArgumentType.create())
+					.suggests(suggestRemoveModifiers(null))
+					.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
+					.then(CommandManager.argument("players", EntityArgumentType.players())
+						.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
+							EntityArgumentType.getPlayers(ctx, "players"))))))
+			.then(CommandManager.literal("clear")
+				.executes(ctx -> runClearModifiers(ctx, self(ctx)))
+				.then(CommandManager.argument("players", EntityArgumentType.players())
+					.executes(ctx -> runClearModifiers(ctx, EntityArgumentType.getPlayers(ctx, "players")))));
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildTaskTestTree() {
+		return CommandManager.literal("test")
+			.requires(OP)
+			.then(CommandManager.literal("clear")
+				.executes(ctx -> runClearTasks(ctx, self(ctx)))
+				.then(CommandManager.argument("players", EntityArgumentType.players())
+					.executes(ctx -> runClearTasks(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
+			.then(CommandManager.argument("task", StringArgumentType.word())
+				.suggests(TestCommand::suggestTasks)
+				.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"), self(ctx)))
+				.then(CommandManager.argument("players", EntityArgumentType.players())
+					.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"),
+						EntityArgumentType.getPlayers(ctx, "players")))));
 	}
 
 	private static Collection<ServerPlayerEntity> self(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
@@ -152,7 +165,7 @@ public final class TestCommand {
 	private static CompletableFuture<Suggestions> suggestTasks(CommandContext<ServerCommandSource> ctx,
 			SuggestionsBuilder builder) {
 		String remaining = builder.getRemainingLowerCase();
-		for (String task : List.of("outside", "sleep", "eat", "drink")) {
+		for (String task : List.of("outside", "sleep", "eat", "drink", "conversation")) {
 			if (task.startsWith(remaining)) builder.suggest(task);
 		}
 		return builder.buildFuture();
@@ -275,9 +288,9 @@ public final class TestCommand {
 	private static int runGiveTask(CommandContext<ServerCommandSource> ctx, String rawTask,
 			Collection<ServerPlayerEntity> players) {
 		ServerCommandSource src = ctx.getSource();
-		PlayerMoodComponent.Task task = parseTask(rawTask);
-		if (task == null) {
-			src.sendError(Text.literal("Unknown task '" + rawTask + "'. Use outside, sleep, eat, or drink."));
+		PlayerMoodComponent.TrainTask forcedTask = newTask(rawTask);
+		if (forcedTask == null) {
+			src.sendError(Text.literal("Unknown task '" + rawTask + "'. Use outside, sleep, eat, drink, or conversation."));
 			return 0;
 		}
 
@@ -285,11 +298,11 @@ public final class TestCommand {
 			PlayerMoodComponent mood = PlayerMoodComponent.KEY.getNullable(player);
 			if (mood == null) continue;
 			mood.tasks.clear();
-			mood.tasks.put(task, newTask(task));
+			mood.tasks.put(forcedTask.getType(), newTask(rawTask));
 			mood.sync();
 		}
 
-		src.sendFeedback(() -> Text.literal("Forced task " + taskName(task) + " for " + playerList(players) + ".")
+		src.sendFeedback(() -> Text.literal("Forced task " + taskName(forcedTask) + " for " + playerList(players) + ".")
 			.formatted(Formatting.GREEN), true);
 		return players.size();
 	}
@@ -320,6 +333,17 @@ public final class TestCommand {
 		};
 	}
 
+	private static PlayerMoodComponent.TrainTask newTask(String rawTask) {
+		if (rawTask != null && switch (rawTask.toLowerCase(Locale.ROOT)) {
+			case "conversation", "smalltalk", "small_talk", "talk" -> true;
+			default -> false;
+		}) {
+			return ConversationTask.createConfigured();
+		}
+		PlayerMoodComponent.Task task = parseTask(rawTask);
+		return task == null ? null : newTask(task);
+	}
+
 	private static PlayerMoodComponent.TrainTask newTask(PlayerMoodComponent.Task task) {
 		return switch (task) {
 			case OUTSIDE -> new PlayerMoodComponent.OutsideTask(GameConstants.OUTSIDE_TASK_DURATION);
@@ -331,6 +355,11 @@ public final class TestCommand {
 
 	private static String taskName(PlayerMoodComponent.Task task) {
 		return task == null ? "(none)" : task.name().toLowerCase(Locale.ROOT);
+	}
+
+	private static String taskName(PlayerMoodComponent.TrainTask task) {
+		if (ConversationTask.isConversation(task)) return "conversation";
+		return task == null ? "(none)" : taskName(task.getType());
 	}
 
 	private static void sendApplied(ServerCommandSource src, String type, String value,
@@ -350,7 +379,7 @@ public final class TestCommand {
 		try {
 			ModifierAssigned.EVENT.invoker().assignModifier(player, modifier);
 		} catch (Throwable t) {
-			MapSelect.LOGGER.warn("ModifierAssigned listener failed during /g roles test modifier add for {} on {}.",
+			MapSelect.LOGGER.warn("ModifierAssigned listener failed during /g modifiers test add for {} on {}.",
 				id(modifier), player.getName().getString(), t);
 		}
 	}
@@ -361,7 +390,7 @@ public final class TestCommand {
 			player.calculateDimensions();
 			player.refreshPositionAndAngles(player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch());
 		} catch (Throwable t) {
-			MapSelect.LOGGER.warn("ModifierRemoved listener failed during /g roles test modifier remove for {} on {}.",
+			MapSelect.LOGGER.warn("ModifierRemoved listener failed during /g modifiers test remove for {} on {}.",
 				id(modifier), player.getName().getString(), t);
 		}
 	}

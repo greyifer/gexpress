@@ -1,3 +1,23 @@
+# Grey's Express 1.4.8
+
+## Added
+
+- Added the Conversation task, which completes by standing near another living player on roughly the same Y level.
+- Added task settings in the Game tab for Conversation enablement, chance, duration, radius, and vertical tolerance.
+- Added `/g tasks test <outside|sleep|eat|drink|conversation> [players]` for forcing task testing.
+- Added a Guidebook Tab keybind, defaulting to Tab, to switch between Roles and Modifiers.
+
+## Changed
+
+- Split test commands so roles, modifiers, and tasks now live under separate `/g roles`, `/g modifiers`, and `/g tasks` command groups.
+- Updated the Players tab to show one Change tag button per player with an inline tag picker.
+
+## Fixed
+
+- Fixed Fresh Air sanity percentages so they add that percent of max sanity instead of targeting a sanity-bar percentage.
+- Fixed Players tab scrolling overshooting and snapping back.
+- Fixed guidebook arrow-key navigation wrapping from the last entry back to the first.
+
 # Grey's Express 1.4.7
 
 ## Added

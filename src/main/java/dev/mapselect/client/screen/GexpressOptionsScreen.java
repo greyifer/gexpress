@@ -9,6 +9,7 @@ import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
+import dev.mapselect.network.GexpressTaskConfigPayload;
 import dev.mapselect.network.PuppetmasterConfigPayload;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -208,9 +209,9 @@ public final class GexpressOptionsScreen {
 		pendingRoleMax.forEach((id, value) ->
 			stageChatCommand("g roles tuning role " + id + " amount " + value));
 		pendingModifierChance.forEach((id, value) ->
-			stageChatCommand("g roles tuning modifier " + id + " chance " + value));
+			stageChatCommand("g modifiers tuning modifier " + id + " chance " + value));
 		pendingModifierMax.forEach((id, value) ->
-			stageChatCommand("g roles tuning modifier " + id + " amount " + value));
+			stageChatCommand("g modifiers tuning modifier " + id + " amount " + value));
 	}
 
 	private static int clamp(int value, int min, int max) {
@@ -339,6 +340,15 @@ public final class GexpressOptionsScreen {
 			GexpressConfig.getMedicShieldBreakFlashAlpha(),
 			GexpressConfig.getSilentShadowAlpha()
 		));
+		if (ClientPlayNetworking.canSend(GexpressTaskConfigPayload.ID)) {
+			ClientPlayNetworking.send(new GexpressTaskConfigPayload(
+				GexpressConfig.isConversationTaskEnabled(),
+				GexpressConfig.getConversationTaskChancePercent(),
+				GexpressConfig.getConversationTaskDurationSeconds(),
+				GexpressConfig.getConversationTaskRadiusBlocks(),
+				GexpressConfig.getConversationTaskVerticalToleranceBlocks()
+			));
+		}
 		if (ClientPlayNetworking.canSend(PuppetmasterConfigPayload.ID)) {
 			ClientPlayNetworking.send(new PuppetmasterConfigPayload(GexpressConfig.canPuppetmasterKillOwnBody()));
 		}

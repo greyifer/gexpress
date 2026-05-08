@@ -2,6 +2,7 @@ package dev.mapselect.mixin.client;
 
 import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
 import cat.rezelyn.watheextended.client.screen.guidebook.GuidebookEntry;
+import dev.mapselect.client.ClientAbilityKeys;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 @Mixin(value = GuidebookScreen.class, remap = false)
 public abstract class GuidebookScreenKeyboardMixin {
@@ -31,6 +34,11 @@ public abstract class GuidebookScreenKeyboardMixin {
 	@Inject(method = "method_25404", at = @At("HEAD"), cancellable = true, remap = false)
 	private void gexpress$handleGuidebookKeyboard(int keyCode, int scanCode, int modifiers,
 			CallbackInfoReturnable<Boolean> cir) {
+		if (ClientAbilityKeys.matches(ClientAbilityKeys.guidebookTabBinding(), keyCode, scanCode)) {
+			if (gexpress$cycleTab()) cir.setReturnValue(true);
+			return;
+		}
+
 		switch (keyCode) {
 			case GLFW.GLFW_KEY_DOWN -> {
 				if (gexpress$selectRelative(1)) cir.setReturnValue(true);
@@ -82,8 +90,7 @@ public abstract class GuidebookScreenKeyboardMixin {
 
 		for (int i = 0; i < entries.size(); i++) {
 			index += direction;
-			if (index < 0) index = entries.size() - 1;
-			else if (index >= entries.size()) index = 0;
+			if (index < 0 || index >= entries.size()) return false;
 			GuidebookEntry entry = entries.get(index);
 			if (!gexpress$isSelectable(entry)) continue;
 			selectEntry(entry);
@@ -136,5 +143,27 @@ public abstract class GuidebookScreenKeyboardMixin {
 	@Unique
 	private int gexpress$clamp(int value, int min, int max) {
 		return Math.max(min, Math.min(max, value));
+	}
+
+	@Unique
+	private boolean gexpress$cycleTab() {
+		try {
+			Class<?> screenClass = Class.forName("cat.rezelyn.watheextended.client.screen.GuidebookScreen");
+			Class<?> tabClass = Class.forName("cat.rezelyn.watheextended.client.screen.GuidebookScreen$Tab");
+			Object[] values = tabClass.getEnumConstants();
+			if (values == null || values.length < 2) return false;
+
+			Field activeTabField = screenClass.getDeclaredField("activeTab");
+			activeTabField.setAccessible(true);
+			Object activeTab = activeTabField.get(this);
+			Object nextTab = values[0].equals(activeTab) ? values[1] : values[0];
+
+			Method selectTabMethod = screenClass.getDeclaredMethod("selectTab", tabClass);
+			selectTabMethod.setAccessible(true);
+			selectTabMethod.invoke(this, nextTab);
+			return true;
+		} catch (Throwable ignored) {
+			return false;
+		}
 	}
 }
