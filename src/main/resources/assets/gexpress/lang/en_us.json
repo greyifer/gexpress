@@ -363,6 +363,8 @@
 	"gui.gexpress.config.category.dev.tooltip": "Greyifer-only tuning values for testing visuals without editing code.",
 	"gui.gexpress.config.category.players": "Players",
 	"gui.gexpress.config.category.players.tooltip": "View online players and manage G'Express tags.",
+	"gui.gexpress.config.category.skins": "Skins",
+	"gui.gexpress.config.category.skins.tooltip": "Choose unlocked knife and gun skins.",
 	"gui.gexpress.config.group.players.live": "Online Players",
 	"gui.gexpress.config.group.players.live.tooltip": "Open the live player list. It refreshes while it is open.",
 	"gui.gexpress.config.players.open": "Live Player Tags",

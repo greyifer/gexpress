@@ -3,6 +3,8 @@
 ## Added
 
 - Added the Bodyguard civilian role with an assigned protect target and a temporary proximity revolver.
+- Added a dedicated Skins tab for choosing unlocked Knife and Gun skins.
+- Added `/g group skins give/remove/equip/list` commands for managing and equipping weapon skins.
 
 ## Changed
 

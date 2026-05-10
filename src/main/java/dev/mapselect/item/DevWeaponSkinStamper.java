@@ -3,6 +3,7 @@ package dev.mapselect.item;
 import dev.doctor4t.wathe.index.WatheDataComponentTypes;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.permissions.GexpressPermissions;
+import dev.mapselect.skin.PlayerSkinComponent;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -20,11 +21,18 @@ public final class DevWeaponSkinStamper {
 	}
 
 	public static void stamp(PlayerEntity player) {
-		if (!GexpressPermissions.isHostOrDev(player) && !GexpressPermissions.isTrusted(player)) return;
+		if (!shouldStamp(player)) return;
 		String owner = player.getUuidAsString();
 		for (int i = 0; i < player.getInventory().size(); i++) {
 			stampStack(player.getInventory().getStack(i), owner);
 		}
+	}
+
+	private static boolean shouldStamp(PlayerEntity player) {
+		if (GexpressPermissions.isHostOrDev(player) || GexpressPermissions.isTrusted(player)) return true;
+		if (player == null || player.getWorld() == null) return false;
+		PlayerSkinComponent component = PlayerSkinComponent.KEY.getNullable(player.getWorld());
+		return component != null && component.hasAnySkin(player.getUuid());
 	}
 
 	private static void stampStack(ItemStack stack, String owner) {

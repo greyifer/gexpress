@@ -89,6 +89,8 @@ public final class GexpressOptionsScreen {
 		int idx = 0;
 		builder.category(GexpressClientCategory.build(parent, isOp, stage));
 		idx++;
+		builder.category(GexpressSkinsCategory.build(parent));
+		idx++;
 
 		if (isDevPlayer()) {
 			builder.category(GexpressDevCategory.build(parent));

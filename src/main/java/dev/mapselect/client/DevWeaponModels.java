@@ -7,6 +7,11 @@ import dev.mapselect.MapSelect;
 import dev.mapselect.host.HostComponent;
 import dev.mapselect.host.TrustedComponent;
 import dev.mapselect.permissions.GexpressPermissions;
+import dev.mapselect.skin.PlayerSkinComponent;
+import dev.mapselect.skin.WeaponSkin;
+import dev.mapselect.skin.WeaponSkinType;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
 import net.fabricmc.fabric.api.client.model.loading.v1.FabricBakedModelManager;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.minecraft.client.MinecraftClient;
@@ -28,6 +33,7 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	public static final Identifier TRUSTED_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_trusted");
 	public static final Identifier SHADOW_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_shadow");
 	public static final Identifier SHADOW_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shadow");
+	public static final String SKIN_PREVIEW_KEY = "gexpress_skin_preview";
 
 	@Override
 	public void onInitializeModelLoader(Context pluginContext) {
@@ -49,7 +55,7 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 		if (!usesDefaultWatheSkin(stack)) return null;
 
 		WeaponSkin skin = resolveSkin(stack, entity);
-		if (skin == WeaponSkin.NONE) return null;
+		if (skin == null || skin == WeaponSkin.DEFAULT) return null;
 		if (stack.isOf(WatheItems.KNIFE)) {
 			return switch (skin) {
 				case DEV -> DEV_KNIFE_MODEL;
@@ -70,15 +76,38 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	}
 
 	private static WeaponSkin resolveSkin(ItemStack stack, LivingEntity entity) {
+		WeaponSkin preview = previewSkin(stack);
+		if (preview != null) return preview;
+		WeaponSkinType type = stack.isOf(WatheItems.KNIFE) ? WeaponSkinType.KNIFE
+			: stack.isOf(WatheItems.REVOLVER) ? WeaponSkinType.GUN : null;
 		if (entity instanceof PlayerEntity player) {
+			WeaponSkin equipped = equippedSkin(player.getUuid(), type);
+			if (equipped != null) return equipped;
 			if (GexpressPermissions.isDev(player)) return WeaponSkin.DEV;
 			if (TrustedComponent.isTrusted(player)) return WeaponSkin.TRUSTED;
 			if (HostComponent.isHost(player)) return WeaponSkin.HOST;
 		}
 		String owner = stack.get(WatheDataComponentTypes.OWNER);
+		WeaponSkin equipped = equippedSkin(parseUuid(owner), type);
+		if (equipped != null) return equipped;
 		if (GexpressPermissions.isDevUuidString(owner)) return WeaponSkin.DEV;
 		if (isTrustedUuidString(owner)) return WeaponSkin.TRUSTED;
-		return isHostUuidString(owner) ? WeaponSkin.HOST : WeaponSkin.NONE;
+		return isHostUuidString(owner) ? WeaponSkin.HOST : WeaponSkin.DEFAULT;
+	}
+
+	private static WeaponSkin previewSkin(ItemStack stack) {
+		NbtComponent data = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
+		String raw = data.copyNbt().getString(SKIN_PREVIEW_KEY);
+		WeaponSkin skin = WeaponSkin.byId(raw);
+		return skin == null || skin == WeaponSkin.DEFAULT ? null : skin;
+	}
+
+	private static WeaponSkin equippedSkin(UUID playerId, WeaponSkinType type) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client == null || client.world == null || playerId == null || type == null) return null;
+		PlayerSkinComponent component = PlayerSkinComponent.KEY.getNullable(client.world);
+		if (component == null || !component.hasEquipped(playerId, type)) return null;
+		return component.equipped(playerId, type);
 	}
 
 	private static boolean usesDefaultWatheSkin(ItemStack stack) {
@@ -114,10 +143,13 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 		}
 	}
 
-	private enum WeaponSkin {
-		NONE,
-		DEV,
-		TRUSTED,
-		HOST
+	private static UUID parseUuid(String uuid) {
+		if (uuid == null || uuid.isBlank()) return null;
+		try {
+			return UUID.fromString(uuid);
+		} catch (IllegalArgumentException ignored) {
+			return null;
+		}
 	}
+
 }
