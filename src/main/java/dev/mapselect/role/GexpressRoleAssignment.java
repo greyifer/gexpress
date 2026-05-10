@@ -484,6 +484,7 @@ public final class GexpressRoleAssignment {
 		if (MapSelectRoles.GODFATHER_ID.equals(id)) return GexpressConfig.getGodfatherStartingGold();
 		if (MapSelectRoles.MAFIOSO_ID.equals(id)) return GexpressConfig.getMafiosoStartingGold();
 		if (MapSelectRoles.JANITOR_ID.equals(id)) return GexpressConfig.getJanitorStartingGold();
+		if (GexpressRoleShop.showsMoneyHud(player)) return GameConstants.MONEY_START;
 		return game != null && game.canUseKillerFeatures(player) ? GameConstants.MONEY_START : 0;
 	}
 

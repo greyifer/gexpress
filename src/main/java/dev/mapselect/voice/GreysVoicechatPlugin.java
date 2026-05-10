@@ -102,7 +102,6 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 
 	private void onOpenALSound(OpenALSoundEvent.Post event) {
 		float pitch = clientPitchFor(event.getChannelId());
-		if (Math.abs(pitch - 1.0F) <= 0.03F) pitch = 1.0F;
 		try {
 			org.lwjgl.openal.AL10.alSourcef(event.getSource(), org.lwjgl.openal.AL10.AL_PITCH, pitch);
 		} catch (Throwable ignored) {

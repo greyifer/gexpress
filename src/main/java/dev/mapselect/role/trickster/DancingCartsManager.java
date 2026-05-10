@@ -4,6 +4,7 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.preset.map.MapPreset;
@@ -428,7 +429,11 @@ public final class DancingCartsManager {
 	}
 
 	private static boolean isPlayableForHarlequin(PlayerEntity player, PlayerEntity harlequin) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(harlequin);
+		if (GexpressTestState.isRoleTester(harlequin)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static long secondsCeil(long ticks) {

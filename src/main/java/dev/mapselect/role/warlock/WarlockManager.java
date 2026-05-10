@@ -5,9 +5,11 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheSounds;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.WarlockKillPayload;
 import dev.mapselect.network.WarlockMarkPayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -81,6 +83,7 @@ public final class WarlockManager {
 
 		warlock.playSoundToPlayer(SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.7F, 0.55F);
 		warlock.sendMessage(Text.literal("Marked " + target.getName().getString() + "."), true);
+		SpyManager.recordInteraction(warlock, target);
 	}
 
 	private static void tryHexKill(ServerPlayerEntity warlock) {
@@ -122,6 +125,7 @@ public final class WarlockManager {
 		ServerPlayerEntity victim = candidates.get(warlock.getRandom().nextInt(candidates.size()));
 		playShot(warlock);
 		GameFunctions.killPlayer(victim, true, warlock, GameConstants.DeathReasons.GUN);
+		SpyManager.recordInteraction(warlock, victim);
 		comp.setKillCooldown(warlock.getUuid());
 		comp.removeMark(warlock.getUuid());
 		warlock.sendMessage(Text.literal("The mark killed " + victim.getName().getString() + "."), true);
@@ -210,7 +214,11 @@ public final class WarlockManager {
 	}
 
 	private static boolean isPlayableForWarlock(PlayerEntity player, PlayerEntity warlock) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(warlock);
+		if (GexpressTestState.isRoleTester(warlock)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static long secondsCeil(long ticks) {

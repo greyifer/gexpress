@@ -12,6 +12,7 @@ import dev.doctor4t.wathe.index.tag.WatheItemTags;
 import dev.doctor4t.wathe.util.ShootMuzzleS2CPayload;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.PuppetmasterHotbarPayload;
@@ -21,6 +22,7 @@ import dev.mapselect.network.PuppetmasterStatePayload;
 import dev.mapselect.network.PuppetmasterTargetsPayload;
 import dev.mapselect.network.PuppetmasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -214,6 +216,7 @@ public final class PuppetmasterManager {
 		puppetmaster.sendMessage(Text.literal("Controls left: " + remainingUses(puppetmaster) + "/"
 			+ GexpressConfig.getPuppetmasterMaxUses()), false);
 		target.sendMessage(Text.literal("You are being controlled."), true);
+		SpyManager.recordInteraction(puppetmaster, target);
 	}
 
 	private static void updateInput(ServerPlayerEntity puppetmaster, PuppetmasterInputPayload payload) {
@@ -408,7 +411,7 @@ public final class PuppetmasterManager {
 		ServerPlayerEntity target = server == null ? null : server.getPlayerManager().getPlayer(session.targetId);
 		endControl(session.controllerId, server, true);
 		controller.setHealth(Math.max(1.0F, controller.getHealth()));
-		if (target != null && GameFunctions.isPlayerAliveAndSurvival(target)) {
+		if (target != null && DeadPlayerStatus.isLivingRoundParticipant(target)) {
 			GameFunctions.killPlayer(target, true, controller, GameConstants.DeathReasons.GENERIC);
 		}
 	}
@@ -561,7 +564,11 @@ public final class PuppetmasterManager {
 	}
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity puppetmaster) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(puppetmaster);
+		if (GexpressTestState.isRoleTester(puppetmaster)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static boolean withinControlRange(ServerPlayerEntity puppetmaster, ServerPlayerEntity target) {

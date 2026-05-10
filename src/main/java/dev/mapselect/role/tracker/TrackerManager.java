@@ -5,11 +5,13 @@ import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.TrackerStatePayload;
 import dev.mapselect.network.TrackerUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -77,6 +79,7 @@ public final class TrackerManager {
 			}
 			tracked.add(target.getUuid());
 			tracker.sendMessage(Text.literal("Tracking " + target.getName().getString() + "."), true);
+			SpyManager.recordInteraction(tracker, target);
 		} else {
 			tracker.sendMessage(Text.literal("Stopped tracking " + target.getName().getString() + "."), true);
 		}
@@ -98,7 +101,7 @@ public final class TrackerManager {
 			if (tracked == null || tracked.isEmpty()) continue;
 			boolean changed = tracked.removeIf(id -> {
 				ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(id);
-				return target == null || target.getWorld() != world || !GameFunctions.isPlayerAliveAndSurvival(target);
+				return target == null || target.getWorld() != world || !DeadPlayerStatus.isLivingRoundParticipant(target);
 			});
 			if (changed) sync(tracker);
 		}
@@ -166,7 +169,11 @@ public final class TrackerManager {
 	}
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity user) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(user);
+		if (GexpressTestState.isRoleTester(user)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static long secondsCeil(long ticks) {

@@ -7,6 +7,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.TricksterDancingCartsPayload;
@@ -141,7 +142,7 @@ public final class TricksterManager {
 	private static List<ServerPlayerEntity> eligiblePlayers(ServerWorld world, ServerPlayerEntity trickster) {
 		boolean testing = GexpressTestState.isRoleTester(trickster);
 		return world.getPlayers(player ->
-			testing ? !player.isSpectator() : GameFunctions.isPlayerAliveAndSurvival(player));
+			testing ? !player.isSpectator() : DeadPlayerStatus.isLivingRoundParticipant(player));
 	}
 
 	private static Map<UUID, UUID> buildDerangement(List<ServerPlayerEntity> players, Map<UUID, UUID> previous) {
@@ -196,6 +197,9 @@ public final class TricksterManager {
 		ThreadLocalRandom random = ThreadLocalRandom.current();
 		for (ServerPlayerEntity player : players) {
 			int percent = min == max ? min : random.nextInt(min, max + 1);
+			if (percent >= 96 && percent <= 104 && min < 100 && max > 100) {
+				percent = random.nextBoolean() ? Math.max(min, 88) : Math.min(max, 112);
+			}
 			out.put(player.getUuid(), percent / 100.0F);
 		}
 		return out;
@@ -331,7 +335,11 @@ public final class TricksterManager {
 	}
 
 	private static boolean isPlayableForTrickster(PlayerEntity player, PlayerEntity trickster) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(trickster);
+		if (GexpressTestState.isRoleTester(trickster)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static long secondsCeil(long ticks) {

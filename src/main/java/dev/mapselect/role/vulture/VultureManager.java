@@ -9,6 +9,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.VultureEatPayload;
@@ -18,6 +19,7 @@ import dev.mapselect.network.VultureStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -74,6 +76,8 @@ public final class VultureManager {
 		ServerTickEvents.END_WORLD_TICK.register(VultureManager::tick);
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 			server.execute(() -> onDisconnect(handler.player, server)));
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+			server.execute(() -> onJoin(handler.player)));
 		AllowPlayerDeath.EVENT.register(VultureManager::allowDeath);
 		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRoundState());
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
@@ -156,6 +160,7 @@ public final class VultureManager {
 		vulture.sendMessage(message, true);
 		syncProgress(vulture, true);
 		target.sendMessage(Text.literal("You were swallowed by the Pelican."), true);
+		SpyManager.recordInteraction(vulture, target);
 		tryEndForVulture(vulture);
 		return true;
 	}
@@ -215,7 +220,6 @@ public final class VultureManager {
 			ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(targetId);
 			ServerPlayerEntity vulture = world.getServer().getPlayerManager().getPlayer(vultureId);
 			if (target == null) {
-				removeMissingTarget(targetId, vultureId);
 				continue;
 			}
 			if (vulture == null || !isPlayable(vulture, vulture)) {
@@ -223,6 +227,7 @@ public final class VultureManager {
 				continue;
 			}
 			keepStashedWithVulture(target, vulture);
+			syncStashedCamera(target, vulture);
 		}
 	}
 
@@ -238,14 +243,32 @@ public final class VultureManager {
 		}
 	}
 
+	private static void syncStashedCamera(ServerPlayerEntity target, ServerPlayerEntity vulture) {
+		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(vulture));
+		if (ServerPlayNetworking.canSend(target, VultureStatePayload.ID)) {
+			ServerPlayNetworking.send(target, new VultureStatePayload(true, vulture.getUuid(), vulture.getId()));
+		}
+	}
+
 	private static void onDisconnect(ServerPlayerEntity player, MinecraftServer server) {
 		UUID playerId = player.getUuid();
 		if (stashedByVulture.containsKey(playerId)) {
 			releaseAllForVulture(playerId, server, lastKnownVulturePoint.get(playerId), true);
 		}
-		UUID vultureId = vultureByStashed.get(playerId);
-		if (vultureId != null) {
-			releasePlayer(playerId, server, lastKnownVulturePoint.get(vultureId), false);
+	}
+
+	private static void onJoin(ServerPlayerEntity player) {
+		if (!isStashed(player)) return;
+		UUID vultureId = vultureByStashed.get(player.getUuid());
+		ServerPlayerEntity vulture = vultureId == null || player.getServer() == null
+			? null : player.getServer().getPlayerManager().getPlayer(vultureId);
+		player.setInvisible(true);
+		player.changeGameMode(GameMode.SPECTATOR);
+		if (vulture != null && isPlayable(vulture, vulture)) {
+			keepStashedWithVulture(player, vulture);
+			syncStashedCamera(player, vulture);
+		} else if (ServerPlayNetworking.canSend(player, VultureStatePayload.ID)) {
+			ServerPlayNetworking.send(player, new VultureStatePayload(true, vultureId, -1));
 		}
 	}
 
@@ -570,7 +593,11 @@ public final class VultureManager {
 	}
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity vulture) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(vulture);
+		if (GexpressTestState.isRoleTester(vulture)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static void clearRoundState() {

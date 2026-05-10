@@ -8,23 +8,25 @@ import net.minecraft.text.TextColor;
 import java.util.Locale;
 
 public enum PlayerTag {
-	OWNER("owner", "Owner", 0x196266, true),
-	PASSENGER("passenger", "Passenger", 0x3C8AC9, true),
-	HOST("host", "Host", 0x559CFF, true),
-	TRUSTED("trusted", "Trusted", 0xF2C94C, true),
-	STAFF("staff", "Staff", 0x79B9A9, true),
-	DEV("dev", "Dev", 0xCBFF2E, false);
+	OWNER("owner", "Owner", 0x196266, true, 90),
+	PASSENGER("passenger", "Passenger", 0x3C8AC9, true, 0),
+	HOST("host", "Host", 0x559CFF, true, 60),
+	TRUSTED("trusted", "Trusted", 0xF2C94C, true, 40),
+	STAFF("staff", "Staff", 0x79B9A9, true, 70),
+	DEV("dev", "Dev", 0xCBFF2E, false, 100);
 
 	private final String id;
 	private final String displayName;
 	private final int color;
 	private final boolean assignable;
+	private final int priority;
 
-	PlayerTag(String id, String displayName, int color, boolean assignable) {
+	PlayerTag(String id, String displayName, int color, boolean assignable, int priority) {
 		this.id = id;
 		this.displayName = displayName;
 		this.color = color;
 		this.assignable = assignable;
+		this.priority = priority;
 	}
 
 	public String id() {
@@ -41,6 +43,10 @@ public enum PlayerTag {
 
 	public boolean assignable() {
 		return assignable;
+	}
+
+	public int priority() {
+		return priority;
 	}
 
 	public MutableText text() {

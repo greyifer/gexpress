@@ -1,3 +1,25 @@
+# Grey's Express 1.5.0
+
+## Added
+
+- Added the Bodyguard civilian role with an assigned protect target and a temporary proximity revolver.
+
+## Changed
+
+- Moved the primary ability keybind into the G'Express keybind category.
+- Tags can now stack, and player names display the two highest-priority tags.
+- Tag editing is now dev-only.
+
+## Fixed
+
+- Dead round participants can no longer use G'Express abilities, and their modifiers are suspended until revival.
+- Pelican can no longer affect dead players and keeps swallowed players inside across reconnects.
+- Scatter Brain now searches nearby safe Y levels instead of failing on the player's exact height.
+- Mafia members are restored to their original role when the Godfather dies.
+- Spy bugs now report ability and kill interactions involving the bugged player.
+- Spy, role ability, and passive-money targeting now consistently ignore dead players.
+- Harlequin voice pitch now avoids unchanged pitch rolls and no longer snaps near-normal values back to normal.
+
 # Grey's Express 1.4.8
 
 ## Added

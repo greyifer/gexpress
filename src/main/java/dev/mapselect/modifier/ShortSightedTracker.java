@@ -1,6 +1,7 @@
 package dev.mapselect.modifier;
 
 import dev.mapselect.MapSelect;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.ShortSightedSyncPayload;
 import dev.mapselect.registry.MapSelectModifiers;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -72,7 +73,8 @@ public final class ShortSightedTracker {
 		if (mods == null) return;
 
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			boolean current = mods.isModifier(player, MapSelectModifiers.SHORT_SIGHTED);
+			boolean current = DeadPlayerStatus.isLivingRoundParticipant(player)
+				&& mods.isModifier(player, MapSelectModifiers.SHORT_SIGHTED);
 			UUID id = player.getUuid();
 			Boolean prev = lastState.get(id);
 			if (prev == null || prev.booleanValue() != current) {

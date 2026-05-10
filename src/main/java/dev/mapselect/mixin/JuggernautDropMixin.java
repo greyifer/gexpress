@@ -2,6 +2,7 @@ package dev.mapselect.mixin;
 
 import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
+import dev.mapselect.role.bodyguard.BodyguardManager;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -21,6 +22,10 @@ public abstract class JuggernautDropMixin {
 			return;
 		}
 		if (MafiaManager.shouldBlockWeaponDrop(player, stack)) {
+			cir.setReturnValue(null);
+			return;
+		}
+		if (BodyguardManager.shouldBlockWeaponDrop(player, stack)) {
 			cir.setReturnValue(null);
 		}
 	}

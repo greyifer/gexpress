@@ -8,6 +8,7 @@ import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.network.BountyHunterStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -185,7 +186,11 @@ public final class BountyHunterManager {
 	}
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity user) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(user);
+		if (GexpressTestState.isRoleTester(user)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static void throttledMessage(ServerWorld world, ServerPlayerEntity hunter, Text message) {

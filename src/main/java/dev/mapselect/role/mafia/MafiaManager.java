@@ -15,6 +15,7 @@ import dev.doctor4t.wathe.index.WatheEntities;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
@@ -26,6 +27,7 @@ import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -155,6 +157,7 @@ public final class MafiaManager {
 			.formatted(Formatting.DARK_GRAY), true);
 		godfather.sendMessage(Text.literal(target.getName().getString() + " is now your " + type.displayName() + ".")
 			.formatted(Formatting.GRAY), true);
+		SpyManager.recordInteraction(godfather, target);
 		syncFamily(godfather.getServerWorld(), godfather.getUuid());
 	}
 
@@ -200,6 +203,9 @@ public final class MafiaManager {
 				pendingRevolverCooldown.put(attacker.getUuid(),
 					GexpressConfig.getMafiaRevolverKillCooldownSeconds() * 20);
 			}
+			if (attacker != target) {
+				SpyManager.recordInteraction(attacker, target);
+			}
 			if (isJanitor(attacker) && attacker != target) {
 				int ticks = GexpressConfig.getJanitorCleanCooldownAfterKillSeconds() * 20;
 				if (ticks > 0) {
@@ -210,6 +216,9 @@ public final class MafiaManager {
 		}
 		if (victim instanceof ServerPlayerEntity dead && (isMafioso(dead) || isJanitor(dead))) {
 			onMemberDeath(dead);
+		}
+		if (victim instanceof ServerPlayerEntity dead && isGodfather(dead)) {
+			onGodfatherDeath(dead);
 		}
 		return true;
 	}
@@ -413,6 +422,32 @@ public final class MafiaManager {
 		syncFamily(member.getServerWorld(), godfatherId);
 	}
 
+	private static void onGodfatherDeath(ServerPlayerEntity godfather) {
+		UUID godfatherId = godfather.getUuid();
+		Slots slots = slotsByGodfather.remove(godfatherId);
+		loadedBulletsByGodfather.remove(godfatherId);
+		if (slots == null) return;
+		restoreMemberAfterGodfatherDeath(godfather.getServerWorld(), slots.mafioso);
+		restoreMemberAfterGodfatherDeath(godfather.getServerWorld(), slots.janitor);
+		if (ServerPlayNetworking.canSend(godfather, MafiaStatePayload.ID)) {
+			ServerPlayNetworking.send(godfather, new MafiaStatePayload(List.of()));
+		}
+	}
+
+	private static void restoreMemberAfterGodfatherDeath(ServerWorld world, UUID memberId) {
+		if (memberId == null) return;
+		godfatherByMember.remove(memberId);
+		Role previousRole = previousRoleByMember.remove(memberId);
+		ServerPlayerEntity member = world.getServer().getPlayerManager().getPlayer(memberId);
+		if (member == null || member.getWorld() != world || !GameFunctions.isPlayerAliveAndSurvival(member)) return;
+		assignRole(member, previousRole == null ? WatheRoles.CIVILIAN : previousRole);
+		if (ServerPlayNetworking.canSend(member, MafiaStatePayload.ID)) {
+			ServerPlayNetworking.send(member, new MafiaStatePayload(List.of()));
+		}
+		member.sendMessage(Text.literal("The Godfather died. Your old role has returned.")
+			.formatted(Formatting.GRAY), true);
+	}
+
 	private static ServerPlayerEntity findTarget(ServerPlayerEntity user, double range) {
 		Vec3d eye = user.getEyePos();
 		Vec3d look = user.getRotationVec(1.0F).normalize();
@@ -420,7 +455,7 @@ public final class MafiaManager {
 		double bestAlong = Double.MAX_VALUE;
 		for (ServerPlayerEntity candidate : user.getServerWorld().getPlayers()) {
 			if (candidate == user || VultureManager.isStashed(candidate)
-					|| !GameFunctions.isPlayerAliveAndSurvival(candidate)) continue;
+					|| !DeadPlayerStatus.isLivingRoundParticipant(candidate)) continue;
 			Vec3d to = candidate.getEyePos().subtract(eye);
 			double along = to.dotProduct(look);
 			if (along < 0.0D || along > range || along >= bestAlong) continue;
@@ -552,7 +587,7 @@ public final class MafiaManager {
 	private static boolean isLivingPlayer(ServerWorld world, UUID id) {
 		if (id == null) return false;
 		ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(id);
-		return player != null && player.getWorld() == world && GameFunctions.isPlayerAliveAndSurvival(player);
+		return player != null && player.getWorld() == world && DeadPlayerStatus.isLivingRoundParticipant(player);
 	}
 
 	private static long replacementRemaining(ServerPlayerEntity godfather, Slots slots, SlotType type) {

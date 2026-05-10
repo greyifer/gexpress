@@ -37,12 +37,22 @@ public class TagCommand {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("tag")
-			.requires(GexpressPermissions::canUseAdminCommands)
+			.requires(GexpressPermissions::canEditTags)
 			.then(CommandManager.literal("set")
 				.then(CommandManager.argument("tag", StringArgumentType.word())
 					.suggests(TagCommand::suggestTags)
 					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 						.executes(TagCommand::runSet))))
+			.then(CommandManager.literal("add")
+				.then(CommandManager.argument("tag", StringArgumentType.word())
+					.suggests(TagCommand::suggestTags)
+					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+						.executes(ctx -> runToggle(ctx, true)))))
+			.then(CommandManager.literal("remove")
+				.then(CommandManager.argument("tag", StringArgumentType.word())
+					.suggests(TagCommand::suggestTags)
+					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+						.executes(ctx -> runToggle(ctx, false)))))
 			.then(CommandManager.literal("list")
 				.executes(TagCommand::runList));
 	}
@@ -54,15 +64,15 @@ public class TagCommand {
 
 	private static int runSet(CommandContext<ServerCommandSource> ctx)
 			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+		return runToggle(ctx, true);
+	}
+
+	private static int runToggle(CommandContext<ServerCommandSource> ctx, boolean enabled)
+			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
 		ServerCommandSource src = ctx.getSource();
 		PlayerTag tag = PlayerTag.byId(StringArgumentType.getString(ctx, "tag"));
 		if (tag == null || !tag.assignable() || tag == PlayerTag.DEV) {
 			src.sendError(Text.literal("Use one of: " + String.join(", ", ASSIGNABLE_TAGS)));
-			return 0;
-		}
-		if (tag == PlayerTag.OWNER && !src.hasPermissionLevel(2)
-				&& !GexpressPermissions.isOwner(src.getPlayer()) && !GexpressPermissions.isDev(src.getPlayer())) {
-			src.sendError(Text.literal("Only an Owner, Dev, or operator can assign Owner."));
 			return 0;
 		}
 
@@ -78,12 +88,12 @@ public class TagCommand {
 				skippedDev++;
 				continue;
 			}
-			if (setTag(profile.getId(), tag, hosts, trusted, tags)) {
+			if (setTag(profile.getId(), tag, enabled, hosts, trusted, tags)) {
 				changed++;
 			}
 			ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(profile.getId());
 			if (online != null) {
-				online.sendMessage(Text.literal("Your G'Express tag is now ").formatted(Formatting.GRAY)
+				online.sendMessage(Text.literal("Your G'Express tag was updated: ").formatted(Formatting.GRAY)
 					.append(GexpressPermissions.tagBadge(tag)), false);
 				refreshPlayerListName(online);
 			}
@@ -101,17 +111,18 @@ public class TagCommand {
 		return changed;
 	}
 
-	private static boolean setTag(UUID uuid, PlayerTag tag, HostComponent hosts, TrustedComponent trusted,
+	private static boolean setTag(UUID uuid, PlayerTag tag, boolean enabled, HostComponent hosts, TrustedComponent trusted,
 			PlayerTagComponent tags) {
-		boolean changed = false;
-		if (tag != PlayerTag.HOST) changed |= hosts.removeHost(uuid);
-		if (tag != PlayerTag.TRUSTED) changed |= trusted.removeTrusted(uuid);
-		if (tag != PlayerTag.OWNER && tag != PlayerTag.STAFF) changed |= tags.clearTag(uuid);
-
-		if (tag == PlayerTag.HOST) changed |= hosts.addHost(uuid);
-		else if (tag == PlayerTag.TRUSTED) changed |= trusted.addTrusted(uuid);
-		else if (tag == PlayerTag.OWNER || tag == PlayerTag.STAFF) changed |= tags.setTag(uuid, tag);
-		return changed;
+		if (tag == PlayerTag.PASSENGER) {
+			boolean changed = hosts.removeHost(uuid) | trusted.removeTrusted(uuid) | tags.clearTag(uuid);
+			return changed;
+		}
+		if (tag == PlayerTag.HOST) return enabled ? hosts.addHost(uuid) : hosts.removeHost(uuid);
+		if (tag == PlayerTag.TRUSTED) return enabled ? trusted.addTrusted(uuid) : trusted.removeTrusted(uuid);
+		if (tag == PlayerTag.OWNER || tag == PlayerTag.STAFF) {
+			return enabled ? tags.addTag(uuid, tag) : tags.removeTag(uuid, tag);
+		}
+		return false;
 	}
 
 	public static void refreshPlayerListName(ServerPlayerEntity player) {
@@ -126,8 +137,8 @@ public class TagCommand {
 		ServerCommandSource src = ctx.getSource();
 		List<String> rows = new ArrayList<>();
 		for (ServerPlayerEntity player : src.getServer().getPlayerManager().getPlayerList()) {
-			PlayerTag tag = GexpressPermissions.effectiveTag(player);
-			rows.add(player.getGameProfile().getName() + "=" + tag.displayName());
+			List<String> tags = GexpressPermissions.effectiveTags(player).stream().map(PlayerTag::displayName).toList();
+			rows.add(player.getGameProfile().getName() + "=" + String.join("+", tags));
 		}
 		if (rows.isEmpty()) {
 			src.sendFeedback(() -> Text.literal("No online players.").formatted(Formatting.GRAY), false);

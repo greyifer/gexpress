@@ -16,6 +16,7 @@ import dev.doctor4t.wathe.index.WatheSounds;
 import dev.doctor4t.wathe.util.ShootMuzzleS2CPayload;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.TimeMasterFreezeStatePayload;
 import dev.mapselect.network.TimeMasterFreezeUsePayload;
 import dev.mapselect.network.TimeMasterRewindPayload;
@@ -259,6 +260,7 @@ public final class TimeMasterManager {
 		ActiveFreeze freeze = ActiveFreeze.capture(world, timeMaster.getUuid(), target, durationTicks);
 		ACTIVE_FREEZES.put(target.getUuid(), freeze);
 		freeze.apply(target);
+		SpyManager.recordInteraction(timeMaster, target);
 		syncFreeze(world, target.getUuid(), timeMaster.getUuid(), true, durationTicks);
 		world.playSound(null, target.getBlockPos(), SoundEvents.BLOCK_GLASS_BREAK,
 			SoundCategory.PLAYERS, 0.75F, 0.55F);
@@ -428,7 +430,7 @@ public final class TimeMasterManager {
 	}
 
 	private static boolean isPlayable(ServerPlayerEntity player, ServerPlayerEntity timeMaster) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(timeMaster);
+		return DeadPlayerStatus.isLivingRoundParticipant(player) || GexpressTestState.isRoleTester(timeMaster);
 	}
 
 	private static long secondsCeil(long ticks) {

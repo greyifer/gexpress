@@ -3,6 +3,7 @@ package dev.mapselect.game;
 import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.network.AltruistUsePayload;
+import dev.mapselect.network.GuardianAngelShieldUsePayload;
 import dev.mapselect.network.MafiaActionPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
 import dev.mapselect.network.PuppetmasterInputPayload;
@@ -32,6 +33,7 @@ public final class GexpressAbilityGuards {
 	private static final int SAFE_PREPARATION_TICKS = 30 * 20;
 	private static final Set<CustomPayload.Id<?>> ABILITY_PAYLOADS = Set.of(
 		AltruistUsePayload.ID,
+		GuardianAngelShieldUsePayload.ID,
 		MafiaActionPayload.ID,
 		MedicShieldUsePayload.ID,
 		PuppetmasterInputPayload.ID,
@@ -67,7 +69,7 @@ public final class GexpressAbilityGuards {
 	public static boolean shouldBlockAbilityPayload(ServerPlayerEntity player, CustomPayload payload) {
 		return player != null && payload != null
 			&& !GexpressTestState.isRoleTester(player)
-			&& isSafePreparation(player.getWorld())
-			&& ABILITY_PAYLOADS.contains(payload.getId());
+			&& ABILITY_PAYLOADS.contains(payload.getId())
+			&& (DeadPlayerStatus.isDeadRoundParticipant(player) || isSafePreparation(player.getWorld()));
 	}
 }

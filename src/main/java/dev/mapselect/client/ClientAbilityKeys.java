@@ -9,6 +9,7 @@ import org.lwjgl.glfw.GLFW;
 import java.lang.reflect.Field;
 
 public final class ClientAbilityKeys {
+	private static KeyBinding primaryBinding;
 	private static KeyBinding secondaryBinding;
 	private static KeyBinding guidebookBinding;
 	private static KeyBinding guidebookTabBinding;
@@ -19,6 +20,12 @@ public final class ClientAbilityKeys {
 
 	public static void register() {
 		if (secondaryBinding != null) return;
+		primaryBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+			"key.gexpress.primary_ability",
+			InputUtil.Type.KEYSYM,
+			GLFW.GLFW_KEY_R,
+			"category.gexpress"
+		));
 		secondaryBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.gexpress.secondary_ability",
 			InputUtil.Type.KEYSYM,
@@ -40,9 +47,7 @@ public final class ClientAbilityKeys {
 	}
 
 	public static KeyBinding primaryBinding() {
-		KeyBinding binding = staticKeyBinding("org.BsXinQin.kinswathe.client.KinsWatheInitializeClient", "abilityBind");
-		if (binding != null) return binding;
-		return staticKeyBinding("org.agmas.noellesroles.client.NoellesrolesClient", "abilityBind");
+		return primaryBinding;
 	}
 
 	public static KeyBinding secondaryBinding() {
@@ -78,8 +83,11 @@ public final class ClientAbilityKeys {
 		if (type == InputUtil.Type.MOUSE) {
 			return GLFW.glfwGetMouseButton(handle, code) == GLFW.GLFW_PRESS;
 		}
-		if (type == InputUtil.Type.KEYSYM || type == InputUtil.Type.SCANCODE) {
-			return InputUtil.isKeyPressed(handle, code);
+		if (type == InputUtil.Type.KEYSYM) {
+			return GLFW.glfwGetKey(handle, code) == GLFW.GLFW_PRESS;
+		}
+		if (type == InputUtil.Type.SCANCODE) {
+			return binding.isPressed();
 		}
 		return binding.isPressed();
 	}

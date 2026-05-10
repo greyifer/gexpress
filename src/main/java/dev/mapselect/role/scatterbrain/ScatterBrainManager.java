@@ -5,6 +5,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.ScatterBrainUsePayload;
@@ -97,7 +98,7 @@ public final class ScatterBrainManager {
 		}
 
 		if (scattered == 0) {
-			scatterBrain.sendMessage(Text.literal("Scatter Brain could not find safe spots at this height."), true);
+			scatterBrain.sendMessage(Text.literal("Scatter Brain could not find safe spots nearby."), true);
 			return;
 		}
 
@@ -162,11 +163,15 @@ public final class ScatterBrainManager {
 
 	private static Vec3d findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points) {
 		double y = player.getY();
-		for (int attempt = 0; attempt < 64; attempt++) {
+		double[] yOffsets = { 0.0D, 1.0D, -1.0D, 2.0D, -2.0D, 3.0D, -3.0D, 4.0D, -4.0D, 6.0D, -6.0D };
+		for (int attempt = 0; attempt < 96; attempt++) {
 			TargetPoint target = points.get(RANDOM.nextInt(points.size()));
-			BlockPos origin = BlockPos.ofFloored(target.x(), y, target.z());
-			Vec3d safe = safeAround(world, player, origin, y);
-			if (safe != null) return safe;
+			for (double yOffset : yOffsets) {
+				double candidateY = y + yOffset;
+				BlockPos origin = BlockPos.ofFloored(target.x(), candidateY, target.z());
+				Vec3d safe = safeAround(world, player, origin, candidateY);
+				if (safe != null) return safe;
+			}
 		}
 		return null;
 	}
@@ -245,7 +250,11 @@ public final class ScatterBrainManager {
 	}
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity user) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(user);
+		if (GexpressTestState.isRoleTester(user)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static long secondsCeil(long ticks) {

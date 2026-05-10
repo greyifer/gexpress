@@ -8,6 +8,7 @@ import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.mafia.MafiaManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -42,7 +43,7 @@ public final class PassiveMoney {
 		if (base <= 0) return;
 		lastGrantTick = world.getTime();
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (!GameFunctions.isPlayerAliveAndSurvival(player)) continue;
+			if (!DeadPlayerStatus.isLivingRoundParticipant(player)) continue;
 			int money = amountFor(game, player);
 			if (money <= 0) continue;
 			PlayerShopComponent.KEY.get(player).addToBalance(money);

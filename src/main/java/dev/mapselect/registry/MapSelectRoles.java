@@ -24,6 +24,7 @@ public final class MapSelectRoles {
 	public static final Identifier TRACKER_ID = Identifier.of(MapSelect.MOD_ID, "tracker");
 	public static final Identifier ALTRUIST_ID = Identifier.of(MapSelect.MOD_ID, "altruist");
 	public static final Identifier SPY_ID = Identifier.of(MapSelect.MOD_ID, "spy");
+	public static final Identifier BODYGUARD_ID = Identifier.of(MapSelect.MOD_ID, "bodyguard");
 	public static final Identifier GODFATHER_ID = Identifier.of(MapSelect.MOD_ID, "godfather");
 	public static final Identifier MAFIOSO_ID = Identifier.of(MapSelect.MOD_ID, "mafioso");
 	public static final Identifier JANITOR_ID = Identifier.of(MapSelect.MOD_ID, "janitor");
@@ -45,6 +46,7 @@ public final class MapSelectRoles {
 	public static Role TRACKER;
 	public static Role ALTRUIST;
 	public static Role SPY;
+	public static Role BODYGUARD;
 	public static Role GODFATHER;
 	public static Role MAFIOSO;
 	public static Role JANITOR;
@@ -216,6 +218,16 @@ public final class MapSelectRoles {
 		SPY = WatheRoles.registerRole(new Role(
 			SPY_ID,
 			0x2E6F9E,
+			true,
+			false,
+			Role.MoodType.REAL,
+			GameConstants.getInTicks(0, 10),
+			false
+		));
+
+		BODYGUARD = WatheRoles.registerRole(new Role(
+			BODYGUARD_ID,
+			0x5E8EE8,
 			true,
 			false,
 			Role.MoodType.REAL,

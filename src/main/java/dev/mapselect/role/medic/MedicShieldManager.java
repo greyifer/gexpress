@@ -6,9 +6,11 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.MedicShieldFlashPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -83,6 +85,7 @@ public final class MedicShieldManager {
 			SoundEvents.BLOCK_BEACON_POWER_SELECT, SoundCategory.PLAYERS, 0.75F, 1.7F);
 		medic.sendMessage(Text.literal("Shielded " + target.getName().getString() + "."), true);
 		target.sendMessage(Text.literal("A Medic shield is protecting you."), true);
+		SpyManager.recordInteraction(medic, target);
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity medic) {
@@ -183,7 +186,11 @@ public final class MedicShieldManager {
 	}
 
 	private static boolean isPlayableForMedic(PlayerEntity player, PlayerEntity medic) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(medic);
+		if (GexpressTestState.isRoleTester(medic)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static long secondsCeil(long ticks) {

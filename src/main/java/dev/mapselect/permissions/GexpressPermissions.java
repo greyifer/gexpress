@@ -16,6 +16,9 @@ import net.minecraft.util.Formatting;
 import net.minecraft.world.World;
 
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 public final class GexpressPermissions {
@@ -55,7 +58,7 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean isTrusted(PlayerEntity player) {
-		return TrustedComponent.isTrusted(player);
+		return TrustedComponent.isTrusted(player) || effectiveTags(player).contains(PlayerTag.TRUSTED);
 	}
 
 	public static boolean isBuilder(PlayerEntity player) {
@@ -64,15 +67,19 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean isStaff(PlayerEntity player) {
-		return effectiveTag(player) == PlayerTag.STAFF;
+		return effectiveTags(player).contains(PlayerTag.STAFF);
 	}
 
 	public static boolean isOwner(PlayerEntity player) {
-		return effectiveTag(player) == PlayerTag.OWNER;
+		return effectiveTags(player).contains(PlayerTag.OWNER);
 	}
 
 	public static boolean canUseAdminCommands(ServerCommandSource source) {
 		return source.hasPermissionLevel(2) || isOwner(source.getPlayer()) || isDev(source.getPlayer()) || isStaff(source.getPlayer());
+	}
+
+	public static boolean canEditTags(ServerCommandSource source) {
+		return source.getEntity() instanceof PlayerEntity player && isDev(player);
 	}
 
 	public static boolean canUseHostCommands(ServerCommandSource source) {
@@ -119,36 +126,58 @@ public final class GexpressPermissions {
 	}
 
 	public static MutableText displayName(PlayerEntity player) {
-		return Text.empty()
-			.append(badgeFor(player))
-			.append(Text.literal(" "))
-			.append(Text.literal(player.getGameProfile().getName()));
+		MutableText out = Text.empty();
+		for (PlayerTag tag : topDisplayTags(player)) {
+			if (!out.getString().isEmpty()) out.append(Text.literal(" "));
+			out.append(tagBadge(tag));
+		}
+		if (!out.getString().isEmpty()) out.append(Text.literal(" "));
+		return out.append(Text.literal(player.getGameProfile().getName()));
 	}
 
 	private static Text badgeFor(PlayerEntity player) {
 		return tagBadge(effectiveTag(player));
 	}
 
+	public static List<PlayerTag> topDisplayTags(PlayerEntity player) {
+		List<PlayerTag> tags = effectiveTags(player);
+		if (tags.isEmpty()) return List.of(PlayerTag.PASSENGER);
+		return tags.stream().limit(2).toList();
+	}
+
 	public static PlayerTag effectiveTag(PlayerEntity player) {
 		if (player == null) return PlayerTag.PASSENGER;
-		return effectiveTag(player.getWorld(), player.getUuid(), player.getGameProfile().getName());
+		List<PlayerTag> tags = effectiveTags(player);
+		return tags.isEmpty() ? PlayerTag.PASSENGER : tags.getFirst();
 	}
 
 	public static PlayerTag effectiveTag(World world, UUID uuid, String name) {
+		List<PlayerTag> tags = effectiveTags(world, uuid, name);
+		return tags.isEmpty() ? PlayerTag.PASSENGER : tags.getFirst();
+	}
+
+	public static List<PlayerTag> effectiveTags(PlayerEntity player) {
+		if (player == null) return List.of(PlayerTag.PASSENGER);
+		return effectiveTags(player.getWorld(), player.getUuid(), player.getGameProfile().getName());
+	}
+
+	public static List<PlayerTag> effectiveTags(World world, UUID uuid, String name) {
+		List<PlayerTag> out = new ArrayList<>();
 		if (world != null) {
 			PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(world);
-			PlayerTag explicit = tags == null ? null : tags.getTag(uuid);
-			if (explicit == PlayerTag.OWNER) return PlayerTag.OWNER;
-			if (isDevUuid(uuid) || isDevName(name)) return PlayerTag.DEV;
-			if (explicit == PlayerTag.STAFF) return PlayerTag.STAFF;
+			if (tags != null) out.addAll(tags.getPlayerTags(uuid));
+			if (isDevUuid(uuid) || isDevName(name)) out.add(PlayerTag.DEV);
 			HostComponent hosts = HostComponent.KEY.getNullable(world);
-			if (hosts != null && hosts.isHost(uuid)) return PlayerTag.HOST;
+			if (hosts != null && hosts.isHost(uuid)) out.add(PlayerTag.HOST);
 			TrustedComponent trusted = TrustedComponent.KEY.getNullable(world);
-			if (trusted != null && trusted.isTrusted(uuid)) return PlayerTag.TRUSTED;
-			if (explicit != null) return explicit;
+			if (trusted != null && trusted.isTrusted(uuid)) out.add(PlayerTag.TRUSTED);
 		}
-		if (isDevUuid(uuid) || isDevName(name)) return PlayerTag.DEV;
-		return PlayerTag.PASSENGER;
+		if (isDevUuid(uuid) || isDevName(name)) out.add(PlayerTag.DEV);
+		if (out.isEmpty()) out.add(PlayerTag.PASSENGER);
+		return out.stream()
+			.distinct()
+			.sorted(Comparator.comparingInt(PlayerTag::priority).reversed())
+			.toList();
 	}
 
 	public static Text tagBadge(PlayerTag tag) {

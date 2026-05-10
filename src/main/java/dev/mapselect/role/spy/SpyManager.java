@@ -1,12 +1,14 @@
 package dev.mapselect.role.spy;
 
 import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerMoodComponent;
 import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.SpyFeedPayload;
 import dev.mapselect.network.SpyStatusPayload;
 import dev.mapselect.network.SpyUsePayload;
@@ -24,6 +26,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
@@ -54,6 +57,7 @@ public final class SpyManager {
 			}
 			return ActionResult.PASS;
 		});
+		AllowPlayerDeath.EVENT.register(SpyManager::recordDeathInteraction);
 		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clear(world));
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear(world));
 	}
@@ -103,7 +107,7 @@ public final class SpyManager {
 			Bug bug = entry.getValue();
 			ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(bug.targetId());
 			if (spy == null || target == null || spy.getWorld() != world || target.getWorld() != world
-					|| bug.expiresAtTick() <= now || !isSpy(spy) || !GameFunctions.isPlayerAliveAndSurvival(spy)
+					|| bug.expiresAtTick() <= now || !isSpy(spy) || !DeadPlayerStatus.isLivingRoundParticipant(spy)
 					|| !isPlayable(target, spy)) {
 				iterator.remove();
 			}
@@ -136,18 +140,34 @@ public final class SpyManager {
 
 	private static void recordInteraction(ServerPlayerEntity actor, Entity entity) {
 		if (!(entity instanceof ServerPlayerEntity other) || actor == other) return;
-		if (!isPlayable(actor, actor)) return;
+		recordInteraction(actor, other);
+	}
+
+	public static void recordInteraction(ServerPlayerEntity actor, ServerPlayerEntity other) {
+		if (actor == null || other == null || actor == other) return;
+		if (!isPlayable(actor, actor) || !isPlayable(other, actor)) return;
 		sendToSpies(actor, actor.getName().getString() + " interacted with " + other.getName().getString() + ".");
+	}
+
+	private static boolean recordDeathInteraction(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
+		if (victim instanceof ServerPlayerEntity target && killer instanceof ServerPlayerEntity actor && actor != target) {
+			recordInteraction(actor, target);
+		}
+		return true;
 	}
 
 	private static void sendToSpies(ServerPlayerEntity target, String line) {
 		if (target == null || line == null || line.isBlank()) return;
+		if (!DeadPlayerStatus.isLivingRoundParticipant(target) && !GexpressTestState.isRoleTester(target)) return;
 		long now = target.getWorld().getTime();
 		for (Map.Entry<UUID, Bug> entry : new LinkedHashMap<>(bugsBySpy).entrySet()) {
 			Bug bug = entry.getValue();
 			if (!target.getUuid().equals(bug.targetId()) || bug.expiresAtTick() <= now) continue;
 			ServerPlayerEntity spy = target.getServer().getPlayerManager().getPlayer(entry.getKey());
-			if (spy == null || spy.getWorld() != target.getWorld() || !isSpy(spy)) continue;
+			if (spy == null || spy.getWorld() != target.getWorld() || !isSpy(spy)
+					|| (!DeadPlayerStatus.isLivingRoundParticipant(spy) && !GexpressTestState.isRoleTester(spy))) {
+				continue;
+			}
 			String throttleKey = spy.getUuid() + ":" + target.getUuid() + ":" + line;
 			if (now < nextLineTick.getOrDefault(throttleKey, 0L)) continue;
 			nextLineTick.put(throttleKey, now + 20L);
@@ -209,7 +229,11 @@ public final class SpyManager {
 	}
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity user) {
-		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(user);
+		if (GexpressTestState.isRoleTester(user)) return true;
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
+		}
+		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
 	private static void clear() {

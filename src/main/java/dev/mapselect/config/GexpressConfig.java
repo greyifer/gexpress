@@ -183,6 +183,8 @@ public final class GexpressConfig {
 	public static boolean lastDeathShieldEnabled = false;
 	/** Whether guardian angel can be assigned to killer, neutral, or Mafia players. */
 	public static boolean guardianAngelAllowNonInnocents = false;
+	/** Whether Bodyguard protect targets are limited to civilian-side players. */
+	public static boolean bodyguardProtectOnlyCivilians = true;
 	/** Whether G'Express uses fixed max Killer/Vigilante counts instead of per-player scaling. */
 	public static boolean useCustomRoleCounts = true;
 	/** Maximum number of normal killer-team players assigned by G'Express role assignment. */
@@ -784,6 +786,10 @@ public final class GexpressConfig {
 		return guardianAngelAllowNonInnocents;
 	}
 
+	public static boolean isBodyguardProtectOnlyCivilians() {
+		return bodyguardProtectOnlyCivilians;
+	}
+
 	public static boolean useCustomRoleCounts() {
 		return useCustomRoleCounts;
 	}
@@ -1102,6 +1108,7 @@ public final class GexpressConfig {
 			janitorCleanCooldownAfterKillSeconds = snap.janitorCleanCooldownAfterKillSeconds;
 			lastDeathShieldEnabled = snap.lastDeathShieldEnabled;
 			guardianAngelAllowNonInnocents = snap.guardianAngelAllowNonInnocents;
+			bodyguardProtectOnlyCivilians = snap.bodyguardProtectOnlyCivilians;
 			useCustomRoleCounts = snap.useCustomRoleCounts;
 			maxKillerAmount = snap.maxKillerAmount;
 			maxVigilanteAmount = snap.maxVigilanteAmount;
@@ -1228,6 +1235,7 @@ public final class GexpressConfig {
 			snap.janitorCleanCooldownAfterKillSeconds = janitorCleanCooldownAfterKillSeconds;
 			snap.lastDeathShieldEnabled = lastDeathShieldEnabled;
 			snap.guardianAngelAllowNonInnocents = guardianAngelAllowNonInnocents;
+			snap.bodyguardProtectOnlyCivilians = bodyguardProtectOnlyCivilians;
 			snap.useCustomRoleCounts = useCustomRoleCounts;
 			snap.maxKillerAmount = maxKillerAmount;
 			snap.maxVigilanteAmount = maxVigilanteAmount;
@@ -1682,6 +1690,7 @@ public final class GexpressConfig {
 		int janitorCleanCooldownAfterKillSeconds = 45;
 		boolean lastDeathShieldEnabled = false;
 		boolean guardianAngelAllowNonInnocents = false;
+		boolean bodyguardProtectOnlyCivilians = true;
 		boolean useCustomRoleCounts = true;
 		int maxKillerAmount = 64;
 		int maxVigilanteAmount = 1;

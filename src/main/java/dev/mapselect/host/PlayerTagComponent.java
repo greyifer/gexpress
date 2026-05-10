@@ -13,8 +13,10 @@ import org.ladysnake.cca.api.v3.component.ComponentRegistry;
 import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class PlayerTagComponent implements AutoSyncedComponent {
@@ -24,18 +26,27 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	);
 
 	private final World world;
-	private final Map<UUID, PlayerTag> tags = new LinkedHashMap<>();
+	private final Map<UUID, LinkedHashSet<PlayerTag>> tags = new LinkedHashMap<>();
 
 	public PlayerTagComponent(World world) {
 		this.world = world;
 	}
 
 	public PlayerTag getTag(UUID uuid) {
-		return uuid == null ? null : tags.get(uuid);
+		Set<PlayerTag> current = getPlayerTags(uuid);
+		return current.stream().max((a, b) -> Integer.compare(a.priority(), b.priority())).orElse(null);
 	}
 
 	public Map<UUID, PlayerTag> getTags() {
-		return Collections.unmodifiableMap(tags);
+		Map<UUID, PlayerTag> out = new LinkedHashMap<>();
+		for (UUID uuid : tags.keySet()) out.put(uuid, getTag(uuid));
+		return Collections.unmodifiableMap(out);
+	}
+
+	public Set<PlayerTag> getPlayerTags(UUID uuid) {
+		if (uuid == null) return Set.of();
+		LinkedHashSet<PlayerTag> current = tags.get(uuid);
+		return current == null ? Set.of() : Collections.unmodifiableSet(current);
 	}
 
 	public boolean setTag(UUID uuid, PlayerTag tag) {
@@ -44,8 +55,30 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 				|| tag == PlayerTag.TRUSTED || tag == PlayerTag.DEV) {
 			return clearTag(uuid);
 		}
-		PlayerTag old = tags.put(uuid, tag);
-		if (old == tag) return false;
+		LinkedHashSet<PlayerTag> next = new LinkedHashSet<>();
+		next.add(tag);
+		LinkedHashSet<PlayerTag> old = tags.put(uuid, next);
+		if (old != null && old.size() == 1 && old.contains(tag)) return false;
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean addTag(UUID uuid, PlayerTag tag) {
+		if (uuid == null || tag == null || tag == PlayerTag.PASSENGER
+				|| tag == PlayerTag.HOST || tag == PlayerTag.TRUSTED || tag == PlayerTag.DEV) {
+			return false;
+		}
+		boolean changed = tags.computeIfAbsent(uuid, id -> new LinkedHashSet<>()).add(tag);
+		if (!changed) return false;
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean removeTag(UUID uuid, PlayerTag tag) {
+		if (uuid == null || tag == null) return false;
+		LinkedHashSet<PlayerTag> current = tags.get(uuid);
+		if (current == null || !current.remove(tag)) return false;
+		if (current.isEmpty()) tags.remove(uuid);
 		KEY.sync(world);
 		return true;
 	}
@@ -70,7 +103,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 						&& playerTag != PlayerTag.HOST
 						&& playerTag != PlayerTag.TRUSTED
 						&& playerTag != PlayerTag.DEV) {
-					tags.put(uuid, playerTag);
+					tags.computeIfAbsent(uuid, id -> new LinkedHashSet<>()).add(playerTag);
 				}
 			} catch (IllegalArgumentException ignored) {
 			}
@@ -80,11 +113,13 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	@Override
 	public void writeToNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		NbtList list = new NbtList();
-		for (Map.Entry<UUID, PlayerTag> entry : tags.entrySet()) {
-			NbtCompound out = new NbtCompound();
-			out.putString("player", entry.getKey().toString());
-			out.putString("tag", entry.getValue().id());
-			list.add(out);
+		for (Map.Entry<UUID, LinkedHashSet<PlayerTag>> entry : tags.entrySet()) {
+			for (PlayerTag playerTag : entry.getValue()) {
+				NbtCompound out = new NbtCompound();
+				out.putString("player", entry.getKey().toString());
+				out.putString("tag", playerTag.id());
+				list.add(out);
+			}
 		}
 		tag.put("tags", list);
 	}
