@@ -5,6 +5,7 @@
 - Added the Bodyguard civilian role with an assigned protect target and a temporary proximity revolver.
 - Added a dedicated Skins tab for choosing unlocked Knife and Gun skins.
 - Added `/g group skins give/remove/equip/list` commands for managing and equipping weapon skins.
+- Added 3D revolver skins for Passenger, Cola, Gold, Jem, and Dev.
 
 ## Changed
 
@@ -21,6 +22,7 @@
 - Spy bugs now report ability and kill interactions involving the bugged player.
 - Spy, role ability, and passive-money targeting now consistently ignore dead players.
 - Harlequin voice pitch now avoids unchanged pitch rolls and no longer snaps near-normal values back to normal.
+- Fixed the Skins tab default preview inheriting the currently equipped skin.
 
 # Grey's Express 1.4.8
 

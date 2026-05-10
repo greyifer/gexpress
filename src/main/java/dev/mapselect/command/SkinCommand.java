@@ -65,12 +65,12 @@ public final class SkinCommand {
 
 	private static CompletableFuture<Suggestions> suggestSkins(CommandContext<ServerCommandSource> ctx,
 			SuggestionsBuilder builder) {
-		return CommandSource.suggestMatching(SKINS, builder);
+		return CommandSource.suggestMatching(skinsForType(ctx, true), builder);
 	}
 
 	private static CompletableFuture<Suggestions> suggestGrantableSkins(CommandContext<ServerCommandSource> ctx,
 			SuggestionsBuilder builder) {
-		return CommandSource.suggestMatching(SKINS.stream().filter(id -> !"default".equals(id)).toList(), builder);
+		return CommandSource.suggestMatching(skinsForType(ctx, false), builder);
 	}
 
 	private static int runEquip(CommandContext<ServerCommandSource> ctx)
@@ -80,6 +80,10 @@ public final class SkinCommand {
 		WeaponSkin skin = skin(ctx);
 		if (type == null || skin == null) {
 			ctx.getSource().sendError(Text.literal("Use type knife/gun and skin " + String.join(", ", SKINS) + "."));
+			return 0;
+		}
+		if (!skin.supports(type)) {
+			ctx.getSource().sendError(Text.literal(skin.displayName() + " is not a " + type.displayName() + " skin."));
 			return 0;
 		}
 		PlayerSkinComponent component = PlayerSkinComponent.KEY.get(player.getServerWorld());
@@ -98,7 +102,7 @@ public final class SkinCommand {
 			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
 		WeaponSkinType type = type(ctx);
 		WeaponSkin skin = skin(ctx);
-		if (type == null || skin == null || skin == WeaponSkin.DEFAULT) {
+		if (type == null || skin == null || skin == WeaponSkin.DEFAULT || !skin.supports(type)) {
 			ctx.getSource().sendError(Text.literal("Use type knife/gun and a non-default skin."));
 			return 0;
 		}
@@ -136,5 +140,15 @@ public final class SkinCommand {
 
 	private static WeaponSkin skin(CommandContext<ServerCommandSource> ctx) {
 		return WeaponSkin.byId(StringArgumentType.getString(ctx, "skin"));
+	}
+
+	private static List<String> skinsForType(CommandContext<ServerCommandSource> ctx, boolean includeDefault) {
+		WeaponSkinType type = type(ctx);
+		if (type == null) return includeDefault ? SKINS : SKINS.stream().filter(id -> !"default".equals(id)).toList();
+		return Arrays.stream(WeaponSkin.values())
+			.filter(skin -> includeDefault || skin != WeaponSkin.DEFAULT)
+			.filter(skin -> skin.supports(type))
+			.map(WeaponSkin::id)
+			.toList();
 	}
 }

@@ -257,11 +257,9 @@ public final class GexpressSkinsCategory {
 
 		private ItemStack previewStack(WeaponSkinType type, WeaponSkin skin) {
 			ItemStack stack = (type == WeaponSkinType.KNIFE ? WatheItems.KNIFE : WatheItems.REVOLVER).getDefaultStack();
-			if (skin != null && skin != WeaponSkin.DEFAULT) {
-				NbtCompound tag = new NbtCompound();
-				tag.putString(DevWeaponModels.SKIN_PREVIEW_KEY, skin.id());
-				stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(tag));
-			}
+			NbtCompound tag = new NbtCompound();
+			tag.putString(DevWeaponModels.SKIN_PREVIEW_KEY, (skin == null ? WeaponSkin.DEFAULT : skin).id());
+			stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(tag));
 			return stack;
 		}
 

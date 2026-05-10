@@ -1,0 +1,7 @@
+{
+	"parent": "gexpress:item/revolver_base",
+	"textures": {
+		"0": "gexpress:item/revolver_gold",
+		"particle": "gexpress:item/revolver_gold"
+	}
+}

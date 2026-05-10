@@ -35,11 +35,15 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 	public Set<WeaponSkin> unlocked(UUID playerId, WeaponSkinType type) {
 		if (playerId == null || type == null) return Set.of(WeaponSkin.DEFAULT);
 		LinkedHashSet<WeaponSkin> out = new LinkedHashSet<>();
-		out.add(WeaponSkin.DEFAULT);
+		if (WeaponSkin.DEFAULT.supports(type)) out.add(WeaponSkin.DEFAULT);
 		EnumMap<WeaponSkinType, LinkedHashSet<WeaponSkin>> byType = unlockedByPlayer.get(playerId);
 		if (byType != null) {
 			Set<WeaponSkin> stored = byType.get(type);
-			if (stored != null) out.addAll(stored);
+			if (stored != null) {
+				for (WeaponSkin skin : stored) {
+					if (skin != null && skin.supports(type)) out.add(skin);
+				}
+			}
 		}
 		return Collections.unmodifiableSet(out);
 	}
@@ -77,6 +81,7 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 
 	public boolean isUnlocked(UUID playerId, WeaponSkinType type, WeaponSkin skin) {
 		if (playerId == null || type == null || skin == null) return false;
+		if (!skin.supports(type)) return false;
 		if (skin.unlockedByDefault()) return true;
 		EnumMap<WeaponSkinType, LinkedHashSet<WeaponSkin>> byType = unlockedByPlayer.get(playerId);
 		Set<WeaponSkin> unlocked = byType == null ? null : byType.get(type);
@@ -84,7 +89,7 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 	}
 
 	public boolean give(UUID playerId, WeaponSkinType type, WeaponSkin skin) {
-		if (playerId == null || type == null || skin == null || skin == WeaponSkin.DEFAULT) return false;
+		if (playerId == null || type == null || skin == null || skin == WeaponSkin.DEFAULT || !skin.supports(type)) return false;
 		boolean changed = unlockedByPlayer
 			.computeIfAbsent(playerId, id -> new EnumMap<>(WeaponSkinType.class))
 			.computeIfAbsent(type, ignored -> new LinkedHashSet<>())
@@ -94,7 +99,7 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 	}
 
 	public boolean remove(UUID playerId, WeaponSkinType type, WeaponSkin skin) {
-		if (playerId == null || type == null || skin == null || skin == WeaponSkin.DEFAULT) return false;
+		if (playerId == null || type == null || skin == null || skin == WeaponSkin.DEFAULT || !skin.supports(type)) return false;
 		EnumMap<WeaponSkinType, LinkedHashSet<WeaponSkin>> byType = unlockedByPlayer.get(playerId);
 		Set<WeaponSkin> unlocked = byType == null ? null : byType.get(type);
 		if (unlocked == null || !unlocked.remove(skin)) return false;
@@ -125,7 +130,7 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 			UUID playerId = parseUuid(entry.getString("player"));
 			WeaponSkinType type = WeaponSkinType.byId(entry.getString("type"));
 			WeaponSkin skin = WeaponSkin.byId(entry.getString("skin"));
-			if (playerId != null && type != null && skin != null && skin != WeaponSkin.DEFAULT) {
+			if (playerId != null && type != null && skin != null && skin != WeaponSkin.DEFAULT && skin.supports(type)) {
 				unlockedByPlayer.computeIfAbsent(playerId, id -> new EnumMap<>(WeaponSkinType.class))
 					.computeIfAbsent(type, ignored -> new LinkedHashSet<>())
 					.add(skin);
