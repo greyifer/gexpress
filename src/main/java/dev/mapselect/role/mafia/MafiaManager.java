@@ -613,6 +613,35 @@ public final class MafiaManager {
 		return remaining;
 	}
 
+	public static void reduceCooldowns(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L) return;
+		if (isGodfather(player)) {
+			Slots slots = slotsByGodfather.get(player.getUuid());
+			if (slots != null) {
+				reduceRecruitCooldown(player, slots, SlotType.MAFIOSO, ticks);
+				reduceRecruitCooldown(player, slots, SlotType.JANITOR, ticks);
+			}
+		}
+		if (isJanitor(player)) {
+			long remaining = janitorCleanRemaining(player);
+			if (remaining > 0L) {
+				long next = Math.max(0L, remaining - ticks);
+				if (next <= 0L) janitorCleanCooldownUntil.remove(player.getUuid());
+				else janitorCleanCooldownUntil.put(player.getUuid(), player.getWorld().getTime() + next);
+				syncJanitorCleanCooldown(player);
+			}
+		}
+	}
+
+	private static void reduceRecruitCooldown(ServerPlayerEntity godfather, Slots slots, SlotType type, long ticks) {
+		long remaining = replacementRemaining(godfather, slots, type);
+		if (remaining <= 0L) return;
+		long next = Math.max(0L, remaining - ticks);
+		if (type == SlotType.MAFIOSO) slots.mafiosoReadyTick = next <= 0L ? 0L : godfather.getWorld().getTime() + next;
+		else slots.janitorReadyTick = next <= 0L ? 0L : godfather.getWorld().getTime() + next;
+		syncRecruitCooldown(godfather, slots, type, next);
+	}
+
 	private static void syncRecruitCooldowns(ServerPlayerEntity godfather) {
 		Slots slots = slotsByGodfather.get(godfather.getUuid());
 		if (slots == null) return;

@@ -49,6 +49,14 @@ public class WarlockComponent implements AutoSyncedComponent {
 		return cooldownRemainingTicks(killCooldownUntil, warlock);
 	}
 
+	public long reduceMarkCooldown(UUID warlock, long ticks) {
+		return reduceCooldown(markCooldownUntil, warlock, ticks);
+	}
+
+	public long reduceKillCooldown(UUID warlock, long ticks) {
+		return reduceCooldown(killCooldownUntil, warlock, ticks);
+	}
+
 	public boolean assignMark(UUID warlock, UUID target) {
 		if (warlock == null || target == null || warlock.equals(target)) return false;
 		warlockToMark.put(warlock, target);
@@ -125,6 +133,23 @@ public class WarlockComponent implements AutoSyncedComponent {
 		Long until = cooldowns.get(warlock);
 		if (until == null) return 0L;
 		return Math.max(0L, until - world.getTime());
+	}
+
+	private long reduceCooldown(Map<UUID, Long> cooldowns, UUID warlock, long ticks) {
+		if (warlock == null || ticks <= 0L) return cooldownRemainingTicks(cooldowns, warlock);
+		Long until = cooldowns.get(warlock);
+		if (until == null) return 0L;
+		long remaining = until - world.getTime();
+		if (remaining <= 0L) {
+			cooldowns.remove(warlock);
+			KEY.sync(world);
+			return 0L;
+		}
+		long nextRemaining = Math.max(0L, remaining - ticks);
+		if (nextRemaining <= 0L) cooldowns.remove(warlock);
+		else cooldowns.put(warlock, world.getTime() + nextRemaining);
+		KEY.sync(world);
+		return nextRemaining;
 	}
 
 	private static void readCooldowns(NbtList list, Map<UUID, Long> out) {

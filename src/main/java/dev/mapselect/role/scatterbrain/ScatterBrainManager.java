@@ -28,7 +28,9 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
 
 import java.io.IOException;
@@ -162,30 +164,52 @@ public final class ScatterBrainManager {
 	}
 
 	private static Vec3d findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points) {
-		double y = player.getY();
-		double[] yOffsets = { 0.0D, 1.0D, -1.0D, 2.0D, -2.0D, 3.0D, -3.0D, 4.0D, -4.0D, 6.0D, -6.0D };
-		for (int attempt = 0; attempt < 96; attempt++) {
+		int playerY = MathHelper.floor(player.getY());
+		for (int attempt = 0; attempt < 160; attempt++) {
 			TargetPoint target = points.get(RANDOM.nextInt(points.size()));
-			for (double yOffset : yOffsets) {
-				double candidateY = y + yOffset;
-				BlockPos origin = BlockPos.ofFloored(target.x(), candidateY, target.z());
-				Vec3d safe = safeAround(world, player, origin, candidateY);
-				if (safe != null) return safe;
-			}
+			int x = MathHelper.floor(target.x());
+			int z = MathHelper.floor(target.z());
+			int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+			Vec3d safe = safeAround(world, player, new BlockPos(x, playerY, z), playerY, topY);
+			if (safe != null) return safe;
 		}
 		return null;
 	}
 
-	private static Vec3d safeAround(ServerWorld world, ServerPlayerEntity player, BlockPos origin, double y) {
-		for (int radius = 0; radius <= 8; radius++) {
+	private static Vec3d safeAround(ServerWorld world, ServerPlayerEntity player, BlockPos origin, int playerY,
+			int topY) {
+		for (int radius = 0; radius <= 12; radius++) {
 			for (int dx = -radius; dx <= radius; dx++) {
 				for (int dz = -radius; dz <= radius; dz++) {
 					if (Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
 					BlockPos pos = origin.add(dx, 0, dz);
 					double x = pos.getX() + 0.5D;
 					double z = pos.getZ() + 0.5D;
-					if (isSafe(world, player, x, y, z)) return new Vec3d(x, y, z);
+					Vec3d safe = safeYInColumn(world, player, x, z, playerY, topY);
+					if (safe != null) return safe;
 				}
+			}
+		}
+		return null;
+	}
+
+	private static Vec3d safeYInColumn(ServerWorld world, ServerPlayerEntity player, double x, double z, int playerY,
+			int seedTopY) {
+		int columnTopY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, MathHelper.floor(x), MathHelper.floor(z));
+		int minY = Math.max(world.getBottomY() + 1, Math.min(Math.min(playerY, seedTopY), columnTopY) - 18);
+		int maxY = Math.min(world.getTopY() - 2, Math.max(Math.max(playerY, seedTopY), columnTopY) + 18);
+		int[] seeds = { playerY, columnTopY, seedTopY, playerY + 1, playerY - 1, columnTopY + 1, columnTopY - 1 };
+		for (int seed : seeds) {
+			if (seed >= minY && seed <= maxY && isSafe(world, player, x, seed, z)) {
+				return new Vec3d(x, seed, z);
+			}
+		}
+		for (int offset = 0; offset <= Math.max(maxY - playerY, playerY - minY); offset++) {
+			int up = playerY + offset;
+			if (up >= minY && up <= maxY && isSafe(world, player, x, up, z)) return new Vec3d(x, up, z);
+			int down = playerY - offset;
+			if (offset != 0 && down >= minY && down <= maxY && isSafe(world, player, x, down, z)) {
+				return new Vec3d(x, down, z);
 			}
 		}
 		return null;
@@ -235,6 +259,22 @@ public final class ScatterBrainManager {
 			return 0L;
 		}
 		return remaining;
+	}
+
+	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L) return cooldownRemaining(player);
+		long remaining = cooldownRemaining(player);
+		if (remaining <= 0L) return 0L;
+		long next = Math.max(0L, remaining - ticks);
+		if (next <= 0L) {
+			cooldownUntil.remove(player.getUuid());
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.SCATTER_BRAIN_SCATTER);
+		} else {
+			cooldownUntil.put(player.getUuid(), player.getWorld().getTime() + next);
+			AbilityCooldownSync.send(player, AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, next,
+				(long) GexpressConfig.getScatterBrainCooldownSeconds() * 20L, false);
+		}
+		return next;
 	}
 
 	private static boolean isScatterBrain(PlayerEntity player) {

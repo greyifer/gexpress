@@ -13,6 +13,7 @@ import dev.mapselect.network.SpyFeedPayload;
 import dev.mapselect.network.SpyStatusPayload;
 import dev.mapselect.network.SpyUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.bodyguard.BodyguardManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.task.ConversationTask;
 import dev.mapselect.testing.GexpressTestState;
@@ -147,6 +148,7 @@ public final class SpyManager {
 		if (actor == null || other == null || actor == other) return;
 		if (!isPlayable(actor, actor) || !isPlayable(other, actor)) return;
 		sendToSpies(actor, actor.getName().getString() + " interacted with " + other.getName().getString() + ".");
+		BodyguardManager.recordInteraction(actor, other);
 	}
 
 	private static boolean recordDeathInteraction(PlayerEntity victim, PlayerEntity killer, Identifier reason) {

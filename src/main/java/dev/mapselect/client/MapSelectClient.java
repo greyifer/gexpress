@@ -64,6 +64,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientMafiaState.register();
 		ClientJanitorState.register();
 		ClientBountyHunterState.register();
+		ClientBodyguardState.register();
 		ClientGuardianAngelState.register();
 		ClientAbilityCooldownHud.register();
 		ClientPresetCache.registerClient();

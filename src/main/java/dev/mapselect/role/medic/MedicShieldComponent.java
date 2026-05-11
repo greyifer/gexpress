@@ -53,6 +53,23 @@ public class MedicShieldComponent implements AutoSyncedComponent {
 		return Math.max(0L, until - world.getTime());
 	}
 
+	public long reduceCooldown(UUID medic, long ticks) {
+		if (medic == null || ticks <= 0L) return cooldownRemainingTicks(medic);
+		Long until = medicCooldownUntil.get(medic);
+		if (until == null) return 0L;
+		long remaining = until - world.getTime();
+		if (remaining <= 0L) {
+			medicCooldownUntil.remove(medic);
+			KEY.sync(world);
+			return 0L;
+		}
+		long nextRemaining = Math.max(0L, remaining - ticks);
+		if (nextRemaining <= 0L) medicCooldownUntil.remove(medic);
+		else medicCooldownUntil.put(medic, world.getTime() + nextRemaining);
+		KEY.sync(world);
+		return nextRemaining;
+	}
+
 	public Map<UUID, UUID> getShields() {
 		return Collections.unmodifiableMap(targetToMedic);
 	}

@@ -2,6 +2,8 @@ package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.cca.PlayerMoodComponent;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.role.AbilityCooldownReducers;
+import dev.mapselect.role.bodyguard.BodyguardManager;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.task.ConversationTask;
 import dev.mapselect.task.FreshAirAreaManager;
@@ -68,6 +70,10 @@ public abstract class PlayerMoodTaskCompletionMixin {
 				setMood(Math.min(1.0F, gexpress$moodBeforeTick + gain));
 			}
 			SpyManager.recordTask(player, completedTask);
+			BodyguardManager.recordTask(player, completedTask);
+			if (player instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
+				AbilityCooldownReducers.reduceForTask(serverPlayer);
+			}
 		}
 	}
 

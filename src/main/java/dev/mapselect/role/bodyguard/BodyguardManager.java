@@ -1,19 +1,29 @@
 package dev.mapselect.role.bodyguard;
 
 import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.WatheRoles;
+import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.cca.PlayerMoodComponent;
+import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheDataComponentTypes;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.network.BodyguardFeedPayload;
+import dev.mapselect.network.BodyguardStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
@@ -35,13 +45,19 @@ public final class BodyguardManager {
 	private static final double PROTECTION_RANGE_SQUARED = 25.0D;
 	private static final String BODYGUARD_REVOLVER_KEY = "gexpress_bodyguard_revolver";
 	private static final Map<UUID, UUID> targetByBodyguard = new ConcurrentHashMap<>();
+	private static final Map<String, Long> nextLineTick = new ConcurrentHashMap<>();
+	private static final Map<UUID, MoodRestore> pendingMoodRestores = new ConcurrentHashMap<>();
 	private static int tickGate;
 
 	private BodyguardManager() {}
 
 	public static void register() {
+		PayloadTypeRegistry.playS2C().register(BodyguardStatePayload.ID, BodyguardStatePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(BodyguardFeedPayload.ID, BodyguardFeedPayload.CODEC);
 		GameEvents.ON_FINISH_INITIALIZE.register(BodyguardManager::initializeRound);
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearRound(world));
+		AllowPlayerDeath.EVENT.register(BodyguardManager::allowDeath);
+		ServerLivingEntityEvents.AFTER_DEATH.register(BodyguardManager::afterDeath);
 		ServerTickEvents.END_WORLD_TICK.register(BodyguardManager::tick);
 	}
 
@@ -59,6 +75,7 @@ public final class BodyguardManager {
 			targetByBodyguard.put(bodyguard.getUuid(), target.getUuid());
 			bodyguard.sendMessage(Text.literal("Protect " + target.getName().getString() + ".")
 				.formatted(Formatting.BLUE), false);
+			sendState(bodyguard, target);
 		}
 	}
 
@@ -77,6 +94,7 @@ public final class BodyguardManager {
 			if (!isBodyguard(bodyguard) || VultureManager.isStashed(bodyguard)
 					|| !isPlayable(bodyguard, bodyguard)) {
 				removeIssuedRevolver(bodyguard);
+				sendClear(bodyguard);
 				continue;
 			}
 			UUID targetId = targetByBodyguard.get(bodyguard.getUuid());
@@ -88,7 +106,10 @@ public final class BodyguardManager {
 				&& bodyguard.squaredDistanceTo(target) <= PROTECTION_RANGE_SQUARED;
 			if (inRange) ensureRevolver(bodyguard);
 			else removeIssuedRevolver(bodyguard);
+			if (target != null && target.getWorld() == world && isPlayable(target, bodyguard)) sendState(bodyguard, target);
+			else sendClear(bodyguard);
 		}
+		nextLineTick.entrySet().removeIf(entry -> entry.getValue() <= world.getTime() - 20L * 10L);
 	}
 
 	private static ServerPlayerEntity chooseTarget(ServerWorld world, GameWorldComponent game, ServerPlayerEntity bodyguard) {
@@ -159,13 +180,127 @@ public final class BodyguardManager {
 		}
 	}
 
+	public static void recordInteraction(ServerPlayerEntity actor, ServerPlayerEntity other) {
+		if (actor == null || other == null || actor == other) return;
+		if (!isPlayable(actor, actor) || !isPlayable(other, actor)) return;
+		for (Map.Entry<UUID, UUID> entry : targetByBodyguard.entrySet()) {
+			ServerPlayerEntity bodyguard = actor.getServer().getPlayerManager().getPlayer(entry.getKey());
+			if (bodyguard == null || bodyguard == actor || bodyguard == other || !isBodyguard(bodyguard)
+					|| !isPlayable(bodyguard, bodyguard)) continue;
+			if (actor.getUuid().equals(entry.getValue())) {
+				sendFeed(bodyguard, actor.getName().getString() + " interacted with " + other.getName().getString() + ".");
+			} else if (other.getUuid().equals(entry.getValue())) {
+				sendFeed(bodyguard, actor.getName().getString() + " interacted with " + other.getName().getString() + ".");
+			}
+		}
+	}
+
+	public static void recordTask(PlayerEntity player, PlayerMoodComponent.TrainTask task) {
+		if (!(player instanceof ServerPlayerEntity target) || task == null) return;
+		String action = switch (task.getType()) {
+			case SLEEP -> "slept";
+			case OUTSIDE -> "got fresh air";
+			case EAT -> "ate";
+			case DRINK -> "drank";
+		};
+		for (Map.Entry<UUID, UUID> entry : targetByBodyguard.entrySet()) {
+			if (!target.getUuid().equals(entry.getValue())) continue;
+			ServerPlayerEntity bodyguard = target.getServer().getPlayerManager().getPlayer(entry.getKey());
+			if (bodyguard != null && isBodyguard(bodyguard) && isPlayable(bodyguard, bodyguard)) {
+				sendFeed(bodyguard, target.getName().getString() + " " + action + ".");
+			}
+		}
+	}
+
+	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, net.minecraft.util.Identifier reason) {
+		if (victim instanceof ServerPlayerEntity target && killer instanceof ServerPlayerEntity bodyguard
+				&& isBodyguard(bodyguard) && hasIssuedRevolver(bodyguard)) {
+			GameWorldComponent game = GameWorldComponent.KEY.getNullable(target.getWorld());
+			if (game != null && isCivilianSide(game, target)) {
+				PlayerMoodComponent mood = PlayerMoodComponent.KEY.getNullable(bodyguard);
+				if (mood != null) pendingMoodRestores.put(target.getUuid(),
+					new MoodRestore(bodyguard.getUuid(), mood.getMood()));
+			}
+		}
+		return true;
+	}
+
+	private static void afterDeath(LivingEntity entity, net.minecraft.entity.damage.DamageSource source) {
+		if (!(entity instanceof ServerPlayerEntity target)) return;
+		restoreBodyguardMood(target);
+		handleProtectedTargetDeath(target);
+	}
+
+	private static void restoreBodyguardMood(ServerPlayerEntity victim) {
+		MoodRestore restore = pendingMoodRestores.remove(victim.getUuid());
+		if (restore == null || victim.getServer() == null) return;
+		ServerPlayerEntity bodyguard = victim.getServer().getPlayerManager().getPlayer(restore.bodyguardId());
+		if (bodyguard == null) return;
+		PlayerMoodComponent mood = PlayerMoodComponent.KEY.getNullable(bodyguard);
+		if (mood != null) {
+			mood.setMood(restore.mood());
+			PlayerMoodComponent.KEY.sync(bodyguard);
+		}
+	}
+
+	private static void handleProtectedTargetDeath(ServerPlayerEntity target) {
+		if (!(target.getWorld() instanceof ServerWorld world)) return;
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
+		for (Map.Entry<UUID, UUID> entry : new ArrayList<>(targetByBodyguard.entrySet())) {
+			if (!target.getUuid().equals(entry.getValue())) continue;
+			ServerPlayerEntity bodyguard = world.getServer().getPlayerManager().getPlayer(entry.getKey());
+			targetByBodyguard.remove(entry.getKey());
+			if (bodyguard == null || bodyguard.getWorld() != world) continue;
+			removeIssuedRevolver(bodyguard);
+			sendClear(bodyguard);
+			if (!isBodyguard(bodyguard) || !isPlayable(bodyguard, bodyguard)) continue;
+			if (bodyguard.squaredDistanceTo(target) <= PROTECTION_RANGE_SQUARED) {
+				sendFeed(bodyguard, target.getName().getString() + " died while you were protecting them.");
+				GameFunctions.killPlayer(bodyguard, true, target, GameConstants.DeathReasons.GENERIC);
+			} else if (game != null) {
+				game.addRole(bodyguard, WatheRoles.CIVILIAN);
+				game.sync();
+				bodyguard.sendMessage(Text.literal(target.getName().getString()
+					+ " died outside your protection range. You are now a Civilian.").formatted(Formatting.GRAY),
+					false);
+			}
+		}
+	}
+
+	private static void sendState(ServerPlayerEntity bodyguard, ServerPlayerEntity target) {
+		if (bodyguard == null || target == null || !ServerPlayNetworking.canSend(bodyguard, BodyguardStatePayload.ID)) {
+			return;
+		}
+		ServerPlayNetworking.send(bodyguard,
+			new BodyguardStatePayload(true, target.getUuid(), target.getName().getString()));
+	}
+
+	private static void sendClear(ServerPlayerEntity bodyguard) {
+		if (bodyguard != null && ServerPlayNetworking.canSend(bodyguard, BodyguardStatePayload.ID)) {
+			ServerPlayNetworking.send(bodyguard, BodyguardStatePayload.clear());
+		}
+	}
+
+	private static void sendFeed(ServerPlayerEntity bodyguard, String line) {
+		if (bodyguard == null || line == null || line.isBlank()
+				|| !ServerPlayNetworking.canSend(bodyguard, BodyguardFeedPayload.ID)) return;
+		long now = bodyguard.getWorld().getTime();
+		String throttleKey = bodyguard.getUuid() + ":" + line;
+		if (now < nextLineTick.getOrDefault(throttleKey, 0L)) return;
+		nextLineTick.put(throttleKey, now + 20L);
+		ServerPlayNetworking.send(bodyguard, new BodyguardFeedPayload(line));
+	}
+
 	private static void clearRound(World world) {
 		if (world instanceof ServerWorld serverWorld) {
 			for (ServerPlayerEntity player : serverWorld.getPlayers()) {
 				removeIssuedRevolver(player);
+				sendClear(player);
 			}
 		}
 		targetByBodyguard.clear();
+		nextLineTick.clear();
+		pendingMoodRestores.clear();
 		tickGate = 0;
 	}
 
@@ -183,4 +318,6 @@ public final class BodyguardManager {
 		}
 		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
+
+	private record MoodRestore(UUID bodyguardId, float mood) {}
 }

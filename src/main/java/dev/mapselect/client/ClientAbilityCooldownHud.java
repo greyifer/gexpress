@@ -87,7 +87,8 @@ public final class ClientAbilityCooldownHud {
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null || client.world == null || client.options.hudHidden) return;
-		if (!ClientRoleRevealState.canShowRoleHud(client)) return;
+		if (!ClientRoleRevealState.canShowRoleHud(client) || !ClientRoleRevealState.canUseRoleAbility(client)
+				|| ClientVultureState.isLocalStashed(client)) return;
 		checkSyncedWorld(client);
 
 		List<AbilityBar> bars = barsFor(client);

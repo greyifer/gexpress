@@ -59,6 +59,23 @@ public class SilentShadowComponent implements AutoSyncedComponent {
 		return Math.max(0L, until - world.getTime());
 	}
 
+	public long reduceCooldown(UUID uuid, long ticks) {
+		if (uuid == null || ticks <= 0L) return cooldownRemainingTicks(uuid);
+		Long until = cooldownUntil.get(uuid);
+		if (until == null) return 0L;
+		long remaining = until - world.getTime();
+		if (remaining <= 0L) {
+			cooldownUntil.remove(uuid);
+			KEY.sync(world);
+			return 0L;
+		}
+		long nextRemaining = Math.max(0L, remaining - ticks);
+		if (nextRemaining <= 0L) cooldownUntil.remove(uuid);
+		else cooldownUntil.put(uuid, world.getTime() + nextRemaining);
+		KEY.sync(world);
+		return nextRemaining;
+	}
+
 	public boolean activate(ServerPlayerEntity player, int durationTicks, int cooldownTicks) {
 		if (player == null || isActive(player.getUuid())) return false;
 		long now = world.getTime();

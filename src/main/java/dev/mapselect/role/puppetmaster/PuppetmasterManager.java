@@ -535,6 +535,22 @@ public final class PuppetmasterManager {
 		return remaining;
 	}
 
+	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L) return remainingCooldownTicks(player);
+		long remaining = remainingCooldownTicks(player);
+		if (remaining <= 0L) return 0L;
+		long next = Math.max(0L, remaining - ticks);
+		if (next <= 0L) {
+			cooldownUntilByController.remove(player.getUuid());
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.PUPPETMASTER_CONTROL);
+		} else {
+			cooldownUntilByController.put(player.getUuid(), player.getWorld().getTime() + next);
+			AbilityCooldownSync.send(player, AbilityCooldownPayload.PUPPETMASTER_CONTROL, next,
+				(long) GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L, false);
+		}
+		return next;
+	}
+
 	private static int remainingUses(ServerPlayerEntity player) {
 		if (player == null) return 0;
 		int maxUses = GexpressConfig.getPuppetmasterMaxUses();

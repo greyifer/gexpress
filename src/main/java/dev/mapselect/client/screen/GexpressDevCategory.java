@@ -35,6 +35,7 @@ public final class GexpressDevCategory {
 			.group(shortSightedGroup())
 			.group(medicShieldVisualsGroup())
 			.group(silentShadowVisualsGroup())
+			.group(tagEditorGroup())
 			.group(endScreenLayoutGroup())
 			.build();
 	}
@@ -214,6 +215,21 @@ public final class GexpressDevCategory {
 				.text(Text.translatable("gui.gexpress.config.option.dev.end_screen_layout.open"))
 				.action((screen, option) -> MinecraftClient.getInstance()
 					.setScreen(new GexpressEndScreenLayoutScreen(screen)))
+				.build())
+			.build();
+	}
+
+	private static OptionGroup tagEditorGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.tag_editor"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.tag_editor.tooltip")))
+			.collapsed(false)
+			.option(ButtonOption.createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.dev.tag_editor"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.tag_editor.tooltip")))
+				.text(Text.translatable("gui.gexpress.config.option.dev.tag_editor.open"))
+				.action((screen, option) -> MinecraftClient.getInstance()
+					.setScreen(new GexpressTagEditorScreen(screen)))
 				.build())
 			.build();
 	}

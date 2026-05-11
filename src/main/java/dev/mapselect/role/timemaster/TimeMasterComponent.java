@@ -42,6 +42,14 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 		return cooldownRemainingTicks(freezeCooldownUntil, playerId);
 	}
 
+	public long reduceRewindCooldown(UUID playerId, long ticks) {
+		return reduceCooldown(cooldownUntil, playerId, ticks);
+	}
+
+	public long reduceFreezeCooldown(UUID playerId, long ticks) {
+		return reduceCooldown(freezeCooldownUntil, playerId, ticks);
+	}
+
 	private long cooldownRemainingTicks(Map<UUID, Long> cooldowns, UUID playerId) {
 		if (playerId == null) return 0L;
 		Long until = cooldowns.get(playerId);
@@ -53,6 +61,23 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 			return 0L;
 		}
 		return remaining;
+	}
+
+	private long reduceCooldown(Map<UUID, Long> cooldowns, UUID playerId, long ticks) {
+		if (playerId == null || ticks <= 0L) return cooldownRemainingTicks(cooldowns, playerId);
+		Long until = cooldowns.get(playerId);
+		if (until == null) return 0L;
+		long remaining = until - world.getTime();
+		if (remaining <= 0L) {
+			cooldowns.remove(playerId);
+			KEY.sync(world);
+			return 0L;
+		}
+		long nextRemaining = Math.max(0L, remaining - ticks);
+		if (nextRemaining <= 0L) cooldowns.remove(playerId);
+		else cooldowns.put(playerId, world.getTime() + nextRemaining);
+		KEY.sync(world);
+		return nextRemaining;
 	}
 
 	public int usesRemaining(UUID playerId) {

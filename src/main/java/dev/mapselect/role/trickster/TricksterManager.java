@@ -302,6 +302,22 @@ public final class TricksterManager {
 		return remaining;
 	}
 
+	public static long reduceMasqueradeCooldown(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L || !(player.getWorld() instanceof ServerWorld world)) {
+			return player == null || !(player.getWorld() instanceof ServerWorld serverWorld)
+				? 0L : masqueradeCooldownRemainingTicks(serverWorld, player.getUuid());
+		}
+		long remaining = masqueradeCooldownRemainingTicks(world, player.getUuid());
+		if (remaining <= 0L) return 0L;
+		long next = Math.max(0L, remaining - ticks);
+		Map<UUID, Long> worldCooldowns = nextMasqueradeUseTicks.computeIfAbsent(world.getRegistryKey(),
+			key -> new ConcurrentHashMap<>());
+		if (next <= 0L) worldCooldowns.remove(player.getUuid());
+		else worldCooldowns.put(player.getUuid(), world.getTime() + next);
+		syncMasqueradeCooldown(player, next);
+		return next;
+	}
+
 	private static void syncMasqueradeCooldownTo(ServerPlayerEntity player) {
 		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
 		syncMasqueradeCooldown(player, masqueradeCooldownRemainingTicks(world, player.getUuid()));

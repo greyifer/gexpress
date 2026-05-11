@@ -4,6 +4,7 @@ import dev.doctor4t.wathe.index.WatheDataComponentTypes;
 import dev.doctor4t.wathe.index.WatheCosmetics;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.MapSelect;
+import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.host.HostComponent;
 import dev.mapselect.host.TrustedComponent;
 import dev.mapselect.permissions.GexpressPermissions;
@@ -72,6 +73,7 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 			};
 		}
 		if (stack.isOf(WatheItems.REVOLVER)) {
+			if (!GexpressConfig.use3dGunSkins() && !hasFlatGunModel(skin)) return null;
 			return switch (skin) {
 				case DEV -> DEV_REVOLVER_MODEL;
 				case TRUSTED -> TRUSTED_REVOLVER_MODEL;
@@ -84,6 +86,10 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 			};
 		}
 		return null;
+	}
+
+	private static boolean hasFlatGunModel(WeaponSkin skin) {
+		return skin == WeaponSkin.HOST || skin == WeaponSkin.TRUSTED;
 	}
 
 	private static WeaponSkin resolveSkin(ItemStack stack, LivingEntity entity) {

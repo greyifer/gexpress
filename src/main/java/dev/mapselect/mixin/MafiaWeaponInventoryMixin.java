@@ -1,6 +1,7 @@
 package dev.mapselect.mixin;
 
 import dev.mapselect.role.mafia.MafiaManager;
+import dev.mapselect.role.bodyguard.BodyguardManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;
@@ -21,7 +22,8 @@ public abstract class MafiaWeaponInventoryMixin {
 	@Inject(method = "remove", at = @At("HEAD"), cancellable = true)
 	private void gexpress$keepMafiaRevolver(Predicate<ItemStack> shouldRemove, int maxCount,
 			Inventory craftingInventory, CallbackInfoReturnable<Integer> cir) {
-		if (MafiaManager.shouldBlockWeaponRemoval(player, shouldRemove, maxCount)) {
+		if (MafiaManager.shouldBlockWeaponRemoval(player, shouldRemove, maxCount)
+				|| BodyguardManager.shouldBlockWeaponRemoval(player, shouldRemove, maxCount)) {
 			cir.setReturnValue(0);
 		}
 	}

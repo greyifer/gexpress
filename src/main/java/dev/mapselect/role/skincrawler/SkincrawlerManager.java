@@ -179,6 +179,22 @@ public final class SkincrawlerManager {
 		return remaining;
 	}
 
+	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L) return cooldownRemaining(player);
+		long remaining = cooldownRemaining(player);
+		if (remaining <= 0L) return 0L;
+		long next = Math.max(0L, remaining - ticks);
+		if (next <= 0L) {
+			cooldownUntil.remove(player.getUuid());
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.SKINCRAWLER_STEAL);
+		} else {
+			cooldownUntil.put(player.getUuid(), player.getWorld().getTime() + next);
+			AbilityCooldownSync.send(player, AbilityCooldownPayload.SKINCRAWLER_STEAL, next,
+				(long) GexpressConfig.getSkincrawlerCooldownSeconds() * 20L, false);
+		}
+		return next;
+	}
+
 	private static void sync(ServerPlayerEntity player) {
 		if (player != null && ServerPlayNetworking.canSend(player, SkincrawlerSkinPayload.ID)) {
 			ServerPlayNetworking.send(player, new SkincrawlerSkinPayload(new HashMap<>(skinSwaps)));

@@ -156,6 +156,22 @@ public final class TrackerManager {
 		return remaining;
 	}
 
+	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L) return cooldownRemaining(player);
+		long remaining = cooldownRemaining(player);
+		if (remaining <= 0L) return 0L;
+		long next = Math.max(0L, remaining - ticks);
+		if (next <= 0L) {
+			cooldownUntil.remove(player.getUuid());
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.TRACKER_TRACK);
+		} else {
+			cooldownUntil.put(player.getUuid(), player.getWorld().getTime() + next);
+			AbilityCooldownSync.send(player, AbilityCooldownPayload.TRACKER_TRACK, next,
+				(long) GexpressConfig.getTrackerCooldownSeconds() * 20L, false);
+		}
+		return next;
+	}
+
 	private static boolean isTracker(PlayerEntity player) {
 		GameWorldComponent game = player == null ? null : GameWorldComponent.KEY.getNullable(player.getWorld());
 		Role role = game == null ? null : game.getRole(player);

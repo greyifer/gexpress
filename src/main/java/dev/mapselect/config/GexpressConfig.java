@@ -231,6 +231,8 @@ public final class GexpressConfig {
 	public static int abilityHudOffsetX = 0;
 	/** Client-only vertical offset in scaled GUI pixels from the default ability HUD anchor. */
 	public static int abilityHudOffsetY = 0;
+	/** Client-only preference for rendering available 3D revolver skin models instead of flat 2D fallbacks. */
+	public static boolean use3dGunSkins = true;
 
 	public static final int C4_PRICE_MIN = 0;
 	public static final int C4_PRICE_MAX = 9999;
@@ -1015,6 +1017,10 @@ public final class GexpressConfig {
 		return Math.max(ABILITY_HUD_OFFSET_MIN, Math.min(ABILITY_HUD_OFFSET_MAX, abilityHudOffsetY));
 	}
 
+	public static boolean use3dGunSkins() {
+		return use3dGunSkins;
+	}
+
 	public static void load() {
 		try {
 			if (!Files.exists(CONFIG_PATH)) {
@@ -1141,6 +1147,7 @@ public final class GexpressConfig {
 			abilityHudScalePercent = snap.abilityHudScalePercent;
 			abilityHudOffsetX = snap.abilityHudOffsetX;
 			abilityHudOffsetY = snap.abilityHudOffsetY;
+			use3dGunSkins = snap.use3dGunSkins;
 			clampInPlace();
 		} catch (IOException | JsonSyntaxException e) {
 			MapSelect.LOGGER.warn("Failed to load gexpress.json; keeping defaults.", e);
@@ -1268,6 +1275,7 @@ public final class GexpressConfig {
 			snap.abilityHudScalePercent = abilityHudScalePercent;
 			snap.abilityHudOffsetX = abilityHudOffsetX;
 			snap.abilityHudOffsetY = abilityHudOffsetY;
+			snap.use3dGunSkins = use3dGunSkins;
 			writeAtomically(CONFIG_PATH, GSON.toJson(snap));
 		} catch (IOException e) {
 			MapSelect.LOGGER.warn("Failed to save gexpress.json.", e);
@@ -1723,5 +1731,6 @@ public final class GexpressConfig {
 		int abilityHudScalePercent = 100;
 		int abilityHudOffsetX = 0;
 		int abilityHudOffsetY = 0;
+		boolean use3dGunSkins = true;
 	}
 }

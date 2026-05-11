@@ -5,6 +5,7 @@ import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.OptionGroup;
+import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import dev.mapselect.config.GexpressConfig;
 import net.minecraft.client.gui.screen.Screen;
@@ -24,8 +25,25 @@ public final class GexpressClientCategory {
 		for (OptionGroup group : base.groups()) {
 			category.group(group);
 		}
+		category.group(weaponSkinsGroup());
 		category.group(abilityHudGroup());
 		return category.build();
+	}
+
+	private static OptionGroup weaponSkinsGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.client.weapon_skins"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.client.weapon_skins.tooltip")))
+			.collapsed(false)
+			.option(Option.<Boolean>createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.client.use_3d_gun_skins"))
+				.description(OptionDescription.of(
+					Text.translatable("gui.gexpress.config.option.client.use_3d_gun_skins.tooltip")))
+				.binding(true, GexpressConfig::use3dGunSkins, value -> GexpressConfig.use3dGunSkins = value)
+				.controller(BooleanControllerBuilder::create)
+				.instant(true)
+				.build())
+			.build();
 	}
 
 	private static OptionGroup abilityHudGroup() {

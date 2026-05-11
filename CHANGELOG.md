@@ -1,3 +1,26 @@
+# Grey's Express 1.5.1
+
+## Added
+
+- Added the Creator tag, custom in-game tag creation, tag color/priority editing, and tag permission flags in the Dev tab.
+- Added a client option for switching between 3D revolver skins and flat 2D gun-skin fallbacks.
+- Added Bodyguard target glow, top-right protect tracking, and partner activity feed.
+- Added a round-end player roster with heads, usernames, and round roles.
+
+## Changed
+
+- Reworked the Players tab tag picker so tags toggle on/off inline and the dev account can edit its own tags.
+- Task and fake-task completion now reduces active ability cooldowns by 5 seconds.
+- Scatter Brain now uses a broader collision/heightmap-based safe-spot search.
+
+## Fixed
+
+- Fixed Bodyguard issued revolvers dropping or being consumed by inventory cleanup after kills.
+- Fixed Bodyguard civilian kills with the issued revolver draining sanity.
+- Fixed Bodyguard target death handling: nearby Bodyguards die with their target, distant Bodyguards become Civilians.
+- Fixed Lovers assignment so the Stupid Express Lovers modifier actually gets a pair.
+- Fixed cooldown bars showing while dead or swallowed by Pelican.
+
 # Grey's Express 1.5.0
 
 ## Added

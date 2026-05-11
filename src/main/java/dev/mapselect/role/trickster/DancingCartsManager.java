@@ -381,6 +381,22 @@ public final class DancingCartsManager {
 		return Math.max(0L, worldCooldowns.getOrDefault(playerId, 0L) - world.getTime());
 	}
 
+	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L || !(player.getWorld() instanceof ServerWorld world)) {
+			return player == null || !(player.getWorld() instanceof ServerWorld serverWorld)
+				? 0L : cooldownRemainingTicks(serverWorld, player.getUuid());
+		}
+		long remaining = cooldownRemainingTicks(world, player.getUuid());
+		if (remaining <= 0L) return 0L;
+		long next = Math.max(0L, remaining - ticks);
+		Map<UUID, Long> worldCooldowns = nextUseTicks.computeIfAbsent(world.getRegistryKey(),
+			key -> new ConcurrentHashMap<>());
+		if (next <= 0L) worldCooldowns.remove(player.getUuid());
+		else worldCooldowns.put(player.getUuid(), world.getTime() + next);
+		syncCooldown(player, next);
+		return next;
+	}
+
 	private static void setCooldown(ServerWorld world, UUID playerId) {
 		nextUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
 			.put(playerId, world.getTime() + GexpressConfig.getTricksterDancingCartsCooldownSeconds() * 20L);

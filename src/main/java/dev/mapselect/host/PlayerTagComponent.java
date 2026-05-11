@@ -15,6 +15,7 @@ import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +28,8 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 
 	private final World world;
 	private final Map<UUID, LinkedHashSet<PlayerTag>> tags = new LinkedHashMap<>();
+	private final Map<String, CustomTag> customTags = new LinkedHashMap<>();
+	private final Map<UUID, LinkedHashSet<String>> customTagAssignments = new LinkedHashMap<>();
 
 	public PlayerTagComponent(World world) {
 		this.world = world;
@@ -84,7 +87,117 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	}
 
 	public boolean clearTag(UUID uuid) {
-		if (uuid == null || tags.remove(uuid) == null) return false;
+		if (uuid == null) return false;
+		boolean changed = tags.remove(uuid) != null;
+		changed |= customTagAssignments.remove(uuid) != null;
+		if (!changed) return false;
+		KEY.sync(world);
+		return true;
+	}
+
+	public Map<String, CustomTag> getCustomTags() {
+		return Collections.unmodifiableMap(customTags);
+	}
+
+	public CustomTag getCustomTag(String id) {
+		return customTags.get(normalizeCustomId(id));
+	}
+
+	public Set<String> getPlayerCustomTags(UUID uuid) {
+		if (uuid == null) return Set.of();
+		LinkedHashSet<String> current = customTagAssignments.get(uuid);
+		return current == null ? Set.of() : Collections.unmodifiableSet(current);
+	}
+
+	public boolean hasCustomPermission(UUID uuid, String permission) {
+		String key = normalizeCustomId(permission);
+		if (key == null) return false;
+		for (String tagId : getPlayerCustomTags(uuid)) {
+			CustomTag tag = customTags.get(tagId);
+			if (tag != null && tag.permissions().contains(key)) return true;
+		}
+		return false;
+	}
+
+	public boolean defineCustomTag(String id, String displayName, int color, int priority) {
+		String normalized = normalizeCustomId(id);
+		if (normalized == null || PlayerTag.byId(normalized) != null) return false;
+		String name = displayName == null || displayName.isBlank() ? normalized : displayName.trim();
+		CustomTag next = new CustomTag(normalized, name, color & 0xFFFFFF, priority, Set.of());
+		CustomTag previous = customTags.put(normalized, next);
+		if (next.equals(previous)) return false;
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean removeCustomTag(String id) {
+		String normalized = normalizeCustomId(id);
+		if (normalized == null || customTags.remove(normalized) == null) return false;
+		for (LinkedHashSet<String> assigned : customTagAssignments.values()) {
+			assigned.remove(normalized);
+		}
+		customTagAssignments.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean setCustomTagColor(String id, int color) {
+		CustomTag tag = getCustomTag(id);
+		if (tag == null) return false;
+		CustomTag next = tag.withColor(color & 0xFFFFFF);
+		if (next.equals(tag)) return false;
+		customTags.put(tag.id(), next);
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean setCustomTagName(String id, String displayName) {
+		CustomTag tag = getCustomTag(id);
+		if (tag == null || displayName == null || displayName.isBlank()) return false;
+		CustomTag next = tag.withDisplayName(displayName.trim());
+		if (next.equals(tag)) return false;
+		customTags.put(tag.id(), next);
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean setCustomTagPriority(String id, int priority) {
+		CustomTag tag = getCustomTag(id);
+		if (tag == null) return false;
+		CustomTag next = tag.withPriority(priority);
+		if (next.equals(tag)) return false;
+		customTags.put(tag.id(), next);
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean setCustomTagPermission(String id, String permission, boolean enabled) {
+		CustomTag tag = getCustomTag(id);
+		String key = normalizeCustomId(permission);
+		if (tag == null || key == null) return false;
+		LinkedHashSet<String> permissions = new LinkedHashSet<>(tag.permissions());
+		boolean changed = enabled ? permissions.add(key) : permissions.remove(key);
+		if (!changed) return false;
+		customTags.put(tag.id(), tag.withPermissions(permissions));
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean addCustomTag(UUID uuid, String id) {
+		String normalized = normalizeCustomId(id);
+		if (uuid == null || normalized == null || !customTags.containsKey(normalized)) return false;
+		boolean changed = customTagAssignments.computeIfAbsent(uuid, key -> new LinkedHashSet<>()).add(normalized);
+		if (!changed) return false;
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean removeCustomTag(UUID uuid, String id) {
+		String normalized = normalizeCustomId(id);
+		if (uuid == null || normalized == null) return false;
+		LinkedHashSet<String> current = customTagAssignments.get(uuid);
+		if (current == null || !current.remove(normalized)) return false;
+		if (current.isEmpty()) customTagAssignments.remove(uuid);
 		KEY.sync(world);
 		return true;
 	}
@@ -92,6 +205,22 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	@Override
 	public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		tags.clear();
+		customTags.clear();
+		customTagAssignments.clear();
+		NbtList customDefinitions = tag.getList("customTags", NbtElement.COMPOUND_TYPE);
+		for (int i = 0; i < customDefinitions.size(); i++) {
+			NbtCompound entry = customDefinitions.getCompound(i);
+			String id = normalizeCustomId(entry.getString("id"));
+			if (id == null || PlayerTag.byId(id) != null) continue;
+			LinkedHashSet<String> permissions = new LinkedHashSet<>();
+			NbtList permissionList = entry.getList("permissions", NbtElement.STRING_TYPE);
+			for (int j = 0; j < permissionList.size(); j++) {
+				String permission = normalizeCustomId(permissionList.getString(j));
+				if (permission != null) permissions.add(permission);
+			}
+			customTags.put(id, new CustomTag(id, entry.getString("name"),
+				entry.getInt("color") & 0xFFFFFF, entry.getInt("priority"), permissions));
+		}
 		NbtList list = tag.getList("tags", NbtElement.COMPOUND_TYPE);
 		for (int i = 0; i < list.size(); i++) {
 			NbtCompound entry = list.getCompound(i);
@@ -108,10 +237,38 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			} catch (IllegalArgumentException ignored) {
 			}
 		}
+		NbtList customAssignments = tag.getList("customAssignments", NbtElement.COMPOUND_TYPE);
+		for (int i = 0; i < customAssignments.size(); i++) {
+			NbtCompound entry = customAssignments.getCompound(i);
+			try {
+				UUID uuid = UUID.fromString(entry.getString("player"));
+				String id = normalizeCustomId(entry.getString("tag"));
+				if (id != null && customTags.containsKey(id)) {
+					customTagAssignments.computeIfAbsent(uuid, key -> new LinkedHashSet<>()).add(id);
+				}
+			} catch (IllegalArgumentException ignored) {
+			}
+		}
 	}
 
 	@Override
 	public void writeToNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
+		NbtList customDefinitions = new NbtList();
+		for (CustomTag customTag : customTags.values()) {
+			NbtCompound out = new NbtCompound();
+			out.putString("id", customTag.id());
+			out.putString("name", customTag.displayName());
+			out.putInt("color", customTag.color());
+			out.putInt("priority", customTag.priority());
+			NbtList permissions = new NbtList();
+			for (String permission : customTag.permissions()) {
+				permissions.add(net.minecraft.nbt.NbtString.of(permission));
+			}
+			out.put("permissions", permissions);
+			customDefinitions.add(out);
+		}
+		tag.put("customTags", customDefinitions);
+
 		NbtList list = new NbtList();
 		for (Map.Entry<UUID, LinkedHashSet<PlayerTag>> entry : tags.entrySet()) {
 			for (PlayerTag playerTag : entry.getValue()) {
@@ -122,11 +279,59 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			}
 		}
 		tag.put("tags", list);
+
+		NbtList customAssignments = new NbtList();
+		for (Map.Entry<UUID, LinkedHashSet<String>> entry : customTagAssignments.entrySet()) {
+			for (String customTag : entry.getValue()) {
+				if (!customTags.containsKey(customTag)) continue;
+				NbtCompound out = new NbtCompound();
+				out.putString("player", entry.getKey().toString());
+				out.putString("tag", customTag);
+				customAssignments.add(out);
+			}
+		}
+		tag.put("customAssignments", customAssignments);
 	}
 
 	public static PlayerTag getTag(PlayerEntity player) {
 		if (player == null || player.getWorld() == null) return null;
 		PlayerTagComponent c = KEY.getNullable(player.getWorld());
 		return c == null ? null : c.getTag(player.getUuid());
+	}
+
+	public static String normalizeCustomId(String raw) {
+		if (raw == null) return null;
+		String cleaned = raw.trim().toLowerCase(Locale.ROOT);
+		if (cleaned.isBlank() || cleaned.length() > 24) return null;
+		for (int i = 0; i < cleaned.length(); i++) {
+			char c = cleaned.charAt(i);
+			if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_') return null;
+		}
+		return cleaned;
+	}
+
+	public record CustomTag(String id, String displayName, int color, int priority, Set<String> permissions) {
+		public CustomTag {
+			id = normalizeCustomId(id);
+			displayName = displayName == null || displayName.isBlank() ? id : displayName.trim();
+			color &= 0xFFFFFF;
+			permissions = Set.copyOf(permissions == null ? Set.of() : permissions);
+		}
+
+		public CustomTag withDisplayName(String displayName) {
+			return new CustomTag(id, displayName, color, priority, permissions);
+		}
+
+		public CustomTag withColor(int color) {
+			return new CustomTag(id, displayName, color, priority, permissions);
+		}
+
+		public CustomTag withPriority(int priority) {
+			return new CustomTag(id, displayName, color, priority, permissions);
+		}
+
+		public CustomTag withPermissions(Set<String> permissions) {
+			return new CustomTag(id, displayName, color, priority, permissions);
+		}
 	}
 }

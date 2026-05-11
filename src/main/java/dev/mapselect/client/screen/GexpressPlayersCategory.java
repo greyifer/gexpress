@@ -7,6 +7,7 @@ import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.gui.YACLScreen;
 import dev.isxander.yacl3.gui.tab.TabExt;
 import dev.mapselect.host.PlayerTag;
+import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -111,10 +112,11 @@ public final class GexpressPlayersCategory {
 		private static final int TAG_BUTTON_HEIGHT = 17;
 		private static final int TAG_BUTTON_GAP = 4;
 		private static final int CHANGE_BUTTON_WIDTH = 92;
-		private static final PlayerTag[] EDITABLE_TAGS = {
+		private static final PlayerTag[] BUILTIN_TAGS = {
 			PlayerTag.OWNER,
 			PlayerTag.STAFF,
 			PlayerTag.HOST,
+			PlayerTag.CREATOR,
 			PlayerTag.TRUSTED,
 			PlayerTag.PASSENGER
 		};
@@ -171,10 +173,11 @@ public final class GexpressPlayersCategory {
 				int rowWidth, int rowHeight, int mouseX, int mouseY) {
 			UUID id = entry.getProfile().getId();
 			String name = entry.getProfile().getName();
-			List<PlayerTag> tags = currentTags(entry);
-			PlayerTag tag = tags.isEmpty() ? PlayerTag.PASSENGER : tags.getFirst();
-			boolean dev = tags.contains(PlayerTag.DEV);
-			boolean expanded = id.equals(expandedPlayer) && !dev;
+			List<GexpressPermissions.TagInfo> tags = currentTags(entry);
+			boolean dev = tags.stream().anyMatch(tag -> PlayerTag.DEV.id().equals(tag.id()));
+			boolean self = client.player != null && client.player.getUuid().equals(id);
+			boolean locked = dev && !self;
+			boolean expanded = id.equals(expandedPlayer) && !locked;
 			boolean hovered = mouseY >= y && mouseY < y + Math.min(rowHeight, ROW_HEIGHT)
 				&& mouseX >= x && mouseX < x + rowWidth;
 			context.fill(x, y, x + rowWidth, y + rowHeight - 4, hovered || expanded ? 0x44222222 : 0x33111111);
@@ -182,7 +185,7 @@ public final class GexpressPlayersCategory {
 			context.drawTextWithShadow(client.textRenderer, Text.literal(name), x + 38, y + 7, 0xFFFFFFFF);
 			drawTagBadges(context, client, tags, x + 38, y + 21);
 
-			if (dev) {
+			if (locked) {
 				context.drawTextWithShadow(client.textRenderer,
 					Text.translatable("gui.gexpress.config.players.locked").formatted(Formatting.DARK_GRAY),
 					x + rowWidth - 78, y + 14, 0xFF777777);
@@ -196,10 +199,11 @@ public final class GexpressPlayersCategory {
 			}
 		}
 
-		private void drawTagBadges(DrawContext context, MinecraftClient client, List<PlayerTag> tags, int x, int y) {
+		private void drawTagBadges(DrawContext context, MinecraftClient client, List<GexpressPermissions.TagInfo> tags,
+				int x, int y) {
 			int drawX = x;
 			int shown = 0;
-			for (PlayerTag tag : tags) {
+			for (GexpressPermissions.TagInfo tag : tags) {
 				if (shown >= 2) break;
 				Text badge = GexpressPermissions.tagBadge(tag);
 				context.drawTextWithShadow(client.textRenderer, badge, drawX, y, 0xFFFFFFFF);
@@ -223,15 +227,16 @@ public final class GexpressPlayersCategory {
 		}
 
 		private void drawTagDropdown(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
-				List<PlayerTag> current, int x, int y, int dropdownWidth, int mouseX, int mouseY) {
+				List<GexpressPermissions.TagInfo> current, int x, int y, int dropdownWidth, int mouseX, int mouseY) {
+			List<TagOption> options = editableTags(client);
 			int columns = dropdownColumns(dropdownWidth);
 			int bx = x;
 			int by = y + 4;
-			for (int i = 0; i < EDITABLE_TAGS.length; i++) {
-				PlayerTag option = EDITABLE_TAGS[i];
-				boolean selected = option == PlayerTag.PASSENGER
-					? current.size() == 1 && current.contains(PlayerTag.PASSENGER)
-					: current.contains(option);
+			for (int i = 0; i < options.size(); i++) {
+				TagOption option = options.get(i);
+				boolean selected = option.id().equals(PlayerTag.PASSENGER.id())
+					? current.size() == 1 && current.stream().anyMatch(tag -> PlayerTag.PASSENGER.id().equals(tag.id()))
+					: current.stream().anyMatch(tag -> option.id().equals(tag.id()));
 				drawTagButton(context, client, playerId, playerName, option, selected, bx, by, mouseX, mouseY);
 				if ((i + 1) % columns == 0) {
 					bx = x;
@@ -243,7 +248,7 @@ public final class GexpressPlayersCategory {
 		}
 
 		private void drawTagButton(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
-				PlayerTag tag, boolean selected, int x, int y, int mouseX, int mouseY) {
+				TagOption tag, boolean selected, int x, int y, int mouseX, int mouseY) {
 			boolean hovered = mouseX >= x && mouseX < x + TAG_BUTTON_WIDTH
 				&& mouseY >= y && mouseY < y + TAG_BUTTON_HEIGHT;
 			int base = selected ? 0xAA222222 : hovered ? 0x77333333 : 0x55222222;
@@ -274,10 +279,12 @@ public final class GexpressPlayersCategory {
 				.toList();
 		}
 
-		private List<PlayerTag> currentTags(PlayerListEntry entry) {
+		private List<GexpressPermissions.TagInfo> currentTags(PlayerListEntry entry) {
 			MinecraftClient client = MinecraftClient.getInstance();
-			if (entry == null || entry.getProfile() == null) return List.of(PlayerTag.PASSENGER);
-			return GexpressPermissions.effectiveTags(client == null ? null : client.world,
+			if (entry == null || entry.getProfile() == null) {
+				return List.of(GexpressPermissions.TagInfo.from(PlayerTag.PASSENGER));
+			}
+			return GexpressPermissions.effectiveTagInfos(client == null ? null : client.world,
 				entry.getProfile().getId(), entry.getProfile().getName());
 		}
 
@@ -286,7 +293,6 @@ public final class GexpressPlayersCategory {
 			for (TagButton tagButton : tagButtons) {
 				if (!tagButton.contains(mouseX, mouseY)) continue;
 				sendTagCommand(tagButton.playerName(), tagButton.tag(), tagButton.selected());
-				expandedPlayer = null;
 				scroll = clampScroll(scroll);
 				return true;
 			}
@@ -309,17 +315,24 @@ public final class GexpressPlayersCategory {
 		}
 
 		private int rowHeight(PlayerListEntry entry, int rowWidth) {
-			List<PlayerTag> tags = currentTags(entry);
-			if (tags.contains(PlayerTag.DEV) || entry == null || entry.getProfile() == null
+			List<GexpressPermissions.TagInfo> tags = currentTags(entry);
+			MinecraftClient client = MinecraftClient.getInstance();
+			boolean dev = tags.stream().anyMatch(tag -> PlayerTag.DEV.id().equals(tag.id()));
+			boolean self = client != null && client.player != null && entry != null && entry.getProfile() != null
+				&& client.player.getUuid().equals(entry.getProfile().getId());
+			if ((dev && !self) || entry == null || entry.getProfile() == null
 					|| !entry.getProfile().getId().equals(expandedPlayer)) {
 				return ROW_HEIGHT;
 			}
-			int rows = (EDITABLE_TAGS.length + dropdownColumns(rowWidth - 44) - 1) / dropdownColumns(rowWidth - 44);
+			int optionCount = editableTags(client).size();
+			int columns = dropdownColumns(rowWidth - 44);
+			int rows = (optionCount + columns - 1) / columns;
 			return ROW_HEIGHT + 8 + rows * TAG_BUTTON_HEIGHT + Math.max(0, rows - 1) * TAG_BUTTON_GAP;
 		}
 
 		private int dropdownColumns(int dropdownWidth) {
-			return Math.max(1, Math.min(EDITABLE_TAGS.length,
+			int options = editableTags(MinecraftClient.getInstance()).size();
+			return Math.max(1, Math.min(Math.max(1, options),
 				(dropdownWidth + TAG_BUTTON_GAP) / (TAG_BUTTON_WIDTH + TAG_BUTTON_GAP)));
 		}
 
@@ -339,12 +352,27 @@ public final class GexpressPlayersCategory {
 			return Math.max(0, Math.min(requested, maxScroll));
 		}
 
-		private void sendTagCommand(String playerName, PlayerTag tag, boolean selected) {
+		private void sendTagCommand(String playerName, TagOption tag, boolean selected) {
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.player == null || client.player.networkHandler == null
-					|| tag == null || tag == PlayerTag.DEV) return;
-			String action = tag == PlayerTag.PASSENGER ? "set" : selected ? "remove" : "add";
+					|| tag == null || PlayerTag.DEV.id().equals(tag.id())) return;
+			String action = PlayerTag.PASSENGER.id().equals(tag.id()) ? "set" : selected ? "remove" : "add";
 			client.player.networkHandler.sendChatCommand("g group tag " + action + " " + tag.id() + " " + playerName);
+		}
+
+		private List<TagOption> editableTags(MinecraftClient client) {
+			List<TagOption> options = new ArrayList<>();
+			for (PlayerTag tag : BUILTIN_TAGS) options.add(TagOption.from(tag));
+			if (client != null && client.world != null) {
+				PlayerTagComponent component = PlayerTagComponent.KEY.getNullable(client.world);
+				if (component != null) {
+					component.getCustomTags().values().stream()
+						.sorted(Comparator.comparingInt(PlayerTagComponent.CustomTag::priority).reversed())
+						.map(TagOption::from)
+						.forEach(options::add);
+				}
+			}
+			return options;
 		}
 
 		@Override
@@ -353,7 +381,7 @@ public final class GexpressPlayersCategory {
 		}
 	}
 
-	private record TagButton(int x, int y, int width, int height, UUID playerId, String playerName, PlayerTag tag,
+	private record TagButton(int x, int y, int width, int height, UUID playerId, String playerName, TagOption tag,
 			boolean selected) {
 		private boolean contains(double mouseX, double mouseY) {
 			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
@@ -363,6 +391,16 @@ public final class GexpressPlayersCategory {
 	private record ChangeButton(int x, int y, int width, int height, UUID playerId) {
 		private boolean contains(double mouseX, double mouseY) {
 			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record TagOption(String id, String displayName, int color, int priority) {
+		private static TagOption from(PlayerTag tag) {
+			return new TagOption(tag.id(), tag.displayName(), tag.color(), tag.priority());
+		}
+
+		private static TagOption from(PlayerTagComponent.CustomTag tag) {
+			return new TagOption(tag.id(), tag.displayName(), tag.color(), tag.priority());
 		}
 	}
 }

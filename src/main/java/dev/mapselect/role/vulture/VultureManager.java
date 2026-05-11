@@ -650,6 +650,22 @@ public final class VultureManager {
 		return remaining;
 	}
 
+	public static long reduceEatCooldown(ServerPlayerEntity player, long ticks) {
+		if (player == null || ticks <= 0L) return remainingEatCooldownTicks(player);
+		long remaining = remainingEatCooldownTicks(player);
+		if (remaining <= 0L) return 0L;
+		long next = Math.max(0L, remaining - ticks);
+		if (next <= 0L) {
+			eatCooldownUntilByPelican.remove(player.getUuid());
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.PELICAN_SWALLOW);
+		} else {
+			eatCooldownUntilByPelican.put(player.getUuid(), player.getWorld().getTime() + next);
+			AbilityCooldownSync.send(player, AbilityCooldownPayload.PELICAN_SWALLOW, next,
+				(long) GexpressConfig.getPelicanEatCooldownSeconds() * 20L, false);
+		}
+		return next;
+	}
+
 	private static long secondsCeil(long ticks) {
 		return Math.max(1L, (ticks + 19L) / 20L);
 	}
