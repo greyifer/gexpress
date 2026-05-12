@@ -8,12 +8,12 @@ import net.minecraft.text.TextColor;
 import java.util.Locale;
 
 public enum PlayerTag {
-	OWNER("owner", "Owner", 0x196266, true, 90),
+	OWNER("owner", "Owner", 0x196266, true, 110),
 	STAFF("staff", "Staff", 0x79B9A9, true, 70),
 	HOST("host", "Host", 0x559CFF, true, 60),
 	CREATOR("creator", "Creator", 0xD36BFF, true, 50),
 	TRUSTED("trusted", "Trusted", 0xF2C94C, true, 40),
-	PASSENGER("passenger", "Passenger", 0x3C8AC9, true, 0),
+	PASSENGER("passenger", "Passenger", 0x3C8AC9, false, 0),
 	DEV("dev", "Dev", 0xCBFF2E, false, 100);
 
 	private final String id;

@@ -17,6 +17,7 @@ import dev.mapselect.modifier.ShortSightedTracker;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.GexpressConfigSyncHandler;
 import dev.mapselect.network.GexpressPresetsSyncHandler;
+import dev.mapselect.preset.map.DefaultMapPresets;
 import dev.mapselect.registry.MapSelectBlockEntities;
 import dev.mapselect.registry.MapSelectBlocks;
 import dev.mapselect.registry.MapSelectItems;
@@ -114,6 +115,7 @@ public class MapSelect implements ModInitializer {
 		DeadVoiceGroupManager.register();
 		AbilityCooldownSync.register();
 		PassiveMoney.register();
+		DefaultMapPresets.register();
 		GexpressConfigSyncHandler.register();
 		GexpressPresetsSyncHandler.register();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->

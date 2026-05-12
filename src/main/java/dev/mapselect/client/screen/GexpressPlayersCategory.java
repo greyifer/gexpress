@@ -117,8 +117,7 @@ public final class GexpressPlayersCategory {
 			PlayerTag.STAFF,
 			PlayerTag.HOST,
 			PlayerTag.CREATOR,
-			PlayerTag.TRUSTED,
-			PlayerTag.PASSENGER
+			PlayerTag.TRUSTED
 		};
 
 		private final List<TagButton> tagButtons = new ArrayList<>();
@@ -175,7 +174,7 @@ public final class GexpressPlayersCategory {
 			String name = entry.getProfile().getName();
 			List<GexpressPermissions.TagInfo> tags = currentTags(entry);
 			boolean dev = tags.stream().anyMatch(tag -> PlayerTag.DEV.id().equals(tag.id()));
-			boolean self = client.player != null && client.player.getUuid().equals(id);
+			boolean self = isSelf(client, entry);
 			boolean locked = dev && !self;
 			boolean expanded = id.equals(expandedPlayer) && !locked;
 			boolean hovered = mouseY >= y && mouseY < y + Math.min(rowHeight, ROW_HEIGHT)
@@ -234,9 +233,7 @@ public final class GexpressPlayersCategory {
 			int by = y + 4;
 			for (int i = 0; i < options.size(); i++) {
 				TagOption option = options.get(i);
-				boolean selected = option.id().equals(PlayerTag.PASSENGER.id())
-					? current.size() == 1 && current.stream().anyMatch(tag -> PlayerTag.PASSENGER.id().equals(tag.id()))
-					: current.stream().anyMatch(tag -> option.id().equals(tag.id()));
+				boolean selected = current.stream().anyMatch(tag -> option.id().equals(tag.id()));
 				drawTagButton(context, client, playerId, playerName, option, selected, bx, by, mouseX, mouseY);
 				if ((i + 1) % columns == 0) {
 					bx = x;
@@ -318,8 +315,7 @@ public final class GexpressPlayersCategory {
 			List<GexpressPermissions.TagInfo> tags = currentTags(entry);
 			MinecraftClient client = MinecraftClient.getInstance();
 			boolean dev = tags.stream().anyMatch(tag -> PlayerTag.DEV.id().equals(tag.id()));
-			boolean self = client != null && client.player != null && entry != null && entry.getProfile() != null
-				&& client.player.getUuid().equals(entry.getProfile().getId());
+			boolean self = isSelf(client, entry);
 			if ((dev && !self) || entry == null || entry.getProfile() == null
 					|| !entry.getProfile().getId().equals(expandedPlayer)) {
 				return ROW_HEIGHT;
@@ -355,16 +351,20 @@ public final class GexpressPlayersCategory {
 		private void sendTagCommand(String playerName, TagOption tag, boolean selected) {
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.player == null || client.player.networkHandler == null
-					|| tag == null || PlayerTag.DEV.id().equals(tag.id())) return;
-			String action = PlayerTag.PASSENGER.id().equals(tag.id()) ? "set" : selected ? "remove" : "add";
+					|| tag == null || PlayerTag.DEV.id().equals(tag.id())
+					|| PlayerTag.PASSENGER.id().equals(tag.id())) return;
+			String action = selected ? "remove" : "add";
 			client.player.networkHandler.sendChatCommand("g group tag " + action + " " + tag.id() + " " + playerName);
 		}
 
 		private List<TagOption> editableTags(MinecraftClient client) {
 			List<TagOption> options = new ArrayList<>();
-			for (PlayerTag tag : BUILTIN_TAGS) options.add(TagOption.from(tag));
+			PlayerTagComponent component = null;
 			if (client != null && client.world != null) {
-				PlayerTagComponent component = PlayerTagComponent.KEY.getNullable(client.world);
+				component = PlayerTagComponent.KEY.getNullable(client.world);
+			}
+			for (PlayerTag tag : BUILTIN_TAGS) options.add(TagOption.from(tag, component));
+			if (client != null && client.world != null) {
 				if (component != null) {
 					component.getCustomTags().values().stream()
 						.sorted(Comparator.comparingInt(PlayerTagComponent.CustomTag::priority).reversed())
@@ -372,7 +372,16 @@ public final class GexpressPlayersCategory {
 						.forEach(options::add);
 				}
 			}
-			return options;
+			return options.stream()
+				.sorted(Comparator.comparingInt(TagOption::priority).reversed()
+					.thenComparing(TagOption::displayName, String.CASE_INSENSITIVE_ORDER))
+				.toList();
+		}
+
+		private boolean isSelf(MinecraftClient client, PlayerListEntry entry) {
+			if (client == null || client.player == null || entry == null || entry.getProfile() == null) return false;
+			if (client.player.getUuid().equals(entry.getProfile().getId())) return true;
+			return client.player.getGameProfile().getName().equalsIgnoreCase(entry.getProfile().getName());
 		}
 
 		@Override
@@ -397,6 +406,11 @@ public final class GexpressPlayersCategory {
 	private record TagOption(String id, String displayName, int color, int priority) {
 		private static TagOption from(PlayerTag tag) {
 			return new TagOption(tag.id(), tag.displayName(), tag.color(), tag.priority());
+		}
+
+		private static TagOption from(PlayerTag tag, PlayerTagComponent component) {
+			if (component == null) return from(tag);
+			return new TagOption(tag.id(), tag.displayName(), component.color(tag), component.priority(tag));
 		}
 
 		private static TagOption from(PlayerTagComponent.CustomTag tag) {

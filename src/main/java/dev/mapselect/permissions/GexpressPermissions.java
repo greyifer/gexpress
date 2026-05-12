@@ -153,7 +153,8 @@ public final class GexpressPermissions {
 
 	public static List<TagInfo> topDisplayTagInfos(PlayerEntity player) {
 		List<TagInfo> tags = effectiveTagInfos(player);
-		if (tags.isEmpty()) return List.of(TagInfo.from(PlayerTag.PASSENGER));
+		if (tags.isEmpty()) return List.of(TagInfo.from(PlayerTag.PASSENGER, player == null || player.getWorld() == null
+			? null : PlayerTagComponent.KEY.getNullable(player.getWorld())));
 		return tags.stream().limit(2).toList();
 	}
 
@@ -180,23 +181,22 @@ public final class GexpressPermissions {
 
 	public static List<TagInfo> effectiveTagInfos(World world, UUID uuid, String name) {
 		List<TagInfo> out = new ArrayList<>();
+		PlayerTagComponent tagComponent = world == null ? null : PlayerTagComponent.KEY.getNullable(world);
 		if (world != null) {
-			PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(world);
-			if (tags != null) {
-				for (PlayerTag tag : tags.getPlayerTags(uuid)) out.add(TagInfo.from(tag));
-				for (String customId : tags.getPlayerCustomTags(uuid)) {
-					PlayerTagComponent.CustomTag customTag = tags.getCustomTag(customId);
+			if (tagComponent != null) {
+				for (PlayerTag tag : tagComponent.getPlayerTags(uuid)) out.add(TagInfo.from(tag, tagComponent));
+				for (String customId : tagComponent.getPlayerCustomTags(uuid)) {
+					PlayerTagComponent.CustomTag customTag = tagComponent.getCustomTag(customId);
 					if (customTag != null) out.add(TagInfo.from(customTag));
 				}
 			}
-			if (isDevUuid(uuid) || isDevName(name)) out.add(TagInfo.from(PlayerTag.DEV));
 			HostComponent hosts = HostComponent.KEY.getNullable(world);
-			if (hosts != null && hosts.isHost(uuid)) out.add(TagInfo.from(PlayerTag.HOST));
+			if (hosts != null && hosts.isHost(uuid)) out.add(TagInfo.from(PlayerTag.HOST, tagComponent));
 			TrustedComponent trusted = TrustedComponent.KEY.getNullable(world);
-			if (trusted != null && trusted.isTrusted(uuid)) out.add(TagInfo.from(PlayerTag.TRUSTED));
+			if (trusted != null && trusted.isTrusted(uuid)) out.add(TagInfo.from(PlayerTag.TRUSTED, tagComponent));
 		}
-		if (isDevUuid(uuid) || isDevName(name)) out.add(TagInfo.from(PlayerTag.DEV));
-		if (out.isEmpty()) out.add(TagInfo.from(PlayerTag.PASSENGER));
+		if (isDevUuid(uuid) || isDevName(name)) out.add(TagInfo.from(PlayerTag.DEV, tagComponent));
+		if (out.isEmpty()) out.add(TagInfo.from(PlayerTag.PASSENGER, tagComponent));
 		return out.stream()
 			.distinct()
 			.sorted(Comparator.comparingInt(TagInfo::priority).reversed())
@@ -265,6 +265,11 @@ public final class GexpressPermissions {
 	public record TagInfo(String id, String displayName, int color, int priority) {
 		public static TagInfo from(PlayerTag tag) {
 			return new TagInfo(tag.id(), tag.displayName(), tag.color(), tag.priority());
+		}
+
+		public static TagInfo from(PlayerTag tag, PlayerTagComponent component) {
+			if (component == null) return from(tag);
+			return new TagInfo(tag.id(), tag.displayName(), component.color(tag), component.priority(tag));
 		}
 
 		public static TagInfo from(PlayerTagComponent.CustomTag tag) {

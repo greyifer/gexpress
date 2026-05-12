@@ -1,5 +1,6 @@
 package dev.mapselect.client.screen;
 
+import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -11,8 +12,10 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -23,8 +26,10 @@ public final class GexpressTagEditorScreen extends Screen {
 	private TextFieldWidget nameField;
 	private TextFieldWidget colorField;
 	private TextFieldWidget priorityField;
+	private ButtonWidget deleteButton;
 	private final Set<String> enabledPermissions = new LinkedHashSet<>();
 	private String selectedId = "";
+	private boolean selectedBuiltin;
 	private float hue = 0.58F;
 	private float saturation = 0.68F;
 	private float value = 0.92F;
@@ -54,8 +59,12 @@ public final class GexpressTagEditorScreen extends Screen {
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.save"), button -> save())
 			.dimensions(formX, formY + 214, 72, 20)
 			.build());
-		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.delete"), button -> delete())
+		deleteButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.delete"),
+				button -> delete())
 			.dimensions(formX + 80, formY + 214, 72, 20)
+			.build());
+		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.new"), button -> clearForNew())
+			.dimensions(formX + 160, formY + 214, 72, 20)
 			.build());
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.move_up"), button ->
 				adjustPriority(1))
@@ -122,34 +131,28 @@ public final class GexpressTagEditorScreen extends Screen {
 	private void drawTagList(DrawContext context, int mouseX, int mouseY) {
 		int x = 18;
 		int y = 52;
-		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.custom_tags"), x, y - 14,
+		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.tags"), x, y - 14,
 			0xFFFFFFFF);
-		PlayerTagComponent component = component();
-		if (component == null || component.getCustomTags().isEmpty()) {
-			context.drawTextWithShadow(textRenderer,
-				Text.translatable("gui.gexpress.tag_editor.no_custom_tags").formatted(Formatting.DARK_GRAY),
-				x, y, 0xFF777777);
-			return;
-		}
 		int row = 0;
-		for (PlayerTagComponent.CustomTag tag : component.getCustomTags().values()) {
+		for (EditableTag tag : visibleTags()) {
 			int ry = y + row * 22;
 			boolean selected = tag.id().equals(selectedId);
 			boolean hovered = mouseX >= x && mouseX < x + 142 && mouseY >= ry && mouseY < ry + 18;
 			context.fill(x, ry, x + 142, ry + 18, selected ? 0xAA2D3542 : hovered ? 0x77313A48 : 0x55212833);
 			context.fill(x, ry + 16, x + 142, ry + 18, 0xFF000000 | tag.color());
 			context.drawTextWithShadow(textRenderer, Text.literal(tag.displayName()), x + 5, ry + 5, 0xFFFFFFFF);
+			if (tag.builtin()) {
+				context.drawTextWithShadow(textRenderer, Text.literal("*"), x + 132, ry + 5, 0xFF9BA3AE);
+			}
 			row++;
 		}
 	}
 
 	private boolean clickTagList(double mouseX, double mouseY) {
-		PlayerTagComponent component = component();
-		if (component == null) return false;
 		int x = 18;
 		int y = 52;
 		int row = 0;
-		for (PlayerTagComponent.CustomTag tag : component.getCustomTags().values()) {
+		for (EditableTag tag : visibleTags()) {
 			int ry = y + row * 22;
 			if (mouseX >= x && mouseX < x + 142 && mouseY >= ry && mouseY < ry + 18) {
 				load(tag);
@@ -174,6 +177,12 @@ public final class GexpressTagEditorScreen extends Screen {
 		int y = 174;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.permissions"), x, y - 14,
 			0xFFFFFFFF);
+		if (selectedBuiltin) {
+			context.drawTextWithShadow(textRenderer,
+				Text.translatable("gui.gexpress.tag_editor.builtin_permissions").formatted(Formatting.DARK_GRAY),
+				x, y + 5, 0xFF777777);
+			return;
+		}
 		for (int i = 0; i < PERMISSIONS.length; i++) {
 			int bx = x + (i % 2) * 86;
 			int by = y + (i / 2) * 21;
@@ -187,6 +196,7 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private boolean clickPermission(double mouseX, double mouseY) {
+		if (selectedBuiltin) return false;
 		int x = 190;
 		int y = 174;
 		for (int i = 0; i < PERMISSIONS.length; i++) {
@@ -268,22 +278,53 @@ public final class GexpressTagEditorScreen extends Screen {
 		colorField.setText(String.format(Locale.ROOT, "#%06X", color));
 	}
 
-	private void load(PlayerTagComponent.CustomTag tag) {
+	private void load(EditableTag tag) {
 		selectedId = tag.id();
+		selectedBuiltin = tag.builtin();
+		idField.setEditable(!selectedBuiltin);
+		nameField.setEditable(!selectedBuiltin);
 		idField.setText(tag.id());
 		nameField.setText(tag.displayName());
 		colorField.setText(String.format(Locale.ROOT, "#%06X", tag.color()));
 		priorityField.setText(Integer.toString(tag.priority()));
 		enabledPermissions.clear();
 		enabledPermissions.addAll(tag.permissions());
+		if (deleteButton != null) {
+			deleteButton.setMessage(Text.translatable(selectedBuiltin
+				? "gui.gexpress.tag_editor.reset"
+				: "gui.gexpress.tag_editor.delete"));
+		}
+		syncHsvFromColor(tag.color());
+	}
+
+	private void clearForNew() {
+		selectedId = "";
+		selectedBuiltin = false;
+		idField.setEditable(true);
+		nameField.setEditable(true);
+		idField.setText("");
+		nameField.setText("");
+		colorField.setText("#D36BFF");
+		priorityField.setText("50");
+		enabledPermissions.clear();
+		if (deleteButton != null) {
+			deleteButton.setMessage(Text.translatable("gui.gexpress.tag_editor.delete"));
+		}
+		syncHsvFromColor(0xD36BFF);
 	}
 
 	private void save() {
 		String id = PlayerTagComponent.normalizeCustomId(idField.getText());
 		if (id == null) return;
-		String name = nameField.getText().isBlank() ? id : nameField.getText().trim().replace(' ', '_');
 		String color = normalizeHex(colorField.getText());
 		int priority = parsePriority();
+		if (selectedBuiltin) {
+			send("g group tag settings color " + id + " " + color);
+			send("g group tag settings priority " + id + " " + priority);
+			selectedId = id;
+			return;
+		}
+		String name = nameField.getText().isBlank() ? id : nameField.getText().trim().replace(' ', '_');
 		send("g group tag custom create " + id + " " + name + " " + color + " " + priority);
 		send("g group tag custom name " + id + " " + name);
 		send("g group tag custom color " + id + " " + color);
@@ -298,6 +339,12 @@ public final class GexpressTagEditorScreen extends Screen {
 	private void delete() {
 		String id = PlayerTagComponent.normalizeCustomId(idField.getText());
 		if (id == null) return;
+		if (selectedBuiltin) {
+			send("g group tag settings reset " + id);
+			PlayerTag builtin = PlayerTag.byId(id);
+			if (builtin != null) load(EditableTag.from(builtin, null));
+			return;
+		}
 		send("g group tag custom delete " + id);
 		selectedId = "";
 		idField.setText("");
@@ -306,12 +353,12 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private void adjustPriority(int delta) {
-		priorityField.setText(Integer.toString(Math.max(1, Math.min(99, parsePriority() + delta))));
+		priorityField.setText(Integer.toString(Math.max(0, Math.min(200, parsePriority() + delta))));
 	}
 
 	private int parsePriority() {
 		try {
-			return Math.max(1, Math.min(99, Integer.parseInt(priorityField.getText().trim())));
+			return Math.max(0, Math.min(200, Integer.parseInt(priorityField.getText().trim())));
 		} catch (NumberFormatException ignored) {
 			return 50;
 		}
@@ -325,6 +372,41 @@ public final class GexpressTagEditorScreen extends Screen {
 		return value.toUpperCase(Locale.ROOT);
 	}
 
+	private List<EditableTag> visibleTags() {
+		PlayerTagComponent component = component();
+		List<EditableTag> out = new ArrayList<>();
+		for (PlayerTag tag : PlayerTag.values()) out.add(EditableTag.from(tag, component));
+		if (component != null) {
+			component.getCustomTags().values().stream()
+				.map(EditableTag::from)
+				.forEach(out::add);
+		}
+		out.sort(Comparator.comparingInt(EditableTag::priority).reversed()
+			.thenComparing(EditableTag::displayName, String.CASE_INSENSITIVE_ORDER));
+		return out;
+	}
+
+	private void syncHsvFromColor(int color) {
+		float r = ((color >> 16) & 0xFF) / 255.0F;
+		float g = ((color >> 8) & 0xFF) / 255.0F;
+		float b = (color & 0xFF) / 255.0F;
+		float max = Math.max(r, Math.max(g, b));
+		float min = Math.min(r, Math.min(g, b));
+		float delta = max - min;
+		value = max;
+		saturation = max <= 0.0F ? 0.0F : delta / max;
+		if (delta <= 0.0F) {
+			hue = 0.0F;
+		} else if (max == r) {
+			hue = ((g - b) / delta) / 6.0F;
+		} else if (max == g) {
+			hue = (2.0F + (b - r) / delta) / 6.0F;
+		} else {
+			hue = (4.0F + (r - g) / delta) / 6.0F;
+		}
+		if (hue < 0.0F) hue += 1.0F;
+	}
+
 	private void send(String command) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client != null && client.player != null && client.player.networkHandler != null) {
@@ -335,5 +417,19 @@ public final class GexpressTagEditorScreen extends Screen {
 	private PlayerTagComponent component() {
 		MinecraftClient client = MinecraftClient.getInstance();
 		return client == null || client.world == null ? null : PlayerTagComponent.KEY.getNullable(client.world);
+	}
+
+	private record EditableTag(String id, String displayName, int color, int priority, boolean builtin,
+			Set<String> permissions) {
+		private static EditableTag from(PlayerTag tag, PlayerTagComponent component) {
+			int color = component == null ? tag.color() : component.color(tag);
+			int priority = component == null ? tag.priority() : component.priority(tag);
+			return new EditableTag(tag.id(), tag.displayName(), color, priority, true, Set.of());
+		}
+
+		private static EditableTag from(PlayerTagComponent.CustomTag tag) {
+			return new EditableTag(tag.id(), tag.displayName(), tag.color(), tag.priority(), false,
+				Set.copyOf(tag.permissions()));
+		}
 	}
 }

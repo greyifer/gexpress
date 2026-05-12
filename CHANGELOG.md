@@ -1,3 +1,22 @@
+# Grey's Express 1.5.2
+
+## Added
+
+- Added a bundled `starting_map` preset using the default snow-map setup values, without a Fresh Air area.
+- Added a Dev-tab model default export button that copies current C4, Spy Bug, and placement-preset tuning as source-ready Java defaults.
+- Built-in tags now appear in the in-game Tag Editor and can have their color and hierarchy priority adjusted.
+
+## Changed
+
+- Owner now ranks above Dev in the default tag hierarchy.
+- The Players tab no longer treats Passenger as a destructive tag assignment; Passenger remains the default fallback when no higher tag is active.
+
+## Fixed
+
+- Fixed setting/toggling Passenger clearing a player's other normal and custom tags.
+- Fixed the Tag Editor only listing custom tags and hiding existing built-in tags.
+- Fixed dev self-detection in the Players tab to also accept matching usernames, so the dev account is not locked out under mismatched UUID setups.
+
 # Grey's Express 1.5.1
 
 ## Added

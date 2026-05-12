@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+@SuppressWarnings("deprecation")
 public final class GexpressDevCategory {
 	private GexpressDevCategory() {}
 
@@ -30,6 +31,7 @@ public final class GexpressDevCategory {
 			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
 			.group(c4BackModelGroup())
 			.group(spyBugModelGroup())
+			.group(modelDefaultsExportGroup())
 			.group(c4PlacementPresetsOption())
 			.group(roleDescriptionsGroup())
 			.group(shortSightedGroup())
@@ -100,6 +102,65 @@ public final class GexpressDevCategory {
 			.option(floatOption("spy_bug_scale", 0.28F, GexpressConfig::getSpyBugScale,
 				v -> GexpressConfig.spyBugScale = v, GexpressConfig.C4_BACK_SCALE_MIN, GexpressConfig.C4_BACK_SCALE_MAX))
 			.build();
+	}
+
+	private static OptionGroup modelDefaultsExportGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.model_defaults_export"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.model_defaults_export.tooltip")))
+			.collapsed(false)
+			.option(ButtonOption.createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.dev.model_defaults_export"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.model_defaults_export.tooltip")))
+				.text(Text.translatable("gui.gexpress.config.option.dev.model_defaults_export.copy"))
+				.action((screen, option) -> copyModelDefaultsToClipboard())
+				.build())
+			.build();
+	}
+
+	private static void copyModelDefaultsToClipboard() {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client == null) return;
+		client.keyboard.setClipboard(modelDefaultsSource());
+		if (client.player != null) {
+			client.player.sendMessage(Text.translatable("gui.gexpress.config.option.dev.model_defaults_export.copied")
+				.formatted(Formatting.GREEN), false);
+		}
+	}
+
+	private static String modelDefaultsSource() {
+		List<String> lines = new ArrayList<>();
+		lines.add("// Paste into GexpressConfig model default fields.");
+		lines.add(defaultLine("c4BackOffsetX", GexpressConfig.getC4BackOffsetX()));
+		lines.add(defaultLine("c4BackOffsetY", GexpressConfig.getC4BackOffsetY()));
+		lines.add(defaultLine("c4BackOffsetZ", GexpressConfig.getC4BackOffsetZ()));
+		lines.add(defaultLine("c4BackRotationX", GexpressConfig.getC4BackRotationX()));
+		lines.add(defaultLine("c4BackRotationY", GexpressConfig.getC4BackRotationY()));
+		lines.add(defaultLine("c4BackRotationZ", GexpressConfig.getC4BackRotationZ()));
+		lines.add(defaultLine("c4BackSlant", GexpressConfig.getC4BackSlant()));
+		lines.add(defaultLine("c4BackScale", GexpressConfig.getC4BackScale()));
+		lines.add(defaultLine("spyBugOffsetX", GexpressConfig.getSpyBugOffsetX()));
+		lines.add(defaultLine("spyBugOffsetY", GexpressConfig.getSpyBugOffsetY()));
+		lines.add(defaultLine("spyBugOffsetZ", GexpressConfig.getSpyBugOffsetZ()));
+		lines.add(defaultLine("spyBugRotationX", GexpressConfig.getSpyBugRotationX()));
+		lines.add(defaultLine("spyBugRotationY", GexpressConfig.getSpyBugRotationY()));
+		lines.add(defaultLine("spyBugRotationZ", GexpressConfig.getSpyBugRotationZ()));
+		lines.add(defaultLine("spyBugSlant", GexpressConfig.getSpyBugSlant()));
+		lines.add(defaultLine("spyBugScale", GexpressConfig.getSpyBugScale()));
+		lines.add("");
+		lines.add("// Paste into the c4PlacementPresets field if these surface presets are final.");
+		lines.add("public static List<String> c4PlacementPresets = new ArrayList<>(List.of(");
+		List<String> presets = GexpressConfig.getC4PlacementPresetStrings();
+		for (int i = 0; i < presets.size(); i++) {
+			String suffix = i == presets.size() - 1 ? "" : ",";
+			lines.add("\t\"" + presets.get(i).replace("\\", "\\\\").replace("\"", "\\\"") + "\"" + suffix);
+		}
+		lines.add("));");
+		return String.join("\n", lines);
+	}
+
+	private static String defaultLine(String name, float value) {
+		return "public static float " + name + " = " + format(value) + "F;";
 	}
 
 	private static OptionGroup roleDescriptionsGroup() {

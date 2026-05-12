@@ -28,6 +28,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 
 	private final World world;
 	private final Map<UUID, LinkedHashSet<PlayerTag>> tags = new LinkedHashMap<>();
+	private final Map<PlayerTag, BuiltinTagSettings> builtinTagSettings = new LinkedHashMap<>();
 	private final Map<String, CustomTag> customTags = new LinkedHashMap<>();
 	private final Map<UUID, LinkedHashSet<String>> customTagAssignments = new LinkedHashMap<>();
 
@@ -37,7 +38,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 
 	public PlayerTag getTag(UUID uuid) {
 		Set<PlayerTag> current = getPlayerTags(uuid);
-		return current.stream().max((a, b) -> Integer.compare(a.priority(), b.priority())).orElse(null);
+		return current.stream().max((a, b) -> Integer.compare(priority(a), priority(b))).orElse(null);
 	}
 
 	public Map<UUID, PlayerTag> getTags() {
@@ -97,6 +98,56 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 
 	public Map<String, CustomTag> getCustomTags() {
 		return Collections.unmodifiableMap(customTags);
+	}
+
+	public BuiltinTagSettings getBuiltinTagSettings(PlayerTag tag) {
+		if (tag == null) return null;
+		return builtinTagSettings.getOrDefault(tag, BuiltinTagSettings.from(tag));
+	}
+
+	public int color(PlayerTag tag) {
+		BuiltinTagSettings settings = getBuiltinTagSettings(tag);
+		return settings == null ? 0xFFFFFF : settings.color();
+	}
+
+	public int priority(PlayerTag tag) {
+		BuiltinTagSettings settings = getBuiltinTagSettings(tag);
+		return settings == null ? 0 : settings.priority();
+	}
+
+	public boolean setBuiltinTagColor(String id, int color) {
+		PlayerTag tag = PlayerTag.byId(id);
+		if (tag == null) return false;
+		BuiltinTagSettings current = getBuiltinTagSettings(tag);
+		return putBuiltinTagSettings(tag, current.withColor(color & 0xFFFFFF));
+	}
+
+	public boolean setBuiltinTagPriority(String id, int priority) {
+		PlayerTag tag = PlayerTag.byId(id);
+		if (tag == null) return false;
+		BuiltinTagSettings current = getBuiltinTagSettings(tag);
+		return putBuiltinTagSettings(tag, current.withPriority(priority));
+	}
+
+	public boolean resetBuiltinTag(String id) {
+		PlayerTag tag = PlayerTag.byId(id);
+		if (tag == null || builtinTagSettings.remove(tag) == null) return false;
+		KEY.sync(world);
+		return true;
+	}
+
+	private boolean putBuiltinTagSettings(PlayerTag tag, BuiltinTagSettings next) {
+		BuiltinTagSettings defaults = BuiltinTagSettings.from(tag);
+		BuiltinTagSettings previous;
+		if (next.equals(defaults)) {
+			previous = builtinTagSettings.remove(tag);
+			if (previous == null) return false;
+		} else {
+			previous = builtinTagSettings.put(tag, next);
+			if (next.equals(previous)) return false;
+		}
+		KEY.sync(world);
+		return true;
 	}
 
 	public CustomTag getCustomTag(String id) {
@@ -205,8 +256,21 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	@Override
 	public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		tags.clear();
+		builtinTagSettings.clear();
 		customTags.clear();
 		customTagAssignments.clear();
+		NbtList builtinDefinitions = tag.getList("builtinTagSettings", NbtElement.COMPOUND_TYPE);
+		for (int i = 0; i < builtinDefinitions.size(); i++) {
+			NbtCompound entry = builtinDefinitions.getCompound(i);
+			PlayerTag playerTag = PlayerTag.byId(entry.getString("id"));
+			if (playerTag == null) continue;
+			int color = entry.contains("color") ? entry.getInt("color") : playerTag.color();
+			int priority = entry.contains("priority") ? entry.getInt("priority") : playerTag.priority();
+			BuiltinTagSettings settings = new BuiltinTagSettings(color, priority);
+			if (!settings.equals(BuiltinTagSettings.from(playerTag))) {
+				builtinTagSettings.put(playerTag, settings);
+			}
+		}
 		NbtList customDefinitions = tag.getList("customTags", NbtElement.COMPOUND_TYPE);
 		for (int i = 0; i < customDefinitions.size(); i++) {
 			NbtCompound entry = customDefinitions.getCompound(i);
@@ -253,6 +317,18 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 
 	@Override
 	public void writeToNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
+		NbtList builtinDefinitions = new NbtList();
+		for (Map.Entry<PlayerTag, BuiltinTagSettings> entry : builtinTagSettings.entrySet()) {
+			BuiltinTagSettings defaults = BuiltinTagSettings.from(entry.getKey());
+			if (entry.getValue().equals(defaults)) continue;
+			NbtCompound out = new NbtCompound();
+			out.putString("id", entry.getKey().id());
+			out.putInt("color", entry.getValue().color());
+			out.putInt("priority", entry.getValue().priority());
+			builtinDefinitions.add(out);
+		}
+		tag.put("builtinTagSettings", builtinDefinitions);
+
 		NbtList customDefinitions = new NbtList();
 		for (CustomTag customTag : customTags.values()) {
 			NbtCompound out = new NbtCompound();
@@ -308,6 +384,24 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_') return null;
 		}
 		return cleaned;
+	}
+
+	public record BuiltinTagSettings(int color, int priority) {
+		public BuiltinTagSettings {
+			color &= 0xFFFFFF;
+		}
+
+		public static BuiltinTagSettings from(PlayerTag tag) {
+			return new BuiltinTagSettings(tag.color(), tag.priority());
+		}
+
+		public BuiltinTagSettings withColor(int color) {
+			return new BuiltinTagSettings(color, priority);
+		}
+
+		public BuiltinTagSettings withPriority(int priority) {
+			return new BuiltinTagSettings(color, priority);
+		}
 	}
 
 	public record CustomTag(String id, String displayName, int color, int priority, Set<String> permissions) {

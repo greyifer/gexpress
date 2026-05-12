@@ -34,8 +34,7 @@ public class TagCommand {
 		PlayerTag.STAFF.id(),
 		PlayerTag.HOST.id(),
 		PlayerTag.CREATOR.id(),
-		PlayerTag.TRUSTED.id(),
-		PlayerTag.PASSENGER.id()
+		PlayerTag.TRUSTED.id()
 	);
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
@@ -61,7 +60,7 @@ public class TagCommand {
 					.then(CommandManager.argument("id", StringArgumentType.word())
 						.then(CommandManager.argument("display", StringArgumentType.word())
 							.then(CommandManager.argument("color", StringArgumentType.word())
-								.then(CommandManager.argument("priority", IntegerArgumentType.integer(1, 99))
+								.then(CommandManager.argument("priority", IntegerArgumentType.integer(0, 200))
 									.executes(TagCommand::runCreateCustom))))))
 				.then(CommandManager.literal("delete")
 					.then(CommandManager.argument("id", StringArgumentType.word())
@@ -80,7 +79,7 @@ public class TagCommand {
 				.then(CommandManager.literal("priority")
 					.then(CommandManager.argument("id", StringArgumentType.word())
 						.suggests(TagCommand::suggestCustomTags)
-						.then(CommandManager.argument("priority", IntegerArgumentType.integer(1, 99))
+						.then(CommandManager.argument("priority", IntegerArgumentType.integer(0, 200))
 							.executes(TagCommand::runCustomPriority))))
 				.then(CommandManager.literal("permission")
 					.then(CommandManager.argument("id", StringArgumentType.word())
@@ -89,6 +88,21 @@ public class TagCommand {
 							.suggests(TagCommand::suggestPermissions)
 							.then(CommandManager.argument("enabled", BoolArgumentType.bool())
 								.executes(TagCommand::runCustomPermission))))))
+			.then(CommandManager.literal("settings")
+				.then(CommandManager.literal("color")
+					.then(CommandManager.argument("id", StringArgumentType.word())
+						.suggests(TagCommand::suggestAllTagDefinitions)
+						.then(CommandManager.argument("color", StringArgumentType.word())
+							.executes(TagCommand::runTagColor))))
+				.then(CommandManager.literal("priority")
+					.then(CommandManager.argument("id", StringArgumentType.word())
+						.suggests(TagCommand::suggestAllTagDefinitions)
+						.then(CommandManager.argument("priority", IntegerArgumentType.integer(0, 200))
+							.executes(TagCommand::runTagPriority))))
+				.then(CommandManager.literal("reset")
+					.then(CommandManager.argument("id", StringArgumentType.word())
+						.suggests(TagCommand::suggestBuiltinTags)
+						.executes(TagCommand::runTagReset))))
 			.then(CommandManager.literal("list")
 				.executes(TagCommand::runList));
 	}
@@ -102,6 +116,22 @@ public class TagCommand {
 			SuggestionsBuilder builder) {
 		PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(ctx.getSource().getWorld());
 		return CommandSource.suggestMatching(tags == null ? List.of() : tags.getCustomTags().keySet(), builder);
+	}
+
+	private static CompletableFuture<Suggestions> suggestBuiltinTags(CommandContext<ServerCommandSource> ctx,
+			SuggestionsBuilder builder) {
+		List<String> ids = new ArrayList<>();
+		for (PlayerTag tag : PlayerTag.values()) ids.add(tag.id());
+		return CommandSource.suggestMatching(ids, builder);
+	}
+
+	private static CompletableFuture<Suggestions> suggestAllTagDefinitions(CommandContext<ServerCommandSource> ctx,
+			SuggestionsBuilder builder) {
+		List<String> ids = new ArrayList<>();
+		for (PlayerTag tag : PlayerTag.values()) ids.add(tag.id());
+		PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(ctx.getSource().getWorld());
+		if (tags != null) ids.addAll(tags.getCustomTags().keySet());
+		return CommandSource.suggestMatching(ids, builder);
 	}
 
 	private static CompletableFuture<Suggestions> suggestPermissions(CommandContext<ServerCommandSource> ctx,
@@ -124,7 +154,8 @@ public class TagCommand {
 		String rawTag = StringArgumentType.getString(ctx, "tag");
 		PlayerTag tag = PlayerTag.byId(rawTag);
 		PlayerTagComponent.CustomTag customTag = tag == null ? tags.getCustomTag(rawTag) : null;
-		if ((tag == null && customTag == null) || tag == PlayerTag.DEV || (tag != null && !tag.assignable())) {
+		if ((tag == null && customTag == null) || tag == PlayerTag.DEV || tag == PlayerTag.PASSENGER
+				|| (tag != null && !tag.assignable())) {
 			src.sendError(Text.literal("Use one of: " + String.join(", ", assignableTags(src))));
 			return 0;
 		}
@@ -133,7 +164,9 @@ public class TagCommand {
 		int skippedDev = 0;
 		ServerPlayerEntity sourcePlayer = src.getPlayer();
 		for (GameProfile profile : profiles) {
-			boolean targetIsSource = sourcePlayer != null && sourcePlayer.getUuid().equals(profile.getId());
+			boolean targetIsSource = sourcePlayer != null
+				&& (sourcePlayer.getUuid().equals(profile.getId())
+					|| sourcePlayer.getGameProfile().getName().equalsIgnoreCase(profile.getName()));
 			if ((GexpressPermissions.isDevUuid(profile.getId())
 					|| GexpressPermissions.isDevName(profile.getName())) && !targetIsSource) {
 				skippedDev++;
@@ -146,7 +179,7 @@ public class TagCommand {
 			ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(profile.getId());
 			if (online != null) {
 				online.sendMessage(Text.literal("Your G'Express tag was updated: ").formatted(Formatting.GRAY)
-					.append(customTag == null ? GexpressPermissions.tagBadge(tag)
+					.append(customTag == null ? GexpressPermissions.tagBadge(GexpressPermissions.TagInfo.from(tag, tags))
 						: GexpressPermissions.tagBadge(GexpressPermissions.TagInfo.from(customTag))), false);
 				refreshPlayerListName(online);
 			}
@@ -165,10 +198,9 @@ public class TagCommand {
 	}
 
 	private static boolean setTag(UUID uuid, PlayerTag tag, boolean enabled, HostComponent hosts, TrustedComponent trusted,
-			PlayerTagComponent tags) {
+		PlayerTagComponent tags) {
 		if (tag == PlayerTag.PASSENGER) {
-			boolean changed = hosts.removeHost(uuid) | trusted.removeTrusted(uuid) | tags.clearTag(uuid);
-			return changed;
+			return false;
 		}
 		if (tag == PlayerTag.HOST) return enabled ? hosts.addHost(uuid) : hosts.removeHost(uuid);
 		if (tag == PlayerTag.TRUSTED) return enabled ? trusted.addTrusted(uuid) : trusted.removeTrusted(uuid);
@@ -187,6 +219,12 @@ public class TagCommand {
 		PlayerListS2CPacket packet = new PlayerListS2CPacket(PlayerListS2CPacket.Action.UPDATE_DISPLAY_NAME, player);
 		for (ServerPlayerEntity viewer : player.getServer().getPlayerManager().getPlayerList()) {
 			viewer.networkHandler.sendPacket(packet);
+		}
+	}
+
+	private static void refreshAllPlayerListNames(ServerCommandSource src) {
+		for (ServerPlayerEntity player : src.getServer().getPlayerManager().getPlayerList()) {
+			refreshPlayerListName(player);
 		}
 	}
 
@@ -223,6 +261,7 @@ public class TagCommand {
 			ctx.getSource().sendError(Text.literal("Could not create that tag. Use a unique id and a hex color."));
 			return 0;
 		}
+		refreshAllPlayerListNames(ctx.getSource());
 		ctx.getSource().sendFeedback(() -> Text.literal("Created custom tag " + id + "."), true);
 		return 1;
 	}
@@ -231,6 +270,7 @@ public class TagCommand {
 		PlayerTagComponent tags = PlayerTagComponent.KEY.get(ctx.getSource().getWorld());
 		String id = StringArgumentType.getString(ctx, "id");
 		boolean changed = tags.removeCustomTag(id);
+		if (changed) refreshAllPlayerListNames(ctx.getSource());
 		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Deleted custom tag " + id + "." : "No tag changed."),
 			true);
 		return changed ? 1 : 0;
@@ -241,6 +281,7 @@ public class TagCommand {
 		String id = StringArgumentType.getString(ctx, "id");
 		String display = StringArgumentType.getString(ctx, "display").replace('_', ' ');
 		boolean changed = tags.setCustomTagName(id, display);
+		if (changed) refreshAllPlayerListNames(ctx.getSource());
 		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag name." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
@@ -250,6 +291,7 @@ public class TagCommand {
 		String id = StringArgumentType.getString(ctx, "id");
 		int color = parseColor(StringArgumentType.getString(ctx, "color"));
 		boolean changed = color >= 0 && tags.setCustomTagColor(id, color);
+		if (changed) refreshAllPlayerListNames(ctx.getSource());
 		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag color." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
@@ -259,6 +301,7 @@ public class TagCommand {
 		String id = StringArgumentType.getString(ctx, "id");
 		int priority = IntegerArgumentType.getInteger(ctx, "priority");
 		boolean changed = tags.setCustomTagPriority(id, priority);
+		if (changed) refreshAllPlayerListNames(ctx.getSource());
 		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag priority." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
@@ -270,6 +313,46 @@ public class TagCommand {
 		boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
 		boolean changed = tags.setCustomTagPermission(id, permission, enabled);
 		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag permission." : "No tag changed."),
+			true);
+		return changed ? 1 : 0;
+	}
+
+	private static int runTagColor(CommandContext<ServerCommandSource> ctx) {
+		PlayerTagComponent tags = PlayerTagComponent.KEY.get(ctx.getSource().getWorld());
+		String id = StringArgumentType.getString(ctx, "id");
+		int color = parseColor(StringArgumentType.getString(ctx, "color"));
+		if (color < 0) {
+			ctx.getSource().sendError(Text.literal("Invalid tag color. Use #RRGGBB or RRGGBB."));
+			return 0;
+		}
+		PlayerTag builtin = PlayerTag.byId(id);
+		boolean changed = builtin != null
+			? tags.setBuiltinTagColor(id, color)
+			: tags.setCustomTagColor(id, color);
+		if (changed) refreshAllPlayerListNames(ctx.getSource());
+		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag color." : "No tag changed."), true);
+		return changed ? 1 : 0;
+	}
+
+	private static int runTagPriority(CommandContext<ServerCommandSource> ctx) {
+		PlayerTagComponent tags = PlayerTagComponent.KEY.get(ctx.getSource().getWorld());
+		String id = StringArgumentType.getString(ctx, "id");
+		int priority = IntegerArgumentType.getInteger(ctx, "priority");
+		PlayerTag builtin = PlayerTag.byId(id);
+		boolean changed = builtin != null
+			? tags.setBuiltinTagPriority(id, priority)
+			: tags.setCustomTagPriority(id, priority);
+		if (changed) refreshAllPlayerListNames(ctx.getSource());
+		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag priority." : "No tag changed."), true);
+		return changed ? 1 : 0;
+	}
+
+	private static int runTagReset(CommandContext<ServerCommandSource> ctx) {
+		PlayerTagComponent tags = PlayerTagComponent.KEY.get(ctx.getSource().getWorld());
+		String id = StringArgumentType.getString(ctx, "id");
+		boolean changed = tags.resetBuiltinTag(id);
+		if (changed) refreshAllPlayerListNames(ctx.getSource());
+		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Reset built-in tag settings." : "No tag changed."),
 			true);
 		return changed ? 1 : 0;
 	}
