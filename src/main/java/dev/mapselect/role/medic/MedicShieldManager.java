@@ -88,7 +88,7 @@ public final class MedicShieldManager {
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity medic) {
-		return AbilityTargeting.findLookTarget(medic, medic.getServerWorld().getPlayers(), SHIELD_RANGE, 0.25D, true,
+		return AbilityTargeting.findLookTarget(medic, medic.getServerWorld().getPlayers(), SHIELD_RANGE, 0.0D, true,
 			candidate -> isPlayableForMedic(candidate, medic));
 	}
 

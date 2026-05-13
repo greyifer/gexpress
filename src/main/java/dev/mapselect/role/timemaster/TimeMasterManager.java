@@ -270,7 +270,7 @@ public final class TimeMasterManager {
 
 	private static ServerPlayerEntity findFreezeTarget(ServerPlayerEntity timeMaster) {
 		double range = GexpressConfig.getTimeMasterFreezeRange();
-		return AbilityTargeting.findLookTarget(timeMaster, timeMaster.getServerWorld().getPlayers(), range, 0.25D, true,
+		return AbilityTargeting.findLookTarget(timeMaster, timeMaster.getServerWorld().getPlayers(), range, 0.0D, true,
 			candidate -> !VultureManager.isStashed(candidate) && isPlayable(candidate, timeMaster));
 	}
 

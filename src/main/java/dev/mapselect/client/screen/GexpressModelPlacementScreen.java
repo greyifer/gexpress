@@ -28,8 +28,8 @@ public final class GexpressModelPlacementScreen extends Screen {
 	private ClientModelAttachmentPreview.Kind kind = ClientModelAttachmentPreview.Kind.C4;
 	private ButtonWidget kindButton;
 	private boolean draggingPreview;
-	private float previewMouseX = 18.0F;
-	private float previewMouseY = 8.0F;
+	private float modelYaw = 180.0F;
+	private float modelPitch = 0.0F;
 
 	public GexpressModelPlacementScreen(Screen parent) {
 		super(Text.translatable("gui.gexpress.model_placement.title"));
@@ -87,7 +87,6 @@ public final class GexpressModelPlacementScreen extends Screen {
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (button == 0 && inPreview(mouseX, mouseY)) {
 			draggingPreview = true;
-			updatePreviewMouse(mouseX, mouseY);
 			return true;
 		}
 		return super.mouseClicked(mouseX, mouseY, button);
@@ -96,7 +95,8 @@ public final class GexpressModelPlacementScreen extends Screen {
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
 		if (button == 0 && draggingPreview) {
-			updatePreviewMouse(mouseX, mouseY);
+			modelYaw = (modelYaw + (float) deltaX * 1.2F) % 360.0F;
+			modelPitch = MathHelper.clamp(modelPitch + (float) deltaY * 0.7F, -35.0F, 35.0F);
 			return true;
 		}
 		return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
@@ -137,8 +137,31 @@ public final class GexpressModelPlacementScreen extends Screen {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.player == null) return;
 		int size = Math.max(70, Math.min(128, (bottom - top) / 2));
-		InventoryScreen.drawEntity(context, left + 20, top + 28, right - 20, bottom - 8, size,
-			0.0625F, previewMouseX, previewMouseY, client.player);
+		int centerX = (left + right) / 2;
+		int centerY = (top + bottom) / 2;
+		float oldYaw = client.player.getYaw();
+		float oldPitch = client.player.getPitch();
+		float oldBodyYaw = client.player.bodyYaw;
+		float oldPrevBodyYaw = client.player.prevBodyYaw;
+		float oldHeadYaw = client.player.headYaw;
+		float oldPrevHeadYaw = client.player.prevHeadYaw;
+		try {
+			client.player.setYaw(modelYaw);
+			client.player.setPitch(modelPitch);
+			client.player.bodyYaw = modelYaw;
+			client.player.prevBodyYaw = modelYaw;
+			client.player.headYaw = modelYaw;
+			client.player.prevHeadYaw = modelYaw;
+			InventoryScreen.drawEntity(context, left + 20, top + 28, right - 20, bottom - 8, size,
+				0.0625F, centerX, centerY, client.player);
+		} finally {
+			client.player.setYaw(oldYaw);
+			client.player.setPitch(oldPitch);
+			client.player.bodyYaw = oldBodyYaw;
+			client.player.prevBodyYaw = oldPrevBodyYaw;
+			client.player.headYaw = oldHeadYaw;
+			client.player.prevHeadYaw = oldPrevHeadYaw;
+		}
 	}
 
 	private boolean inPreview(double mouseX, double mouseY) {
@@ -147,15 +170,6 @@ public final class GexpressModelPlacementScreen extends Screen {
 		int right = width - 26;
 		int bottom = height - 44;
 		return mouseX >= left && mouseX < right && mouseY >= top && mouseY < bottom;
-	}
-
-	private void updatePreviewMouse(double mouseX, double mouseY) {
-		int left = Math.max(286, width / 2 - 42);
-		int top = 50;
-		int right = width - 26;
-		int bottom = height - 44;
-		previewMouseX = (float) MathHelper.clamp(mouseX - (left + right) / 2.0D, -80.0D, 80.0D);
-		previewMouseY = (float) MathHelper.clamp(mouseY - (top + bottom) / 2.0D, -80.0D, 80.0D);
 	}
 
 	private void toggleKind() {

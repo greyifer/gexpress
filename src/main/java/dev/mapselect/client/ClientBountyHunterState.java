@@ -20,7 +20,6 @@ import java.util.UUID;
 public final class ClientBountyHunterState {
 	private static UUID targetId;
 	private static String targetName = "";
-	private static int rewardCoins;
 	private static long remainingTicks;
 	private static boolean active;
 	private static float alpha;
@@ -38,7 +37,6 @@ public final class ClientBountyHunterState {
 		active = payload.active();
 		targetId = payload.targetId();
 		targetName = payload.targetName();
-		rewardCoins = Math.max(0, payload.rewardGold());
 		remainingTicks = Math.max(0L, payload.remainingTicks());
 	}
 
@@ -59,7 +57,7 @@ public final class ClientBountyHunterState {
 		int a = Math.max(0, Math.min(255, Math.round(alpha * 255.0F)));
 		TextRenderer text = client.textRenderer;
 		int width = 104;
-		int height = 136;
+		int height = 104;
 		int x = context.getScaledWindowWidth() - width - 9;
 		int y = 24;
 
@@ -76,17 +74,14 @@ public final class ClientBountyHunterState {
 		drawRoughBorder(context, x, y, width, height, paperDark, paperLight);
 		drawPaperWear(context, x, y, width, height, a);
 		context.fill(x + 8, y + 38, x + width - 8, y + 41, inkSoft);
-		context.fill(x + 8, y + 89, x + width - 8, y + 92, inkSoft);
 
 		drawCentered(context, text, "WANTED", x, y + 8, width, ink);
 		drawCentered(context, text, "DEAD OR ALIVE", x, y + 23, width, inkSoft);
 		drawHead(context, client, targetId, x + width / 2 - 18, y + 49, a);
 		drawCentered(context, text, trimToWidth(text, targetName, width - 12), x, y + 82, width, ink);
-		drawCentered(context, text, "REWARD", x, y + 99, width, inkSoft);
-		drawCentered(context, text, rewardCoins + " coins", x, y + 111, width, ink);
 		if (remainingTicks > 0L) {
 			String seconds = Math.max(1L, (remainingTicks + 19L) / 20L) + "s left";
-			drawCentered(context, text, seconds, x, y + 124, width, withAlpha(0x5A2F12, a));
+			drawCentered(context, text, seconds, x, y + 94, width, withAlpha(0x5A2F12, a));
 		}
 	}
 

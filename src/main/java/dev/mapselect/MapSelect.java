@@ -37,6 +37,7 @@ import dev.mapselect.role.RoundEndRoleRosterSync;
 import dev.mapselect.role.RoleModifierTuningBridge;
 import dev.mapselect.role.altruist.AltruistManager;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
+import dev.mapselect.role.covenant.CovenantManager;
 import dev.mapselect.role.guardian.GuardianAngelManager;
 import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
@@ -92,6 +93,7 @@ public class MapSelect implements ModInitializer {
 		TricksterManager.register();
 		PuppetmasterManager.register();
 		BountyHunterManager.register();
+		CovenantManager.register();
 		ScatterBrainManager.register();
 		SkincrawlerManager.register();
 		SpyManager.register();

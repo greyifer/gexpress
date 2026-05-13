@@ -10,6 +10,7 @@ import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
+import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.mapselect.MapSelect;
@@ -56,7 +57,10 @@ public final class GexpressGameCategory {
 	private static final String GODFATHER_ID = MapSelect.MOD_ID + ":godfather";
 	private static final String MAFIOSO_ID = MapSelect.MOD_ID + ":mafioso";
 	private static final String JANITOR_ID = MapSelect.MOD_ID + ":janitor";
+	private static final String DRACULA_ID = MapSelect.MOD_ID + ":dracula";
+	private static final String VAMPIRE_ID = MapSelect.MOD_ID + ":vampire";
 	private static final Set<String> MAFIA_ROLE_IDS = Set.of(GODFATHER_ID, MAFIOSO_ID, JANITOR_ID);
+	private static final Set<String> COVENANT_ROLE_IDS = Set.of(DRACULA_ID, VAMPIRE_ID);
 	private static final String EOD_SPECIALIST_ID = MapSelect.MOD_ID + ":eod_specialist";
 	private static final String SHORT_SIGHTED_ID = MapSelect.MOD_ID + ":short_sighted";
 	private static final String HUNGRY_ID = MapSelect.MOD_ID + ":hungry";
@@ -119,6 +123,7 @@ public final class GexpressGameCategory {
 		globalRoleOpts.add(playersPerVigilante);
 		globalRoleOpts.add(playersPerNeutral);
 		globalRoleOpts.add(buildMafiaMinimumPlayersOption());
+		globalRoleOpts.add(buildSpecialRoleOccurrenceOption());
 		globalRoleOpts.add(buildLastDeathShieldOption());
 		globalRoleOpts.add(buildGuardianAngelAllowNonInnocentsOption());
 		globalRoleOpts.add(buildPassiveIncomeOption("killer", 5,
@@ -264,11 +269,16 @@ public final class GexpressGameCategory {
 		bySide.put(RolesDisplay.Side.INNOCENT, new ArrayList<>());
 		bySide.put(RolesDisplay.Side.NEUTRAL, new ArrayList<>());
 		List<String> mafiaRoles = new ArrayList<>();
+		List<String> covenantRoles = new ArrayList<>();
 
 		for (Map.Entry<String, RolesDisplay.RoleDisplay> e : display.entrySet()) {
 			if (isBuiltinNonConfigRole(e.getKey()) || isRetiredExternalVulture(e.getKey())) continue;
 			if (isMafiaRoleId(e.getKey())) {
 				mafiaRoles.add(e.getKey());
+				continue;
+			}
+			if (isCovenantRoleId(e.getKey())) {
+				covenantRoles.add(e.getKey());
 				continue;
 			}
 			RolesDisplay.RoleDisplay rd = e.getValue();
@@ -292,6 +302,10 @@ public final class GexpressGameCategory {
 		if (!mafiaRoles.isEmpty()) {
 			groups.add(buildRoleGroup(Text.translatable("gui.gexpress.config.group.roles.mafia").formatted(Formatting.DARK_GRAY),
 				mafiaRoles, display, weOptsByRole));
+		}
+		if (!covenantRoles.isEmpty()) {
+			groups.add(buildRoleGroup(Text.translatable("gui.gexpress.config.group.roles.covenant").formatted(Formatting.DARK_RED),
+				covenantRoles, display, weOptsByRole));
 		}
 		return groups;
 	}
@@ -441,11 +455,21 @@ public final class GexpressGameCategory {
 
 	private static Option<Integer> buildMafiaMinimumPlayersOption() {
 		return Option.<Integer>createBuilder()
-			.name(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players"))
-			.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_minimum_players.tooltip")))
+			.name(Text.translatable("gui.gexpress.config.option.special_role_minimum_players"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.special_role_minimum_players.tooltip")))
 			.binding(15, GexpressConfig::getMafiaMinimumPlayers, v -> GexpressConfig.mafiaMinimumPlayers = v)
 			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 				.range(GexpressConfig.MAFIA_MINIMUM_PLAYERS_MIN, GexpressConfig.MAFIA_MINIMUM_PLAYERS_MAX))
+			.build();
+	}
+
+	private static Option<GexpressConfig.SpecialRoleOccurrence> buildSpecialRoleOccurrenceOption() {
+		return Option.<GexpressConfig.SpecialRoleOccurrence>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.special_role_occurrence"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.special_role_occurrence.tooltip")))
+			.binding(GexpressConfig.SpecialRoleOccurrence.BOTH, GexpressConfig::getSpecialRoleOccurrence,
+				v -> GexpressConfig.specialRoleOccurrence = v.id())
+			.controller(opt -> EnumControllerBuilder.create(opt).enumClass(GexpressConfig.SpecialRoleOccurrence.class))
 			.build();
 	}
 
@@ -1450,6 +1474,10 @@ public final class GexpressGameCategory {
 
 	private static boolean isMafiaRoleId(String roleId) {
 		return roleId != null && MAFIA_ROLE_IDS.contains(roleId);
+	}
+
+	private static boolean isCovenantRoleId(String roleId) {
+		return roleId != null && COVENANT_ROLE_IDS.contains(roleId);
 	}
 
 	private static OptionGroup errorGroup(String langKey) {

@@ -106,7 +106,7 @@ public final class GuardianAngelManager {
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity guardian) {
 		return AbilityTargeting.findLookTarget(guardian, guardian.getServerWorld().getPlayers(),
-			SHIELD_RANGE, 0.25D, true, DeadPlayerStatus::isLivingRoundParticipant);
+			SHIELD_RANGE, 0.0D, true, DeadPlayerStatus::isLivingRoundParticipant);
 	}
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {

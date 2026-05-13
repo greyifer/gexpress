@@ -90,17 +90,15 @@ public final class ScatterBrainManager {
 
 		int scattered = 0;
 		for (ServerPlayerEntity player : players) {
-			Vec3d pos = findSafePoint(world, player, points);
-			if (pos == null) continue;
-			player.teleport(world, pos.x, pos.y, pos.z,
-				player.getYaw(), player.getPitch());
+			TargetPoint pos = points.get(RANDOM.nextInt(points.size()));
+			player.teleport(world, pos.x(), pos.y(), pos.z(), pos.yaw(), pos.pitch());
 			player.setVelocity(0.0D, 0.0D, 0.0D);
 			player.velocityModified = true;
 			scattered++;
 		}
 
 		if (scattered == 0) {
-			scatterBrain.sendMessage(Text.literal("Scatter Brain could not find safe spots nearby."), true);
+			scatterBrain.sendMessage(Text.literal("Scatter Brain could not find random RTP slots."), true);
 			return;
 		}
 
@@ -121,33 +119,16 @@ public final class ScatterBrainManager {
 				if (preset != null) {
 					if (preset.randomSpawnPositions != null) {
 						for (MapPreset.PosData spawn : preset.randomSpawnPositions) {
-							points.add(new TargetPoint(spawn.x, spawn.z));
+							points.add(TargetPoint.from(spawn));
 						}
 					}
-					if (points.isEmpty() && preset.playArea != null) addBoxPoints(points, preset.playArea.toBox(), 128);
-					if (points.isEmpty() && preset.wholeMapArea != null) addBoxPoints(points, preset.wholeMapArea.toBox(), 128);
 				}
 			} catch (IOException ignored) {
 			}
 		}
 		if (!points.isEmpty()) return points;
 
-		Box playArea = MapVariablesWorldComponent.KEY.get(world).getPlayArea();
-		if (playArea != null) {
-			addBoxPoints(points, playArea, 128);
-			return points;
-		}
-
-		for (ServerPlayerEntity player : world.getPlayers(GameFunctions::isPlayerAliveAndSurvival)) {
-			for (int i = 0; i < 16; i++) {
-				double angle = RANDOM.nextDouble() * Math.PI * 2.0D;
-				double distance = 8.0D + RANDOM.nextDouble() * 56.0D;
-				points.add(new TargetPoint(
-					player.getX() + Math.cos(angle) * distance,
-					player.getZ() + Math.sin(angle) * distance
-				));
-			}
-		}
+		for (MapPreset.PosData spawn : MapPreset.randomSpawnsFrom(world)) points.add(TargetPoint.from(spawn));
 		return points;
 	}
 
@@ -301,5 +282,13 @@ public final class ScatterBrainManager {
 		return Math.max(1L, (ticks + 19L) / 20L);
 	}
 
-	private record TargetPoint(double x, double z) {}
+	private record TargetPoint(double x, double y, double z, float yaw, float pitch) {
+		private TargetPoint(double x, double z) {
+			this(x, 0.0D, z, 0.0F, 0.0F);
+		}
+
+		private static TargetPoint from(MapPreset.PosData pos) {
+			return new TargetPoint(pos.x, pos.y, pos.z, pos.yaw, pos.pitch);
+		}
+	}
 }

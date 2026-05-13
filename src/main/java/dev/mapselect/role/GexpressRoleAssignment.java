@@ -293,17 +293,20 @@ public final class GexpressRoleAssignment {
 				|| role == WatheRoles.LOOSE_END
 				|| MapSelectRoles.MAFIOSO == role
 				|| MapSelectRoles.JANITOR == role
-				|| isMafiaDisabledForLobby(role)
+				|| MapSelectRoles.VAMPIRE == role
+				|| isSpecialRoleDisabledForLobby(role)
 				|| isRetiredExternalVulture(role)) {
 			return false;
 		}
 		return !Harpymodloader.NON_MURDER_ROLES.contains(role);
 	}
 
-	private static boolean isMafiaDisabledForLobby(Role role) {
-		return role == MapSelectRoles.GODFATHER
-			&& assignmentPlayerCount > 0
-			&& assignmentPlayerCount < GexpressConfig.getMafiaMinimumPlayers();
+	private static boolean isSpecialRoleDisabledForLobby(Role role) {
+		if (role != MapSelectRoles.GODFATHER && role != MapSelectRoles.DRACULA) return false;
+		GexpressConfig.SpecialRoleOccurrence occurrence = GexpressConfig.getSpecialRoleOccurrence();
+		if (role == MapSelectRoles.GODFATHER && !occurrence.mafiaEnabled()) return true;
+		if (role == MapSelectRoles.DRACULA && !occurrence.covenantEnabled()) return true;
+		return assignmentPlayerCount > 0 && assignmentPlayerCount < GexpressConfig.getMafiaMinimumPlayers();
 	}
 
 	private static boolean isRetiredExternalVulture(Role role) {

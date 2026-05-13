@@ -343,7 +343,8 @@ public final class GexpressOptionsScreen {
 			GexpressConfig.getMedicShieldBreakFlashTicks(),
 			GexpressConfig.getMedicShieldBlockFlashAlpha(),
 			GexpressConfig.getMedicShieldBreakFlashAlpha(),
-			GexpressConfig.getSilentShadowAlpha()
+			GexpressConfig.getSilentShadowAlpha(),
+			GexpressConfig.getSpecialRoleOccurrenceId()
 		));
 		if (ClientPlayNetworking.canSend(GexpressTaskConfigPayload.ID)) {
 			ClientPlayNetworking.send(new GexpressTaskConfigPayload(

@@ -24,6 +24,52 @@ import java.util.Map;
  * accepted values back to connected clients.
  */
 public final class GexpressConfig {
+	public enum SpecialRoleOccurrence {
+		MAFIA("mafia", true, false),
+		COVENANT("covenant", false, true),
+		BOTH("both", true, true);
+
+		private final String id;
+		private final boolean mafiaEnabled;
+		private final boolean covenantEnabled;
+
+		SpecialRoleOccurrence(String id, boolean mafiaEnabled, boolean covenantEnabled) {
+			this.id = id;
+			this.mafiaEnabled = mafiaEnabled;
+			this.covenantEnabled = covenantEnabled;
+		}
+
+		public String id() {
+			return id;
+		}
+
+		public boolean mafiaEnabled() {
+			return mafiaEnabled;
+		}
+
+		public boolean covenantEnabled() {
+			return covenantEnabled;
+		}
+
+		public static SpecialRoleOccurrence fromId(String id) {
+			if (id != null) {
+				for (SpecialRoleOccurrence value : values()) {
+					if (value.id.equalsIgnoreCase(id) || value.name().equalsIgnoreCase(id)) return value;
+				}
+			}
+			return BOTH;
+		}
+
+		@Override
+		public String toString() {
+			return switch (this) {
+				case MAFIA -> "Mafia";
+				case COVENANT -> "The Covenant";
+				case BOTH -> "Both";
+			};
+		}
+	}
+
 	private GexpressConfig() {}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -157,8 +203,10 @@ public final class GexpressConfig {
 	public static int godfatherMaxLoadedBullets = 3;
 	/** Coins Mafia roles start with when they join the family. */
 	public static int mafiaStartingGold = 100;
-	/** Minimum lobby size required before Godfather can be naturally assigned. */
+	/** Minimum lobby size required before special-role families can be naturally assigned. */
 	public static int mafiaMinimumPlayers = 15;
+	/** Which special-role family can occur once the minimum lobby size is met. */
+	public static String specialRoleOccurrence = SpecialRoleOccurrence.BOTH.id();
 	/** Coins Godfather starts with. */
 	public static int godfatherStartingGold = 100;
 	/** Coins Mafioso starts with. */
@@ -743,6 +791,14 @@ public final class GexpressConfig {
 			Math.min(MAFIA_MINIMUM_PLAYERS_MAX, mafiaMinimumPlayers));
 	}
 
+	public static SpecialRoleOccurrence getSpecialRoleOccurrence() {
+		return SpecialRoleOccurrence.fromId(specialRoleOccurrence);
+	}
+
+	public static String getSpecialRoleOccurrenceId() {
+		return getSpecialRoleOccurrence().id();
+	}
+
 	public static int getGodfatherStartingGold() {
 		return Math.max(MAFIA_STARTING_GOLD_MIN,
 			Math.min(MAFIA_STARTING_GOLD_MAX, godfatherStartingGold));
@@ -1127,6 +1183,7 @@ public final class GexpressConfig {
 			godfatherMaxLoadedBullets = snap.godfatherMaxLoadedBullets;
 			mafiaStartingGold = snap.mafiaStartingGold;
 			mafiaMinimumPlayers = snap.mafiaMinimumPlayers;
+			specialRoleOccurrence = snap.specialRoleOccurrence;
 			godfatherStartingGold = snap.godfatherStartingGold;
 			mafiosoStartingGold = snap.mafiosoStartingGold;
 			janitorStartingGold = snap.janitorStartingGold;
@@ -1258,6 +1315,7 @@ public final class GexpressConfig {
 			snap.godfatherMaxLoadedBullets = godfatherMaxLoadedBullets;
 			snap.mafiaStartingGold = mafiaStartingGold;
 			snap.mafiaMinimumPlayers = mafiaMinimumPlayers;
+			snap.specialRoleOccurrence = specialRoleOccurrence;
 			snap.godfatherStartingGold = godfatherStartingGold;
 			snap.mafiosoStartingGold = mafiosoStartingGold;
 			snap.janitorStartingGold = janitorStartingGold;
@@ -1358,7 +1416,7 @@ public final class GexpressConfig {
 			float shortSightedFogRange,
 			int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
 			int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
-			float silentShadowAlpha) {
+			float silentShadowAlpha, String specialRoleOccurrence) {
 		GexpressConfig.c4Price = c4Price;
 		GexpressConfig.c4FuseSeconds = c4FuseSeconds;
 		GexpressConfig.c4FirstBeepSeconds = c4FirstBeepSeconds;
@@ -1468,6 +1526,7 @@ public final class GexpressConfig {
 		GexpressConfig.medicShieldBlockFlashAlpha = medicShieldBlockFlashAlpha;
 		GexpressConfig.medicShieldBreakFlashAlpha = medicShieldBreakFlashAlpha;
 		GexpressConfig.silentShadowAlpha = silentShadowAlpha;
+		GexpressConfig.specialRoleOccurrence = specialRoleOccurrence;
 		clampInPlace();
 	}
 
@@ -1550,6 +1609,7 @@ public final class GexpressConfig {
 		godfatherMaxLoadedBullets = getGodfatherMaxLoadedBullets();
 		mafiaStartingGold = getMafiaStartingGold();
 		mafiaMinimumPlayers = getMafiaMinimumPlayers();
+		specialRoleOccurrence = getSpecialRoleOccurrenceId();
 		godfatherStartingGold = getGodfatherStartingGold();
 		mafiosoStartingGold = getMafiosoStartingGold();
 		janitorStartingGold = getJanitorStartingGold();
@@ -1724,6 +1784,7 @@ public final class GexpressConfig {
 		int godfatherMaxLoadedBullets = 3;
 		int mafiaStartingGold = 100;
 		int mafiaMinimumPlayers = 15;
+		String specialRoleOccurrence = SpecialRoleOccurrence.BOTH.id();
 		int godfatherStartingGold = 100;
 		int mafiosoStartingGold = 100;
 		int janitorStartingGold = 100;

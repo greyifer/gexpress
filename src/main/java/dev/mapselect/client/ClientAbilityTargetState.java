@@ -4,10 +4,11 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.registry.MapSelectRoles;
-import dev.mapselect.role.AbilityTargeting;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.Identifier;
 
 import java.util.UUID;
@@ -36,12 +37,11 @@ public final class ClientAbilityTargetState {
 		if (!ClientRoleRevealState.canUseRoleAbility(client)) return;
 		TargetSpec spec = targetSpec(client);
 		if (spec == null) return;
-		AbstractClientPlayerEntity target = AbilityTargeting.findLookTarget(client.player, client.world.getPlayers(),
-			spec.range(), 0.25D, true, candidate -> candidate != client.player
-				&& !candidate.isSpectator()
-				&& !candidate.isInvisible()
-				&& !candidate.isRemoved());
-		if (target == null) return;
+		if (client.crosshairTarget == null || client.crosshairTarget.getType() != HitResult.Type.ENTITY) return;
+		if (!(((EntityHitResult) client.crosshairTarget).getEntity() instanceof AbstractClientPlayerEntity target)) return;
+		if (target == client.player || target.isSpectator() || !target.isAlive() || target.isInvisible()
+				|| target.isRemoved() || !client.player.canSee(target)) return;
+		if (client.player.getEyePos().squaredDistanceTo(target.getEyePos()) > spec.range() * spec.range()) return;
 		targetId = target.getUuid();
 		targetColor = spec.color();
 	}
@@ -58,6 +58,9 @@ public final class ClientAbilityTargetState {
 		if (MapSelectRoles.TRACKER_ID.equals(id)) return new TargetSpec(GexpressConfig.getTrackerRange(), 0x3E9CFF);
 		if (MapSelectRoles.SPY_ID.equals(id)) return new TargetSpec(GexpressConfig.getSpyBugRange(), 0x2E6F9E);
 		if (MapSelectRoles.GODFATHER_ID.equals(id)) return new TargetSpec(GexpressConfig.getMafiaRecruitRange(), 0xC5C5C5);
+		if (MapSelectRoles.DRACULA_ID.equals(id) || MapSelectRoles.VAMPIRE_ID.equals(id)) {
+			return new TargetSpec(3.0D, 0xB81832);
+		}
 		return null;
 	}
 

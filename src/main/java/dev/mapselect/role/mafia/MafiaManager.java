@@ -449,7 +449,7 @@ public final class MafiaManager {
 	}
 
 	private static ServerPlayerEntity findTarget(ServerPlayerEntity user, double range) {
-		return AbilityTargeting.findLookTarget(user, user.getServerWorld().getPlayers(), range, 0.25D, true,
+		return AbilityTargeting.findLookTarget(user, user.getServerWorld().getPlayers(), range, 0.0D, true,
 			candidate -> !VultureManager.isStashed(candidate) && DeadPlayerStatus.isLivingRoundParticipant(candidate));
 	}
 

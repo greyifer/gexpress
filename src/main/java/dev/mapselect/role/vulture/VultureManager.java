@@ -113,7 +113,7 @@ public final class VultureManager {
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity vulture) {
-		return AbilityTargeting.findLookTarget(vulture, vulture.getServerWorld().getPlayers(), EAT_RANGE, 0.25D, true,
+		return AbilityTargeting.findLookTarget(vulture, vulture.getServerWorld().getPlayers(), EAT_RANGE, 0.0D, true,
 			candidate -> !isStashed(candidate) && isPlayable(candidate, vulture));
 	}
 
@@ -618,7 +618,20 @@ public final class VultureManager {
 	private static void syncProgress(ServerPlayerEntity vulture, boolean show) {
 		if (vulture == null) return;
 		int eaten = eatenByVulture.getOrDefault(vulture.getUuid(), Set.of()).size();
-		sendProgress(vulture, new VultureProgressPayload(show, eaten, requiredEaten(vulture)));
+		sendProgress(vulture, new VultureProgressPayload(show, eaten, requiredEaten(vulture), bellyEntries(vulture)));
+	}
+
+	private static List<VultureProgressPayload.BellyEntry> bellyEntries(ServerPlayerEntity vulture) {
+		if (vulture == null || vulture.getServer() == null) return List.of();
+		Deque<UUID> belly = stashedByVulture.get(vulture.getUuid());
+		if (belly == null || belly.isEmpty()) return List.of();
+		List<VultureProgressPayload.BellyEntry> out = new ArrayList<>();
+		for (UUID targetId : belly) {
+			ServerPlayerEntity target = vulture.getServer().getPlayerManager().getPlayer(targetId);
+			String name = target == null ? "Offline" : target.getName().getString();
+			out.add(new VultureProgressPayload.BellyEntry(targetId, name));
+		}
+		return out;
 	}
 
 	private static void clearProgress(ServerWorld world) {

@@ -186,7 +186,7 @@ public final class SpyManager {
 		double bestDistanceSq = Double.MAX_VALUE;
 		for (ServerPlayerEntity candidate : spy.getServerWorld().getPlayers()) {
 			if (candidate == spy || VultureManager.isStashed(candidate) || !isPlayable(candidate, spy)) continue;
-			var hit = candidate.getBoundingBox().expand(0.25D).raycast(eye, end);
+			var hit = candidate.getBoundingBox().raycast(eye, end);
 			if (hit.isEmpty() || !spy.canSee(candidate)) continue;
 			double distanceSq = eye.squaredDistanceTo(hit.get());
 			if (distanceSq >= bestDistanceSq) continue;

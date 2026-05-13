@@ -9,7 +9,6 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.network.BountyHunterStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.vulture.VultureManager;
@@ -38,7 +37,6 @@ public final class BountyHunterManager {
 	private static final Map<UUID, Long> deadlineByHunter = new HashMap<>();
 	private static final Map<UUID, Long> penaltyUntilByHunter = new HashMap<>();
 	private static final Map<UUID, Long> nextMessageTickByHunter = new HashMap<>();
-	private static final List<PendingBalanceAdjustment> pendingBalanceAdjustments = new ArrayList<>();
 	private static int tickGate;
 
 	private BountyHunterManager() {}
@@ -53,7 +51,6 @@ public final class BountyHunterManager {
 
 	private static void tick(ServerWorld world) {
 		if (world.getRegistryKey() != World.OVERWORLD) return;
-		applyPendingBalanceAdjustments(world);
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean active = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
 		if (!active && !GexpressTestState.hasRoleTesters()) {
@@ -132,7 +129,7 @@ public final class BountyHunterManager {
 		List<ServerPlayerEntity> out = new ArrayList<>();
 		for (ServerPlayerEntity player : hunter.getServerWorld().getPlayers()) {
 			if (player == hunter || VultureManager.isStashed(player) || !isPlayable(player, hunter)) continue;
-			if (isKillerSide(game, player)) continue;
+			if (!isBountyCandidateSide(game, player)) continue;
 			out.add(player);
 		}
 		return out;
@@ -144,44 +141,20 @@ public final class BountyHunterManager {
 		}
 		if (!isBountyHunter(hunter)) return true;
 		boolean bountyTarget = target.getUuid().equals(targetByHunter.get(hunter.getUuid()));
-		int desiredNet = bountyTarget ? GexpressConfig.getBountyHunterRewardGold() : -50;
-		int startingBalance = PlayerShopComponent.KEY.get(hunter).balance;
-		long now = hunter.getWorld().getTime();
-		pendingBalanceAdjustments.add(new PendingBalanceAdjustment(hunter.getUuid(), target.getUuid(),
-			startingBalance, desiredNet, bountyTarget, now + 2L, now + 40L));
-		return true;
-	}
-
-	private static void applyPendingBalanceAdjustments(ServerWorld world) {
-		if (pendingBalanceAdjustments.isEmpty()) return;
-		long now = world.getTime();
-		for (int i = pendingBalanceAdjustments.size() - 1; i >= 0; i--) {
-			PendingBalanceAdjustment pending = pendingBalanceAdjustments.get(i);
-			if (now > pending.expiresAtTick()) {
-				pendingBalanceAdjustments.remove(i);
-				continue;
+		PlayerShopComponent shop = PlayerShopComponent.KEY.get(hunter);
+		if (bountyTarget) {
+			shop.addToBalance(GexpressConfig.getBountyHunterRewardGold());
+			PlayerShopComponent.KEY.sync(hunter);
+			clearHunter(hunter.getUuid());
+			sendClear(hunter);
+		} else {
+			int penalty = Math.min(50, Math.max(0, shop.balance));
+			if (penalty > 0) {
+				shop.addToBalance(-penalty);
+				PlayerShopComponent.KEY.sync(hunter);
 			}
-			if (now < pending.applyAtTick()) continue;
-
-			ServerPlayerEntity hunter = world.getServer().getPlayerManager().getPlayer(pending.hunterId());
-			if (hunter != null) {
-				PlayerShopComponent shop = PlayerShopComponent.KEY.get(hunter);
-				int targetBalance = Math.max(0, pending.startingBalance() + pending.desiredNet());
-				if (shop.balance != targetBalance) {
-					shop.setBalance(targetBalance);
-					PlayerShopComponent.KEY.sync(hunter);
-				}
-				if (pending.bountyTarget()) {
-					int reward = GexpressConfig.getBountyHunterRewardGold();
-					hunter.sendMessage(Text.literal("Bounty claimed: +" + reward + " coins.").formatted(Formatting.GOLD), true);
-					clearHunter(hunter.getUuid());
-					sendClear(hunter);
-				} else {
-					hunter.sendMessage(Text.literal("Wrong target: -50 coins.").formatted(Formatting.RED), true);
-				}
-			}
-			pendingBalanceAdjustments.remove(i);
 		}
+		return true;
 	}
 
 	private static void startPenalty(ServerWorld world, ServerPlayerEntity hunter) {
@@ -218,6 +191,12 @@ public final class BountyHunterManager {
 		if (game == null || player == null) return false;
 		Role role = game.getRole(player);
 		return game.canUseKillerFeatures(player) || (role != null && role.canUseKiller());
+	}
+
+	private static boolean isBountyCandidateSide(GameWorldComponent game, ServerPlayerEntity player) {
+		if (game == null || player == null) return false;
+		Role role = game.getRole(player);
+		return role != null && role.isInnocent() && !game.canUseKillerFeatures(player) && !role.canUseKiller();
 	}
 
 	private static boolean isPlayable(PlayerEntity player, PlayerEntity user) {
@@ -268,7 +247,6 @@ public final class BountyHunterManager {
 		deadlineByHunter.clear();
 		penaltyUntilByHunter.clear();
 		nextMessageTickByHunter.clear();
-		pendingBalanceAdjustments.clear();
 		tickGate = 0;
 	}
 
@@ -288,9 +266,6 @@ public final class BountyHunterManager {
 
 	public record TimeState(Map<UUID, UUID> targetByHunter, Map<UUID, Long> deadlineByHunter,
 			Map<UUID, Long> penaltyUntilByHunter, Map<UUID, Long> nextMessageTickByHunter) {}
-
-	private record PendingBalanceAdjustment(UUID hunterId, UUID victimId, int startingBalance, int desiredNet,
-			boolean bountyTarget, long applyAtTick, long expiresAtTick) {}
 
 	private static long secondsCeil(long ticks) {
 		return Math.max(1L, (ticks + 19L) / 20L);

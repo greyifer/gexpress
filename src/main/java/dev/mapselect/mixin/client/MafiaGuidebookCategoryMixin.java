@@ -21,6 +21,10 @@ public abstract class MafiaGuidebookCategoryMixin {
 		MapSelect.MOD_ID + ":mafioso",
 		MapSelect.MOD_ID + ":janitor"
 	);
+	private static final Set<String> GEXPRESS$COVENANT_ROLES = Set.of(
+		MapSelect.MOD_ID + ":dracula",
+		MapSelect.MOD_ID + ":vampire"
+	);
 
 	@Inject(method = "buildRoles", at = @At("RETURN"), cancellable = true, require = 0)
 	private static void gexpress$moveMafiaRolesToFamilySection(
@@ -30,22 +34,35 @@ public abstract class MafiaGuidebookCategoryMixin {
 
 		List<GuidebookEntry> normal = new ArrayList<>(entries.size());
 		List<GuidebookEntry> mafia = new ArrayList<>();
+		List<GuidebookEntry> covenant = new ArrayList<>();
 		for (GuidebookEntry entry : entries) {
 			String id = entry == null ? null : entry.id();
 			if (id != null && GEXPRESS$MAFIA_ROLES.contains(id)) {
 				mafia.add(entry);
+			} else if (id != null && GEXPRESS$COVENANT_ROLES.contains(id)) {
+				covenant.add(entry);
 			} else {
 				normal.add(entry);
 			}
 		}
-		if (mafia.isEmpty()) return;
+		if (mafia.isEmpty() && covenant.isEmpty()) return;
 
-		normal.add(GuidebookEntry.spacer());
-		normal.add(GuidebookEntry.header(
-			Text.translatable("gui.gexpress.guidebook.roles.side.mafia").formatted(Formatting.DARK_GRAY),
-			0x555555
-		));
-		normal.addAll(mafia);
+		if (!mafia.isEmpty()) {
+			normal.add(GuidebookEntry.spacer());
+			normal.add(GuidebookEntry.header(
+				Text.translatable("gui.gexpress.guidebook.roles.side.mafia").formatted(Formatting.DARK_GRAY),
+				0x555555
+			));
+			normal.addAll(mafia);
+		}
+		if (!covenant.isEmpty()) {
+			normal.add(GuidebookEntry.spacer());
+			normal.add(GuidebookEntry.header(
+				Text.translatable("gui.gexpress.guidebook.roles.side.covenant").formatted(Formatting.DARK_RED),
+				0xB81832
+			));
+			normal.addAll(covenant);
+		}
 		cir.setReturnValue(normal);
 	}
 }

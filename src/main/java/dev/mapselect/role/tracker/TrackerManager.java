@@ -108,7 +108,7 @@ public final class TrackerManager {
 
 	private static ServerPlayerEntity findTarget(ServerPlayerEntity tracker) {
 		double range = GexpressConfig.getTrackerRange();
-		return AbilityTargeting.findLookTarget(tracker, tracker.getServerWorld().getPlayers(), range, 0.25D, true,
+		return AbilityTargeting.findLookTarget(tracker, tracker.getServerWorld().getPlayers(), range, 0.0D, true,
 			candidate -> !VultureManager.isStashed(candidate) && isPlayable(candidate, tracker));
 	}
 

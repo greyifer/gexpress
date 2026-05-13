@@ -2,6 +2,7 @@ package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.gamemode.MurderGameMode;
+import dev.mapselect.role.covenant.CovenantManager;
 import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
 import dev.mapselect.role.vulture.VultureManager;
@@ -17,6 +18,7 @@ public abstract class JuggernautMurderWinMixin {
 	private void gexpress$soloJuggernautWin(ServerWorld world, GameWorldComponent game, CallbackInfo ci) {
 		if (VultureManager.handleMurderTick(world, game)
 				|| MafiaManager.handleMurderTick(world, game)
+				|| CovenantManager.handleMurderTick(world, game)
 				|| JuggernautManager.handleMurderTick(world, game)) {
 			ci.cancel();
 		}

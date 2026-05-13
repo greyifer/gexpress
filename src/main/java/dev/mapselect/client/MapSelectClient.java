@@ -64,6 +64,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientMafiaState.register();
 		ClientJanitorState.register();
 		ClientBountyHunterState.register();
+		ClientCovenantState.register();
 		ClientBodyguardState.register();
 		ClientGuardianAngelState.register();
 		ClientAbilityTargetState.register();
@@ -225,7 +226,8 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.medicShieldBreakFlashTicks(),
 				payload.medicShieldBlockFlashAlpha(),
 				payload.medicShieldBreakFlashAlpha(),
-				payload.silentShadowAlpha()
+				payload.silentShadowAlpha(),
+				payload.specialRoleOccurrence()
 				);
 		GuidebookScreen.invalidateIfOpen();
 	}

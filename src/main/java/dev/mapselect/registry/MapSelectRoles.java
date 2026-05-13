@@ -7,6 +7,9 @@ import dev.mapselect.MapSelect;
 import net.minecraft.util.Identifier;
 
 public final class MapSelectRoles {
+	private static final int CIVILIAN_STAMINA = GameConstants.getInTicks(0, 10);
+	private static final int DOUBLE_CIVILIAN_STAMINA = GameConstants.getInTicks(0, 20);
+
 	public static final Identifier BOMB_SPECIALIST_ID = Identifier.of(MapSelect.MOD_ID, "bomb_specialist");
 	public static final Identifier MEDIC_ID = Identifier.of(MapSelect.MOD_ID, "medic");
 	public static final Identifier SNITCH_ID = Identifier.of(MapSelect.MOD_ID, "snitch");
@@ -28,6 +31,8 @@ public final class MapSelectRoles {
 	public static final Identifier GODFATHER_ID = Identifier.of(MapSelect.MOD_ID, "godfather");
 	public static final Identifier MAFIOSO_ID = Identifier.of(MapSelect.MOD_ID, "mafioso");
 	public static final Identifier JANITOR_ID = Identifier.of(MapSelect.MOD_ID, "janitor");
+	public static final Identifier DRACULA_ID = Identifier.of(MapSelect.MOD_ID, "dracula");
+	public static final Identifier VAMPIRE_ID = Identifier.of(MapSelect.MOD_ID, "vampire");
 
 	public static Role BOMB_SPECIALIST;
 	public static Role MEDIC;
@@ -50,6 +55,8 @@ public final class MapSelectRoles {
 	public static Role GODFATHER;
 	public static Role MAFIOSO;
 	public static Role JANITOR;
+	public static Role DRACULA;
+	public static Role VAMPIRE;
 
 	public static void register() {
 		// Killer-side role. Same build as vanilla Killer:
@@ -71,7 +78,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -81,7 +88,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -91,7 +98,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -101,7 +108,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -131,7 +138,7 @@ public final class MapSelectRoles {
 			false,
 			false,
 			Role.MoodType.FAKE,
-			-1,
+			DOUBLE_CIVILIAN_STAMINA,
 			true
 		));
 
@@ -191,7 +198,7 @@ public final class MapSelectRoles {
 			false,
 			false,
 			Role.MoodType.FAKE,
-			-1,
+			DOUBLE_CIVILIAN_STAMINA,
 			true
 		));
 
@@ -201,7 +208,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -211,7 +218,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -221,7 +228,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -231,7 +238,7 @@ public final class MapSelectRoles {
 			true,
 			false,
 			Role.MoodType.REAL,
-			GameConstants.getInTicks(0, 10),
+			CIVILIAN_STAMINA,
 			false
 		));
 
@@ -241,7 +248,7 @@ public final class MapSelectRoles {
 			false,
 			false,
 			Role.MoodType.FAKE,
-			-1,
+			DOUBLE_CIVILIAN_STAMINA,
 			true
 		));
 
@@ -251,7 +258,7 @@ public final class MapSelectRoles {
 			false,
 			false,
 			Role.MoodType.FAKE,
-			-1,
+			DOUBLE_CIVILIAN_STAMINA,
 			true
 		));
 
@@ -261,7 +268,27 @@ public final class MapSelectRoles {
 			false,
 			false,
 			Role.MoodType.FAKE,
-			-1,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		DRACULA = WatheRoles.registerRole(new Role(
+			DRACULA_ID,
+			0xB81832,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		VAMPIRE = WatheRoles.registerRole(new Role(
+			VAMPIRE_ID,
+			0x7C1330,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
 			true
 		));
 	}

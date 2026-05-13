@@ -95,7 +95,7 @@ public final class GexpressConfigSyncHandler {
 						payload.shortSightedFogRange(),
 						payload.medicShieldBlockFlashTicks(), payload.medicShieldBreakFlashTicks(),
 						payload.medicShieldBlockFlashAlpha(), payload.medicShieldBreakFlashAlpha(),
-						payload.silentShadowAlpha());
+						payload.silentShadowAlpha(), payload.specialRoleOccurrence());
 					GexpressConfigSyncPayload after = currentPayload();
 					if (after.equals(before)) return;
 
@@ -360,7 +360,8 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getMedicShieldBreakFlashTicks(),
 			GexpressConfig.getMedicShieldBlockFlashAlpha(),
 			GexpressConfig.getMedicShieldBreakFlashAlpha(),
-			GexpressConfig.getSilentShadowAlpha()
+			GexpressConfig.getSilentShadowAlpha(),
+			GexpressConfig.getSpecialRoleOccurrenceId()
 		);
 	}
 

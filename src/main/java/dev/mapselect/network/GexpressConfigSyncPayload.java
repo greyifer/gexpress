@@ -51,14 +51,19 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		float shortSightedFogRange,
 		int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
 		int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
-		float silentShadowAlpha) implements CustomPayload {
+		float silentShadowAlpha, String specialRoleOccurrence) implements CustomPayload {
 
-	private static final int WIRE_VERSION = 3;
+	private static final int WIRE_VERSION = 4;
+	private static final String DEFAULT_SPECIAL_ROLE_OCCURRENCE = "both";
 
 	public static final CustomPayload.Id<GexpressConfigSyncPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "config_sync_v2"));
 	public static final CustomPayload.Id<GexpressConfigSyncPayload> LEGACY_ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "config_sync"));
+
+	public GexpressConfigSyncPayload {
+		specialRoleOccurrence = specialRoleOccurrence == null ? DEFAULT_SPECIAL_ROLE_OCCURRENCE : specialRoleOccurrence;
+	}
 
 	public static final PacketCodec<PacketByteBuf, GexpressConfigSyncPayload> CODEC = PacketCodec.of(
 		(payload, buf) -> {
@@ -183,29 +188,32 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		buf.writeInt(payload.medicShieldBlockFlashAlpha());
 		buf.writeInt(payload.medicShieldBreakFlashAlpha());
 		buf.writeFloat(payload.silentShadowAlpha());
+		buf.writeString(payload.specialRoleOccurrence(), 32);
 	}
 
 	private static GexpressConfigSyncPayload decodeVersioned(PacketByteBuf buf) {
 		int version = buf.readVarInt();
+		if (version == 3) return decodeFields(buf, true, false);
 		if (version != WIRE_VERSION) {
 			throw new IllegalArgumentException("Unsupported G'Express config sync version " + version);
 		}
-		return decodeFields(buf, true);
+		return decodeFields(buf, true, true);
 	}
 
 	private static GexpressConfigSyncPayload decodeLegacy(PacketByteBuf buf) {
 		int start = buf.readerIndex();
 		try {
-			GexpressConfigSyncPayload payload = decodeFields(buf, true);
+			GexpressConfigSyncPayload payload = decodeFields(buf, true, false);
 			if (buf.readableBytes() == 0) return payload;
 		} catch (RuntimeException ignored) {
 			// Fall back to the pre-Guardian-Angel wire layout below.
 		}
 		buf.readerIndex(start);
-		return decodeFields(buf, false);
+		return decodeFields(buf, false, false);
 	}
 
-	private static GexpressConfigSyncPayload decodeFields(PacketByteBuf buf, boolean includesGuardianAngelSetting) {
+	private static GexpressConfigSyncPayload decodeFields(PacketByteBuf buf, boolean includesGuardianAngelSetting,
+			boolean includesSpecialRoleOccurrence) {
 		return new GexpressConfigSyncPayload(
 			buf.readInt(), // c4Price
 			buf.readInt(), // c4FuseSeconds
@@ -315,7 +323,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // medicShieldBreakFlashTicks
 			buf.readInt(), // medicShieldBlockFlashAlpha
 			buf.readInt(), // medicShieldBreakFlashAlpha
-			buf.readFloat() // silentShadowAlpha
+			buf.readFloat(), // silentShadowAlpha
+			includesSpecialRoleOccurrence ? buf.readString(32) : DEFAULT_SPECIAL_ROLE_OCCURRENCE
 		);
 	}
 

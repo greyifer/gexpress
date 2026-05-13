@@ -143,7 +143,7 @@ public final class WarlockManager {
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity player, double range) {
-		return AbilityTargeting.findLookTarget(player, player.getServerWorld().getPlayers(), range, 0.25D, true,
+		return AbilityTargeting.findLookTarget(player, player.getServerWorld().getPlayers(), range, 0.0D, true,
 			candidate -> isPlayableForWarlock(candidate, player));
 	}
 

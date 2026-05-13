@@ -3,6 +3,7 @@ package dev.mapselect.voice;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.VoicechatPlugin;
 import de.maxhenkel.voicechat.api.events.CreateGroupEvent;
+import de.maxhenkel.voicechat.api.events.ClientReceiveSoundEvent;
 import de.maxhenkel.voicechat.api.events.EntitySoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.LocationalSoundPacketEvent;
@@ -36,6 +37,10 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 	public void registerEvents(EventRegistration registration) {
 		try {
 			registration.registerEvent(OpenALSoundEvent.Post.class, this::onOpenALSound);
+		} catch (Throwable ignored) {
+		}
+		try {
+			registration.registerEvent(ClientReceiveSoundEvent.class, this::onClientReceiveSound);
 		} catch (Throwable ignored) {
 		}
 		registration.registerEvent(MicrophonePacketEvent.class, this::onMicrophonePacket);
@@ -98,6 +103,11 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		if (nativePlayer instanceof ServerPlayerEntity player) {
 			player.sendMessage(Text.literal("Only operators can create voice chat groups.").formatted(Formatting.RED), true);
 		}
+	}
+
+	private void onClientReceiveSound(ClientReceiveSoundEvent event) {
+		if (event == null || event.getRawAudio() == null || event.getRawAudio().length == 0) return;
+		ClientVoiceActivity.markSpeaking(event.getId());
 	}
 
 	private void onOpenALSound(OpenALSoundEvent.Post event) {
