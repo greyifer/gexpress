@@ -49,7 +49,7 @@ public final class RoleModifierTuningBridge {
 		}
 		for (Map.Entry<String, Integer> entry : RoleModifierTuningConfig.modifierMaxEntries().entrySet()) {
 			Identifier id = parse(entry.getKey());
-			if (id != null && !isFixedPairLovers(id)) putModifierMax(id, entry.getValue());
+			if (id != null) putModifierMax(id, isFixedPairLovers(id) ? Math.min(2, entry.getValue()) : entry.getValue());
 		}
 	}
 
@@ -125,6 +125,8 @@ public final class RoleModifierTuningBridge {
 	}
 
 	private static boolean isFixedPairLovers(Identifier id) {
-		return "stupid_express".equals(id.getNamespace()) && "lovers".equals(id.getPath());
+		if (id == null) return false;
+		return id.getNamespace().toLowerCase(java.util.Locale.ROOT).contains("stupid")
+			&& id.getPath().toLowerCase(java.util.Locale.ROOT).contains("lover");
 	}
 }

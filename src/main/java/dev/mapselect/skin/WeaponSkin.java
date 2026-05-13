@@ -8,7 +8,7 @@ public enum WeaponSkin {
 	HOST("host", "Host", 0x559CFF, false, Set.of(WeaponSkinType.KNIFE, WeaponSkinType.GUN)),
 	TRUSTED("trusted", "Trusted", 0xF2C94C, false, Set.of(WeaponSkinType.KNIFE, WeaponSkinType.GUN)),
 	DEV("dev", "Dev", 0xCBFF2E, false, Set.of(WeaponSkinType.KNIFE, WeaponSkinType.GUN)),
-	PASSENGER("passenger", "Passenger", 0x8EA1AD, false, Set.of(WeaponSkinType.GUN)),
+	PASSENGER("passenger", "Default", 0x8EA1AD, false, Set.of(WeaponSkinType.GUN)),
 	COLA("cola", "Cola", 0xE63B34, false, Set.of(WeaponSkinType.GUN)),
 	GOLD("gold", "Gold", 0xF2C94C, false, Set.of(WeaponSkinType.GUN)),
 	JEM("jem", "Jem", 0x82D97A, false, Set.of(WeaponSkinType.GUN));
@@ -45,6 +45,23 @@ public enum WeaponSkin {
 
 	public boolean supports(WeaponSkinType type) {
 		return type != null && types.contains(type);
+	}
+
+	public WeaponSkin logical(WeaponSkinType type) {
+		if (type == WeaponSkinType.GUN) {
+			return switch (this) {
+				case PASSENGER -> DEFAULT;
+				case HOST -> GOLD;
+				case TRUSTED -> COLA;
+				default -> this;
+			};
+		}
+		return this;
+	}
+
+	public boolean visibleInPicker(WeaponSkinType type) {
+		if (!supports(type)) return false;
+		return type != WeaponSkinType.GUN || (this != PASSENGER && this != HOST && this != TRUSTED);
 	}
 
 	public static WeaponSkin byId(String raw) {

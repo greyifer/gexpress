@@ -31,6 +31,7 @@ public final class GexpressDevCategory {
 			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
 			.group(c4BackModelGroup())
 			.group(spyBugModelGroup())
+			.group(modelPlacementEditorGroup())
 			.group(modelDefaultsExportGroup())
 			.group(c4PlacementPresetsOption())
 			.group(roleDescriptionsGroup())
@@ -114,6 +115,21 @@ public final class GexpressDevCategory {
 				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.model_defaults_export.tooltip")))
 				.text(Text.translatable("gui.gexpress.config.option.dev.model_defaults_export.copy"))
 				.action((screen, option) -> copyModelDefaultsToClipboard())
+				.build())
+			.build();
+	}
+
+	private static OptionGroup modelPlacementEditorGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.model_placement_editor"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.model_placement_editor.tooltip")))
+			.collapsed(false)
+			.option(ButtonOption.createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.dev.model_placement_editor"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.model_placement_editor.tooltip")))
+				.text(Text.translatable("gui.gexpress.config.option.dev.model_placement_editor.open"))
+				.action((screen, option) -> MinecraftClient.getInstance()
+					.setScreen(new GexpressModelPlacementScreen(screen)))
 				.build())
 			.build();
 	}

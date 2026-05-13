@@ -63,8 +63,9 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 		WeaponSkinType type = stack.isOf(WatheItems.KNIFE) ? WeaponSkinType.KNIFE
 			: stack.isOf(WatheItems.REVOLVER) ? WeaponSkinType.GUN : null;
 		WeaponSkin skin = resolveSkin(stack, entity);
-		if (skin == null || skin == WeaponSkin.DEFAULT || !skin.supports(type)) return null;
+		if (skin == null || !skin.supports(type)) return null;
 		if (stack.isOf(WatheItems.KNIFE)) {
+			if (skin == WeaponSkin.DEFAULT) return null;
 			return switch (skin) {
 				case DEV -> DEV_KNIFE_MODEL;
 				case TRUSTED -> TRUSTED_KNIFE_MODEL;
@@ -73,23 +74,22 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 			};
 		}
 		if (stack.isOf(WatheItems.REVOLVER)) {
-			if (!GexpressConfig.use3dGunSkins() && !hasFlatGunModel(skin)) return null;
+			if (!GexpressConfig.use3dGunSkins()) {
+				return switch (skin.logical(WeaponSkinType.GUN)) {
+					case GOLD -> HOST_REVOLVER_MODEL;
+					case COLA -> TRUSTED_REVOLVER_MODEL;
+					default -> null;
+				};
+			}
 			return switch (skin) {
 				case DEV -> DEV_REVOLVER_MODEL;
-				case TRUSTED -> TRUSTED_REVOLVER_MODEL;
-				case HOST -> HOST_REVOLVER_MODEL;
-				case PASSENGER -> PASSENGER_REVOLVER_MODEL;
-				case COLA -> COLA_REVOLVER_MODEL;
-				case GOLD -> GOLD_REVOLVER_MODEL;
+				case DEFAULT, PASSENGER -> PASSENGER_REVOLVER_MODEL;
+				case TRUSTED, COLA -> COLA_REVOLVER_MODEL;
+				case HOST, GOLD -> GOLD_REVOLVER_MODEL;
 				case JEM -> JEM_REVOLVER_MODEL;
-				default -> null;
 			};
 		}
 		return null;
-	}
-
-	private static boolean hasFlatGunModel(WeaponSkin skin) {
-		return skin == WeaponSkin.HOST || skin == WeaponSkin.TRUSTED;
 	}
 
 	private static WeaponSkin resolveSkin(ItemStack stack, LivingEntity entity) {

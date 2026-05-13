@@ -115,6 +115,11 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 		return settings == null ? 0 : settings.priority();
 	}
 
+	public Set<String> permissions(PlayerTag tag) {
+		BuiltinTagSettings settings = getBuiltinTagSettings(tag);
+		return settings == null ? Set.of() : settings.permissions();
+	}
+
 	public boolean setBuiltinTagColor(String id, int color) {
 		PlayerTag tag = PlayerTag.byId(id);
 		if (tag == null) return false;
@@ -127,6 +132,17 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 		if (tag == null) return false;
 		BuiltinTagSettings current = getBuiltinTagSettings(tag);
 		return putBuiltinTagSettings(tag, current.withPriority(priority));
+	}
+
+	public boolean setBuiltinTagPermission(String id, String permission, boolean enabled) {
+		PlayerTag tag = PlayerTag.byId(id);
+		String key = normalizeCustomId(permission);
+		if (tag == null || key == null) return false;
+		BuiltinTagSettings current = getBuiltinTagSettings(tag);
+		LinkedHashSet<String> permissions = new LinkedHashSet<>(current.permissions());
+		boolean changed = enabled ? permissions.add(key) : permissions.remove(key);
+		if (!changed) return false;
+		return putBuiltinTagSettings(tag, current.withPermissions(permissions));
 	}
 
 	public boolean resetBuiltinTag(String id) {
@@ -161,8 +177,17 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	}
 
 	public boolean hasCustomPermission(UUID uuid, String permission) {
+		return hasPermission(uuid, Set.of(), permission);
+	}
+
+	public boolean hasPermission(UUID uuid, Iterable<PlayerTag> builtinTags, String permission) {
 		String key = normalizeCustomId(permission);
 		if (key == null) return false;
+		if (builtinTags != null) {
+			for (PlayerTag tag : builtinTags) {
+				if (tag != null && permissions(tag).contains(key)) return true;
+			}
+		}
 		for (String tagId : getPlayerCustomTags(uuid)) {
 			CustomTag tag = customTags.get(tagId);
 			if (tag != null && tag.permissions().contains(key)) return true;
@@ -266,7 +291,16 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			if (playerTag == null) continue;
 			int color = entry.contains("color") ? entry.getInt("color") : playerTag.color();
 			int priority = entry.contains("priority") ? entry.getInt("priority") : playerTag.priority();
-			BuiltinTagSettings settings = new BuiltinTagSettings(color, priority);
+			LinkedHashSet<String> permissions = new LinkedHashSet<>(defaultPermissions(playerTag));
+			NbtList permissionList = entry.getList("permissions", NbtElement.STRING_TYPE);
+			if (entry.contains("permissions")) {
+				permissions.clear();
+				for (int j = 0; j < permissionList.size(); j++) {
+					String permission = normalizeCustomId(permissionList.getString(j));
+					if (permission != null) permissions.add(permission);
+				}
+			}
+			BuiltinTagSettings settings = new BuiltinTagSettings(color, priority, permissions);
 			if (!settings.equals(BuiltinTagSettings.from(playerTag))) {
 				builtinTagSettings.put(playerTag, settings);
 			}
@@ -325,6 +359,11 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			out.putString("id", entry.getKey().id());
 			out.putInt("color", entry.getValue().color());
 			out.putInt("priority", entry.getValue().priority());
+			NbtList permissions = new NbtList();
+			for (String permission : entry.getValue().permissions()) {
+				permissions.add(net.minecraft.nbt.NbtString.of(permission));
+			}
+			out.put("permissions", permissions);
 			builtinDefinitions.add(out);
 		}
 		tag.put("builtinTagSettings", builtinDefinitions);
@@ -386,21 +425,38 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 		return cleaned;
 	}
 
-	public record BuiltinTagSettings(int color, int priority) {
+	private static Set<String> defaultPermissions(PlayerTag tag) {
+		if (tag == null) return Set.of();
+		return switch (tag) {
+			case OWNER -> Set.of("owner", "admin", "host", "setup", "builder", "staff", "trusted");
+			case DEV -> Set.of("admin", "host", "setup", "builder", "staff", "trusted");
+			case STAFF -> Set.of("admin", "host", "setup", "builder", "staff");
+			case HOST -> Set.of("host", "setup", "builder");
+			case TRUSTED -> Set.of("trusted");
+			default -> Set.of();
+		};
+	}
+
+	public record BuiltinTagSettings(int color, int priority, Set<String> permissions) {
 		public BuiltinTagSettings {
 			color &= 0xFFFFFF;
+			permissions = Set.copyOf(permissions == null ? Set.of() : permissions);
 		}
 
 		public static BuiltinTagSettings from(PlayerTag tag) {
-			return new BuiltinTagSettings(tag.color(), tag.priority());
+			return new BuiltinTagSettings(tag.color(), tag.priority(), defaultPermissions(tag));
 		}
 
 		public BuiltinTagSettings withColor(int color) {
-			return new BuiltinTagSettings(color, priority);
+			return new BuiltinTagSettings(color, priority, permissions);
 		}
 
 		public BuiltinTagSettings withPriority(int priority) {
-			return new BuiltinTagSettings(color, priority);
+			return new BuiltinTagSettings(color, priority, permissions);
+		}
+
+		public BuiltinTagSettings withPermissions(Set<String> permissions) {
+			return new BuiltinTagSettings(color, priority, permissions);
 		}
 	}
 

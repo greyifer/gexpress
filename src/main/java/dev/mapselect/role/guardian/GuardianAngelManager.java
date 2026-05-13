@@ -10,6 +10,7 @@ import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.GuardianAngelShieldStatePayload;
 import dev.mapselect.network.GuardianAngelShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.vulture.VultureManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -19,7 +20,6 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
@@ -33,7 +33,6 @@ public final class GuardianAngelManager {
 	private static final int SHIELD_DURATION_TICKS = 100;
 	private static final int SYNC_INTERVAL_TICKS = 10;
 	private static final double SHIELD_RANGE = 32.0D;
-	private static final double LOOK_RADIUS_SQUARED = 1.75D;
 
 	private static UUID guardianId;
 	private static boolean guardianUsed;
@@ -106,21 +105,8 @@ public final class GuardianAngelManager {
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity guardian) {
-		Vec3d eye = guardian.getEyePos();
-		Vec3d look = guardian.getRotationVec(1.0F).normalize();
-		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
-		for (ServerPlayerEntity candidate : guardian.getServerWorld().getPlayers()) {
-			if (candidate == guardian || !DeadPlayerStatus.isLivingRoundParticipant(candidate)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > SHIELD_RANGE || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > LOOK_RADIUS_SQUARED || !guardian.canSee(candidate)) continue;
-			best = candidate;
-			bestAlong = along;
-		}
-		return best;
+		return AbilityTargeting.findLookTarget(guardian, guardian.getServerWorld().getPlayers(),
+			SHIELD_RANGE, 0.25D, true, DeadPlayerStatus::isLivingRoundParticipant);
 	}
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {

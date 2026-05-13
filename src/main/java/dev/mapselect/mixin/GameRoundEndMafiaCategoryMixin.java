@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
+import dev.mapselect.role.RoundEndRoleRosterSync;
 import dev.mapselect.role.mafia.MafiaManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.World;
@@ -31,6 +32,7 @@ public abstract class GameRoundEndMafiaCategoryMixin {
 			dev.doctor4t.wathe.game.GameFunctions.WinStatus winStatus, CallbackInfo ci) {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		if (game == null || this.players.isEmpty()) return;
+		RoundEndRoleRosterSync.send(world, players);
 		boolean changed = false;
 		for (int i = 0; i < this.players.size(); i++) {
 			GameRoundEndComponent.RoundEndData entry = this.players.get(i);

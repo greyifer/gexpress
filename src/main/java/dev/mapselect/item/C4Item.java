@@ -89,9 +89,6 @@ public class C4Item extends Item {
 			stack.decrement(1);
 		}
 
-		world.playSound(null, target.getX(), target.getY(), target.getZ(),
-			SoundEvents.ENTITY_TNT_PRIMED, SoundCategory.PLAYERS, 0.8F, 1.3F);
-
 		return ActionResult.CONSUME;
 	}
 

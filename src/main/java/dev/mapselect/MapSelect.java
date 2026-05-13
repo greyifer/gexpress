@@ -33,6 +33,7 @@ import dev.mapselect.role.KillerRoleInfoManager;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
+import dev.mapselect.role.RoundEndRoleRosterSync;
 import dev.mapselect.role.RoleModifierTuningBridge;
 import dev.mapselect.role.altruist.AltruistManager;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
@@ -104,6 +105,7 @@ public class MapSelect implements ModInitializer {
 		TakeoverManager.register();
 		MafiaManager.register();
 		KillerRoleInfoManager.register();
+		RoundEndRoleRosterSync.register();
 		FurnaceDupeGuard.register();
 		DevWeaponSkinStamper.register();
 		EodDistribution.register();

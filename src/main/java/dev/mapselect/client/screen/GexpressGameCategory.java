@@ -102,16 +102,22 @@ public final class GexpressGameCategory {
 		globalRoleOpts.add(buildUseCustomRoleCountsOption());
 		Option<Integer> maxKillers = buildMaxKillerAmountOption();
 		Option<Integer> maxVigilantes = buildMaxVigilanteAmountOption();
+		Option<Integer> maxNeutrals = buildMaxNeutralAmountOption();
 		Option<Integer> playersPerKiller = buildPlayersPerKillerOption();
 		Option<Integer> playersPerVigilante = buildPlayersPerVigilanteOption();
+		Option<Integer> playersPerNeutral = buildPlayersPerNeutralOption();
 		OptionVisibility.setHiddenWhen(maxKillers, () -> !GexpressConfig.useCustomRoleCounts());
 		OptionVisibility.setHiddenWhen(maxVigilantes, () -> !GexpressConfig.useCustomRoleCounts());
+		OptionVisibility.setHiddenWhen(maxNeutrals, () -> !GexpressConfig.useCustomRoleCounts());
 		OptionVisibility.setHiddenWhen(playersPerKiller, GexpressConfig::useCustomRoleCounts);
 		OptionVisibility.setHiddenWhen(playersPerVigilante, GexpressConfig::useCustomRoleCounts);
+		OptionVisibility.setHiddenWhen(playersPerNeutral, GexpressConfig::useCustomRoleCounts);
 		globalRoleOpts.add(maxKillers);
 		globalRoleOpts.add(maxVigilantes);
+		globalRoleOpts.add(maxNeutrals);
 		globalRoleOpts.add(playersPerKiller);
 		globalRoleOpts.add(playersPerVigilante);
+		globalRoleOpts.add(playersPerNeutral);
 		globalRoleOpts.add(buildMafiaMinimumPlayersOption());
 		globalRoleOpts.add(buildLastDeathShieldOption());
 		globalRoleOpts.add(buildGuardianAngelAllowNonInnocentsOption());
@@ -128,6 +134,7 @@ public final class GexpressGameCategory {
 		List<Option<?>> globalModOpts = new ArrayList<>();
 		OptionGroup modsGroup = weGroupByKey.get(WE_MODIFIERS_KEY);
 		if (modsGroup != null) parseWeGroup(modsGroup, WE_MOD_OPTS_PREFIX, modKeyToWeOpts, globalModOpts);
+		globalModOpts.add(buildMaxModifiersPerPlayerOption());
 
 		if (!globalRoleOpts.isEmpty()) {
 			category.group(buildPassthroughGroup("gui.gexpress.config.group.roles.global", globalRoleOpts));
@@ -392,6 +399,16 @@ public final class GexpressGameCategory {
 			.build();
 	}
 
+	private static Option<Integer> buildPlayersPerNeutralOption() {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.players_per_neutral"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.players_per_neutral.tooltip")))
+			.binding(8, GexpressConfig::getPlayersPerNeutral, v -> GexpressConfig.playersPerNeutral = v)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+				.range(GexpressConfig.PLAYERS_PER_NEUTRAL_MIN, GexpressConfig.PLAYERS_PER_NEUTRAL_MAX))
+			.build();
+	}
+
 	private static Option<Integer> buildMaxVigilanteAmountOption() {
 		return Option.<Integer>createBuilder()
 			.name(Text.translatable("gui.gexpress.config.option.max_vigilante_amount"))
@@ -399,6 +416,26 @@ public final class GexpressGameCategory {
 			.binding(1, GexpressConfig::getMaxVigilanteAmount, v -> GexpressConfig.maxVigilanteAmount = v)
 			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 				.range(GexpressConfig.MAX_VIGILANTE_AMOUNT_MIN, GexpressConfig.MAX_VIGILANTE_AMOUNT_MAX))
+			.build();
+	}
+
+	private static Option<Integer> buildMaxNeutralAmountOption() {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.max_neutral_amount"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.max_neutral_amount.tooltip")))
+			.binding(64, GexpressConfig::getMaxNeutralAmount, v -> GexpressConfig.maxNeutralAmount = v)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+				.range(GexpressConfig.MAX_NEUTRAL_AMOUNT_MIN, GexpressConfig.MAX_NEUTRAL_AMOUNT_MAX))
+			.build();
+	}
+
+	private static Option<Integer> buildMaxModifiersPerPlayerOption() {
+		return Option.<Integer>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.max_modifiers_per_player"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.max_modifiers_per_player.tooltip")))
+			.binding(3, GexpressConfig::getMaxModifiersPerPlayer, v -> GexpressConfig.maxModifiersPerPlayer = v)
+			.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+				.range(GexpressConfig.MAX_MODIFIERS_PER_PLAYER_MIN, GexpressConfig.MAX_MODIFIERS_PER_PLAYER_MAX))
 			.build();
 	}
 

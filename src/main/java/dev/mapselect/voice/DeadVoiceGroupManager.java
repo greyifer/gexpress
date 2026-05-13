@@ -2,8 +2,10 @@ package dev.mapselect.voice;
 
 import de.maxhenkel.voicechat.api.Group;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
+import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.role.vulture.VultureManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -22,7 +24,7 @@ public final class DeadVoiceGroupManager {
 
 	public static boolean canJoinDeadVoice(UUID playerId) {
 		ServerPlayerEntity player = playerFor(playerId);
-		return player == null || DeadPlayerStatus.isDeadRoundParticipant(player);
+		return player == null || shouldBeInDeadVoice(player);
 	}
 
 	private static void tick(ServerWorld world) {
@@ -30,11 +32,26 @@ public final class DeadVoiceGroupManager {
 		if (TrainVoicePlugin.SERVER_API == null || tickDelay++ % 5 != 0) return;
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			VoicechatConnection connection = TrainVoicePlugin.SERVER_API.getConnectionOf(player.getUuid());
-			if (connection == null || !isWatheDeadGroup(connection.getGroup())) continue;
-			if (!DeadPlayerStatus.isDeadRoundParticipant(player)) {
+			if (connection == null) continue;
+			boolean inDeadGroup = isWatheDeadGroup(connection.getGroup());
+			boolean shouldBeDead = shouldBeInDeadVoice(player);
+			if (shouldBeDead && !inDeadGroup) {
+				TrainVoicePlugin.addPlayer(player.getUuid());
+			} else if (!shouldBeDead && inDeadGroup) {
 				connection.setGroup(null);
 			}
 		}
+	}
+
+	private static boolean shouldBeInDeadVoice(ServerPlayerEntity player) {
+		return DeadPlayerStatus.isDeadRoundParticipant(player) || isSpectatorDuringRound(player);
+	}
+
+	private static boolean isSpectatorDuringRound(ServerPlayerEntity player) {
+		if (player == null || player.getWorld() == null || VultureManager.isStashed(player)) return false;
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
+		return game != null && game.isRunning() && player.isSpectator()
+			&& !DeadPlayerStatus.isLivingRoundParticipant(player);
 	}
 
 	private static ServerPlayerEntity playerFor(UUID playerId) {

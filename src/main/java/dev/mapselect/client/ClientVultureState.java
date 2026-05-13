@@ -52,7 +52,7 @@ public final class ClientVultureState {
 		}
 		vultureId = payload.vultureId();
 		vultureEntityId = payload.vultureEntityId();
-		Entity vulture = client.world == null ? null : client.world.getEntityById(vultureEntityId);
+		Entity vulture = vultureEntity(client);
 		if (vulture != null) client.setCameraEntity(vulture);
 	}
 
@@ -73,7 +73,7 @@ public final class ClientVultureState {
 			showProgress && isLocalVulture(client) && ClientRoleRevealState.canShowRoleHud(client) ? 1.0F : 0.0F);
 
 		if (isLocalStashed(client)) {
-			Entity vulture = client.world.getEntityById(vultureEntityId);
+			Entity vulture = vultureEntity(client);
 			if (vulture != null && client.getCameraEntity() != vulture) {
 				client.setCameraEntity(vulture);
 			}
@@ -119,9 +119,16 @@ public final class ClientVultureState {
 
 	public static boolean shouldHideBellyEntity(MinecraftClient client, Entity entity) {
 		if (!isLocalStashed(client) || !(entity instanceof PlayerEntity player)) return false;
+		if (client.player != null && client.player.getUuid().equals(player.getUuid())) return false;
 		if (vultureId != null && vultureId.equals(player.getUuid())) return false;
-		Entity vulture = client.world == null ? null : client.world.getEntityById(vultureEntityId);
-		return vulture != null && player.isSpectator() && player.squaredDistanceTo(vulture) <= 9.0D;
+		return player.isSpectator();
+	}
+
+	private static Entity vultureEntity(MinecraftClient client) {
+		if (client == null || client.world == null) return null;
+		Entity byId = vultureEntityId < 0 ? null : client.world.getEntityById(vultureEntityId);
+		if (byId != null) return byId;
+		return vultureId == null ? null : client.world.getPlayerByUuid(vultureId);
 	}
 
 	private static boolean isLocalVulture(MinecraftClient client) {

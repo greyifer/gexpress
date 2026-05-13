@@ -25,6 +25,7 @@ import dev.mapselect.network.MafiaIntroPayload;
 import dev.mapselect.network.MafiaStatePayload;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.role.spy.SpyManager;
@@ -59,7 +60,6 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 public final class MafiaManager {
-	private static final double LOOK_RADIUS_SQUARED = 1.25D;
 	private static final double BODY_LOOK_RADIUS_SQUARED = 2.25D;
 	private static final int INTRO_TICKS = 90;
 	private static final Map<UUID, Slots> slotsByGodfather = new HashMap<>();
@@ -449,22 +449,8 @@ public final class MafiaManager {
 	}
 
 	private static ServerPlayerEntity findTarget(ServerPlayerEntity user, double range) {
-		Vec3d eye = user.getEyePos();
-		Vec3d look = user.getRotationVec(1.0F).normalize();
-		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
-		for (ServerPlayerEntity candidate : user.getServerWorld().getPlayers()) {
-			if (candidate == user || VultureManager.isStashed(candidate)
-					|| !DeadPlayerStatus.isLivingRoundParticipant(candidate)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > range || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > LOOK_RADIUS_SQUARED || !user.canSee(candidate)) continue;
-			best = candidate;
-			bestAlong = along;
-		}
-		return best;
+		return AbilityTargeting.findLookTarget(user, user.getServerWorld().getPlayers(), range, 0.25D, true,
+			candidate -> !VultureManager.isStashed(candidate) && DeadPlayerStatus.isLivingRoundParticipant(candidate));
 	}
 
 	private static PlayerBodyEntity findBody(ServerPlayerEntity janitor) {

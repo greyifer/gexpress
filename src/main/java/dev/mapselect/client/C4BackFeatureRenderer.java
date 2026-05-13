@@ -2,6 +2,7 @@ package dev.mapselect.client;
 
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
+import dev.mapselect.role.bombspecialist.C4PlacementPreset;
 import dev.mapselect.registry.MapSelectItems;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
@@ -28,12 +29,18 @@ public class C4BackFeatureRenderer extends FeatureRenderer<AbstractClientPlayerE
 	                   AbstractClientPlayerEntity entity, float limbAngle, float limbDistance,
 	                   float tickDelta, float animationProgress, float headYaw, float headPitch) {
 		if (entity.isInvisible()) return;
-		if (!C4BackComponent.hasC4(entity)) return;
+		boolean hasC4 = C4BackComponent.hasC4(entity);
+		C4PlacementPreset previewPreset = ClientModelAttachmentPreview.c4Preset(entity);
+		if (!hasC4 && previewPreset == null) return;
 
 		matrices.push();
 		this.getContextModel().body.rotate(matrices);
-		int presetIndex = C4BackComponent.getPresetIndex(entity);
-		C4ModelTransforms.applyPlacement(matrices, GexpressConfig.getC4PlacementPreset(presetIndex));
+		C4PlacementPreset preset = previewPreset;
+		if (preset == null) {
+			int presetIndex = C4BackComponent.getPresetIndex(entity);
+			preset = GexpressConfig.getC4PlacementPreset(presetIndex);
+		}
+		C4ModelTransforms.applyPlacement(matrices, preset);
 
 		MinecraftClient mc = MinecraftClient.getInstance();
 		ItemRenderer ir = mc.getItemRenderer();

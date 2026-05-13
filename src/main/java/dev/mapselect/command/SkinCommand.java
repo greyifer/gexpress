@@ -147,7 +147,9 @@ public final class SkinCommand {
 		if (type == null) return includeDefault ? SKINS : SKINS.stream().filter(id -> !"default".equals(id)).toList();
 		return Arrays.stream(WeaponSkin.values())
 			.filter(skin -> includeDefault || skin != WeaponSkin.DEFAULT)
-			.filter(skin -> skin.supports(type))
+			.map(skin -> skin.logical(type))
+			.distinct()
+			.filter(skin -> skin.visibleInPicker(type))
 			.map(WeaponSkin::id)
 			.toList();
 	}

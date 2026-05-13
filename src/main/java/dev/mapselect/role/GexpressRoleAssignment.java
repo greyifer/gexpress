@@ -153,6 +153,9 @@ public final class GexpressRoleAssignment {
 		int vigilanteTarget = GexpressConfig.useCustomRoleCounts()
 			? GexpressConfig.getMaxVigilanteAmount()
 			: scaledVigilanteCount(available, assignedCounts);
+		int neutralTarget = GexpressConfig.useCustomRoleCounts()
+			? GexpressConfig.getMaxNeutralAmount()
+			: scaledNeutralCount(available, assignedCounts);
 		int killerSlots = Math.max(0, Math.min(killerTarget, available.size())
 			- countAssignedKillers(assignedCounts));
 		int assignedKillers = assignRolePool(game, available, assignedCounts, rolePool(RolePool.KILLER), killerSlots);
@@ -160,7 +163,9 @@ public final class GexpressRoleAssignment {
 		int vigilanteSlots = Math.max(0, Math.min(vigilanteTarget, available.size())
 			- assignedCounts.getOrDefault(WatheRoles.VIGILANTE, 0));
 		assignRolePool(game, available, assignedCounts, vigilantePool(), vigilanteSlots);
-		assignRolePool(game, available, assignedCounts, rolePool(RolePool.NEUTRAL), available.size());
+		int neutralSlots = Math.max(0, Math.min(neutralTarget, available.size())
+			- countAssignedNeutrals(assignedCounts));
+		assignRolePool(game, available, assignedCounts, rolePool(RolePool.NEUTRAL), neutralSlots);
 		assignRolePool(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
 	}
 
@@ -173,6 +178,11 @@ public final class GexpressRoleAssignment {
 	private static int scaledVigilanteCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
 		int players = totalPlayerCount(available, assignedCounts);
 		return Math.max(0, players / GexpressConfig.getPlayersPerVigilante());
+	}
+
+	private static int scaledNeutralCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
+		int players = totalPlayerCount(available, assignedCounts);
+		return Math.max(0, players / GexpressConfig.getPlayersPerNeutral());
 	}
 
 	private static int totalPlayerCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
@@ -253,6 +263,17 @@ public final class GexpressRoleAssignment {
 		for (Map.Entry<Role, Integer> entry : assignedCounts.entrySet()) {
 			Role role = entry.getKey();
 			if (role != null && role.canUseKiller()) {
+				total += Math.max(0, entry.getValue());
+			}
+		}
+		return total;
+	}
+
+	private static int countAssignedNeutrals(Map<Role, Integer> assignedCounts) {
+		int total = 0;
+		for (Map.Entry<Role, Integer> entry : assignedCounts.entrySet()) {
+			Role role = entry.getKey();
+			if (role != null && !role.canUseKiller() && !role.isInnocent()) {
 				total += Math.max(0, entry.getValue());
 			}
 		}
@@ -358,6 +379,8 @@ public final class GexpressRoleAssignment {
 			for (UUID playerId : entry.getValue()) {
 				ServerPlayerEntity player = byId.get(playerId);
 				if (player == null || hasModifier(modifiers, player, modifier)) continue;
+				if (isLoversModifier(modifier) && modifiers.getAllWithModifier(modifier).size() >= 2) continue;
+				if (!canApplyModifier(game, modifiers, player, modifier)) continue;
 				addModifier(modifiers, player, modifier);
 			}
 		}
@@ -391,16 +414,18 @@ public final class GexpressRoleAssignment {
 			List<ServerPlayerEntity> players, Modifier modifier) {
 		int alreadyAssigned = modifiers.getAllWithModifier(modifier).size();
 		if (alreadyAssigned >= 2) return;
+		int needed = 2 - alreadyAssigned;
 		List<ServerPlayerEntity> candidates = new ArrayList<>();
 		for (ServerPlayerEntity player : players) {
 			if (hasModifier(modifiers, player, modifier)) continue;
-			if (!canApplyModifier(game, player, modifier)) continue;
+			if (!canApplyModifier(game, modifiers, player, modifier)) continue;
 			candidates.add(player);
 		}
-		if (candidates.size() < 2) return;
+		if (candidates.size() < needed) return;
 		Collections.shuffle(candidates, RANDOM);
-		addModifier(modifiers, candidates.get(0), modifier);
-		addModifier(modifiers, candidates.get(1), modifier);
+		for (int i = 0; i < needed; i++) {
+			addModifier(modifiers, candidates.get(i), modifier);
+		}
 	}
 
 	private static boolean isModifierDisabled(Modifier modifier) {
@@ -410,9 +435,10 @@ public final class GexpressRoleAssignment {
 	}
 
 	private static boolean isLoversModifier(Modifier modifier) {
-		return modifier != null && modifier.identifier() != null
-			&& "stupid_express".equals(modifier.identifier().getNamespace())
-			&& "lovers".equals(modifier.identifier().getPath());
+		if (modifier == null || modifier.identifier() == null) return false;
+		String namespace = modifier.identifier().getNamespace().toLowerCase(java.util.Locale.ROOT);
+		String path = modifier.identifier().getPath().toLowerCase(java.util.Locale.ROOT);
+		return namespace.contains("stupid") && path.contains("lover");
 	}
 
 	private static ServerPlayerEntity randomModifierCandidate(GameWorldComponent game, WorldModifierComponent modifiers,
@@ -420,14 +446,19 @@ public final class GexpressRoleAssignment {
 		List<ServerPlayerEntity> candidates = new ArrayList<>();
 		for (ServerPlayerEntity player : players) {
 			if (hasModifier(modifiers, player, modifier)) continue;
-			if (!canApplyModifier(game, player, modifier)) continue;
+			if (!canApplyModifier(game, modifiers, player, modifier)) continue;
 			candidates.add(player);
 		}
 		if (candidates.isEmpty()) return null;
 		return candidates.get(RANDOM.nextInt(candidates.size()));
 	}
 
-	private static boolean canApplyModifier(GameWorldComponent game, ServerPlayerEntity player, Modifier modifier) {
+	private static boolean canApplyModifier(GameWorldComponent game, WorldModifierComponent modifiers,
+			ServerPlayerEntity player, Modifier modifier) {
+		int maxModifiers = GexpressConfig.getMaxModifiersPerPlayer();
+		if (maxModifiers <= 0 || modifierCount(modifiers, player) >= maxModifiers) {
+			return false;
+		}
 		Role role = game.getRole(player);
 		if (isCivilianOnlyGexpressModifier(modifier) && (role == null || !role.isInnocent()
 				|| game.canUseKillerFeatures(player))) {
@@ -445,6 +476,11 @@ public final class GexpressRoleAssignment {
 			return false;
 		}
 		return !modifier.civilianOnly || !game.canUseKillerFeatures(player);
+	}
+
+	private static int modifierCount(WorldModifierComponent modifiers, ServerPlayerEntity player) {
+		List<Modifier> current = modifiers.getModifiers(player);
+		return current == null ? 0 : current.size();
 	}
 
 	private static boolean isCivilianOnlyGexpressModifier(Modifier modifier) {

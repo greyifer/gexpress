@@ -9,6 +9,7 @@ import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.WarlockKillPayload;
 import dev.mapselect.network.WarlockMarkPayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
@@ -22,7 +23,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
@@ -31,7 +31,6 @@ import java.util.UUID;
 
 public final class WarlockManager {
 	private static final double MARK_RANGE = 4.0D;
-	private static final double LOOK_RADIUS_SQUARED = 1.0D;
 	public static final double KILL_RANGE = 3.0D;
 	private static final double KILL_RANGE_SQUARED = KILL_RANGE * KILL_RANGE;
 
@@ -144,21 +143,8 @@ public final class WarlockManager {
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity player, double range) {
-		Vec3d eye = player.getEyePos();
-		Vec3d look = player.getRotationVec(1.0F).normalize();
-		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
-		for (ServerPlayerEntity candidate : player.getServerWorld().getPlayers()) {
-			if (candidate == player || !isPlayableForWarlock(candidate, player)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > range || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > LOOK_RADIUS_SQUARED) continue;
-			best = candidate;
-			bestAlong = along;
-		}
-		return best;
+		return AbilityTargeting.findLookTarget(player, player.getServerWorld().getPlayers(), range, 0.25D, true,
+			candidate -> isPlayableForWarlock(candidate, player));
 	}
 
 	private static void playShot(ServerPlayerEntity warlock) {

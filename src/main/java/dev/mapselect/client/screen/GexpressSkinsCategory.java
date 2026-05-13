@@ -244,6 +244,9 @@ public final class GexpressSkinsCategory {
 			PlayerSkinComponent component = PlayerSkinComponent.KEY.getNullable(client.world);
 			Set<WeaponSkin> skins = component == null ? Set.of(WeaponSkin.DEFAULT) : component.unlocked(client.player.getUuid(), type);
 			return skins.stream()
+				.map(skin -> skin.logical(type))
+				.distinct()
+				.filter(skin -> skin.visibleInPicker(type))
 				.sorted(Comparator.comparingInt(Enum::ordinal))
 				.toList();
 		}
@@ -258,7 +261,8 @@ public final class GexpressSkinsCategory {
 		private ItemStack previewStack(WeaponSkinType type, WeaponSkin skin) {
 			ItemStack stack = (type == WeaponSkinType.KNIFE ? WatheItems.KNIFE : WatheItems.REVOLVER).getDefaultStack();
 			NbtCompound tag = new NbtCompound();
-			tag.putString(DevWeaponModels.SKIN_PREVIEW_KEY, (skin == null ? WeaponSkin.DEFAULT : skin).id());
+			WeaponSkin preview = skin == null ? WeaponSkin.DEFAULT : skin.logical(type);
+			tag.putString(DevWeaponModels.SKIN_PREVIEW_KEY, preview.id());
 			stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(tag));
 			return stack;
 		}

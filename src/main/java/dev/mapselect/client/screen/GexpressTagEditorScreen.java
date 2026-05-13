@@ -66,14 +66,6 @@ public final class GexpressTagEditorScreen extends Screen {
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.new"), button -> clearForNew())
 			.dimensions(formX + 160, formY + 214, 72, 20)
 			.build());
-		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.move_up"), button ->
-				adjustPriority(1))
-			.dimensions(formX, formY + 240, 72, 20)
-			.build());
-		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.move_down"), button ->
-				adjustPriority(-1))
-			.dimensions(formX + 80, formY + 240, 72, 20)
-			.build());
 		addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> close())
 			.dimensions(width / 2 - 45, height - 28, 90, 20)
 			.build());
@@ -177,12 +169,6 @@ public final class GexpressTagEditorScreen extends Screen {
 		int y = 174;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.permissions"), x, y - 14,
 			0xFFFFFFFF);
-		if (selectedBuiltin) {
-			context.drawTextWithShadow(textRenderer,
-				Text.translatable("gui.gexpress.tag_editor.builtin_permissions").formatted(Formatting.DARK_GRAY),
-				x, y + 5, 0xFF777777);
-			return;
-		}
 		for (int i = 0; i < PERMISSIONS.length; i++) {
 			int bx = x + (i % 2) * 86;
 			int by = y + (i / 2) * 21;
@@ -196,7 +182,6 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private boolean clickPermission(double mouseX, double mouseY) {
-		if (selectedBuiltin) return false;
 		int x = 190;
 		int y = 174;
 		for (int i = 0; i < PERMISSIONS.length; i++) {
@@ -218,11 +203,13 @@ public final class GexpressTagEditorScreen extends Screen {
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.color_picker"), x, y - 14,
 			0xFFFFFFFF);
 		int hueColor = 0xFF000000 | MathHelper.hsvToRgb(hue, 1.0F, 1.0F);
-		for (int ix = 0; ix < w; ix++) {
+		final int swatchStep = 4;
+		for (int ix = 0; ix < w; ix += swatchStep) {
 			float sat = ix / (float) Math.max(1, w - 1);
-			for (int iy = 0; iy < h; iy++) {
+			for (int iy = 0; iy < h; iy += swatchStep) {
 				float val = 1.0F - iy / (float) Math.max(1, h - 1);
-				context.fill(x + ix, y + iy, x + ix + 1, y + iy + 1,
+				context.fill(x + ix, y + iy, Math.min(x + ix + swatchStep, x + w),
+					Math.min(y + iy + swatchStep, y + h),
 					0xFF000000 | MathHelper.hsvToRgb(hue, sat, val));
 			}
 		}
@@ -231,9 +218,9 @@ public final class GexpressTagEditorScreen extends Screen {
 		int cursorY = y + Math.round((1.0F - value) * (h - 1));
 		context.drawBorder(cursorX - 3, cursorY - 3, 7, 7, 0xFFFFFFFF);
 		int sliderY = y + h + 20;
-		for (int ix = 0; ix < w; ix++) {
+		for (int ix = 0; ix < w; ix += 2) {
 			float localHue = ix / (float) Math.max(1, w - 1);
-			context.fill(x + ix, sliderY, x + ix + 1, sliderY + 8,
+			context.fill(x + ix, sliderY, Math.min(x + ix + 2, x + w), sliderY + 8,
 				0xFF000000 | MathHelper.hsvToRgb(localHue, 1.0F, 1.0F));
 		}
 		context.drawBorder(x, sliderY, w, 8, 0xFF617083);
@@ -321,6 +308,10 @@ public final class GexpressTagEditorScreen extends Screen {
 		if (selectedBuiltin) {
 			send("g group tag settings color " + id + " " + color);
 			send("g group tag settings priority " + id + " " + priority);
+			for (String permission : PERMISSIONS) {
+				send("g group tag settings permission " + id + " " + permission + " "
+					+ enabledPermissions.contains(permission));
+			}
 			selectedId = id;
 			return;
 		}
@@ -350,10 +341,6 @@ public final class GexpressTagEditorScreen extends Screen {
 		idField.setText("");
 		nameField.setText("");
 		enabledPermissions.clear();
-	}
-
-	private void adjustPriority(int delta) {
-		priorityField.setText(Integer.toString(Math.max(0, Math.min(200, parsePriority() + delta))));
 	}
 
 	private int parsePriority() {
@@ -424,7 +411,8 @@ public final class GexpressTagEditorScreen extends Screen {
 		private static EditableTag from(PlayerTag tag, PlayerTagComponent component) {
 			int color = component == null ? tag.color() : component.color(tag);
 			int priority = component == null ? tag.priority() : component.priority(tag);
-			return new EditableTag(tag.id(), tag.displayName(), color, priority, true, Set.of());
+			Set<String> permissions = component == null ? Set.of() : component.permissions(tag);
+			return new EditableTag(tag.id(), tag.displayName(), color, priority, true, Set.copyOf(permissions));
 		}
 
 		private static EditableTag from(PlayerTagComponent.CustomTag tag) {

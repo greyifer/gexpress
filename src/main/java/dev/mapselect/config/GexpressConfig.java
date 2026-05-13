@@ -191,10 +191,16 @@ public final class GexpressConfig {
 	public static int maxKillerAmount = 64;
 	/** Maximum number of Vigilantes assigned by G'Express role assignment. */
 	public static int maxVigilanteAmount = 1;
+	/** Maximum number of neutral-role players assigned by G'Express role assignment. */
+	public static int maxNeutralAmount = 64;
+	/** Maximum total modifiers one player can receive in a round. */
+	public static int maxModifiersPerPlayer = 3;
 	/** Number of players per killer when custom role counts are disabled. */
 	public static int playersPerKiller = 6;
 	/** Number of players per Vigilante when custom role counts are disabled. */
 	public static int playersPerVigilante = 8;
+	/** Number of players per neutral role when custom role counts are disabled. */
+	public static int playersPerNeutral = 8;
 	/** Synced C4 backpack model tuning. */
 	public static float c4BackOffsetX = 0.0F;
 	public static float c4BackOffsetY = 0.24F;
@@ -374,10 +380,16 @@ public final class GexpressConfig {
 	public static final int MAX_KILLER_AMOUNT_MAX = 64;
 	public static final int MAX_VIGILANTE_AMOUNT_MIN = 0;
 	public static final int MAX_VIGILANTE_AMOUNT_MAX = 64;
+	public static final int MAX_NEUTRAL_AMOUNT_MIN = 0;
+	public static final int MAX_NEUTRAL_AMOUNT_MAX = 64;
+	public static final int MAX_MODIFIERS_PER_PLAYER_MIN = 0;
+	public static final int MAX_MODIFIERS_PER_PLAYER_MAX = 16;
 	public static final int PLAYERS_PER_KILLER_MIN = 1;
 	public static final int PLAYERS_PER_KILLER_MAX = 64;
 	public static final int PLAYERS_PER_VIGILANTE_MIN = 1;
 	public static final int PLAYERS_PER_VIGILANTE_MAX = 64;
+	public static final int PLAYERS_PER_NEUTRAL_MIN = 1;
+	public static final int PLAYERS_PER_NEUTRAL_MAX = 64;
 	public static final float C4_BACK_OFFSET_MIN = -1.0F;
 	public static final float C4_BACK_OFFSET_MAX = 1.0F;
 	public static final float C4_BACK_ROTATION_MIN = -180.0F;
@@ -804,6 +816,15 @@ public final class GexpressConfig {
 		return Math.max(MAX_VIGILANTE_AMOUNT_MIN, Math.min(MAX_VIGILANTE_AMOUNT_MAX, maxVigilanteAmount));
 	}
 
+	public static int getMaxNeutralAmount() {
+		return Math.max(MAX_NEUTRAL_AMOUNT_MIN, Math.min(MAX_NEUTRAL_AMOUNT_MAX, maxNeutralAmount));
+	}
+
+	public static int getMaxModifiersPerPlayer() {
+		return Math.max(MAX_MODIFIERS_PER_PLAYER_MIN,
+			Math.min(MAX_MODIFIERS_PER_PLAYER_MAX, maxModifiersPerPlayer));
+	}
+
 	public static int getPlayersPerKiller() {
 		return Math.max(PLAYERS_PER_KILLER_MIN, Math.min(PLAYERS_PER_KILLER_MAX, playersPerKiller));
 	}
@@ -811,6 +832,10 @@ public final class GexpressConfig {
 	public static int getPlayersPerVigilante() {
 		return Math.max(PLAYERS_PER_VIGILANTE_MIN,
 			Math.min(PLAYERS_PER_VIGILANTE_MAX, playersPerVigilante));
+	}
+
+	public static int getPlayersPerNeutral() {
+		return Math.max(PLAYERS_PER_NEUTRAL_MIN, Math.min(PLAYERS_PER_NEUTRAL_MAX, playersPerNeutral));
 	}
 
 	public static float getC4BackOffsetX() {
@@ -1118,8 +1143,11 @@ public final class GexpressConfig {
 			useCustomRoleCounts = snap.useCustomRoleCounts;
 			maxKillerAmount = snap.maxKillerAmount;
 			maxVigilanteAmount = snap.maxVigilanteAmount;
+			maxNeutralAmount = snap.maxNeutralAmount;
+			maxModifiersPerPlayer = snap.maxModifiersPerPlayer;
 			playersPerKiller = snap.playersPerKiller;
 			playersPerVigilante = snap.playersPerVigilante;
+			playersPerNeutral = snap.playersPerNeutral;
 			c4BackOffsetX = snap.c4BackOffsetX;
 			c4BackOffsetY = snap.c4BackOffsetY;
 			c4BackOffsetZ = snap.c4BackOffsetZ;
@@ -1246,8 +1274,11 @@ public final class GexpressConfig {
 			snap.useCustomRoleCounts = useCustomRoleCounts;
 			snap.maxKillerAmount = maxKillerAmount;
 			snap.maxVigilanteAmount = maxVigilanteAmount;
+			snap.maxNeutralAmount = maxNeutralAmount;
+			snap.maxModifiersPerPlayer = maxModifiersPerPlayer;
 			snap.playersPerKiller = playersPerKiller;
 			snap.playersPerVigilante = playersPerVigilante;
+			snap.playersPerNeutral = playersPerNeutral;
 			snap.c4BackOffsetX = c4BackOffsetX;
 			snap.c4BackOffsetY = c4BackOffsetY;
 			snap.c4BackOffsetZ = c4BackOffsetZ;
@@ -1315,7 +1346,8 @@ public final class GexpressConfig {
 			int mafiaRevolverKillCooldownSeconds, int janitorCleanRange, int janitorCleanCooldownSeconds,
 			int janitorRevolverCooldownAfterCleanSeconds, int janitorCleanCooldownAfterKillSeconds,
 			boolean useCustomRoleCounts,
-			int maxKillerAmount, int maxVigilanteAmount, int playersPerKiller, int playersPerVigilante,
+			int maxKillerAmount, int maxVigilanteAmount, int maxNeutralAmount, int maxModifiersPerPlayer,
+			int playersPerKiller, int playersPerVigilante, int playersPerNeutral,
 			float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 			float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
 			float c4BackSlant, float c4BackScale,
@@ -1407,8 +1439,11 @@ public final class GexpressConfig {
 		GexpressConfig.useCustomRoleCounts = useCustomRoleCounts;
 		GexpressConfig.maxKillerAmount = maxKillerAmount;
 		GexpressConfig.maxVigilanteAmount = maxVigilanteAmount;
+		GexpressConfig.maxNeutralAmount = maxNeutralAmount;
+		GexpressConfig.maxModifiersPerPlayer = maxModifiersPerPlayer;
 		GexpressConfig.playersPerKiller = playersPerKiller;
 		GexpressConfig.playersPerVigilante = playersPerVigilante;
+		GexpressConfig.playersPerNeutral = playersPerNeutral;
 		GexpressConfig.c4BackOffsetX = c4BackOffsetX;
 		GexpressConfig.c4BackOffsetY = c4BackOffsetY;
 		GexpressConfig.c4BackOffsetZ = c4BackOffsetZ;
@@ -1527,8 +1562,11 @@ public final class GexpressConfig {
 		janitorCleanCooldownAfterKillSeconds = getJanitorCleanCooldownAfterKillSeconds();
 		maxKillerAmount = getMaxKillerAmount();
 		maxVigilanteAmount = getMaxVigilanteAmount();
+		maxNeutralAmount = getMaxNeutralAmount();
+		maxModifiersPerPlayer = getMaxModifiersPerPlayer();
 		playersPerKiller = getPlayersPerKiller();
 		playersPerVigilante = getPlayersPerVigilante();
+		playersPerNeutral = getPlayersPerNeutral();
 		c4BackOffsetX = getC4BackOffsetX();
 		c4BackOffsetY = getC4BackOffsetY();
 		c4BackOffsetZ = getC4BackOffsetZ();
@@ -1702,8 +1740,11 @@ public final class GexpressConfig {
 		boolean useCustomRoleCounts = true;
 		int maxKillerAmount = 64;
 		int maxVigilanteAmount = 1;
+		int maxNeutralAmount = 64;
+		int maxModifiersPerPlayer = 3;
 		int playersPerKiller = 6;
 		int playersPerVigilante = 8;
+		int playersPerNeutral = 8;
 		float c4BackOffsetX = 0.0F;
 		float c4BackOffsetY = 0.24F;
 		float c4BackOffsetZ = 0.28F;

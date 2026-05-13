@@ -11,6 +11,7 @@ import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.TrackerStatePayload;
 import dev.mapselect.network.TrackerUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
@@ -22,7 +23,6 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
@@ -34,7 +34,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class TrackerManager {
-	private static final double LOOK_RADIUS_SQUARED = 1.2D;
 	private static final Map<UUID, LinkedHashSet<UUID>> trackedByTracker = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long> cooldownUntil = new ConcurrentHashMap<>();
 
@@ -109,22 +108,8 @@ public final class TrackerManager {
 
 	private static ServerPlayerEntity findTarget(ServerPlayerEntity tracker) {
 		double range = GexpressConfig.getTrackerRange();
-		Vec3d eye = tracker.getEyePos();
-		Vec3d look = tracker.getRotationVec(1.0F).normalize();
-		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
-		for (ServerPlayerEntity candidate : tracker.getServerWorld().getPlayers()) {
-			if (candidate == tracker || VultureManager.isStashed(candidate)
-					|| !isPlayable(candidate, tracker)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > range || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > LOOK_RADIUS_SQUARED || !tracker.canSee(candidate)) continue;
-			best = candidate;
-			bestAlong = along;
-		}
-		return best;
+		return AbilityTargeting.findLookTarget(tracker, tracker.getServerWorld().getPlayers(), range, 0.25D, true,
+			candidate -> !VultureManager.isStashed(candidate) && isPlayable(candidate, tracker));
 	}
 
 	private static void sync(ServerPlayerEntity tracker) {

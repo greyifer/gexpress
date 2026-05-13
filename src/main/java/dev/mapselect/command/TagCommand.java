@@ -99,6 +99,13 @@ public class TagCommand {
 						.suggests(TagCommand::suggestAllTagDefinitions)
 						.then(CommandManager.argument("priority", IntegerArgumentType.integer(0, 200))
 							.executes(TagCommand::runTagPriority))))
+				.then(CommandManager.literal("permission")
+					.then(CommandManager.argument("id", StringArgumentType.word())
+						.suggests(TagCommand::suggestAllTagDefinitions)
+						.then(CommandManager.argument("permission", StringArgumentType.word())
+							.suggests(TagCommand::suggestPermissions)
+							.then(CommandManager.argument("enabled", BoolArgumentType.bool())
+								.executes(TagCommand::runTagPermission)))))
 				.then(CommandManager.literal("reset")
 					.then(CommandManager.argument("id", StringArgumentType.word())
 						.suggests(TagCommand::suggestBuiltinTags)
@@ -344,6 +351,20 @@ public class TagCommand {
 			: tags.setCustomTagPriority(id, priority);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
 		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag priority." : "No tag changed."), true);
+		return changed ? 1 : 0;
+	}
+
+	private static int runTagPermission(CommandContext<ServerCommandSource> ctx) {
+		PlayerTagComponent tags = PlayerTagComponent.KEY.get(ctx.getSource().getWorld());
+		String id = StringArgumentType.getString(ctx, "id");
+		String permission = StringArgumentType.getString(ctx, "permission");
+		boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
+		PlayerTag builtin = PlayerTag.byId(id);
+		boolean changed = builtin != null
+			? tags.setBuiltinTagPermission(id, permission, enabled)
+			: tags.setCustomTagPermission(id, permission, enabled);
+		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag permission." : "No tag changed."),
+			true);
 		return changed ? 1 : 0;
 	}
 

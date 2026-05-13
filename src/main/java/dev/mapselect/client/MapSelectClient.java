@@ -66,6 +66,8 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientBountyHunterState.register();
 		ClientBodyguardState.register();
 		ClientGuardianAngelState.register();
+		ClientAbilityTargetState.register();
+		ClientRoundEndRoleRoster.register();
 		ClientAbilityCooldownHud.register();
 		ClientPresetCache.registerClient();
 		ClientTrainPresetCache.registerClient();
@@ -195,8 +197,11 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.useCustomRoleCounts(),
 				payload.maxKillerAmount(),
 				payload.maxVigilanteAmount(),
+				payload.maxNeutralAmount(),
+				payload.maxModifiersPerPlayer(),
 				payload.playersPerKiller(),
 				payload.playersPerVigilante(),
+				payload.playersPerNeutral(),
 				payload.c4BackOffsetX(),
 				payload.c4BackOffsetY(),
 				payload.c4BackOffsetZ(),

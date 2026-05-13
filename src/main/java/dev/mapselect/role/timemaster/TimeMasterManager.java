@@ -24,6 +24,7 @@ import dev.mapselect.network.TimeMasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
+import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.guardian.GuardianAngelManager;
 import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
@@ -90,7 +91,6 @@ public final class TimeMasterManager {
 	private static final int VISUAL_SNAPSHOT_INTERVAL_TICKS = 2;
 	private static final int HISTORY_PADDING_TICKS = 40;
 	private static final int REWIND_ANIMATION_TICKS = 48;
-	private static final double FREEZE_LOOK_RADIUS_SQUARED = 1.0D;
 	private static final Map<RegistryKey<World>, Deque<WorldSnapshot>> HISTORY = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, Deque<VisualSnapshot>> VISUAL_HISTORY = new ConcurrentHashMap<>();
 	private static final Map<RegistryKey<World>, Deque<WeaponEvent>> WEAPON_EVENTS = new ConcurrentHashMap<>();
@@ -270,22 +270,8 @@ public final class TimeMasterManager {
 
 	private static ServerPlayerEntity findFreezeTarget(ServerPlayerEntity timeMaster) {
 		double range = GexpressConfig.getTimeMasterFreezeRange();
-		Vec3d eye = timeMaster.getEyePos();
-		Vec3d look = timeMaster.getRotationVec(1.0F).normalize();
-		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
-		for (ServerPlayerEntity candidate : timeMaster.getServerWorld().getPlayers()) {
-			if (candidate == timeMaster || VultureManager.isStashed(candidate)
-					|| !isPlayable(candidate, timeMaster)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > range || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > FREEZE_LOOK_RADIUS_SQUARED || !timeMaster.canSee(candidate)) continue;
-			best = candidate;
-			bestAlong = along;
-		}
-		return best;
+		return AbilityTargeting.findLookTarget(timeMaster, timeMaster.getServerWorld().getPlayers(), range, 0.25D, true,
+			candidate -> !VultureManager.isStashed(candidate) && isPlayable(candidate, timeMaster));
 	}
 
 	private static void tickFreezes(ServerWorld world) {

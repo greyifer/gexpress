@@ -55,33 +55,29 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean isHostOrDev(PlayerEntity player) {
-		return isOwner(player) || isDev(player) || HostComponent.isHost(player) || isStaff(player)
-			|| hasCustomPermission(player, "host");
+		return isDev(player) || HostComponent.isHost(player) || hasTagPermission(player, "host");
 	}
 
 	public static boolean isTrusted(PlayerEntity player) {
 		return TrustedComponent.isTrusted(player) || effectiveTags(player).contains(PlayerTag.TRUSTED)
-			|| hasCustomPermission(player, "trusted");
+			|| hasTagPermission(player, "trusted");
 	}
 
 	public static boolean isBuilder(PlayerEntity player) {
-		PlayerTag tag = effectiveTag(player);
-		return tag == PlayerTag.OWNER || tag == PlayerTag.DEV || tag == PlayerTag.STAFF
-			|| hasCustomPermission(player, "builder") || hasCustomPermission(player, "setup");
+		return hasTagPermission(player, "builder") || hasTagPermission(player, "setup");
 	}
 
 	public static boolean isStaff(PlayerEntity player) {
-		return effectiveTags(player).contains(PlayerTag.STAFF) || hasCustomPermission(player, "staff");
+		return hasTagPermission(player, "staff");
 	}
 
 	public static boolean isOwner(PlayerEntity player) {
-		return effectiveTags(player).contains(PlayerTag.OWNER) || hasCustomPermission(player, "owner");
+		return hasTagPermission(player, "owner");
 	}
 
 	public static boolean canUseAdminCommands(ServerCommandSource source) {
 		PlayerEntity player = source.getPlayer();
-		return source.hasPermissionLevel(2) || isOwner(player) || isDev(player) || isStaff(player)
-			|| hasCustomPermission(player, "admin");
+		return source.hasPermissionLevel(2) || isDev(player) || hasTagPermission(player, "admin");
 	}
 
 	public static boolean canEditTags(ServerCommandSource source) {
@@ -124,7 +120,8 @@ public final class GexpressPermissions {
 		World world = server.getWorld(World.OVERWORLD);
 		PlayerTagComponent tags = world == null ? null : PlayerTagComponent.KEY.getNullable(world);
 		return tags != null && (tags.getTag(uuid) == PlayerTag.OWNER
-			|| tags.hasCustomPermission(uuid, "owner") || tags.hasCustomPermission(uuid, "admin"));
+			|| tags.hasPermission(uuid, tags.getPlayerTags(uuid), "owner")
+			|| tags.hasPermission(uuid, tags.getPlayerTags(uuid), "admin"));
 	}
 
 	public static boolean hasBadge(PlayerEntity player) {
@@ -222,10 +219,10 @@ public final class GexpressPermissions {
 			.toList();
 	}
 
-	private static boolean hasCustomPermission(PlayerEntity player, String permission) {
+	private static boolean hasTagPermission(PlayerEntity player, String permission) {
 		if (player == null || player.getWorld() == null) return false;
 		PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(player.getWorld());
-		return tags != null && tags.hasCustomPermission(player.getUuid(), permission);
+		return tags != null && tags.hasPermission(player.getUuid(), effectiveTags(player), permission);
 	}
 
 	public static Text tagBadge(PlayerTag tag) {

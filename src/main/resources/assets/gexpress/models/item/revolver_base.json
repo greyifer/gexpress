@@ -1,6 +1,7 @@
 {
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
+	"gui_light": "front",
 	"textures": {
 		"0": "gexpress:item/revolver_passenger",
 		"particle": "gexpress:item/revolver_passenger"

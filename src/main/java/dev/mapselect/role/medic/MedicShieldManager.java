@@ -10,6 +10,7 @@ import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.MedicShieldFlashPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
@@ -24,14 +25,12 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.UUID;
 
 public final class MedicShieldManager {
 	private static final double SHIELD_RANGE = 4.0D;
-	private static final double LOOK_RADIUS_SQUARED = 1.0D;
 
 	private MedicShieldManager() {}
 
@@ -89,21 +88,8 @@ public final class MedicShieldManager {
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity medic) {
-		Vec3d eye = medic.getEyePos();
-		Vec3d look = medic.getRotationVec(1.0F).normalize();
-		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
-		for (ServerPlayerEntity candidate : medic.getServerWorld().getPlayers()) {
-			if (candidate == medic || !isPlayableForMedic(candidate, medic)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > SHIELD_RANGE || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > LOOK_RADIUS_SQUARED) continue;
-			best = candidate;
-			bestAlong = along;
-		}
-		return best;
+		return AbilityTargeting.findLookTarget(medic, medic.getServerWorld().getPlayers(), SHIELD_RANGE, 0.25D, true,
+			candidate -> isPlayableForMedic(candidate, medic));
 	}
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {

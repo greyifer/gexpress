@@ -1,6 +1,7 @@
 package dev.mapselect.client;
 
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.role.bombspecialist.C4PlacementPreset;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.role.spy.SpyBugComponent;
 import net.minecraft.client.MinecraftClient;
@@ -27,11 +28,15 @@ public class SpyBugFeatureRenderer extends FeatureRenderer<AbstractClientPlayerE
 	public void render(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light,
 	                   AbstractClientPlayerEntity entity, float limbAngle, float limbDistance,
 	                   float tickDelta, float animationProgress, float headYaw, float headPitch) {
-		if (entity.isInvisible() || !SpyBugComponent.hasBug(entity)) return;
+		if (entity.isInvisible()) return;
+		C4PlacementPreset previewPreset = ClientModelAttachmentPreview.spyBugPreset(entity);
+		if (!SpyBugComponent.hasBug(entity) && previewPreset == null) return;
 
 		matrices.push();
 		this.getContextModel().body.rotate(matrices);
-		C4ModelTransforms.applyPlacement(matrices, GexpressConfig.getSpyBugPlacementPreset());
+		C4ModelTransforms.applyPlacement(matrices, previewPreset == null
+			? GexpressConfig.getSpyBugPlacementPreset()
+			: previewPreset);
 
 		MinecraftClient mc = MinecraftClient.getInstance();
 		ItemRenderer itemRenderer = mc.getItemRenderer();

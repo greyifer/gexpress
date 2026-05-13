@@ -9,6 +9,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.client.gui.RoundTextRenderer;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
+import dev.mapselect.client.ClientRoundEndRoleRoster;
 import dev.mapselect.client.EndScreenLayoutConfig;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import net.minecraft.client.font.TextRenderer;
@@ -108,21 +109,26 @@ public abstract class MafiaRoundEndRendererMixin {
 			int columnX = index < maxRows ? leftX : rightX;
 			int rowY = y + (index % maxRows) * rowHeight;
 			Role actualRole = game.getRole(entry.player().getId());
-			drawRosterRow(context, renderer, entry.player(), actualRole == null
-				? entry.role().titleText : Text.literal(titleCase(actualRole.identifier().getPath())), columnX, rowY);
+			Text fallback = actualRole != null && actualRole.identifier() != null
+				? Text.literal(titleCase(actualRole.identifier().getPath()))
+				: entry.role().roleText == null ? entry.role().titleText : entry.role().roleText;
+			Text roleText = ClientRoundEndRoleRoster.roleText(entry.player().getId(), fallback);
+			int roleColor = ClientRoundEndRoleRoster.roleColor(entry.player().getId(),
+				actualRole == null ? 0xFFB9D7FF : 0xFF000000 | actualRole.color());
+			drawRosterRow(context, renderer, entry.player(), roleText, roleColor, columnX, rowY);
 			index++;
 			if (index >= maxRows * 2) break;
 		}
 	}
 
 	private static void drawRosterRow(DrawContext context, TextRenderer renderer, GameProfile profile, Text role,
-			int x, int y) {
+			int roleColor, int x, int y) {
 		context.fill(x - 2, y - 1, x + 164, y + 17, 0x66000000);
 		drawHead(context, profile, x, y + 1);
 		String name = trim(renderer, profile.getName(), 74);
 		String roleName = trim(renderer, role == null ? "" : role.getString(), 72);
 		context.drawTextWithShadow(renderer, Text.literal(name), x + 18, y, 0xFFFFFFFF);
-		context.drawTextWithShadow(renderer, Text.literal(roleName), x + 18, y + 8, 0xFFB9D7FF);
+		context.drawTextWithShadow(renderer, Text.literal(roleName), x + 18, y + 8, roleColor);
 	}
 
 	private static void drawHead(DrawContext context, GameProfile profile, int x, int y) {

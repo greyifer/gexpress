@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 public final class DefaultMapPresets {
-	public static final String STARTING_MAP = "starting_map";
+	public static final String STARTING_MAP = "snow";
 
 	private DefaultMapPresets() {}
 

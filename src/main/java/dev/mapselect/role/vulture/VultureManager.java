@@ -17,6 +17,7 @@ import dev.mapselect.network.VultureProgressPayload;
 import dev.mapselect.network.VultureReleasePayload;
 import dev.mapselect.network.VultureStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.role.spy.SpyManager;
@@ -50,7 +51,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class VultureManager {
 	private static final double EAT_RANGE = 3.15D;
-	private static final double LOOK_RADIUS_SQUARED = 1.0D;
 	private static final int EAT_TIME_BONUS_TICKS = 30 * 20;
 	private static final Map<UUID, UUID> vultureByStashed = new ConcurrentHashMap<>();
 	private static final Map<UUID, Deque<UUID>> stashedByVulture = new ConcurrentHashMap<>();
@@ -59,7 +59,9 @@ public final class VultureManager {
 	private static final Map<UUID, ReleasePoint> lastKnownVulturePoint = new ConcurrentHashMap<>();
 	private static final Map<UUID, Long> eatCooldownUntilByPelican = new ConcurrentHashMap<>();
 	private static final int PROGRESS_SYNC_INTERVAL_TICKS = 10;
+	private static final int STASHED_STATE_SYNC_INTERVAL_TICKS = 10;
 	private static int progressSyncTicker = 0;
+	private static int stashedStateSyncTicker = 0;
 
 	private VultureManager() {}
 
@@ -111,21 +113,8 @@ public final class VultureManager {
 	}
 
 	private static ServerPlayerEntity findLookTarget(ServerPlayerEntity vulture) {
-		Vec3d eye = vulture.getEyePos();
-		Vec3d look = vulture.getRotationVec(1.0F).normalize();
-		ServerPlayerEntity best = null;
-		double bestAlong = Double.MAX_VALUE;
-		for (ServerPlayerEntity candidate : vulture.getServerWorld().getPlayers()) {
-			if (candidate == vulture || isStashed(candidate) || !isPlayable(candidate, vulture)) continue;
-			Vec3d to = candidate.getEyePos().subtract(eye);
-			double along = to.dotProduct(look);
-			if (along < 0.0D || along > EAT_RANGE || along >= bestAlong) continue;
-			double perpendicularSq = Math.max(0.0D, to.lengthSquared() - along * along);
-			if (perpendicularSq > LOOK_RADIUS_SQUARED) continue;
-			best = candidate;
-			bestAlong = along;
-		}
-		return best;
+		return AbilityTargeting.findLookTarget(vulture, vulture.getServerWorld().getPlayers(), EAT_RANGE, 0.25D, true,
+			candidate -> !isStashed(candidate) && isPlayable(candidate, vulture));
 	}
 
 	private static boolean stash(ServerPlayerEntity vulture, ServerPlayerEntity target) {
@@ -207,6 +196,11 @@ public final class VultureManager {
 			progressSyncTicker = PROGRESS_SYNC_INTERVAL_TICKS;
 			syncProgressForWorld(world, keepBellyState || GexpressTestState.hasRoleTesters());
 		}
+		boolean syncStashedState = false;
+		if (stashedStateSyncTicker-- <= 0) {
+			stashedStateSyncTicker = STASHED_STATE_SYNC_INTERVAL_TICKS;
+			syncStashedState = true;
+		}
 
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (isVulture(player)) {
@@ -227,7 +221,7 @@ public final class VultureManager {
 				continue;
 			}
 			keepStashedWithVulture(target, vulture);
-			syncStashedCamera(target, vulture);
+			if (syncStashedState) syncStashedCamera(target, vulture);
 		}
 	}
 
@@ -608,6 +602,7 @@ public final class VultureManager {
 		lastKnownVulturePoint.clear();
 		eatCooldownUntilByPelican.clear();
 		progressSyncTicker = 0;
+		stashedStateSyncTicker = 0;
 	}
 
 	private static void syncProgressForWorld(ServerWorld world, boolean show) {

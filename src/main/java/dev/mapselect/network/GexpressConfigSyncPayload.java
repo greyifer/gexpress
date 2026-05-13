@@ -39,7 +39,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int janitorCleanRange, int janitorCleanCooldownSeconds, int janitorRevolverCooldownAfterCleanSeconds,
 		int janitorCleanCooldownAfterKillSeconds,
 		boolean useCustomRoleCounts, int maxKillerAmount, int maxVigilanteAmount,
-		int playersPerKiller, int playersPerVigilante,
+		int maxNeutralAmount, int maxModifiersPerPlayer,
+		int playersPerKiller, int playersPerVigilante, int playersPerNeutral,
 		float c4BackOffsetX, float c4BackOffsetY, float c4BackOffsetZ,
 		float c4BackRotationX, float c4BackRotationY, float c4BackRotationZ,
 		float c4BackSlant, float c4BackScale,
@@ -52,7 +53,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
 		float silentShadowAlpha) implements CustomPayload {
 
-	private static final int WIRE_VERSION = 2;
+	private static final int WIRE_VERSION = 3;
 
 	public static final CustomPayload.Id<GexpressConfigSyncPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "config_sync_v2"));
@@ -153,8 +154,11 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		buf.writeBoolean(payload.useCustomRoleCounts());
 		buf.writeInt(payload.maxKillerAmount());
 		buf.writeInt(payload.maxVigilanteAmount());
+		buf.writeInt(payload.maxNeutralAmount());
+		buf.writeInt(payload.maxModifiersPerPlayer());
 		buf.writeInt(payload.playersPerKiller());
 		buf.writeInt(payload.playersPerVigilante());
+		buf.writeInt(payload.playersPerNeutral());
 		buf.writeFloat(payload.c4BackOffsetX());
 		buf.writeFloat(payload.c4BackOffsetY());
 		buf.writeFloat(payload.c4BackOffsetZ());
@@ -283,8 +287,11 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readBoolean(), // useCustomRoleCounts
 			buf.readInt(), // maxKillerAmount
 			buf.readInt(), // maxVigilanteAmount
+			buf.readInt(), // maxNeutralAmount
+			buf.readInt(), // maxModifiersPerPlayer
 			buf.readInt(), // playersPerKiller
 			buf.readInt(), // playersPerVigilante
+			buf.readInt(), // playersPerNeutral
 			buf.readFloat(), // c4BackOffsetX
 			buf.readFloat(), // c4BackOffsetY
 			buf.readFloat(), // c4BackOffsetZ

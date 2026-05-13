@@ -8,6 +8,7 @@ import dev.mapselect.client.ClientGuardianAngelState;
 import dev.mapselect.client.ClientBodyguardState;
 import dev.mapselect.client.ClientTimeMasterFreezeState;
 import dev.mapselect.client.ClientTrackerState;
+import dev.mapselect.client.ClientAbilityTargetState;
 import net.minecraft.entity.Entity;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,7 +28,8 @@ public abstract class MedicShieldEntityGlowMixin {
 						|| ClientMafiaState.shouldGlow(player.getUuid())
 						|| ClientGuardianAngelState.shouldGlow(player)
 						|| ClientBodyguardState.shouldGlow(player)
-						|| ClientTrackerState.isTracked(player.getUuid())))) {
+						|| ClientTrackerState.isTracked(player.getUuid())
+						|| ClientAbilityTargetState.shouldGlow(player)))) {
 			cir.setReturnValue(true);
 		}
 	}
@@ -70,6 +72,11 @@ public abstract class MedicShieldEntityGlowMixin {
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientTrackerState.isTracked(player.getUuid())) {
 			cir.setReturnValue(0x3E9CFF);
+			return;
+		}
+		if ((Object) this instanceof AbstractClientPlayerEntity player
+				&& ClientAbilityTargetState.shouldGlow(player)) {
+			cir.setReturnValue(ClientAbilityTargetState.glowColor());
 		}
 	}
 }
