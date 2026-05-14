@@ -8,6 +8,7 @@ import dev.isxander.yacl3.gui.YACLScreen;
 import dev.isxander.yacl3.gui.tab.TabExt;
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
+import dev.mapselect.level.LevelComponent;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -27,10 +28,13 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -112,6 +116,9 @@ public final class GexpressPlayersCategory {
 		private static final int TAG_BUTTON_HEIGHT = 17;
 		private static final int TAG_BUTTON_GAP = 4;
 		private static final int CHANGE_BUTTON_WIDTH = 92;
+		private static final int LEVEL_EDITOR_HEIGHT = 58;
+		private static final int LEVEL_FIELD_WIDTH = 62;
+		private static final int LEVEL_APPLY_WIDTH = 38;
 		private static final PlayerTag[] BUILTIN_TAGS = {
 			PlayerTag.OWNER,
 			PlayerTag.STAFF,
@@ -122,6 +129,10 @@ public final class GexpressPlayersCategory {
 
 		private final List<TagButton> tagButtons = new ArrayList<>();
 		private final List<ChangeButton> changeButtons = new ArrayList<>();
+		private final List<LevelFieldBox> levelFields = new ArrayList<>();
+		private final List<LevelApplyButton> levelApplyButtons = new ArrayList<>();
+		private final Map<UUID, LevelDraft> levelDrafts = new HashMap<>();
+		private FocusedLevelField focusedLevelField;
 		private UUID expandedPlayer;
 		private int scroll;
 
@@ -143,6 +154,8 @@ public final class GexpressPlayersCategory {
 
 			tagButtons.clear();
 			changeButtons.clear();
+			levelFields.clear();
+			levelApplyButtons.clear();
 			List<PlayerListEntry> entries = onlinePlayers();
 			if (entries.isEmpty()) {
 				scroll = 0;
@@ -193,8 +206,11 @@ public final class GexpressPlayersCategory {
 
 			drawChangeButton(context, client, id, x + rowWidth - CHANGE_BUTTON_WIDTH - 6, y + 10, mouseX, mouseY);
 			if (expanded) {
-				drawTagDropdown(context, client, id, name, tags, x + 38, y + ROW_HEIGHT - 2,
-					rowWidth - 44, mouseX, mouseY);
+				int detailX = x + 38;
+				int detailWidth = rowWidth - 44;
+				drawLevelEditor(context, client, id, name, detailX, y + ROW_HEIGHT - 2, detailWidth, mouseX, mouseY);
+				drawTagDropdown(context, client, id, name, tags, detailX, y + ROW_HEIGHT + LEVEL_EDITOR_HEIGHT - 4,
+					detailWidth, mouseX, mouseY);
 			}
 		}
 
@@ -223,6 +239,69 @@ public final class GexpressPlayersCategory {
 			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(label),
 				x + CHANGE_BUTTON_WIDTH / 2, y + 4, 0xFFFFFFFF);
 			changeButtons.add(new ChangeButton(x, y, CHANGE_BUTTON_WIDTH, TAG_BUTTON_HEIGHT, playerId));
+		}
+
+		private void drawLevelEditor(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
+				int x, int y, int editorWidth, int mouseX, int mouseY) {
+			LevelSnapshot snapshot = levelSnapshot(client, playerId);
+			LevelDraft draft = levelDraft(playerId, snapshot);
+			context.fill(x, y + 4, x + editorWidth, y + LEVEL_EDITOR_HEIGHT - 8, 0x33212A35);
+			context.drawBorder(x, y + 4, editorWidth, LEVEL_EDITOR_HEIGHT - 12, 0x55758AA0);
+			context.drawTextWithShadow(client.textRenderer, Text.literal("Level"), x + 8, y + 12, 0xFFB8C3CC);
+			context.drawTextWithShadow(client.textRenderer, Text.literal("XP"), x + 8, y + 33, 0xFFB8C3CC);
+
+			int fieldX = x + 56;
+			int levelY = y + 8;
+			int xpY = y + 29;
+			drawLevelField(context, client, playerId, playerName, LevelFieldKind.LEVEL, draft.levelText,
+				fieldX, levelY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
+			drawLevelApply(context, client, playerId, playerName, LevelFieldKind.LEVEL,
+				fieldX + LEVEL_FIELD_WIDTH + 5, levelY, mouseX, mouseY);
+
+			drawLevelField(context, client, playerId, playerName, LevelFieldKind.XP, draft.xpText,
+				fieldX, xpY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
+			context.drawTextWithShadow(client.textRenderer, Text.literal("/ " + snapshot.neededXp()),
+				fieldX + LEVEL_FIELD_WIDTH + 7, xpY + 5, 0xFF8FA1B2);
+			drawLevelApply(context, client, playerId, playerName, LevelFieldKind.XP,
+				fieldX + LEVEL_FIELD_WIDTH + 52, xpY, mouseX, mouseY);
+
+			int barX = Math.min(x + editorWidth - 114, fieldX + LEVEL_FIELD_WIDTH + 96);
+			int barY = y + 16;
+			int barW = Math.max(52, x + editorWidth - barX - 10);
+			float progress = snapshot.neededXp() <= 0 ? 0.0F
+				: Math.min(1.0F, snapshot.levelXp() / (float) snapshot.neededXp());
+			context.fill(barX, barY, barX + barW, barY + 5, 0xAA0B1016);
+			context.fill(barX, barY, barX + Math.round(barW * progress), barY + 5, 0xFF7CC9A2);
+			context.drawTextWithShadow(client.textRenderer,
+				Text.literal("Lv " + snapshot.level() + "  " + snapshot.levelXp() + "/" + snapshot.neededXp()),
+				barX, barY + 10, 0xFFB8C3CC);
+		}
+
+		private void drawLevelField(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
+				LevelFieldKind kind, String text, int x, int y, int fieldWidth, int mouseX, int mouseY) {
+			boolean hovered = mouseX >= x && mouseX < x + fieldWidth && mouseY >= y && mouseY < y + TAG_BUTTON_HEIGHT;
+			boolean focused = focusedLevelField != null && focusedLevelField.matches(playerId, kind);
+			context.fill(x, y, x + fieldWidth, y + TAG_BUTTON_HEIGHT,
+				focused ? 0xDD182538 : hovered ? 0xBB17202B : 0x99101720);
+			context.drawBorder(x, y, fieldWidth, TAG_BUTTON_HEIGHT, focused ? 0xFFE2F0FF : 0x88758AA0);
+			String visible = client.textRenderer.trimToWidth(text == null ? "" : text, fieldWidth - 8);
+			context.drawTextWithShadow(client.textRenderer, Text.literal(visible), x + 4, y + 5, 0xFFFFFFFF);
+			if (focused && (System.currentTimeMillis() / 450L) % 2L == 0L) {
+				int cursorX = x + 4 + client.textRenderer.getWidth(visible);
+				context.fill(cursorX, y + 4, cursorX + 1, y + TAG_BUTTON_HEIGHT - 4, 0xFFFFFFFF);
+			}
+			levelFields.add(new LevelFieldBox(x, y, fieldWidth, TAG_BUTTON_HEIGHT, playerId, playerName, kind));
+		}
+
+		private void drawLevelApply(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
+				LevelFieldKind kind, int x, int y, int mouseX, int mouseY) {
+			boolean hovered = mouseX >= x && mouseX < x + LEVEL_APPLY_WIDTH && mouseY >= y && mouseY < y + TAG_BUTTON_HEIGHT;
+			context.fill(x, y, x + LEVEL_APPLY_WIDTH, y + TAG_BUTTON_HEIGHT, hovered ? 0xAA314152 : 0x77314152);
+			context.drawBorder(x, y, LEVEL_APPLY_WIDTH, TAG_BUTTON_HEIGHT, hovered ? 0xFFDAE8F7 : 0x8890A0AA);
+			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("Set"),
+				x + LEVEL_APPLY_WIDTH / 2, y + 5, 0xFFFFFFFF);
+			levelApplyButtons.add(new LevelApplyButton(x, y, LEVEL_APPLY_WIDTH, TAG_BUTTON_HEIGHT, playerId,
+				playerName, kind));
 		}
 
 		private void drawTagDropdown(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
@@ -287,6 +366,17 @@ public final class GexpressPlayersCategory {
 
 		@Override
 		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+			for (LevelApplyButton applyButton : levelApplyButtons) {
+				if (!applyButton.contains(mouseX, mouseY)) continue;
+				submitLevelField(applyButton.playerId(), applyButton.playerName(), applyButton.kind());
+				return true;
+			}
+			for (LevelFieldBox field : levelFields) {
+				if (!field.contains(mouseX, mouseY)) continue;
+				focusedLevelField = new FocusedLevelField(field.playerId(), field.playerName(), field.kind());
+				setFocused(true);
+				return true;
+			}
 			for (TagButton tagButton : tagButtons) {
 				if (!tagButton.contains(mouseX, mouseY)) continue;
 				sendTagCommand(tagButton.playerName(), tagButton.tag(), tagButton.selected());
@@ -299,7 +389,48 @@ public final class GexpressPlayersCategory {
 				scroll = clampScroll(scroll);
 				return true;
 			}
+			focusedLevelField = null;
 			return super.mouseClicked(mouseX, mouseY, button);
+		}
+
+		@Override
+		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+			if (focusedLevelField == null) return super.keyPressed(keyCode, scanCode, modifiers);
+			LevelDraft draft = levelDrafts.get(focusedLevelField.playerId());
+			if (draft == null) return true;
+			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+				submitLevelField(focusedLevelField.playerId(), focusedLevelField.playerName(), focusedLevelField.kind());
+				return true;
+			}
+			if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+				focusedLevelField = null;
+				return true;
+			}
+			if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+				String value = focusedLevelField.kind() == LevelFieldKind.XP ? draft.xpText : draft.levelText;
+				value = value == null || value.isEmpty() ? "" : value.substring(0, value.length() - 1);
+				draft.set(focusedLevelField.kind(), value);
+				return true;
+			}
+			if (keyCode == GLFW.GLFW_KEY_DELETE) {
+				draft.set(focusedLevelField.kind(), "");
+				return true;
+			}
+			if (keyCode == GLFW.GLFW_KEY_V && Screen.hasControlDown()) {
+				MinecraftClient client = MinecraftClient.getInstance();
+				appendDigits(draft, focusedLevelField.kind(), client == null ? "" : client.keyboard.getClipboard());
+				return true;
+			}
+			return true;
+		}
+
+		@Override
+		public boolean charTyped(char chr, int modifiers) {
+			if (focusedLevelField == null) return super.charTyped(chr, modifiers);
+			LevelDraft draft = levelDrafts.get(focusedLevelField.playerId());
+			if (draft == null) return true;
+			if (Character.isDigit(chr)) appendDigits(draft, focusedLevelField.kind(), Character.toString(chr));
+			return true;
 		}
 
 		@Override
@@ -323,7 +454,8 @@ public final class GexpressPlayersCategory {
 			int optionCount = editableTags(client).size();
 			int columns = dropdownColumns(rowWidth - 44);
 			int rows = (optionCount + columns - 1) / columns;
-			return ROW_HEIGHT + 8 + rows * TAG_BUTTON_HEIGHT + Math.max(0, rows - 1) * TAG_BUTTON_GAP;
+			return ROW_HEIGHT + LEVEL_EDITOR_HEIGHT + 8 + rows * TAG_BUTTON_HEIGHT
+				+ Math.max(0, rows - 1) * TAG_BUTTON_GAP;
 		}
 
 		private int dropdownColumns(int dropdownWidth) {
@@ -355,6 +487,55 @@ public final class GexpressPlayersCategory {
 					|| PlayerTag.PASSENGER.id().equals(tag.id())) return;
 			String action = selected ? "remove" : "add";
 			client.player.networkHandler.sendChatCommand("g group tag " + action + " " + tag.id() + " " + playerName);
+		}
+
+		private void submitLevelField(UUID playerId, String playerName, LevelFieldKind kind) {
+			LevelDraft draft = levelDrafts.get(playerId);
+			if (draft == null) return;
+			Integer value = parsePositiveInt(kind == LevelFieldKind.XP ? draft.xpText : draft.levelText);
+			if (value == null) return;
+			MinecraftClient client = MinecraftClient.getInstance();
+			if (client == null || client.player == null || client.player.networkHandler == null) return;
+			String subcommand = kind == LevelFieldKind.XP ? "xp" : "level";
+			client.player.networkHandler.sendChatCommand("g admin dev level " + subcommand + " " + playerName + " " + value);
+			focusedLevelField = null;
+		}
+
+		private LevelSnapshot levelSnapshot(MinecraftClient client, UUID playerId) {
+			LevelComponent levels = client == null || client.world == null ? null : LevelComponent.KEY.getNullable(client.world);
+			if (levels == null || playerId == null) return new LevelSnapshot(1, 0, LevelComponent.xpNeededForLevel(1));
+			return new LevelSnapshot(levels.level(playerId), levels.xpIntoLevel(playerId),
+				levels.xpNeededForNextLevel(playerId));
+		}
+
+		private LevelDraft levelDraft(UUID playerId, LevelSnapshot snapshot) {
+			LevelDraft draft = levelDrafts.computeIfAbsent(playerId, id -> new LevelDraft());
+			if (focusedLevelField == null || !focusedLevelField.matches(playerId, LevelFieldKind.XP)) {
+				draft.xpText = Integer.toString(snapshot.levelXp());
+			}
+			if (focusedLevelField == null || !focusedLevelField.matches(playerId, LevelFieldKind.LEVEL)) {
+				draft.levelText = Integer.toString(snapshot.level());
+			}
+			return draft;
+		}
+
+		private void appendDigits(LevelDraft draft, LevelFieldKind kind, String raw) {
+			if (raw == null || raw.isEmpty()) return;
+			StringBuilder out = new StringBuilder(kind == LevelFieldKind.XP ? draft.xpText : draft.levelText);
+			for (int i = 0; i < raw.length() && out.length() < 9; i++) {
+				char c = raw.charAt(i);
+				if (Character.isDigit(c)) out.append(c);
+			}
+			draft.set(kind, out.toString());
+		}
+
+		private Integer parsePositiveInt(String raw) {
+			if (raw == null || raw.isBlank()) return null;
+			try {
+				return Math.max(0, Integer.parseInt(raw.trim()));
+			} catch (NumberFormatException ignored) {
+				return null;
+			}
 		}
 
 		private List<TagOption> editableTags(MinecraftClient client) {
@@ -400,6 +581,46 @@ public final class GexpressPlayersCategory {
 	private record ChangeButton(int x, int y, int width, int height, UUID playerId) {
 		private boolean contains(double mouseX, double mouseY) {
 			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record LevelFieldBox(int x, int y, int width, int height, UUID playerId, String playerName,
+			LevelFieldKind kind) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record LevelApplyButton(int x, int y, int width, int height, UUID playerId, String playerName,
+			LevelFieldKind kind) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record FocusedLevelField(UUID playerId, String playerName, LevelFieldKind kind) {
+		private boolean matches(UUID otherPlayerId, LevelFieldKind otherKind) {
+			return playerId != null && playerId.equals(otherPlayerId) && kind == otherKind;
+		}
+	}
+
+	private record LevelSnapshot(int level, int levelXp, int neededXp) {}
+
+	private enum LevelFieldKind {
+		XP,
+		LEVEL
+	}
+
+	private static final class LevelDraft {
+		private String xpText = "";
+		private String levelText = "";
+
+		private void set(LevelFieldKind kind, String value) {
+			if (kind == LevelFieldKind.XP) {
+				xpText = value == null ? "" : value;
+			} else {
+				levelText = value == null ? "" : value;
+			}
 		}
 	}
 

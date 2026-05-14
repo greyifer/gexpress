@@ -13,6 +13,8 @@ import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +96,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-		if (button == 0 && draggingPreview) {
+		if (draggingPreview) {
 			modelYaw = (modelYaw + (float) deltaX * 1.2F) % 360.0F;
 			modelPitch = MathHelper.clamp(modelPitch + (float) deltaY * 0.7F, -35.0F, 35.0F);
 			return true;
@@ -139,6 +141,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 		int size = Math.max(70, Math.min(128, (bottom - top) / 2));
 		int centerX = (left + right) / 2;
 		int centerY = (top + bottom) / 2;
+		float entityScale = client.player.getScale();
 		float oldYaw = client.player.getYaw();
 		float oldPitch = client.player.getPitch();
 		float oldBodyYaw = client.player.bodyYaw;
@@ -147,14 +150,21 @@ public final class GexpressModelPlacementScreen extends Screen {
 		float oldPrevHeadYaw = client.player.prevHeadYaw;
 		try {
 			client.player.setYaw(modelYaw);
-			client.player.setPitch(modelPitch);
+			client.player.setPitch(-modelPitch);
 			client.player.bodyYaw = modelYaw;
 			client.player.prevBodyYaw = modelYaw;
 			client.player.headYaw = modelYaw;
 			client.player.prevHeadYaw = modelYaw;
-			InventoryScreen.drawEntity(context, left + 20, top + 28, right - 20, bottom - 8, size,
-				0.0625F, centerX, centerY, client.player);
+			float pitchRadians = modelPitch * ((float) Math.PI / 180.0F);
+			Quaternionf bodyRotation = new Quaternionf().rotateX(pitchRadians);
+			Quaternionf rotation = new Quaternionf().rotateZ((float) Math.PI).mul(bodyRotation);
+			Vector3f translation = new Vector3f(0.0F,
+				client.player.getHeight() / 2.0F + 0.0625F * size * entityScale, 0.0F);
+			context.enableScissor(left + 20, top + 28, right - 20, bottom - 8);
+			InventoryScreen.drawEntity(context, centerX, centerY, size / entityScale,
+				translation, rotation, bodyRotation, client.player);
 		} finally {
+			context.disableScissor();
 			client.player.setYaw(oldYaw);
 			client.player.setPitch(oldPitch);
 			client.player.bodyYaw = oldBodyYaw;

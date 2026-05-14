@@ -59,9 +59,19 @@ public class LevelComponent implements AutoSyncedComponent {
 	public boolean addXp(UUID playerId, int amount) {
 		if (playerId == null || amount <= 0) return false;
 		int next = Math.max(0, xp(playerId) + amount);
+		return setXp(playerId, next);
+	}
+
+	public boolean setXp(UUID playerId, int xp) {
+		if (playerId == null) return false;
+		int next = Math.max(0, xp);
 		xpByPlayer.put(playerId, next);
 		KEY.sync(world);
 		return true;
+	}
+
+	public boolean setLevel(UUID playerId, int level) {
+		return setXp(playerId, totalXpForLevel(level));
 	}
 
 	public static int levelForXp(int xp) {
@@ -76,6 +86,15 @@ public class LevelComponent implements AutoSyncedComponent {
 
 	public static int xpNeededForLevel(int level) {
 		return Math.max(1, level) * 100;
+	}
+
+	public static int totalXpForLevel(int level) {
+		int target = Math.max(1, level);
+		int total = 0;
+		for (int current = 1; current < target; current++) {
+			total += xpNeededForLevel(current);
+		}
+		return total;
 	}
 
 	public static int level(PlayerEntity player) {

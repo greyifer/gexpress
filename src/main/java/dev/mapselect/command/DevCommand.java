@@ -1,5 +1,6 @@
 package dev.mapselect.command;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -10,6 +11,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.level.LevelComponent;
 import dev.mapselect.network.GexpressConfigSyncHandler;
 import dev.mapselect.network.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
@@ -18,12 +20,15 @@ import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
 import net.minecraft.command.argument.BlockPosArgumentType;
+import net.minecraft.command.argument.GameProfileArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.Collection;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +53,19 @@ public final class DevCommand {
 
 		return CommandManager.literal("dev")
 			.requires(DEV)
+			.then(CommandManager.literal("level")
+				.then(CommandManager.literal("xp")
+					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+						.then(CommandManager.argument("amount", IntegerArgumentType.integer(0))
+							.executes(ctx -> runLevelXp(ctx,
+								GameProfileArgumentType.getProfileArgument(ctx, "players"),
+								IntegerArgumentType.getInteger(ctx, "amount"))))))
+				.then(CommandManager.literal("level")
+					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+						.then(CommandManager.argument("level", IntegerArgumentType.integer(1))
+							.executes(ctx -> runLevelSet(ctx,
+								GameProfileArgumentType.getProfileArgument(ctx, "players"),
+								IntegerArgumentType.getInteger(ctx, "level")))))))
 			.then(CommandManager.literal("c4back")
 				.then(CommandManager.literal("offset")
 					.then(floatSetting("x", GexpressConfig.C4_BACK_OFFSET_MIN, GexpressConfig.C4_BACK_OFFSET_MAX,
@@ -140,6 +158,49 @@ public final class DevCommand {
 								StringArgumentType.getString(ctx, "preset"),
 								BlockPosArgumentType.getBlockPos(ctx, "corner1"),
 								BlockPosArgumentType.getBlockPos(ctx, "corner2")))))));
+	}
+
+	private static int runLevelXp(CommandContext<ServerCommandSource> ctx, Collection<GameProfile> profiles,
+			int progress) {
+		ServerCommandSource src = ctx.getSource();
+		LevelComponent levels = LevelComponent.KEY.get(src.getWorld());
+		int changed = 0;
+		for (GameProfile profile : profiles) {
+			if (profile == null || profile.getId() == null) continue;
+			int currentLevel = levels.level(profile.getId());
+			int totalXp = LevelComponent.totalXpForLevel(currentLevel) + progress;
+			if (levels.setXp(profile.getId(), totalXp)) {
+				refreshLevelDisplay(src, profile);
+				changed++;
+			}
+		}
+		final int finalChanged = changed;
+		src.sendFeedback(() -> Text.literal("Set level XP progress to " + progress + " for "
+				+ finalChanged + " player(s).").formatted(Formatting.GREEN), true);
+		return changed;
+	}
+
+	private static int runLevelSet(CommandContext<ServerCommandSource> ctx, Collection<GameProfile> profiles,
+			int level) {
+		ServerCommandSource src = ctx.getSource();
+		LevelComponent levels = LevelComponent.KEY.get(src.getWorld());
+		int changed = 0;
+		for (GameProfile profile : profiles) {
+			if (profile == null || profile.getId() == null) continue;
+			if (levels.setLevel(profile.getId(), level)) {
+				refreshLevelDisplay(src, profile);
+				changed++;
+			}
+		}
+		final int finalChanged = changed;
+		src.sendFeedback(() -> Text.literal("Set level to " + level + " for "
+				+ finalChanged + " player(s).").formatted(Formatting.GREEN), true);
+		return changed;
+	}
+
+	private static void refreshLevelDisplay(ServerCommandSource src, GameProfile profile) {
+		ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(profile.getId());
+		if (online != null) TagCommand.refreshPlayerListName(online);
 	}
 
 	private static LiteralArgumentBuilder<ServerCommandSource> floatSetting(String name, float min, float max,
