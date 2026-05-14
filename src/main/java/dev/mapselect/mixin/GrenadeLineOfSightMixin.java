@@ -23,6 +23,7 @@ public abstract class GrenadeLineOfSightMixin {
 	@Redirect(
 		method = "method_7488(Lnet/minecraft/class_239;)V",
 		at = @At(value = "INVOKE", target = "Ldev/doctor4t/wathe/game/GameFunctions;killPlayer(Lnet/minecraft/class_1657;ZLnet/minecraft/class_1657;Lnet/minecraft/class_2960;)V", remap = false),
+		require = 0,
 		remap = false
 	)
 	private void gexpress$grenadesNeedLineOfSight(PlayerEntity victim, boolean dead,
