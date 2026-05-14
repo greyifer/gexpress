@@ -21,15 +21,16 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class GrenadeLineOfSightMixin {
 	@Dynamic("Wathe's GrenadeEntity calls GameFunctions with named descriptors outside this project's mappings.")
 	@Redirect(
-		method = "onCollision",
-		at = @At(value = "INVOKE", target = "Ldev/doctor4t/wathe/game/GameFunctions;killPlayer(Lnet/minecraft/server/network/ServerPlayerEntity;ZLnet/minecraft/entity/player/PlayerEntity;Lnet/minecraft/util/Identifier;)V", remap = false),
+		method = "method_7488(Lnet/minecraft/class_239;)V",
+		at = @At(value = "INVOKE", target = "Ldev/doctor4t/wathe/game/GameFunctions;killPlayer(Lnet/minecraft/class_1657;ZLnet/minecraft/class_1657;Lnet/minecraft/class_2960;)V", remap = false),
 		remap = false
 	)
-	private void gexpress$grenadesNeedLineOfSight(ServerPlayerEntity victim, boolean dead,
+	private void gexpress$grenadesNeedLineOfSight(PlayerEntity victim, boolean dead,
 			PlayerEntity killer, Identifier reason) {
 		Entity self = (Entity) (Object) this;
 		if (!(self.getWorld() instanceof ServerWorld world)) return;
-		if (hasExplosionLineOfSight(world, self.getPos(), victim)) {
+		if (victim instanceof ServerPlayerEntity serverVictim
+				&& hasExplosionLineOfSight(world, self.getPos(), serverVictim)) {
 			GameFunctions.killPlayer(victim, dead, killer, reason);
 		}
 	}
