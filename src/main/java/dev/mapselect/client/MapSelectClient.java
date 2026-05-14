@@ -38,6 +38,8 @@ public class MapSelectClient implements ClientModInitializer {
 		GexpressRoleAnnouncementTexts.register();
 		registerConfigReceiver();
 		ClientAbilityKeys.register();
+		ClientRenderDistanceGuard.register();
+		ClientLevelHud.register();
 		ClientDeadGuidebookKey.register();
 		ClientFreshAirAmbienceState.register();
 		ClientShortSightedState.register();

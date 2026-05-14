@@ -83,6 +83,12 @@ public final class SnitchManager {
 			if (!isSnitch(game, player) || !isPlayable(player)) continue;
 			UUID id = player.getUuid();
 			presentSnitches.add(id);
+			if (VultureManager.isStashed(player)) {
+				int completed = completedTasks.getOrDefault(id, 0);
+				int required = GexpressConfig.getSnitchTasksRequired();
+				syncSnitchInfo(player, game, world, Math.min(completed, required), required);
+				continue;
+			}
 			int current = taskCount(player);
 			Integer previous = lastTaskCounts.put(id, current);
 			int completed = completedTasks.getOrDefault(id, 0);

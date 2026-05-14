@@ -29,7 +29,7 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 			return;
 		}
 		if (target instanceof PlayerEntity player && ClientAmnesiaState.shouldHideKillerIdentity(player)) {
-			cir.setReturnValue(ClientAmnesiaState.civilianInstinctColor(player));
+			cir.setReturnValue(-1);
 		}
 	}
 }

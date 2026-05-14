@@ -76,7 +76,6 @@ public final class EodDistribution {
 			if (!activeGame && !testingEod) continue;
 			if (!GameFunctions.isPlayerAliveAndSurvival(player) && !testingEod) continue;
 			UUID id = player.getUuid();
-			if (granted.contains(id)) continue;
 			if (!mods.isModifier(player, MapSelectModifiers.EOD_SPECIALIST)) continue;
 
 			// Belt-and-suspenders: if the player already has Pliers (e.g. from a prior grant
@@ -85,6 +84,10 @@ public final class EodDistribution {
 			if (player.getInventory().count(MapSelectItems.PLIERS) > 0) {
 				granted.add(id);
 				continue;
+			}
+			if (granted.contains(id)) {
+				granted.remove(id);
+				MapSelect.LOGGER.debug("Re-handing missing Pliers to EOD Specialist {}", player.getName().getString());
 			}
 
 			ItemStack stack = new ItemStack(MapSelectItems.PLIERS);

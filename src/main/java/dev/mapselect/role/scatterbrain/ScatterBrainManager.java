@@ -90,8 +90,10 @@ public final class ScatterBrainManager {
 
 		int scattered = 0;
 		for (ServerPlayerEntity player : players) {
-			TargetPoint pos = points.get(RANDOM.nextInt(points.size()));
-			player.teleport(world, pos.x(), pos.y(), pos.z(), pos.yaw(), pos.pitch());
+			Vec3d safe = findSafePoint(world, player, points);
+			if (safe == null) continue;
+			float yaw = RANDOM.nextFloat() * 360.0F;
+			player.teleport(world, safe.x, safe.y, safe.z, yaw, player.getPitch());
 			player.setVelocity(0.0D, 0.0D, 0.0D);
 			player.velocityModified = true;
 			scattered++;
@@ -129,6 +131,10 @@ public final class ScatterBrainManager {
 		if (!points.isEmpty()) return points;
 
 		for (MapPreset.PosData spawn : MapPreset.randomSpawnsFrom(world)) points.add(TargetPoint.from(spawn));
+		if (points.isEmpty()) {
+			MapVariablesWorldComponent map = MapVariablesWorldComponent.KEY.getNullable(world);
+			if (map != null) addBoxPoints(points, map.getPlayArea(), 128);
+		}
 		return points;
 	}
 
@@ -145,11 +151,13 @@ public final class ScatterBrainManager {
 	}
 
 	private static Vec3d findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points) {
-		int playerY = MathHelper.floor(player.getY());
 		for (int attempt = 0; attempt < 160; attempt++) {
 			TargetPoint target = points.get(RANDOM.nextInt(points.size()));
 			int x = MathHelper.floor(target.x());
 			int z = MathHelper.floor(target.z());
+			int playerY = target.y() > world.getBottomY()
+				? MathHelper.floor(target.y())
+				: MathHelper.floor(player.getY());
 			int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
 			Vec3d safe = safeAround(world, player, new BlockPos(x, playerY, z), playerY, topY);
 			if (safe != null) return safe;

@@ -60,7 +60,7 @@ public final class ClientVultureState {
 		vultureId = payload.vultureId();
 		vultureEntityId = payload.vultureEntityId();
 		Entity vulture = vultureEntity(client);
-		if (vulture != null) client.setCameraEntity(vulture);
+		if (vulture != null && client.getCameraEntity() != vulture) client.setCameraEntity(vulture);
 	}
 
 	private static void applyProgress(VultureProgressPayload payload) {

@@ -29,7 +29,6 @@ public abstract class PlayerEntityDisplayNameMixin {
 				return;
 			}
 		}
-		if (!GexpressPermissions.hasBadge(self)) return;
 		cir.setReturnValue(GexpressPermissions.displayName(self));
 	}
 

@@ -229,14 +229,16 @@ public final class JuggernautManager {
 
 	private static boolean isKnifeDeath(Identifier reason) {
 		if (dev.doctor4t.wathe.game.GameConstants.DeathReasons.KNIFE.equals(reason)) return true;
+		if (dev.doctor4t.wathe.game.GameConstants.DeathReasons.BAT.equals(reason)) return true;
 		String path = reason == null ? "" : reason.getPath().toLowerCase(java.util.Locale.ROOT);
-		return path.contains("knife") || path.contains("stab");
+		return path.contains("knife") || path.contains("stab") || path.contains("melee") || path.contains("bat");
 	}
 
 	private static boolean isGunDeath(Identifier reason) {
 		if (dev.doctor4t.wathe.game.GameConstants.DeathReasons.GUN.equals(reason)) return true;
 		String path = reason == null ? "" : reason.getPath().toLowerCase(java.util.Locale.ROOT);
-		return path.contains("gun") || path.contains("revolver") || path.contains("shot") || path.contains("bullet");
+		return path.contains("gun") || path.contains("revolver") || path.contains("shot") || path.contains("shoot")
+			|| path.contains("bullet") || path.contains("projectile");
 	}
 
 	private static long shieldRechargeRemainingTicks(ServerPlayerEntity player) {

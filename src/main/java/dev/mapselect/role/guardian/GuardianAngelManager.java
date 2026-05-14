@@ -120,6 +120,12 @@ public final class GuardianAngelManager {
 		return false;
 	}
 
+	public static boolean removeShield(UUID targetId, ServerWorld world) {
+		if (targetId == null || shieldUntilByTarget.remove(targetId) == null) return false;
+		syncAll(world);
+		return true;
+	}
+
 	private static void tick(ServerWorld world) {
 		if (world.getRegistryKey() != World.OVERWORLD) return;
 		if (!DeadPlayerStatus.isRunningOrStopping(world)) {

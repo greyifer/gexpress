@@ -46,6 +46,7 @@ public final class ClientMafiaState {
 	private static boolean shaderActive;
 	private static int loadedBullets;
 	private static int maxBullets = 3;
+	private static int familyGlowColor = FAMILY_GLOW_COLOR;
 	private static float ammoAlpha;
 	private static float blackWhiteStrength;
 	private static long lastMafiaIntroMs;
@@ -62,6 +63,7 @@ public final class ClientMafiaState {
 			context.client().execute(() -> {
 				familyIds.clear();
 				familyIds.addAll(payload.memberIds());
+				familyGlowColor = payload.color();
 			}));
 		ClientPlayNetworking.registerGlobalReceiver(MafiaIntroPayload.ID, (payload, context) ->
 			context.client().execute(() -> {
@@ -86,7 +88,7 @@ public final class ClientMafiaState {
 	}
 
 	public static int glowColor() {
-		return FAMILY_GLOW_COLOR;
+		return familyGlowColor;
 	}
 
 	private static boolean isFamilyInstinctEnabled(MinecraftClient client) {
@@ -119,11 +121,8 @@ public final class ClientMafiaState {
 		if (MapSelectRoles.GODFATHER_ID.equals(roleId)) {
 			boolean primary = isDown(client, ClientAbilityKeys.primaryBinding());
 			boolean secondary = isDown(client, ClientAbilityKeys.secondaryBinding());
-			if (primary && !wasPrimaryDown && ClientPlayNetworking.canSend(MafiaActionPayload.ID)) {
-				ClientPlayNetworking.send(new MafiaActionPayload(MafiaActionPayload.RECRUIT_MAFIOSO));
-			}
-			if (secondary && !wasSecondaryDown && ClientPlayNetworking.canSend(MafiaActionPayload.ID)) {
-				ClientPlayNetworking.send(new MafiaActionPayload(MafiaActionPayload.RECRUIT_JANITOR));
+			if (primary && !wasPrimaryDown) {
+				client.setScreen(new GodfatherRecruitScreen());
 			}
 			wasPrimaryDown = primary;
 			wasSecondaryDown = secondary;
@@ -296,7 +295,7 @@ public final class ClientMafiaState {
 			playedMafiaIntroThisRound = false;
 			return;
 		}
-		if (playedMafiaIntroThisRound || !ClientRoleRevealState.canShowRoleHud(client)) return;
+		if (playedMafiaIntroThisRound || !ClientRoleRevealState.isRoleRevealSettled()) return;
 		playedMafiaIntroThisRound = true;
 		pendingMafiaIntro = false;
 		introTicks = Math.max(introTicks, pendingIntroDurationTicks > 0 ? pendingIntroDurationTicks : 90);

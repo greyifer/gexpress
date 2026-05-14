@@ -3,6 +3,8 @@ package dev.mapselect.game;
 import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.network.AltruistUsePayload;
+import dev.mapselect.network.CovenantBatPayload;
+import dev.mapselect.network.CovenantBitePayload;
 import dev.mapselect.network.GuardianAngelShieldUsePayload;
 import dev.mapselect.network.MafiaActionPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
@@ -33,6 +35,8 @@ public final class GexpressAbilityGuards {
 	private static final int SAFE_PREPARATION_TICKS = 30 * 20;
 	private static final Set<CustomPayload.Id<?>> ABILITY_PAYLOADS = Set.of(
 		AltruistUsePayload.ID,
+		CovenantBatPayload.ID,
+		CovenantBitePayload.ID,
 		GuardianAngelShieldUsePayload.ID,
 		MafiaActionPayload.ID,
 		MedicShieldUsePayload.ID,

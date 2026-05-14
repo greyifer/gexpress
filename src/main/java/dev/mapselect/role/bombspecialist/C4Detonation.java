@@ -276,11 +276,25 @@ public final class C4Detonation {
 
 		List<ServerPlayerEntity> victims = world.getPlayers(p -> {
 			if (!GameFunctions.isPlayerAliveAndSurvival(p)) return false;
-			return p.getPos().isInRange(blastCenter, BLAST_RADIUS);
+			return p.getPos().isInRange(blastCenter, BLAST_RADIUS) && hasExplosionLineOfSight(world, blastCenter, p);
 		});
 		for (ServerPlayerEntity victim : victims) {
 			GameFunctions.killPlayer(victim, true, attacker, GameConstants.DeathReasons.GRENADE);
 		}
+	}
+
+	private static boolean hasExplosionLineOfSight(ServerWorld world, Vec3d blastCenter, ServerPlayerEntity victim) {
+		Vec3d center = blastCenter.add(0.0D, 0.35D, 0.0D);
+		Vec3d eye = victim.getEyePos();
+		Vec3d body = victim.getPos().add(0.0D, victim.getHeight() * 0.5D, 0.0D);
+		return unobstructed(world, center, eye, victim) || unobstructed(world, center, body, victim);
+	}
+
+	private static boolean unobstructed(ServerWorld world, Vec3d from, Vec3d to, ServerPlayerEntity victim) {
+		BlockHitResult hit = world.raycast(new RaycastContext(from, to,
+			RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, victim));
+		if (hit.getType() == HitResult.Type.MISS) return true;
+		return hit.getPos().squaredDistanceTo(from) + 0.05D >= to.squaredDistanceTo(from);
 	}
 
 	private static void tickThrownCharges(ServerWorld world, long now) {

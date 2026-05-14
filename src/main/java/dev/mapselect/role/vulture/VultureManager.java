@@ -18,6 +18,8 @@ import dev.mapselect.network.VultureReleasePayload;
 import dev.mapselect.network.VultureStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
+import dev.mapselect.role.guardian.GuardianAngelManager;
+import dev.mapselect.role.medic.MedicShieldComponent;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.role.spy.SpyManager;
@@ -131,6 +133,7 @@ public final class VultureManager {
 		stashedByVulture.computeIfAbsent(vultureId, id -> new ArrayDeque<>()).addLast(targetId);
 		eatenByVulture.computeIfAbsent(vultureId, id -> ConcurrentHashMap.newKeySet()).add(targetId);
 
+		clearAttachedShields(target);
 		target.stopRiding();
 		target.setSneaking(false);
 		target.setInvisible(true);
@@ -152,6 +155,13 @@ public final class VultureManager {
 		SpyManager.recordInteraction(vulture, target);
 		tryEndForVulture(vulture);
 		return true;
+	}
+
+	private static void clearAttachedShields(ServerPlayerEntity target) {
+		if (target == null || !(target.getWorld() instanceof ServerWorld world)) return;
+		MedicShieldComponent medicShields = MedicShieldComponent.KEY.getNullable(world);
+		if (medicShields != null) medicShields.removeShield(target.getUuid());
+		GuardianAngelManager.removeShield(target.getUuid(), world);
 	}
 
 	private static boolean addEatTimeBonus(ServerPlayerEntity vulture) {

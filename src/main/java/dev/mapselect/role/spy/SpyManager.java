@@ -18,15 +18,12 @@ import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.task.ConversationTask;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -52,12 +49,6 @@ public final class SpyManager {
 		ServerPlayNetworking.registerGlobalReceiver(SpyUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryBug(context.player())));
 		ServerTickEvents.END_WORLD_TICK.register(SpyManager::tick);
-		UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-			if (!world.isClient && player instanceof ServerPlayerEntity actor) {
-				recordInteraction(actor, entity);
-			}
-			return ActionResult.PASS;
-		});
 		AllowPlayerDeath.EVENT.register(SpyManager::recordDeathInteraction);
 		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clear(world));
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear(world));
@@ -137,11 +128,6 @@ public final class SpyManager {
 			return;
 		}
 		if (task != null) recordTask(player, task.getType());
-	}
-
-	private static void recordInteraction(ServerPlayerEntity actor, Entity entity) {
-		if (!(entity instanceof ServerPlayerEntity other) || actor == other) return;
-		recordInteraction(actor, other);
 	}
 
 	public static void recordInteraction(ServerPlayerEntity actor, ServerPlayerEntity other) {

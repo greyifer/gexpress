@@ -9,6 +9,7 @@ import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.game.LastDeathShieldManager;
 import dev.mapselect.game.SpectatorMovementGuard;
 import dev.mapselect.item.DevWeaponSkinStamper;
+import dev.mapselect.level.LevelManager;
 import dev.mapselect.modifier.EodDistribution;
 import dev.mapselect.modifier.MutedNotesDistribution;
 import dev.mapselect.modifier.NightVisionManager;
@@ -119,6 +120,7 @@ public class MapSelect implements ModInitializer {
 		DeadVoiceGroupManager.register();
 		AbilityCooldownSync.register();
 		PassiveMoney.register();
+		LevelManager.register();
 		DefaultMapPresets.register();
 		GexpressConfigSyncHandler.register();
 		GexpressPresetsSyncHandler.register();

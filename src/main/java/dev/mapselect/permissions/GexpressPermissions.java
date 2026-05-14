@@ -4,6 +4,7 @@ import dev.mapselect.host.HostComponent;
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.host.TrustedComponent;
+import dev.mapselect.level.LevelComponent;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
@@ -135,7 +136,9 @@ public final class GexpressPermissions {
 			out.append(tagBadge(tag));
 		}
 		if (!out.getString().isEmpty()) out.append(Text.literal(" "));
-		return out.append(Text.literal(player.getGameProfile().getName()));
+		out.append(Text.literal(player.getGameProfile().getName()));
+		out.append(Text.literal(" [Lv " + LevelComponent.level(player) + "]").formatted(Formatting.GRAY));
+		return out;
 	}
 
 	private static Text badgeFor(PlayerEntity player) {

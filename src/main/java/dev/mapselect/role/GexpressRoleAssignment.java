@@ -117,6 +117,7 @@ public final class GexpressRoleAssignment {
 			godfathers.add(player);
 		}
 		TakeoverManager.assignSides(godfathers);
+		assignRolePool(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
 	}
 
 	private static void setNight(ServerWorld world) {

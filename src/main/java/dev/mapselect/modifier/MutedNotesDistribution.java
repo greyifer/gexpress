@@ -53,10 +53,17 @@ public final class MutedNotesDistribution {
 			if (!activeGame && !testingMuted) continue;
 			if (!GameFunctions.isPlayerAliveAndSurvival(player) && !testingMuted) continue;
 			UUID id = player.getUuid();
-			if (granted.contains(id)) continue;
 			if (!modifiers.isModifier(player, MapSelectModifiers.MUTED)) continue;
 
 			int missing = STARTING_NOTES - player.getInventory().count(WatheItems.NOTE);
+			if (missing <= 0) {
+				granted.add(id);
+				continue;
+			}
+			if (granted.contains(id)) {
+				granted.remove(id);
+				MapSelect.LOGGER.debug("Re-handing missing note(s) to muted player {}", player.getName().getString());
+			}
 			if (missing > 0) {
 				ItemStack stack = WatheItems.NOTE.getDefaultStack();
 				stack.setCount(missing);

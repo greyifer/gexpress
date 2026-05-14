@@ -1,3 +1,28 @@
+# Grey's Express 1.5.3
+
+## Added
+
+- Added persistent player levels with 25 XP for playing a round and 50 bonus XP for winning; levels now show in tab names, player display names, and the out-of-game HUD.
+- Added the Godfather recruit picker so the primary ability can choose Mafioso or Janitor from one small menu.
+
+## Changed
+
+- Takeover now assigns normal civilian-category roles to non-Godfathers, keeps purple and lime Mafia families separate, allows each Godfather up to three Mafiosos and three Janitors, and keeps recruited Mafia members on their side after their Godfather dies.
+- Dracula bat form now uses a live, upright bat camera and keeps flight active while transformed.
+- Scatter Brain now searches for safe RTP positions from map random spawns or the play area before teleporting players.
+
+## Fixed
+
+- Fixed ability cooldown bars and ability-key checks being tied to the role reveal timer instead of only hiding while dead, in safe time, or inside a Pelican.
+- Fixed Pelican belly camera state flashing, swallowed shield state carrying onto Pelican views, swallowed Snitch progress being overwritten, and swallowed players being re-synced correctly after reconnect.
+- Fixed Spy and Bodyguard interaction feeds firing from ordinary right-clicks such as food or drink use.
+- Fixed EOD Specialist pliers and Muted notes not being reissued when their initial grant was missed or lost.
+- Fixed Amnesia killer instinct revealing other killers with a glow.
+- Fixed Time Master server-side ability use while dead.
+- Fixed C4 and Wathe grenades killing through walls.
+- Fixed Juggernaut shield break detection for knife, bat, revolver, bullet, and projectile-style death reasons.
+- Fixed client render distance being left below 32 by other option writes.
+
 # Grey's Express 1.5.2
 
 ## Added

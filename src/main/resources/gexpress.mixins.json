@@ -13,6 +13,7 @@
 		"GameRoundEndMafiaCategoryMixin",
 		"FoodPlatterHungryThirstyMixin",
 		"FreshAirAreaMixin",
+		"GrenadeLineOfSightMixin",
 		"HmlRoleModifierTuningMixin",
 		"JuggernautDropMixin",
 		"JuggernautMurderWinMixin",

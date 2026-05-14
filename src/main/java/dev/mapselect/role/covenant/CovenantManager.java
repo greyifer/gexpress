@@ -25,6 +25,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.passive.BatEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.packet.s2c.play.SetCameraEntityS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -216,10 +217,18 @@ public final class CovenantManager {
 			batTicksByPlayer.put(id, ticks);
 			Entity entity = player.getServerWorld().getEntity(state.batId());
 			if (entity instanceof BatEntity bat) {
+				bat.setRoosting(false);
+				bat.setNoGravity(true);
 				bat.refreshPositionAndAngles(player.getX(), player.getY() + 0.6D, player.getZ(),
 					player.getYaw(), player.getPitch());
 				bat.setVelocity(player.getVelocity());
 			}
+			if (!player.getAbilities().allowFlying || !player.getAbilities().flying) {
+				player.getAbilities().allowFlying = true;
+				player.getAbilities().flying = true;
+				player.sendAbilitiesUpdate();
+			}
+			player.fallDistance = 0.0F;
 			if (ticks <= 0) endBat(player);
 		} else if (ticks < BAT_MAX) {
 			batTicksByPlayer.put(id, Math.min(BAT_MAX, ticks + 1));
@@ -233,6 +242,8 @@ public final class CovenantManager {
 			player.getYaw(), player.getPitch());
 		bat.setInvulnerable(true);
 		bat.setSilent(true);
+		bat.setRoosting(false);
+		bat.setNoGravity(true);
 		bat.setAiDisabled(true);
 		player.getServerWorld().spawnEntity(bat);
 
@@ -243,6 +254,7 @@ public final class CovenantManager {
 		player.getAbilities().flying = true;
 		player.setInvisible(true);
 		player.sendAbilitiesUpdate();
+		player.networkHandler.sendPacket(new SetCameraEntityS2CPacket(bat));
 	}
 
 	private static void endBat(ServerPlayerEntity player) {
@@ -255,6 +267,7 @@ public final class CovenantManager {
 		player.getAbilities().flying = state.flying();
 		player.setInvisible(state.invisible());
 		player.sendAbilitiesUpdate();
+		player.networkHandler.sendPacket(new SetCameraEntityS2CPacket(player));
 	}
 
 	private static void fillBlood(ServerPlayerEntity player) {

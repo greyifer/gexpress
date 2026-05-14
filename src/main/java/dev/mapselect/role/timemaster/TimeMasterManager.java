@@ -187,6 +187,7 @@ public final class TimeMasterManager {
 	private static void tryRewind(ServerPlayerEntity timeMaster) {
 		if (timeMaster == null || !(timeMaster.getWorld() instanceof ServerWorld world)) return;
 		if (VultureManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
+		if (!GexpressTestState.isRoleTester(timeMaster) && !GameFunctions.isPlayerAliveAndSurvival(timeMaster)) return;
 		if (!canTrack(world) || !isTimeMaster(timeMaster) || !isPlayable(timeMaster, timeMaster)) return;
 
 		TimeMasterComponent comp = TimeMasterComponent.KEY.get(world);
@@ -229,6 +230,7 @@ public final class TimeMasterManager {
 	private static void tryFreeze(ServerPlayerEntity timeMaster) {
 		if (timeMaster == null || !(timeMaster.getWorld() instanceof ServerWorld world)) return;
 		if (VultureManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
+		if (!GexpressTestState.isRoleTester(timeMaster) && !GameFunctions.isPlayerAliveAndSurvival(timeMaster)) return;
 		if (!canTrack(world) || !isTimeMaster(timeMaster) || !isPlayable(timeMaster, timeMaster)) return;
 
 		TimeMasterComponent comp = TimeMasterComponent.KEY.get(world);
