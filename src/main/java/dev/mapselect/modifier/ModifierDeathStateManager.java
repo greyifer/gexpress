@@ -57,7 +57,7 @@ public final class ModifierDeathStateManager {
 	}
 
 	private static void suspend(ServerPlayerEntity player, WorldModifierComponent component) {
-		ArrayList<Modifier> current = component.getModifiers(player.getUuid());
+		ArrayList<Modifier> current = safeModifiers(component, player);
 		List<Modifier> stored = suspendedModifiers.computeIfAbsent(player.getUuid(), id -> new ArrayList<>(current));
 		mergeMissing(stored, current);
 		if (current.isEmpty()) return;
@@ -71,7 +71,7 @@ public final class ModifierDeathStateManager {
 	private static void restore(ServerPlayerEntity player, WorldModifierComponent component) {
 		List<Modifier> stored = suspendedModifiers.remove(player.getUuid());
 		if (stored == null) return;
-		ArrayList<Modifier> current = component.getModifiers(player.getUuid());
+		ArrayList<Modifier> current = safeModifiers(component, player);
 		List<Modifier> oldValues = new ArrayList<>(current);
 		current.clear();
 		current.addAll(stored);
@@ -101,6 +101,12 @@ public final class ModifierDeathStateManager {
 			if (modifier != null && id != null && id.equals(modifier.identifier())) return true;
 		}
 		return false;
+	}
+
+	private static ArrayList<Modifier> safeModifiers(WorldModifierComponent component, ServerPlayerEntity player) {
+		if (component == null || player == null) return new ArrayList<>();
+		ArrayList<Modifier> current = component.getModifiers(player.getUuid());
+		return current == null ? new ArrayList<>() : current;
 	}
 
 	private static void safeAssignModifier(ServerPlayerEntity player, Modifier modifier) {

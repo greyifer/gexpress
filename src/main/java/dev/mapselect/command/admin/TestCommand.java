@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.admin;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -41,6 +41,8 @@ import java.util.function.Predicate;
 
 public final class TestCommand {
 	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseAdminCommands;
+	private static final Predicate<ServerCommandSource> ROLE_TEST = GexpressPermissions::canUseRoleCommands;
+	private static final Predicate<ServerCommandSource> MODIFIER_TEST = GexpressPermissions::canUseModifierCommands;
 
 	private TestCommand() {}
 
@@ -49,8 +51,25 @@ public final class TestCommand {
 	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildRoleTestTree() {
-		return CommandManager.literal("test")
-			.requires(OP)
+		return roleTestTree("roles", OP);
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildRoleTestSubTree() {
+		return roleTestTree("test", ROLE_TEST);
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildModifierTestTree() {
+		return modifierTestTree("modifiers", OP);
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildModifierTestSubTree() {
+		return modifierTestTree("test", MODIFIER_TEST);
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> roleTestTree(String literal,
+			Predicate<ServerCommandSource> requirement) {
+		return CommandManager.literal(literal)
+			.requires(requirement)
 			.then(CommandManager.literal("role")
 				.then(CommandManager.literal("clear")
 					.executes(ctx -> runClearRole(ctx, self(ctx)))
@@ -63,9 +82,10 @@ public final class TestCommand {
 							EntityArgumentType.getPlayers(ctx, "players"))))));
 	}
 
-	public static LiteralArgumentBuilder<ServerCommandSource> buildModifierTestTree() {
-		return CommandManager.literal("test")
-			.requires(OP)
+	private static LiteralArgumentBuilder<ServerCommandSource> modifierTestTree(String literal,
+			Predicate<ServerCommandSource> requirement) {
+		return CommandManager.literal(literal)
+			.requires(requirement)
 			.then(CommandManager.literal("add")
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
@@ -97,7 +117,7 @@ public final class TestCommand {
 	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTaskTestTree() {
-		return CommandManager.literal("test")
+		return CommandManager.literal("tasks")
 			.requires(OP)
 			.then(CommandManager.literal("clear")
 				.executes(ctx -> runClearTasks(ctx, self(ctx)))
@@ -158,7 +178,7 @@ public final class TestCommand {
 	}
 
 	private static boolean hasModifier(WorldModifierComponent mods, ServerPlayerEntity player, Modifier modifier) {
-		return mods.getModifiers(player.getUuid()).stream()
+		return safeModifiers(mods, player).stream()
 			.anyMatch(current -> current == modifier || current.identifier().equals(modifier.identifier()));
 	}
 
@@ -246,7 +266,7 @@ public final class TestCommand {
 		}
 
 		for (ServerPlayerEntity player : players) {
-			List<Modifier> current = mods.getModifiers(player.getUuid());
+			List<Modifier> current = safeModifiers(mods, player);
 			boolean removed = current.removeIf(m -> m == modifier || m.identifier().equals(modifier.identifier()));
 			if (removed) {
 				safeRemoveModifier(player, modifier);
@@ -270,7 +290,7 @@ public final class TestCommand {
 		}
 
 		for (ServerPlayerEntity player : players) {
-			ArrayList<Modifier> current = mods.getModifiers(player.getUuid());
+			ArrayList<Modifier> current = safeModifiers(mods, player);
 			List<Modifier> removed = new ArrayList<>(current);
 			current.clear();
 			for (Modifier modifier : removed) {
@@ -382,6 +402,12 @@ public final class TestCommand {
 			MapSelect.LOGGER.warn("ModifierAssigned listener failed during /g modifiers test add for {} on {}.",
 				id(modifier), player.getName().getString(), t);
 		}
+	}
+
+	private static ArrayList<Modifier> safeModifiers(WorldModifierComponent component, ServerPlayerEntity player) {
+		if (component == null || player == null) return new ArrayList<>();
+		ArrayList<Modifier> current = component.getModifiers(player.getUuid());
+		return current == null ? new ArrayList<>() : current;
 	}
 
 	private static void safeRemoveModifier(ServerPlayerEntity player, Modifier modifier) {

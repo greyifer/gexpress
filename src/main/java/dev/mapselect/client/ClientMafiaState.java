@@ -105,7 +105,11 @@ public final class ClientMafiaState {
 		if (introTicks > 0) introTicks--;
 		updateMafiaIntro(client);
 		updateMafiaWeather(client);
-		blackWhiteStrength = MathHelper.lerp(0.045F, blackWhiteStrength, shouldUseBlackWhite(client) ? 1.0F : 0.0F);
+		if (ClientVultureState.isLocalStashed(client)) {
+			blackWhiteStrength = 1.0F;
+		} else {
+			blackWhiteStrength = MathHelper.lerp(0.045F, blackWhiteStrength, shouldUseBlackWhite(client) ? 1.0F : 0.0F);
+		}
 		if (blackWhiteStrength < 0.01F) blackWhiteStrength = 0.0F;
 		if (blackWhiteStrength > 0.99F) blackWhiteStrength = 1.0F;
 		updateBlackWhiteShader(client);

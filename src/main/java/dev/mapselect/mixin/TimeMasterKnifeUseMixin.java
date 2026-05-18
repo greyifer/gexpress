@@ -15,6 +15,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(KnifeItem.class)
 public abstract class TimeMasterKnifeUseMixin {
+	@Inject(method = "use", at = @At("HEAD"), cancellable = true)
+	private void gexpress$blockRewindKnifeReady(World world, PlayerEntity user, Hand hand,
+			CallbackInfoReturnable<TypedActionResult<ItemStack>> cir) {
+		if (!world.isClient && user instanceof ServerPlayerEntity player
+				&& (TimeMasterManager.isFrozen(player) || TimeMasterManager.isRewinding(player))) {
+			cir.setReturnValue(TypedActionResult.fail(user.getStackInHand(hand)));
+		}
+	}
+
 	@Inject(method = "use", at = @At("RETURN"))
 	private void gexpress$recordTimeMasterKnifeReady(World world, PlayerEntity user, Hand hand,
 			CallbackInfoReturnable<TypedActionResult<ItemStack>> cir) {

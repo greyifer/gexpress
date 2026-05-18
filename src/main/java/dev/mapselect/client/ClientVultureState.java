@@ -30,6 +30,7 @@ import java.util.UUID;
 public final class ClientVultureState {
 	private static volatile UUID vultureId;
 	private static volatile int vultureEntityId = -1;
+	private static volatile boolean localStashed;
 	private static int eaten;
 	private static int required = 1;
 	private static List<VultureProgressPayload.BellyEntry> belly = List.of();
@@ -52,11 +53,13 @@ public final class ClientVultureState {
 	private static void applyState(MinecraftClient client, VultureStatePayload payload) {
 		if (client == null) return;
 		if (!payload.stashed()) {
+			localStashed = false;
 			vultureId = null;
 			vultureEntityId = -1;
 			if (client.player != null) client.setCameraEntity(client.player);
 			return;
 		}
+		localStashed = true;
 		vultureId = payload.vultureId();
 		vultureEntityId = payload.vultureEntityId();
 		Entity vulture = vultureEntity(client);
@@ -158,7 +161,7 @@ public final class ClientVultureState {
 	}
 
 	public static boolean isLocalStashed(MinecraftClient client) {
-		return client != null && client.player != null && vultureId != null;
+		return client != null && client.player != null && localStashed;
 	}
 
 	public static boolean shouldHideBellyEntity(MinecraftClient client, Entity entity) {
@@ -187,6 +190,7 @@ public final class ClientVultureState {
 	}
 
 	private static void clearLocal() {
+		localStashed = false;
 		vultureId = null;
 		vultureEntityId = -1;
 		showProgress = false;

@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.setup;
 
 import cat.rezelyn.watheextended.cca.WatheExtendedWorldComponent;
 import cat.rezelyn.watheextended.game.TeleportationSlot;

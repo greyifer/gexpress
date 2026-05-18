@@ -2,6 +2,7 @@ package dev.mapselect.client.screen;
 
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
+import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -20,7 +21,7 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class GexpressTagEditorScreen extends Screen {
-	private static final String[] PERMISSIONS = { "admin", "host", "setup", "builder", "staff", "trusted", "owner" };
+	private static final List<String> PERMISSIONS = GexpressPermissions.permissionKeys();
 	private final Screen parent;
 	private TextFieldWidget idField;
 	private TextFieldWidget nameField;
@@ -56,15 +57,16 @@ public final class GexpressTagEditorScreen extends Screen {
 		colorField.setText("#D36BFF");
 		priorityField.setText("50");
 
+		int buttonY = Math.min(height - 58, formY + 292);
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.save"), button -> save())
-			.dimensions(formX, formY + 214, 72, 20)
+			.dimensions(formX, buttonY, 72, 20)
 			.build());
 		deleteButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.delete"),
 				button -> delete())
-			.dimensions(formX + 80, formY + 214, 72, 20)
+			.dimensions(formX + 80, buttonY, 72, 20)
 			.build());
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.new"), button -> clearForNew())
-			.dimensions(formX + 160, formY + 214, 72, 20)
+			.dimensions(formX + 160, buttonY, 72, 20)
 			.build());
 		addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> close())
 			.dimensions(width / 2 - 45, height - 28, 90, 20)
@@ -169,26 +171,33 @@ public final class GexpressTagEditorScreen extends Screen {
 		int y = 174;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.permissions"), x, y - 14,
 			0xFFFFFFFF);
-		for (int i = 0; i < PERMISSIONS.length; i++) {
-			int bx = x + (i % 2) * 86;
-			int by = y + (i / 2) * 21;
-			String permission = PERMISSIONS[i];
+		for (int i = 0; i < PERMISSIONS.size(); i++) {
+			int bx = x + (i % 2) * 172;
+			int by = y + (i / 2) * 28;
+			String permission = PERMISSIONS.get(i);
 			boolean selected = enabledPermissions.contains(permission);
-			boolean hovered = mouseX >= bx && mouseX < bx + 78 && mouseY >= by && mouseY < by + 17;
-			context.fill(bx, by, bx + 78, by + 17, selected ? 0xAA2E6F57 : hovered ? 0x77313A48 : 0x55212833);
-			context.drawTextWithShadow(textRenderer, Text.literal(permission), bx + 5, by + 5,
+			boolean hovered = mouseX >= bx && mouseX < bx + 164 && mouseY >= by && mouseY < by + 24;
+			context.fill(bx, by, bx + 164, by + 24, selected ? 0xAA2E6F57 : hovered ? 0x77313A48 : 0x55212833);
+			context.drawBorder(bx, by, 164, 24, selected ? 0xAA6BE3A7 : 0x443C4A58);
+			context.drawTextWithShadow(textRenderer, Text.literal(permission), bx + 5, by + 3,
 				selected ? 0xFFB8FFD7 : 0xFFFFFFFF);
+			String description = GexpressPermissions.permissionDescription(permission);
+			if (description != null) {
+				context.drawTextWithShadow(textRenderer,
+					Text.literal(textRenderer.trimToWidth(description, 154)).formatted(Formatting.GRAY),
+					bx + 5, by + 14, 0xFF9BA3AE);
+			}
 		}
 	}
 
 	private boolean clickPermission(double mouseX, double mouseY) {
 		int x = 190;
 		int y = 174;
-		for (int i = 0; i < PERMISSIONS.length; i++) {
-			int bx = x + (i % 2) * 86;
-			int by = y + (i / 2) * 21;
-			if (mouseX < bx || mouseX >= bx + 78 || mouseY < by || mouseY >= by + 17) continue;
-			String permission = PERMISSIONS[i];
+		for (int i = 0; i < PERMISSIONS.size(); i++) {
+			int bx = x + (i % 2) * 172;
+			int by = y + (i / 2) * 28;
+			if (mouseX < bx || mouseX >= bx + 164 || mouseY < by || mouseY >= by + 24) continue;
+			String permission = PERMISSIONS.get(i);
 			if (!enabledPermissions.remove(permission)) enabledPermissions.add(permission);
 			return true;
 		}
@@ -275,7 +284,10 @@ public final class GexpressTagEditorScreen extends Screen {
 		colorField.setText(String.format(Locale.ROOT, "#%06X", tag.color()));
 		priorityField.setText(Integer.toString(tag.priority()));
 		enabledPermissions.clear();
-		enabledPermissions.addAll(tag.permissions());
+		for (String permission : tag.permissions()) {
+			String key = GexpressPermissions.canonicalPermission(permission);
+			if (key != null) enabledPermissions.add(key);
+		}
 		if (deleteButton != null) {
 			deleteButton.setMessage(Text.translatable(selectedBuiltin
 				? "gui.gexpress.tag_editor.reset"
@@ -306,22 +318,22 @@ public final class GexpressTagEditorScreen extends Screen {
 		String color = normalizeHex(colorField.getText());
 		int priority = parsePriority();
 		if (selectedBuiltin) {
-			send("g group tag settings color " + id + " " + color);
-			send("g group tag settings priority " + id + " " + priority);
+			send("g admin tag settings color " + id + " " + color);
+			send("g admin tag settings priority " + id + " " + priority);
 			for (String permission : PERMISSIONS) {
-				send("g group tag settings permission " + id + " " + permission + " "
+				send("g admin tag settings permission " + id + " " + permission + " "
 					+ enabledPermissions.contains(permission));
 			}
 			selectedId = id;
 			return;
 		}
 		String name = nameField.getText().isBlank() ? id : nameField.getText().trim().replace(' ', '_');
-		send("g group tag custom create " + id + " " + name + " " + color + " " + priority);
-		send("g group tag custom name " + id + " " + name);
-		send("g group tag custom color " + id + " " + color);
-		send("g group tag custom priority " + id + " " + priority);
+		send("g admin tag custom create " + id + " " + name + " " + color + " " + priority);
+		send("g admin tag custom name " + id + " " + name);
+		send("g admin tag custom color " + id + " " + color);
+		send("g admin tag custom priority " + id + " " + priority);
 		for (String permission : PERMISSIONS) {
-			send("g group tag custom permission " + id + " " + permission + " "
+			send("g admin tag custom permission " + id + " " + permission + " "
 				+ enabledPermissions.contains(permission));
 		}
 		selectedId = id;
@@ -331,12 +343,12 @@ public final class GexpressTagEditorScreen extends Screen {
 		String id = PlayerTagComponent.normalizeCustomId(idField.getText());
 		if (id == null) return;
 		if (selectedBuiltin) {
-			send("g group tag settings reset " + id);
+			send("g admin tag settings reset " + id);
 			PlayerTag builtin = PlayerTag.byId(id);
 			if (builtin != null) load(EditableTag.from(builtin, null));
 			return;
 		}
-		send("g group tag custom delete " + id);
+		send("g admin tag custom delete " + id);
 		selectedId = "";
 		idField.setText("");
 		nameField.setText("");

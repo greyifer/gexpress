@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.game;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;

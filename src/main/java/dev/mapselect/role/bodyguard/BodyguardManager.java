@@ -164,13 +164,15 @@ public final class BodyguardManager {
 	}
 
 	public static boolean shouldBlockWeaponDrop(PlayerEntity player, ItemStack stack) {
-		return isIssuedRevolver(stack);
+		if (isIssuedRevolver(stack)) return true;
+		return player != null && isBodyguard(player) && stack != null && stack.isOf(WatheItems.REVOLVER);
 	}
 
 	public static boolean shouldBlockWeaponRemoval(PlayerEntity player, Predicate<ItemStack> predicate, int maxCount) {
 		if (player == null || predicate == null || maxCount <= 0 || !isBodyguard(player)) return false;
 		try {
 			ItemStack probe = WatheItems.REVOLVER.getDefaultStack();
+			probe.set(WatheDataComponentTypes.OWNER, player.getUuidAsString());
 			NbtCompound tag = new NbtCompound();
 			tag.putBoolean(BODYGUARD_REVOLVER_KEY, true);
 			probe.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(tag));
@@ -303,6 +305,24 @@ public final class BodyguardManager {
 		pendingMoodRestores.clear();
 		tickGate = 0;
 	}
+
+	public static TimeState snapshotForTimeRewind() {
+		return new TimeState(Map.copyOf(targetByBodyguard));
+	}
+
+	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
+		targetByBodyguard.clear();
+		if (state != null) targetByBodyguard.putAll(state.targetByBodyguard());
+		if (world == null) return;
+		for (ServerPlayerEntity bodyguard : world.getPlayers()) {
+			UUID targetId = targetByBodyguard.get(bodyguard.getUuid());
+			ServerPlayerEntity target = targetId == null ? null : world.getServer().getPlayerManager().getPlayer(targetId);
+			if (target != null && target.getWorld() == world) sendState(bodyguard, target);
+			else sendClear(bodyguard);
+		}
+	}
+
+	public record TimeState(Map<UUID, UUID> targetByBodyguard) {}
 
 	private static boolean isBodyguard(PlayerEntity player) {
 		if (player == null || player.getWorld() == null) return false;

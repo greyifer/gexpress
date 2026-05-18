@@ -28,8 +28,8 @@ public class SpyBugFeatureRenderer extends FeatureRenderer<AbstractClientPlayerE
 	public void render(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light,
 	                   AbstractClientPlayerEntity entity, float limbAngle, float limbDistance,
 	                   float tickDelta, float animationProgress, float headYaw, float headPitch) {
-		if (entity.isInvisible()) return;
 		C4PlacementPreset previewPreset = ClientModelAttachmentPreview.spyBugPreset(entity);
+		if (entity.isInvisible() && previewPreset == null) return;
 		if (!SpyBugComponent.hasBug(entity) && previewPreset == null) return;
 
 		matrices.push();

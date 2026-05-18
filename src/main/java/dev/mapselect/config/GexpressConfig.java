@@ -6,8 +6,15 @@ import com.google.gson.JsonSyntaxException;
 import dev.mapselect.MapSelect;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.util.Identifier;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -72,6 +80,12 @@ public final class GexpressConfig {
 
 	private GexpressConfig() {}
 
+	public record LevelRoadmapEntry(int level, String title, String description) {
+		public boolean configured() {
+			return title != null && !title.isBlank();
+		}
+	}
+
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("gexpress.json");
 
@@ -83,6 +97,8 @@ public final class GexpressConfig {
 	public static int wrongWirePercent = 20;
 	/** Cost in coins for a Grenade in the Bomb Specialist's shop. */
 	public static int grenadePrice = 150;
+	/** Blocks/tags/patterns the grenade line-of-sight check ignores when tracing through the map. */
+	public static List<String> grenadeLineOfSightPassThroughBlocks = defaultGrenadePassThroughBlocks();
 	/** Coins paid every Wathe passive-income tick to killer-team roles. */
 	public static int passiveIncomeKiller = 5;
 	/** Coins paid every Wathe passive-income tick to civilian roles. */
@@ -233,7 +249,7 @@ public final class GexpressConfig {
 	public static boolean guardianAngelAllowNonInnocents = false;
 	/** Whether Bodyguard protect targets are limited to civilian-side players. */
 	public static boolean bodyguardProtectOnlyCivilians = true;
-	/** Whether G'Express uses fixed max Killer/Vigilante counts instead of per-player scaling. */
+	/** Whether side count fields cap normal role assignment instead of using only per-player scaling. */
 	public static boolean useCustomRoleCounts = true;
 	/** Maximum number of normal killer-team players assigned by G'Express role assignment. */
 	public static int maxKillerAmount = 64;
@@ -287,6 +303,26 @@ public final class GexpressConfig {
 	public static int abilityHudOffsetY = 0;
 	/** Client-only preference for rendering available 3D revolver skin models instead of flat 2D fallbacks. */
 	public static boolean use3dGunSkins = true;
+	/** XP granted to everyone recorded at the end of a completed round. */
+	public static int levelRoundXp = 25;
+	/** Extra XP granted to players on the winning side. */
+	public static int levelWinXp = 25;
+	/** Extra XP stacked on top of win XP when a neutral role wins. */
+	public static int levelNeutralWinBonusXp = 25;
+	/** XP granted to a killer when their kill is accepted by Wathe's death pipeline. */
+	public static int levelKillXp = 10;
+	/** XP granted to civilian-side players for completing a task. */
+	public static int levelCivilianTaskXp = 5;
+	/** Base XP needed to move from level 1 to 2. */
+	public static int levelBaseXp = 100;
+	/** Added XP needed for each next level after the base. 100 preserves the old 100/200/300 curve. */
+	public static int levelXpIncrease = 100;
+	/** Number of levels shown in the XP Roadmap tab. */
+	public static int levelRoadmapDisplayLevels = 25;
+	/** Optional rows like "5=750" overriding the generated XP needed for a specific level. */
+	public static List<String> levelXpOverrides = new ArrayList<>();
+	/** Optional rows like "5|Gold Skin|Unlocks the Gold revolver skin." shown in the roadmap. */
+	public static List<String> levelRewardRoadmap = new ArrayList<>();
 
 	public static final int C4_PRICE_MIN = 0;
 	public static final int C4_PRICE_MAX = 9999;
@@ -298,6 +334,12 @@ public final class GexpressConfig {
 	public static final int WRONG_WIRE_MAX = 100;
 	public static final int GRENADE_PRICE_MIN = 0;
 	public static final int GRENADE_PRICE_MAX = 9999;
+	public static final int LEVEL_XP_AMOUNT_MIN = 0;
+	public static final int LEVEL_XP_AMOUNT_MAX = 10000;
+	public static final int LEVEL_XP_REQUIRED_MIN = 1;
+	public static final int LEVEL_XP_REQUIRED_MAX = 1000000;
+	public static final int LEVEL_ROADMAP_DISPLAY_MIN = 1;
+	public static final int LEVEL_ROADMAP_DISPLAY_MAX = 200;
 	public static final int PASSIVE_INCOME_MIN = 0;
 	public static final int PASSIVE_INCOME_MAX = 9999;
 	public static final int MEDIC_SHIELD_COOLDOWN_MIN = 0;
@@ -477,6 +519,123 @@ public final class GexpressConfig {
 
 	public static int getGrenadePrice() {
 		return Math.max(GRENADE_PRICE_MIN, Math.min(GRENADE_PRICE_MAX, grenadePrice));
+	}
+
+	public static List<String> getGrenadeLineOfSightPassThroughBlockStrings() {
+		return normalizeStringList(grenadeLineOfSightPassThroughBlocks);
+	}
+
+	public static void setGrenadeLineOfSightPassThroughBlockStrings(List<String> values) {
+		grenadeLineOfSightPassThroughBlocks = normalizeStringList(values);
+	}
+
+	public static String getGrenadeLineOfSightPassThroughBlocksSyncString() {
+		return encodeStringList(getGrenadeLineOfSightPassThroughBlockStrings());
+	}
+
+	public static void setGrenadeLineOfSightPassThroughBlocksSyncString(String raw) {
+		grenadeLineOfSightPassThroughBlocks = decodeStringList(raw);
+	}
+
+	public static boolean isGrenadeLineOfSightPassThrough(BlockState state) {
+		if (state == null || state.isAir()) return true;
+		Identifier blockId = Registries.BLOCK.getId(state.getBlock());
+		String blockIdString = blockId.toString();
+		String blockPath = blockId.getPath();
+		for (String entry : getGrenadeLineOfSightPassThroughBlockStrings()) {
+			if (matchesBlockSelector(state, blockIdString, blockPath, entry)) return true;
+		}
+		return false;
+	}
+
+	public static int getLevelRoundXp() {
+		return Math.max(LEVEL_XP_AMOUNT_MIN, Math.min(LEVEL_XP_AMOUNT_MAX, levelRoundXp));
+	}
+
+	public static int getLevelWinXp() {
+		return Math.max(LEVEL_XP_AMOUNT_MIN, Math.min(LEVEL_XP_AMOUNT_MAX, levelWinXp));
+	}
+
+	public static int getLevelNeutralWinBonusXp() {
+		return Math.max(LEVEL_XP_AMOUNT_MIN, Math.min(LEVEL_XP_AMOUNT_MAX, levelNeutralWinBonusXp));
+	}
+
+	public static int getLevelKillXp() {
+		return Math.max(LEVEL_XP_AMOUNT_MIN, Math.min(LEVEL_XP_AMOUNT_MAX, levelKillXp));
+	}
+
+	public static int getLevelCivilianTaskXp() {
+		return Math.max(LEVEL_XP_AMOUNT_MIN, Math.min(LEVEL_XP_AMOUNT_MAX, levelCivilianTaskXp));
+	}
+
+	public static int getLevelBaseXp() {
+		return Math.max(LEVEL_XP_REQUIRED_MIN, Math.min(LEVEL_XP_REQUIRED_MAX, levelBaseXp));
+	}
+
+	public static int getLevelXpIncrease() {
+		return Math.max(0, Math.min(LEVEL_XP_REQUIRED_MAX, levelXpIncrease));
+	}
+
+	public static int getLevelRoadmapDisplayLevels() {
+		return Math.max(LEVEL_ROADMAP_DISPLAY_MIN,
+			Math.min(LEVEL_ROADMAP_DISPLAY_MAX, levelRoadmapDisplayLevels));
+	}
+
+	public static List<String> getLevelXpOverrideStrings() {
+		return normalizeStringList(levelXpOverrides);
+	}
+
+	public static void setLevelXpOverrideStrings(List<String> values) {
+		levelXpOverrides = normalizeStringList(values);
+	}
+
+	public static String getLevelXpOverridesSyncString() {
+		return encodeStringList(getLevelXpOverrideStrings());
+	}
+
+	public static void setLevelXpOverridesSyncString(String raw) {
+		levelXpOverrides = decodeStringList(raw);
+	}
+
+	public static List<String> getLevelRewardRoadmapStrings() {
+		return normalizeStringList(levelRewardRoadmap);
+	}
+
+	public static void setLevelRewardRoadmapStrings(List<String> values) {
+		levelRewardRoadmap = normalizeStringList(values);
+	}
+
+	public static String getLevelRewardRoadmapSyncString() {
+		return encodeStringList(getLevelRewardRoadmapStrings());
+	}
+
+	public static void setLevelRewardRoadmapSyncString(String raw) {
+		levelRewardRoadmap = decodeStringList(raw);
+	}
+
+	public static int getXpNeededForLevel(int level) {
+		int safeLevel = Math.max(1, level);
+		Integer override = xpOverrideForLevel(safeLevel);
+		if (override != null) return override;
+		long generated = (long) getLevelBaseXp() + (long) (safeLevel - 1) * getLevelXpIncrease();
+		return (int) Math.max(LEVEL_XP_REQUIRED_MIN, Math.min(LEVEL_XP_REQUIRED_MAX, generated));
+	}
+
+	public static List<LevelRoadmapEntry> getLevelRoadmapEntries() {
+		List<LevelRoadmapEntry> entries = new ArrayList<>();
+		for (String raw : getLevelRewardRoadmapStrings()) {
+			LevelRoadmapEntry entry = parseLevelRoadmapEntry(raw);
+			if (entry != null) entries.add(entry);
+		}
+		return entries;
+	}
+
+	public static LevelRoadmapEntry getLevelRoadmapEntry(int level) {
+		int safeLevel = Math.max(1, level);
+		for (LevelRoadmapEntry entry : getLevelRoadmapEntries()) {
+			if (entry.level() == safeLevel) return entry;
+		}
+		return new LevelRoadmapEntry(safeLevel, "", "");
 	}
 
 	public static int getPassiveIncomeKiller() {
@@ -1116,6 +1275,8 @@ public final class GexpressConfig {
 			c4FirstBeepSeconds = snap.c4FirstBeepSeconds;
 			wrongWirePercent = snap.wrongWirePercent;
 			grenadePrice = snap.grenadePrice;
+			grenadeLineOfSightPassThroughBlocks = normalizeStringList(
+				snap.grenadeLineOfSightPassThroughBlocks);
 			passiveIncomeKiller = snap.passiveIncomeKiller;
 			passiveIncomeCivilian = snap.passiveIncomeCivilian;
 			passiveIncomeNeutral = snap.passiveIncomeNeutral;
@@ -1233,6 +1394,16 @@ public final class GexpressConfig {
 			abilityHudOffsetX = snap.abilityHudOffsetX;
 			abilityHudOffsetY = snap.abilityHudOffsetY;
 			use3dGunSkins = snap.use3dGunSkins;
+			levelRoundXp = snap.levelRoundXp;
+			levelWinXp = snap.levelWinXp;
+			levelNeutralWinBonusXp = snap.levelNeutralWinBonusXp;
+			levelKillXp = snap.levelKillXp;
+			levelCivilianTaskXp = snap.levelCivilianTaskXp;
+			levelBaseXp = snap.levelBaseXp;
+			levelXpIncrease = snap.levelXpIncrease;
+			levelRoadmapDisplayLevels = snap.levelRoadmapDisplayLevels;
+			levelXpOverrides = normalizeStringList(snap.levelXpOverrides);
+			levelRewardRoadmap = normalizeStringList(snap.levelRewardRoadmap);
 			clampInPlace();
 		} catch (IOException | JsonSyntaxException e) {
 			MapSelect.LOGGER.warn("Failed to load gexpress.json; keeping defaults.", e);
@@ -1249,6 +1420,7 @@ public final class GexpressConfig {
 			snap.c4FirstBeepSeconds = c4FirstBeepSeconds;
 			snap.wrongWirePercent = wrongWirePercent;
 			snap.grenadePrice = grenadePrice;
+			snap.grenadeLineOfSightPassThroughBlocks = getGrenadeLineOfSightPassThroughBlockStrings();
 			snap.passiveIncomeKiller = passiveIncomeKiller;
 			snap.passiveIncomeCivilian = passiveIncomeCivilian;
 			snap.passiveIncomeNeutral = passiveIncomeNeutral;
@@ -1365,6 +1537,16 @@ public final class GexpressConfig {
 			snap.abilityHudOffsetX = abilityHudOffsetX;
 			snap.abilityHudOffsetY = abilityHudOffsetY;
 			snap.use3dGunSkins = use3dGunSkins;
+			snap.levelRoundXp = levelRoundXp;
+			snap.levelWinXp = levelWinXp;
+			snap.levelNeutralWinBonusXp = levelNeutralWinBonusXp;
+			snap.levelKillXp = levelKillXp;
+			snap.levelCivilianTaskXp = levelCivilianTaskXp;
+			snap.levelBaseXp = levelBaseXp;
+			snap.levelXpIncrease = levelXpIncrease;
+			snap.levelRoadmapDisplayLevels = levelRoadmapDisplayLevels;
+			snap.levelXpOverrides = getLevelXpOverrideStrings();
+			snap.levelRewardRoadmap = getLevelRewardRoadmapStrings();
 			writeAtomically(CONFIG_PATH, GSON.toJson(snap));
 		} catch (IOException e) {
 			MapSelect.LOGGER.warn("Failed to save gexpress.json.", e);
@@ -1541,12 +1723,31 @@ public final class GexpressConfig {
 		clampInPlace();
 	}
 
+	public static void applyDevTuning(int levelRoundXp, int levelWinXp, int levelNeutralWinBonusXp,
+			int levelKillXp, int levelCivilianTaskXp, int levelBaseXp, int levelXpIncrease,
+			int levelRoadmapDisplayLevels, String levelXpOverrides, String levelRewardRoadmap,
+			String grenadeLineOfSightPassThroughBlocks) {
+		GexpressConfig.levelRoundXp = levelRoundXp;
+		GexpressConfig.levelWinXp = levelWinXp;
+		GexpressConfig.levelNeutralWinBonusXp = levelNeutralWinBonusXp;
+		GexpressConfig.levelKillXp = levelKillXp;
+		GexpressConfig.levelCivilianTaskXp = levelCivilianTaskXp;
+		GexpressConfig.levelBaseXp = levelBaseXp;
+		GexpressConfig.levelXpIncrease = levelXpIncrease;
+		GexpressConfig.levelRoadmapDisplayLevels = levelRoadmapDisplayLevels;
+		GexpressConfig.setLevelXpOverridesSyncString(levelXpOverrides);
+		GexpressConfig.setLevelRewardRoadmapSyncString(levelRewardRoadmap);
+		GexpressConfig.setGrenadeLineOfSightPassThroughBlocksSyncString(grenadeLineOfSightPassThroughBlocks);
+		clampInPlace();
+	}
+
 	private static void clampInPlace() {
 		c4Price = getC4Price();
 		c4FuseSeconds = getC4FuseSeconds();
 		c4FirstBeepSeconds = getC4FirstBeepSeconds();
 		wrongWirePercent = getWrongWirePercent();
 		grenadePrice = getGrenadePrice();
+		grenadeLineOfSightPassThroughBlocks = getGrenadeLineOfSightPassThroughBlockStrings();
 		passiveIncomeKiller = getPassiveIncomeKiller();
 		passiveIncomeCivilian = getPassiveIncomeCivilian();
 		passiveIncomeNeutral = getPassiveIncomeNeutral();
@@ -1652,6 +1853,16 @@ public final class GexpressConfig {
 		abilityHudScalePercent = getAbilityHudScalePercent();
 		abilityHudOffsetX = getAbilityHudOffsetX();
 		abilityHudOffsetY = getAbilityHudOffsetY();
+		levelRoundXp = getLevelRoundXp();
+		levelWinXp = getLevelWinXp();
+		levelNeutralWinBonusXp = getLevelNeutralWinBonusXp();
+		levelKillXp = getLevelKillXp();
+		levelCivilianTaskXp = getLevelCivilianTaskXp();
+		levelBaseXp = getLevelBaseXp();
+		levelXpIncrease = getLevelXpIncrease();
+		levelRoadmapDisplayLevels = getLevelRoadmapDisplayLevels();
+		levelXpOverrides = getLevelXpOverrideStrings();
+		levelRewardRoadmap = getLevelRewardRoadmapStrings();
 	}
 
 	private static C4PlacementPreset currentC4PlacementPreset() {
@@ -1693,6 +1904,130 @@ public final class GexpressConfig {
 		return out;
 	}
 
+	private static List<String> defaultGrenadePassThroughBlocks() {
+		return new ArrayList<>(List.of(
+			"minecraft:glass",
+			"minecraft:tinted_glass",
+			"minecraft:glass_pane",
+			"minecraft:*_stained_glass",
+			"minecraft:*_stained_glass_pane",
+			"minecraft:iron_bars",
+			"minecraft:chain"
+		));
+	}
+
+	private static List<String> normalizeStringList(List<String> values) {
+		List<String> out = new ArrayList<>();
+		if (values == null) return out;
+		for (String raw : values) {
+			String cleaned = raw == null ? "" : raw.strip();
+			if (!cleaned.isEmpty()) out.add(cleaned);
+		}
+		return out;
+	}
+
+	private static String encodeStringList(List<String> values) {
+		String json = GSON.toJson(normalizeStringList(values));
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+	}
+
+	private static List<String> decodeStringList(String raw) {
+		if (raw == null || raw.isBlank()) return new ArrayList<>();
+		try {
+			byte[] bytes = Base64.getUrlDecoder().decode(raw);
+			List<?> decoded = GSON.fromJson(new String(bytes, StandardCharsets.UTF_8), List.class);
+			List<String> out = new ArrayList<>();
+			if (decoded != null) {
+				for (Object value : decoded) {
+					if (value instanceof String string) out.add(string);
+				}
+			}
+			return normalizeStringList(out);
+		} catch (IllegalArgumentException | JsonSyntaxException ignored) {
+			return new ArrayList<>();
+		}
+	}
+
+	private static boolean matchesBlockSelector(BlockState state, String blockId, String blockPath, String raw) {
+		if (raw == null || raw.isBlank()) return false;
+		String selector = raw.strip().toLowerCase(Locale.ROOT);
+		if (selector.startsWith("#")) {
+			Identifier tagId = parseIdentifier(selector.substring(1));
+			if (tagId == null) return false;
+			TagKey<Block> tag = TagKey.of(RegistryKeys.BLOCK, tagId);
+			return state.isIn(tag);
+		}
+		if (selector.indexOf('*') >= 0) {
+			return wildcardMatches(selector, blockId)
+				|| (!selector.contains(":") && wildcardMatches(selector, blockPath));
+		}
+		return selector.equals(blockId) || (!selector.contains(":") && selector.equals(blockPath));
+	}
+
+	private static boolean wildcardMatches(String pattern, String value) {
+		if (pattern == null || value == null) return false;
+		String[] parts = pattern.split("\\*", -1);
+		int index = 0;
+		if (!pattern.startsWith("*")) {
+			if (!value.startsWith(parts[0])) return false;
+			index = parts[0].length();
+		}
+		int startPart = pattern.startsWith("*") ? 0 : 1;
+		for (int i = startPart; i < parts.length; i++) {
+			String part = parts[i];
+			if (part.isEmpty()) continue;
+			int found = value.indexOf(part, index);
+			if (found < 0) return false;
+			index = found + part.length();
+		}
+		return pattern.endsWith("*") || parts.length == 0 || value.endsWith(parts[parts.length - 1]);
+	}
+
+	private static Identifier parseIdentifier(String raw) {
+		if (raw == null || raw.isBlank()) return null;
+		try {
+			return Identifier.of(raw.strip());
+		} catch (RuntimeException ignored) {
+			return null;
+		}
+	}
+
+	private static Integer xpOverrideForLevel(int level) {
+		for (String raw : getLevelXpOverrideStrings()) {
+			int separator = raw.indexOf('=');
+			if (separator < 0) separator = raw.indexOf(':');
+			if (separator < 0) continue;
+			Integer parsedLevel = parsePositiveInt(raw.substring(0, separator));
+			Integer parsedXp = parsePositiveInt(raw.substring(separator + 1));
+			if (parsedLevel != null && parsedLevel == level && parsedXp != null) {
+				return Math.max(LEVEL_XP_REQUIRED_MIN, Math.min(LEVEL_XP_REQUIRED_MAX, parsedXp));
+			}
+		}
+		return null;
+	}
+
+	private static LevelRoadmapEntry parseLevelRoadmapEntry(String raw) {
+		if (raw == null || raw.isBlank()) return null;
+		String[] parts = raw.split("\\|", 3);
+		if (parts.length < 2) return null;
+		Integer level = parsePositiveInt(parts[0]);
+		if (level == null) return null;
+		String title = parts[1].strip();
+		String description = parts.length >= 3 ? parts[2].strip() : "";
+		if (title.isEmpty() && description.isEmpty()) return null;
+		return new LevelRoadmapEntry(level, title, description);
+	}
+
+	private static Integer parsePositiveInt(String raw) {
+		if (raw == null) return null;
+		try {
+			int value = Integer.parseInt(raw.strip());
+			return value > 0 ? value : null;
+		} catch (NumberFormatException ignored) {
+			return null;
+		}
+	}
+
 	private static float clampFloat(float value, float min, float max, float fallback) {
 		if (!Float.isFinite(value)) return fallback;
 		return Math.max(min, Math.min(max, value));
@@ -1718,6 +2053,7 @@ public final class GexpressConfig {
 		int c4FirstBeepSeconds = 3;
 		int wrongWirePercent = 20;
 		int grenadePrice = 150;
+		List<String> grenadeLineOfSightPassThroughBlocks = defaultGrenadePassThroughBlocks();
 		int passiveIncomeKiller = 5;
 		int passiveIncomeCivilian = 0;
 		int passiveIncomeNeutral = 5;
@@ -1834,5 +2170,15 @@ public final class GexpressConfig {
 		int abilityHudOffsetX = 0;
 		int abilityHudOffsetY = 0;
 		boolean use3dGunSkins = true;
+		int levelRoundXp = 25;
+		int levelWinXp = 25;
+		int levelNeutralWinBonusXp = 25;
+		int levelKillXp = 10;
+		int levelCivilianTaskXp = 5;
+		int levelBaseXp = 100;
+		int levelXpIncrease = 100;
+		int levelRoadmapDisplayLevels = 25;
+		List<String> levelXpOverrides = new ArrayList<>();
+		List<String> levelRewardRoadmap = new ArrayList<>();
 	}
 }

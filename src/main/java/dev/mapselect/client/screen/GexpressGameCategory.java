@@ -153,11 +153,11 @@ public final class GexpressGameCategory {
 			category.group(errorGroup("gui.gexpress.config.group.roles.error"));
 		}
 
-		for (OptionGroup sideGroup : buildRoleSideGroups(roleDisplay, roleKeyToWeOpts)) {
+		for (OptionGroup sideGroup : buildRoleSideGroups(roleDisplay, roleKeyToWeOpts, parent, stage)) {
 			category.group(sideGroup);
 		}
 
-		category.group(buildModifiersGroup(modKeyToWeOpts));
+		category.group(buildModifiersGroup(modKeyToWeOpts, parent, stage));
 
 		if (!globalModOpts.isEmpty()) {
 			category.group(buildPassthroughGroup("gui.gexpress.config.group.modifiers.global", globalModOpts));
@@ -263,7 +263,8 @@ public final class GexpressGameCategory {
 	}
 
 	private static List<OptionGroup> buildRoleSideGroups(Map<String, RolesDisplay.RoleDisplay> display,
-	                                                      Map<String, List<Option<?>>> weOptsByRole) {
+	                                                Map<String, List<Option<?>>> weOptsByRole,
+	                                                Screen parent, BiConsumer<String, Screen> stage) {
 		Map<RolesDisplay.Side, List<String>> bySide = new EnumMap<>(RolesDisplay.Side.class);
 		bySide.put(RolesDisplay.Side.KILLER, new ArrayList<>());
 		bySide.put(RolesDisplay.Side.INNOCENT, new ArrayList<>());
@@ -297,28 +298,30 @@ public final class GexpressGameCategory {
 		for (RolesDisplay.Side side : List.of(RolesDisplay.Side.KILLER, RolesDisplay.Side.INNOCENT, RolesDisplay.Side.NEUTRAL)) {
 			List<String> roleIds = bySide.get(side);
 			if (roleIds.isEmpty()) continue;
-			groups.add(buildRoleSideGroup(side, roleIds, display, weOptsByRole));
+			groups.add(buildRoleSideGroup(side, roleIds, display, weOptsByRole, parent, stage));
 		}
 		if (!mafiaRoles.isEmpty()) {
 			groups.add(buildRoleGroup(Text.translatable("gui.gexpress.config.group.roles.mafia").formatted(Formatting.DARK_GRAY),
-				mafiaRoles, display, weOptsByRole));
+				mafiaRoles, display, weOptsByRole, parent, stage));
 		}
 		if (!covenantRoles.isEmpty()) {
 			groups.add(buildRoleGroup(Text.translatable("gui.gexpress.config.group.roles.covenant").formatted(Formatting.DARK_RED),
-				covenantRoles, display, weOptsByRole));
+				covenantRoles, display, weOptsByRole, parent, stage));
 		}
 		return groups;
 	}
 
 	private static OptionGroup buildRoleSideGroup(RolesDisplay.Side side, List<String> roleIds,
 	                                                Map<String, RolesDisplay.RoleDisplay> display,
-	                                                Map<String, List<Option<?>>> weOptsByRole) {
-		return buildRoleGroup(sideTitle(side), roleIds, display, weOptsByRole);
+	                                                Map<String, List<Option<?>>> weOptsByRole,
+	                                                Screen parent, BiConsumer<String, Screen> stage) {
+		return buildRoleGroup(sideTitle(side), roleIds, display, weOptsByRole, parent, stage);
 	}
 
 	private static OptionGroup buildRoleGroup(Text title, List<String> roleIds,
 	                                                Map<String, RolesDisplay.RoleDisplay> display,
-	                                                Map<String, List<Option<?>>> weOptsByRole) {
+	                                                Map<String, List<Option<?>>> weOptsByRole,
+	                                                Screen parent, BiConsumer<String, Screen> stage) {
 		OptionGroup.Builder g = OptionGroup.createBuilder()
 			.name(title)
 			.collapsed(false);
@@ -334,13 +337,14 @@ public final class GexpressGameCategory {
 			subOptions.addAll(buildRoleSubOptions(id));
 			subOptions.addAll(weOptsByRole.getOrDefault(roleIdToWeKey(id), List.of()));
 
-			Option<Boolean> toggle = buildRoleToggle(id, rd);
+			Option<Boolean> toggle = buildRoleToggle(id, rd, parent, stage);
 			attachDropdown(g, toggle, subOptions);
 		}
 		return g.build();
 	}
 
-	private static Option<Boolean> buildRoleToggle(String id, RolesDisplay.RoleDisplay rd) {
+	private static Option<Boolean> buildRoleToggle(String id, RolesDisplay.RoleDisplay rd,
+			Screen parent, BiConsumer<String, Screen> stage) {
 		MutableText name = colorizedRoleName(rd, id);
 		OptionDescription desc = buildRoleDescription(id, rd);
 
@@ -354,7 +358,7 @@ public final class GexpressGameCategory {
 				return !ConfigHelper.getDisabledRoles().contains(id);
 			}, v -> {
 				GexpressOptionsScreen.pendingRoleState.put(id, v);
-				GexpressOptionsScreen.stageChatCommand("setEnabledRole " + id + " " + v);
+				stage.accept("setEnabledRole " + id + " " + v, parent);
 			})
 			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
 				.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
@@ -1156,7 +1160,8 @@ public final class GexpressGameCategory {
 		return List.of();
 	}
 
-	private static OptionGroup buildModifiersGroup(Map<String, List<Option<?>>> weOptsByModifier) {
+	private static OptionGroup buildModifiersGroup(Map<String, List<Option<?>>> weOptsByModifier,
+			Screen parent, BiConsumer<String, Screen> stage) {
 		OptionGroup.Builder g = OptionGroup.createBuilder()
 			.name(Text.translatable("gui.gexpress.config.group.modifiers"))
 			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.modifiers.tooltip")))
@@ -1183,13 +1188,14 @@ public final class GexpressGameCategory {
 			subOptions.addAll(buildModifierSubOptions(id));
 			subOptions.addAll(weOptsByModifier.getOrDefault(roleIdToWeKey(id), List.of()));
 
-			Option<Boolean> toggle = buildModifierToggle(id, md);
+			Option<Boolean> toggle = buildModifierToggle(id, md, parent, stage);
 			attachDropdown(g, toggle, subOptions);
 		}
 		return g.build();
 	}
 
-	private static Option<Boolean> buildModifierToggle(String id, ModifiersDisplay.ModifierDisplay md) {
+	private static Option<Boolean> buildModifierToggle(String id, ModifiersDisplay.ModifierDisplay md,
+			Screen parent, BiConsumer<String, Screen> stage) {
 		MutableText name = colorizedModifierName(md, id);
 		OptionDescription desc = buildModifierDescription(id);
 
@@ -1203,7 +1209,7 @@ public final class GexpressGameCategory {
 				return !ConfigHelper.getDisabledModifiers().contains(id);
 			}, v -> {
 				GexpressOptionsScreen.pendingModifierState.put(id, v);
-				GexpressOptionsScreen.stageChatCommand("setEnabledModifier " + id + " " + v);
+				stage.accept("setEnabledModifier " + id + " " + v, parent);
 			})
 			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
 				.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))

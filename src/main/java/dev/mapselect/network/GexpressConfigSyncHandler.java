@@ -20,10 +20,12 @@ public final class GexpressConfigSyncHandler {
 	public static void register() {
 		PayloadTypeRegistry.playC2S().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(GexpressTaskConfigPayload.ID, GexpressTaskConfigPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(GexpressDevTuningPayload.ID, GexpressDevTuningPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.LEGACY_ID, GexpressConfigSyncPayload.LEGACY_CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressTaskConfigPayload.ID, GexpressTaskConfigPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(GexpressDevTuningPayload.ID, GexpressDevTuningPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
@@ -178,6 +180,42 @@ public final class GexpressConfigSyncHandler {
 					broadcastTaskConfig(server);
 				});
 			});
+		ServerPlayNetworking.registerGlobalReceiver(GexpressDevTuningPayload.ID,
+			(payload, context) -> {
+				ServerPlayerEntity sender = context.player();
+				if (!GexpressPermissions.canEditGameOptions(sender)) {
+					MapSelect.LOGGER.warn("Ignoring gexpress dev tuning sync from {} (not OP/host/dev)",
+						sender.getName().getString());
+					return;
+				}
+
+				MinecraftServer server = sender.getServer();
+				if (server == null) return;
+				server.execute(() -> {
+					GexpressDevTuningPayload before = currentDevTuningPayload();
+					GexpressConfig.applyDevTuning(payload.levelRoundXp(), payload.levelWinXp(),
+						payload.levelNeutralWinBonusXp(), payload.levelKillXp(), payload.levelCivilianTaskXp(),
+						payload.levelBaseXp(), payload.levelXpIncrease(), payload.levelRoadmapDisplayLevels(),
+						payload.levelXpOverrides(), payload.levelRewardRoadmap(),
+						payload.grenadeLineOfSightPassThroughBlocks());
+					GexpressDevTuningPayload after = currentDevTuningPayload();
+					if (after.equals(before)) return;
+
+					GexpressConfig.save();
+					MapSelect.LOGGER.info("G'Express dev tuning updated by {}: xp=[round {}, win {}, neutral {}, kill {}, task {}, base {}, inc {}, roadmapLevels {}], grenadePassThrough={}",
+						sender.getName().getString(),
+						GexpressConfig.getLevelRoundXp(),
+						GexpressConfig.getLevelWinXp(),
+						GexpressConfig.getLevelNeutralWinBonusXp(),
+						GexpressConfig.getLevelKillXp(),
+						GexpressConfig.getLevelCivilianTaskXp(),
+						GexpressConfig.getLevelBaseXp(),
+						GexpressConfig.getLevelXpIncrease(),
+						GexpressConfig.getLevelRoadmapDisplayLevels(),
+						GexpressConfig.getGrenadeLineOfSightPassThroughBlockStrings());
+					broadcastDevTuning(server);
+				});
+			});
 		ServerPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID,
 			(payload, context) -> {
 				ServerPlayerEntity sender = context.player();
@@ -209,6 +247,7 @@ public final class GexpressConfigSyncHandler {
 			ServerPlayNetworking.send(player, payload);
 		}
 		broadcastTaskConfig(server);
+		broadcastDevTuning(server);
 		broadcastPuppetmasterConfig(server);
 	}
 
@@ -217,6 +256,7 @@ public final class GexpressConfigSyncHandler {
 			ServerPlayNetworking.send(player, currentPayload());
 		}
 		sendTaskConfigTo(player);
+		sendDevTuningTo(player);
 		sendPuppetmasterConfigTo(player);
 	}
 
@@ -232,6 +272,20 @@ public final class GexpressConfigSyncHandler {
 	private static void sendTaskConfigTo(ServerPlayerEntity player) {
 		if (!ServerPlayNetworking.canSend(player, GexpressTaskConfigPayload.ID)) return;
 		ServerPlayNetworking.send(player, currentTaskPayload());
+	}
+
+	private static void broadcastDevTuning(MinecraftServer server) {
+		GexpressDevTuningPayload payload = currentDevTuningPayload();
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			if (ServerPlayNetworking.canSend(player, GexpressDevTuningPayload.ID)) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
+	private static void sendDevTuningTo(ServerPlayerEntity player) {
+		if (!ServerPlayNetworking.canSend(player, GexpressDevTuningPayload.ID)) return;
+		ServerPlayNetworking.send(player, currentDevTuningPayload());
 	}
 
 	private static void broadcastPuppetmasterConfig(MinecraftServer server) {
@@ -372,6 +426,22 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getConversationTaskDurationSeconds(),
 			GexpressConfig.getConversationTaskRadiusBlocks(),
 			GexpressConfig.getConversationTaskVerticalToleranceBlocks()
+		);
+	}
+
+	private static GexpressDevTuningPayload currentDevTuningPayload() {
+		return new GexpressDevTuningPayload(
+			GexpressConfig.getLevelRoundXp(),
+			GexpressConfig.getLevelWinXp(),
+			GexpressConfig.getLevelNeutralWinBonusXp(),
+			GexpressConfig.getLevelKillXp(),
+			GexpressConfig.getLevelCivilianTaskXp(),
+			GexpressConfig.getLevelBaseXp(),
+			GexpressConfig.getLevelXpIncrease(),
+			GexpressConfig.getLevelRoadmapDisplayLevels(),
+			GexpressConfig.getLevelXpOverridesSyncString(),
+			GexpressConfig.getLevelRewardRoadmapSyncString(),
+			GexpressConfig.getGrenadeLineOfSightPassThroughBlocksSyncString()
 		);
 	}
 }

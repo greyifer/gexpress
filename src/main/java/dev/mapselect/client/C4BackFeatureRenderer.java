@@ -28,9 +28,9 @@ public class C4BackFeatureRenderer extends FeatureRenderer<AbstractClientPlayerE
 	public void render(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light,
 	                   AbstractClientPlayerEntity entity, float limbAngle, float limbDistance,
 	                   float tickDelta, float animationProgress, float headYaw, float headPitch) {
-		if (entity.isInvisible()) return;
 		boolean hasC4 = C4BackComponent.hasC4(entity);
 		C4PlacementPreset previewPreset = ClientModelAttachmentPreview.c4Preset(entity);
+		if (entity.isInvisible() && previewPreset == null) return;
 		if (!hasC4 && previewPreset == null) return;
 
 		matrices.push();

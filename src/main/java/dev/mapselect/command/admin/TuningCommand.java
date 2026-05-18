@@ -1,7 +1,8 @@
-package dev.mapselect.command;
+package dev.mapselect.command.admin;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import dev.doctor4t.wathe.api.WatheRoles;
@@ -16,7 +17,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import org.agmas.harpymodloader.modifiers.HMLModifiers;
 
-public class TuningCommand {
+public final class TuningCommand {
 	private static final SuggestionProvider<ServerCommandSource> ROLE_SUGGESTIONS = (ctx, builder) -> {
 		for (var role : WatheRoles.ROLES) {
 			builder.suggest(role.identifier().toString());
@@ -31,71 +32,83 @@ public class TuningCommand {
 		return builder.buildFuture();
 	};
 
+	private TuningCommand() {}
+
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("tuning")
-			.requires(GexpressPermissions::canUseHostCommands)
+			.requires(GexpressPermissions::canUseAdminCommands)
 			.then(roleBranch())
 			.then(modifierBranch());
 	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildRoleTree() {
 		return CommandManager.literal("tuning")
-			.requires(GexpressPermissions::canUseHostCommands)
+			.requires(GexpressPermissions::canUseRoleCommands)
+			.then(roleTarget())
 			.then(roleBranch());
 	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildModifierTree() {
 		return CommandManager.literal("tuning")
-			.requires(GexpressPermissions::canUseHostCommands)
+			.requires(GexpressPermissions::canUseModifierCommands)
+			.then(modifierTarget())
 			.then(modifierBranch());
 	}
 
 	private static LiteralArgumentBuilder<ServerCommandSource> roleBranch() {
 		return CommandManager.literal("role")
-				.then(CommandManager.argument("id", IdentifierArgumentType.identifier())
-					.suggests(ROLE_SUGGESTIONS)
-					.then(CommandManager.literal("chance")
-						.then(CommandManager.argument("value", IntegerArgumentType.integer(
-								RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX))
-							.executes(ctx -> setRoleChance(ctx,
-								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value")))))
-					.then(CommandManager.literal("max")
-						.then(CommandManager.argument("value", IntegerArgumentType.integer(
-								RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
-							.executes(ctx -> setRoleMax(ctx,
-								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value")))))
-					.then(CommandManager.literal("amount")
-						.then(CommandManager.argument("value", IntegerArgumentType.integer(
-								RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
-							.executes(ctx -> setRoleMax(ctx,
-								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value"))))));
+			.then(roleTarget());
+	}
+
+	private static RequiredArgumentBuilder<ServerCommandSource, Identifier> roleTarget() {
+		return CommandManager.argument("id", IdentifierArgumentType.identifier())
+			.suggests(ROLE_SUGGESTIONS)
+			.then(CommandManager.literal("chance")
+				.then(CommandManager.argument("value", IntegerArgumentType.integer(
+						RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX))
+					.executes(ctx -> setRoleChance(ctx,
+						IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
+						IntegerArgumentType.getInteger(ctx, "value")))))
+			.then(CommandManager.literal("max")
+				.then(CommandManager.argument("value", IntegerArgumentType.integer(
+						RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
+					.executes(ctx -> setRoleMax(ctx,
+						IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
+						IntegerArgumentType.getInteger(ctx, "value")))))
+			.then(CommandManager.literal("amount")
+				.then(CommandManager.argument("value", IntegerArgumentType.integer(
+						RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
+					.executes(ctx -> setRoleMax(ctx,
+						IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
+						IntegerArgumentType.getInteger(ctx, "value")))));
 	}
 
 	private static LiteralArgumentBuilder<ServerCommandSource> modifierBranch() {
 		return CommandManager.literal("modifier")
-				.then(CommandManager.argument("id", IdentifierArgumentType.identifier())
-					.suggests(MODIFIER_SUGGESTIONS)
-					.then(CommandManager.literal("chance")
-						.then(CommandManager.argument("value", IntegerArgumentType.integer(
-								RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX))
-							.executes(ctx -> setModifierChance(ctx,
-								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value")))))
-					.then(CommandManager.literal("max")
-						.then(CommandManager.argument("value", IntegerArgumentType.integer(
-								RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
-							.executes(ctx -> setModifierMax(ctx,
-								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value")))))
-					.then(CommandManager.literal("amount")
-						.then(CommandManager.argument("value", IntegerArgumentType.integer(
-								RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
-							.executes(ctx -> setModifierMax(ctx,
-								IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
-								IntegerArgumentType.getInteger(ctx, "value"))))));
+			.then(modifierTarget());
+	}
+
+	private static RequiredArgumentBuilder<ServerCommandSource, Identifier> modifierTarget() {
+		return CommandManager.argument("id", IdentifierArgumentType.identifier())
+			.suggests(MODIFIER_SUGGESTIONS)
+			.then(CommandManager.literal("chance")
+				.then(CommandManager.argument("value", IntegerArgumentType.integer(
+						RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX))
+					.executes(ctx -> setModifierChance(ctx,
+						IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
+						IntegerArgumentType.getInteger(ctx, "value")))))
+			.then(CommandManager.literal("max")
+				.then(CommandManager.argument("value", IntegerArgumentType.integer(
+						RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
+					.executes(ctx -> setModifierMax(ctx,
+						IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
+						IntegerArgumentType.getInteger(ctx, "value")))))
+			.then(CommandManager.literal("amount")
+				.then(CommandManager.argument("value", IntegerArgumentType.integer(
+						RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX))
+					.executes(ctx -> setModifierMax(ctx,
+						IdentifierArgumentType.getIdentifier(ctx, "id").toString(),
+						IntegerArgumentType.getInteger(ctx, "value")))));
 	}
 
 	private static int setRoleChance(CommandContext<ServerCommandSource> ctx, String id, int value) {

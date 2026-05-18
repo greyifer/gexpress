@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.admin;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.arguments.FloatArgumentType;
@@ -10,6 +10,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import dev.mapselect.command.setup.TrainCommand;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.level.LevelComponent;
 import dev.mapselect.network.GexpressConfigSyncHandler;
@@ -48,10 +49,14 @@ public final class DevCommand {
 	private DevCommand() {}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
+		return appendTo(CommandManager.literal("dev"));
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> appendTo(LiteralArgumentBuilder<ServerCommandSource> root) {
 		SuggestionProvider<ServerCommandSource> rolePaths = DevCommand::suggestRolePaths;
 		SuggestionProvider<ServerCommandSource> trainNames = TrainCommand::suggestTrainNames;
 
-		return CommandManager.literal("dev")
+		return root
 			.requires(DEV)
 			.then(CommandManager.literal("level")
 				.then(CommandManager.literal("xp")

@@ -1,6 +1,7 @@
 package dev.mapselect.level;
 
 import dev.mapselect.MapSelect;
+import dev.mapselect.config.GexpressConfig;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
@@ -85,7 +86,7 @@ public class LevelComponent implements AutoSyncedComponent {
 	}
 
 	public static int xpNeededForLevel(int level) {
-		return Math.max(1, level) * 100;
+		return GexpressConfig.getXpNeededForLevel(level);
 	}
 
 	public static int totalXpForLevel(int level) {

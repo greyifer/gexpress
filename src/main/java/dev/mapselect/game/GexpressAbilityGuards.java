@@ -24,6 +24,7 @@ import dev.mapselect.network.VultureEatPayload;
 import dev.mapselect.network.VultureReleasePayload;
 import dev.mapselect.network.WarlockKillPayload;
 import dev.mapselect.network.WarlockMarkPayload;
+import dev.mapselect.role.timemaster.TimeMasterManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -74,6 +75,6 @@ public final class GexpressAbilityGuards {
 		return player != null && payload != null
 			&& !GexpressTestState.isRoleTester(player)
 			&& ABILITY_PAYLOADS.contains(payload.getId())
-			&& (DeadPlayerStatus.isDeadRoundParticipant(player) || isSafePreparation(player.getWorld()));
+			&& (DeadPlayerStatus.isDeadRoundParticipant(player) || TimeMasterManager.isRewinding(player));
 	}
 }

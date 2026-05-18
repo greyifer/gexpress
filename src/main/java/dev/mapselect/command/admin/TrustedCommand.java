@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.admin;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;

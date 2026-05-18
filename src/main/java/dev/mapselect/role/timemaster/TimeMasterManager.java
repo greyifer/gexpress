@@ -17,14 +17,18 @@ import dev.doctor4t.wathe.util.ShootMuzzleS2CPayload;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.level.LevelComponent;
 import dev.mapselect.network.TimeMasterFreezeStatePayload;
 import dev.mapselect.network.TimeMasterFreezeUsePayload;
 import dev.mapselect.network.TimeMasterRewindPayload;
 import dev.mapselect.network.TimeMasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
+import dev.mapselect.role.bombspecialist.C4Detonation;
+import dev.mapselect.role.bodyguard.BodyguardManager;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
 import dev.mapselect.role.AbilityTargeting;
+import dev.mapselect.role.covenant.CovenantManager;
 import dev.mapselect.role.guardian.GuardianAngelManager;
 import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
@@ -34,12 +38,14 @@ import dev.mapselect.role.silent.SilentShadowComponent;
 import dev.mapselect.role.skincrawler.SkincrawlerManager;
 import dev.mapselect.role.snitch.SnitchManager;
 import dev.mapselect.role.spy.SpyManager;
+import dev.mapselect.role.spy.SpyBugComponent;
 import dev.mapselect.role.trickster.DancingCartsManager;
 import dev.mapselect.role.trickster.TricksterManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.role.warlock.WarlockComponent;
 import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.voice.VoiceMuteState;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -113,6 +119,10 @@ public final class TimeMasterManager {
 			(payload, context) -> context.server().execute(() -> tryRewind(context.player())));
 		ServerPlayNetworking.registerGlobalReceiver(TimeMasterFreezeUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryFreeze(context.player())));
+		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, damageSource, damageAmount) ->
+			!(entity.getWorld() instanceof ServerWorld world) || !isRewinding(world));
+		ServerLivingEntityEvents.ALLOW_DEATH.register((entity, damageSource, damageAmount) ->
+			!(entity.getWorld() instanceof ServerWorld world) || !isRewinding(world));
 		ServerTickEvents.END_WORLD_TICK.register(TimeMasterManager::tick);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> syncActiveFreezes(handler.player)));
@@ -214,7 +224,7 @@ public final class TimeMasterManager {
 			(int) Math.max(1L, (world.getTime() - snapshot.tick() + 19L) / 20L));
 		if (!comp.consume(timeMaster.getUuid())) return;
 
-		world.playSound(null, timeMaster.getBlockPos(), SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
+		timeMaster.playSoundToPlayer(SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
 			SoundCategory.PLAYERS, 1.0F, 1.25F);
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			ServerPlayNetworking.send(player, new TimeMasterRewindPayload(REWIND_ANIMATION_TICKS));
@@ -264,8 +274,8 @@ public final class TimeMasterManager {
 		freeze.apply(target);
 		SpyManager.recordInteraction(timeMaster, target);
 		syncFreeze(world, target.getUuid(), timeMaster.getUuid(), true, durationTicks);
-		world.playSound(null, target.getBlockPos(), SoundEvents.BLOCK_GLASS_BREAK,
-			SoundCategory.PLAYERS, 0.75F, 0.55F);
+		timeMaster.playSoundToPlayer(SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.75F, 0.55F);
+		target.playSoundToPlayer(SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.75F, 0.55F);
 		timeMaster.sendMessage(Text.literal("Froze " + target.getName().getString() + "."), true);
 		target.sendMessage(Text.literal("You are frozen in time."), true);
 	}
@@ -313,6 +323,14 @@ public final class TimeMasterManager {
 
 	public static boolean isFrozen(ServerPlayerEntity player) {
 		return player != null && ACTIVE_FREEZES.containsKey(player.getUuid());
+	}
+
+	public static boolean isRewinding(ServerWorld world) {
+		return world != null && ACTIVE_REWINDS.containsKey(world.getRegistryKey());
+	}
+
+	public static boolean isRewinding(ServerPlayerEntity player) {
+		return player != null && player.getWorld() instanceof ServerWorld world && isRewinding(world);
 	}
 
 	private static void syncFreeze(ServerWorld world, UUID targetId, UUID timeMasterId, boolean frozen, int durationTicks) {
@@ -781,9 +799,13 @@ public final class TimeMasterManager {
 			MafiaManager.TimeState mafia, SkincrawlerManager.TimeState skincrawler,
 			SpyManager.TimeState spy,
 			GuardianAngelManager.TimeState guardianAngel,
+			C4Detonation.TimeState c4Detonation,
+			BodyguardManager.TimeState bodyguard,
+			CovenantManager.TimeState covenant,
 			NbtCompound gameWorld, NbtCompound gameTime, NbtCompound timeMaster,
-			NbtCompound c4Back, NbtCompound medicShield,
-			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute) {
+			NbtCompound c4Back, NbtCompound spyBug, NbtCompound medicShield,
+			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute,
+			NbtCompound level) {
 
 		private static WorldSnapshot capture(ServerWorld world) {
 			RegistryWrapper.WrapperLookup lookup = world.getRegistryManager();
@@ -820,14 +842,19 @@ public final class TimeMasterManager {
 				SkincrawlerManager.snapshotForTimeRewind(),
 				SpyManager.snapshotForTimeRewind(),
 				GuardianAngelManager.snapshotForTimeRewind(),
+				C4Detonation.snapshotForTimeRewind(),
+				BodyguardManager.snapshotForTimeRewind(),
+				CovenantManager.snapshotForTimeRewind(),
 				writeComponent(GameWorldComponent.KEY.getNullable(world), lookup),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
 				writeComponent(TimeMasterComponent.KEY.getNullable(world), lookup),
 				writeComponent(C4BackComponent.KEY.getNullable(world), lookup),
+				writeComponent(SpyBugComponent.KEY.getNullable(world), lookup),
 				writeComponent(MedicShieldComponent.KEY.getNullable(world), lookup),
 				writeComponent(SilentShadowComponent.KEY.getNullable(world), lookup),
 				writeComponent(WarlockComponent.KEY.getNullable(world), lookup),
-				writeComponent(VoiceMuteState.KEY.getNullable(world), lookup)
+				writeComponent(VoiceMuteState.KEY.getNullable(world), lookup),
+				writeComponent(LevelComponent.KEY.getNullable(world), lookup)
 			);
 		}
 
@@ -899,26 +926,33 @@ public final class TimeMasterManager {
 			}
 
 			restoreItems(world);
+			C4Detonation.restoreForTimeRewind(c4Detonation);
 			restoreBodies(world, revived);
 			readComponent(GameWorldComponent.KEY.getNullable(world), gameWorld, lookup);
 			readComponent(GameTimeComponent.KEY.getNullable(world), gameTime, lookup);
 			readComponent(TimeMasterComponent.KEY.getNullable(world), timeMaster, lookup);
 			readComponent(C4BackComponent.KEY.getNullable(world), c4Back, lookup);
+			readComponent(SpyBugComponent.KEY.getNullable(world), spyBug, lookup);
 			readComponent(MedicShieldComponent.KEY.getNullable(world), medicShield, lookup);
 			readComponent(SilentShadowComponent.KEY.getNullable(world), silentShadow, lookup);
 			readComponent(WarlockComponent.KEY.getNullable(world), warlock, lookup);
 			readComponent(VoiceMuteState.KEY.getNullable(world), voiceMute, lookup);
+			readComponent(LevelComponent.KEY.getNullable(world), level, lookup);
 			VultureManager.restoreForTimeRewind(world, vulture);
 			GuardianAngelManager.restoreForTimeRewind(world, guardianAngel);
+			BodyguardManager.restoreForTimeRewind(world, bodyguard);
+			CovenantManager.restoreForTimeRewind(world, covenant);
 
 			GameWorldComponent.KEY.sync(world);
 			GameTimeComponent.KEY.sync(world);
 			TimeMasterComponent.KEY.sync(world);
 			C4BackComponent.KEY.sync(world);
+			SpyBugComponent.KEY.sync(world);
 			MedicShieldComponent.KEY.sync(world);
 			SilentShadowComponent.KEY.sync(world);
 			WarlockComponent.KEY.sync(world);
 			VoiceMuteState.KEY.sync(world);
+			LevelComponent.KEY.sync(world);
 		}
 
 		private void restoreBlocks(ServerWorld world, RegistryWrapper.WrapperLookup lookup) {

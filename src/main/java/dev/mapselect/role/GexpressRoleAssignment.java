@@ -117,7 +117,7 @@ public final class GexpressRoleAssignment {
 			godfathers.add(player);
 		}
 		TakeoverManager.assignSides(godfathers);
-		assignRolePool(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
+		assignRoleRequests(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
 	}
 
 	private static void setNight(ServerWorld world) {
@@ -148,41 +148,58 @@ public final class GexpressRoleAssignment {
 
 	private static void assignConfiguredRoles(GameWorldComponent game, List<ServerPlayerEntity> available,
 			Map<Role, Integer> assignedCounts) {
-		int killerTarget = GexpressConfig.useCustomRoleCounts()
-			? GexpressConfig.getMaxKillerAmount()
-			: scaledKillerCount(available, assignedCounts);
-		int vigilanteTarget = GexpressConfig.useCustomRoleCounts()
-			? GexpressConfig.getMaxVigilanteAmount()
-			: scaledVigilanteCount(available, assignedCounts);
-		int neutralTarget = GexpressConfig.useCustomRoleCounts()
-			? GexpressConfig.getMaxNeutralAmount()
-			: scaledNeutralCount(available, assignedCounts);
-		int killerSlots = Math.max(0, Math.min(killerTarget, available.size())
-			- countAssignedKillers(assignedCounts));
-		int assignedKillers = assignRolePool(game, available, assignedCounts, rolePool(RolePool.KILLER), killerSlots);
-		assignFallbackKillers(game, available, assignedCounts, killerSlots - assignedKillers);
-		int vigilanteSlots = Math.max(0, Math.min(vigilanteTarget, available.size())
-			- assignedCounts.getOrDefault(WatheRoles.VIGILANTE, 0));
-		assignRolePool(game, available, assignedCounts, vigilantePool(), vigilanteSlots);
-		int neutralSlots = Math.max(0, Math.min(neutralTarget, available.size())
-			- countAssignedNeutrals(assignedCounts));
-		assignRolePool(game, available, assignedCounts, rolePool(RolePool.NEUTRAL), neutralSlots);
-		assignRolePool(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
+		int killerSlots = remainingNormalRoleSlots(RolePool.KILLER, available, assignedCounts);
+		int assignedKillers = assignRoleRequests(game, available, assignedCounts,
+			rolePool(RolePool.KILLER), killerSlots);
+		if (countAssignedKillers(assignedCounts) == 0 && totalPlayerCount(available, assignedCounts) > 1) {
+			assignFallbackKillers(game, available, assignedCounts, Math.max(0, 1 - assignedKillers));
+		}
+
+		assignRoleRequests(game, available, assignedCounts, vigilantePool(),
+			remainingNormalRoleSlots(RolePool.VIGILANTE, available, assignedCounts));
+		assignRoleRequests(game, available, assignedCounts, rolePool(RolePool.NEUTRAL),
+			remainingNormalRoleSlots(RolePool.NEUTRAL, available, assignedCounts));
+		assignRoleRequests(game, available, assignedCounts, rolePool(RolePool.CIVILIAN), available.size());
 	}
 
-	private static int scaledKillerCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
-		int players = totalPlayerCount(available, assignedCounts);
+	private static int remainingNormalRoleSlots(RolePool pool, List<ServerPlayerEntity> available,
+			Map<Role, Integer> assignedCounts) {
+		int totalPlayers = totalPlayerCount(available, assignedCounts);
+		int cap = switch (pool) {
+			case KILLER -> sideRoleBudget(GexpressConfig.getMaxKillerAmount(),
+				GexpressConfig.MAX_KILLER_AMOUNT_MAX, scaledKillerCount(totalPlayers));
+			case VIGILANTE -> sideRoleBudget(GexpressConfig.getMaxVigilanteAmount(),
+				GexpressConfig.MAX_VIGILANTE_AMOUNT_MAX, scaledVigilanteCount(totalPlayers));
+			case NEUTRAL -> sideRoleBudget(GexpressConfig.getMaxNeutralAmount(),
+				GexpressConfig.MAX_NEUTRAL_AMOUNT_MAX, scaledNeutralCount(totalPlayers));
+			case CIVILIAN -> available.size();
+		};
+		int alreadyAssigned = switch (pool) {
+			case KILLER -> countAssignedKillers(assignedCounts);
+			case VIGILANTE -> assignedCounts.getOrDefault(WatheRoles.VIGILANTE, 0);
+			case NEUTRAL -> countAssignedNeutrals(assignedCounts);
+			case CIVILIAN -> 0;
+		};
+		return Math.max(0, Math.min(available.size(), cap - alreadyAssigned));
+	}
+
+	private static int sideRoleBudget(int configuredMax, int unlimitedSentinel, int scaledTarget) {
+		if (!GexpressConfig.useCustomRoleCounts()) {
+			return Math.min(configuredMax, scaledTarget);
+		}
+		return configuredMax >= unlimitedSentinel ? scaledTarget : configuredMax;
+	}
+
+	private static int scaledKillerCount(int players) {
 		if (players <= 1) return 0;
 		return Math.max(1, players / GexpressConfig.getPlayersPerKiller());
 	}
 
-	private static int scaledVigilanteCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
-		int players = totalPlayerCount(available, assignedCounts);
+	private static int scaledVigilanteCount(int players) {
 		return Math.max(0, players / GexpressConfig.getPlayersPerVigilante());
 	}
 
-	private static int scaledNeutralCount(List<ServerPlayerEntity> available, Map<Role, Integer> assignedCounts) {
-		int players = totalPlayerCount(available, assignedCounts);
+	private static int scaledNeutralCount(int players) {
 		return Math.max(0, players / GexpressConfig.getPlayersPerNeutral());
 	}
 
@@ -192,10 +209,10 @@ public final class GexpressRoleAssignment {
 		return total;
 	}
 
-	private static int assignRolePool(GameWorldComponent game, List<ServerPlayerEntity> available,
+	private static int assignRoleRequests(GameWorldComponent game, List<ServerPlayerEntity> available,
 			Map<Role, Integer> assignedCounts, List<Role> pool, int maxAssignments) {
 		if (available.isEmpty() || maxAssignments <= 0 || pool.isEmpty()) return 0;
-		List<Role> tickets = roleTickets(pool, assignedCounts);
+		List<Role> tickets = requestedRoleTickets(pool, assignedCounts);
 		Collections.shuffle(tickets, RANDOM);
 		int assignments = Math.min(maxAssignments, tickets.size());
 		for (int i = 0; i < assignments && !available.isEmpty(); i++) {
@@ -228,7 +245,7 @@ public final class GexpressRoleAssignment {
 		return pool.get(RANDOM.nextInt(pool.size()));
 	}
 
-	private static List<Role> roleTickets(List<Role> pool, Map<Role, Integer> assignedCounts) {
+	private static List<Role> requestedRoleTickets(List<Role> pool, Map<Role, Integer> assignedCounts) {
 		List<Role> tickets = new ArrayList<>();
 		for (Role role : pool) {
 			if (role == null || role.identifier() == null) continue;
@@ -392,26 +409,39 @@ public final class GexpressRoleAssignment {
 
 	private static void assignConfiguredModifiers(GameWorldComponent game, WorldModifierComponent modifiers,
 			List<ServerPlayerEntity> players) {
-		List<Modifier> modifierOrder = new ArrayList<>(HMLModifiers.MODIFIERS);
-		Collections.shuffle(modifierOrder, RANDOM);
-		for (Modifier modifier : modifierOrder) {
-			if (modifier == null || isModifierDisabled(modifier)) continue;
-			if (!passes(RoleModifierTuningConfig.getModifierChance(modifier.identifier().toString()))) continue;
-
+		List<Modifier> tickets = requestedModifierTickets(modifiers);
+		Collections.shuffle(tickets, RANDOM);
+		for (Modifier modifier : tickets) {
 			if (isLoversModifier(modifier)) {
 				assignLoversModifier(game, modifiers, players, modifier);
-				continue;
-			}
-
-			int amount = RoleModifierTuningConfig.getModifierMax(modifier.identifier().toString());
-			int alreadyAssigned = modifiers.getAllWithModifier(modifier).size();
-			int remaining = Math.max(0, amount - alreadyAssigned);
-			for (int i = 0; i < remaining; i++) {
-				ServerPlayerEntity player = randomModifierCandidate(game, modifiers, players, modifier);
-				if (player == null) break;
-				addModifier(modifiers, player, modifier);
+			} else {
+				ServerPlayerEntity player = bestModifierCandidate(game, modifiers, players, modifier);
+				if (player != null) addModifier(modifiers, player, modifier);
 			}
 		}
+	}
+
+	private static List<Modifier> requestedModifierTickets(WorldModifierComponent modifiers) {
+		List<Modifier> tickets = new ArrayList<>();
+		List<Modifier> modifierOrder = new ArrayList<>(HMLModifiers.MODIFIERS);
+		Collections.shuffle(modifierOrder, RANDOM);
+		Set<Identifier> seen = new HashSet<>();
+		for (Modifier modifier : modifierOrder) {
+			if (modifier == null || modifier.identifier() == null || isModifierDisabled(modifier)) continue;
+			if (!seen.add(modifier.identifier())) continue;
+			if (!passes(RoleModifierTuningConfig.getModifierChance(modifier.identifier().toString()))) continue;
+			int desired = desiredModifierAmount(modifier);
+			int alreadyAssigned = modifiers.getAllWithModifier(modifier).size();
+			int remaining = Math.max(0, desired - alreadyAssigned);
+			for (int i = 0; i < remaining; i++) tickets.add(modifier);
+		}
+		return tickets;
+	}
+
+	private static int desiredModifierAmount(Modifier modifier) {
+		if (isLoversModifier(modifier)) return 2;
+		if (modifier == null || modifier.identifier() == null) return 0;
+		return RoleModifierTuningConfig.getModifierMax(modifier.identifier().toString());
 	}
 
 	private static void assignLoversModifier(GameWorldComponent game, WorldModifierComponent modifiers,
@@ -445,12 +475,19 @@ public final class GexpressRoleAssignment {
 		return namespace.contains("stupid") && path.contains("lover");
 	}
 
-	private static ServerPlayerEntity randomModifierCandidate(GameWorldComponent game, WorldModifierComponent modifiers,
+	private static ServerPlayerEntity bestModifierCandidate(GameWorldComponent game, WorldModifierComponent modifiers,
 			List<ServerPlayerEntity> players, Modifier modifier) {
 		List<ServerPlayerEntity> candidates = new ArrayList<>();
+		int bestCount = Integer.MAX_VALUE;
 		for (ServerPlayerEntity player : players) {
 			if (hasModifier(modifiers, player, modifier)) continue;
 			if (!canApplyModifier(game, modifiers, player, modifier)) continue;
+			int count = modifierCount(modifiers, player);
+			if (count < bestCount) {
+				candidates.clear();
+				bestCount = count;
+			}
+			if (count != bestCount) continue;
 			candidates.add(player);
 		}
 		if (candidates.isEmpty()) return null;

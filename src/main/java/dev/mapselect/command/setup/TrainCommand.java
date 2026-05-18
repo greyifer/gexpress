@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.setup;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -53,7 +53,7 @@ public class TrainCommand {
 						.executes(ctx -> runShow(ctx, StringArgumentType.getString(ctx, "name"))))));
 	}
 
-	static CompletableFuture<Suggestions> suggestTrainNames(CommandContext<ServerCommandSource> ctx, SuggestionsBuilder builder) {
+	public static CompletableFuture<Suggestions> suggestTrainNames(CommandContext<ServerCommandSource> ctx, SuggestionsBuilder builder) {
 		try {
 			List<String> names = TrainPresetStorage.list(ctx.getSource().getServer());
 			String remaining = builder.getRemainingLowerCase();

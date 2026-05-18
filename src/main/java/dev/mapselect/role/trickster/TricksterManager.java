@@ -89,8 +89,7 @@ public final class TricksterManager {
 		ServerWorld world = trickster.getServerWorld();
 		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
 		if (active == null || !active.isActive(world)) return true;
-		world.playSound(null, trickster.getX(), trickster.getY(), trickster.getZ(),
-			MapSelectSounds.JEVIL_LAUGH, SoundCategory.PLAYERS, 1.0F, 1.0F);
+		trickster.playSoundToPlayer(MapSelectSounds.JEVIL_LAUGH, SoundCategory.PLAYERS, 1.0F, 1.0F);
 		cancelActiveMasquerade(world);
 		return false;
 	}
@@ -134,7 +133,7 @@ public final class TricksterManager {
 			ServerPlayNetworking.send(player, payload);
 		}
 
-		world.playSound(null, trickster.getBlockPos(), SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE,
+		trickster.playSoundToPlayer(SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE,
 			SoundCategory.PLAYERS, 0.85F, 1.65F);
 		trickster.sendMessage(Text.literal("Masquerade."), true);
 	}

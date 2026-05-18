@@ -1,5 +1,6 @@
 package dev.mapselect.client.screen;
 
+import com.mojang.authlib.GameProfile;
 import dev.mapselect.client.ClientModelAttachmentPreview;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
@@ -9,6 +10,8 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.network.OtherClientPlayerEntity;
+import net.minecraft.client.world.ClientWorld;
 import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -32,6 +35,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 	private boolean draggingPreview;
 	private float modelYaw = 180.0F;
 	private float modelPitch = 0.0F;
+	private OtherClientPlayerEntity previewPlayer;
 
 	public GexpressModelPlacementScreen(Screen parent) {
 		super(Text.translatable("gui.gexpress.model_placement.title"));
@@ -137,41 +141,57 @@ public final class GexpressModelPlacementScreen extends Screen {
 				: Text.translatable("gui.gexpress.model_placement.spy_bug"),
 			left + 10, top + 9, 0xFFFFFFFF);
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client.player == null) return;
+		OtherClientPlayerEntity entity = previewEntity(client);
+		if (entity == null) return;
 		int size = Math.max(70, Math.min(128, (bottom - top) / 2));
 		int centerX = (left + right) / 2;
 		int centerY = (top + bottom) / 2;
-		float entityScale = client.player.getScale();
-		float oldYaw = client.player.getYaw();
-		float oldPitch = client.player.getPitch();
-		float oldBodyYaw = client.player.bodyYaw;
-		float oldPrevBodyYaw = client.player.prevBodyYaw;
-		float oldHeadYaw = client.player.headYaw;
-		float oldPrevHeadYaw = client.player.prevHeadYaw;
+		float entityScale = entity.getScale();
+		float oldYaw = entity.getYaw();
+		float oldPitch = entity.getPitch();
+		float oldBodyYaw = entity.bodyYaw;
+		float oldPrevBodyYaw = entity.prevBodyYaw;
+		float oldHeadYaw = entity.headYaw;
+		float oldPrevHeadYaw = entity.prevHeadYaw;
 		try {
-			client.player.setYaw(modelYaw);
-			client.player.setPitch(-modelPitch);
-			client.player.bodyYaw = modelYaw;
-			client.player.prevBodyYaw = modelYaw;
-			client.player.headYaw = modelYaw;
-			client.player.prevHeadYaw = modelYaw;
+			entity.setInvisible(false);
+			entity.setYaw(modelYaw);
+			entity.setPitch(-modelPitch);
+			entity.bodyYaw = modelYaw;
+			entity.prevBodyYaw = modelYaw;
+			entity.headYaw = modelYaw;
+			entity.prevHeadYaw = modelYaw;
 			float pitchRadians = modelPitch * ((float) Math.PI / 180.0F);
 			Quaternionf bodyRotation = new Quaternionf().rotateX(pitchRadians);
 			Quaternionf rotation = new Quaternionf().rotateZ((float) Math.PI).mul(bodyRotation);
 			Vector3f translation = new Vector3f(0.0F,
-				client.player.getHeight() / 2.0F + 0.0625F * size * entityScale, 0.0F);
+				entity.getHeight() / 2.0F + size * entityScale, 0.0F);
 			context.enableScissor(left + 20, top + 28, right - 20, bottom - 8);
 			InventoryScreen.drawEntity(context, centerX, centerY, size / entityScale,
-				translation, rotation, bodyRotation, client.player);
+				translation, rotation, bodyRotation, entity);
 		} finally {
 			context.disableScissor();
-			client.player.setYaw(oldYaw);
-			client.player.setPitch(oldPitch);
-			client.player.bodyYaw = oldBodyYaw;
-			client.player.prevBodyYaw = oldPrevBodyYaw;
-			client.player.headYaw = oldHeadYaw;
-			client.player.prevHeadYaw = oldPrevHeadYaw;
+			entity.setYaw(oldYaw);
+			entity.setPitch(oldPitch);
+			entity.bodyYaw = oldBodyYaw;
+			entity.prevBodyYaw = oldPrevBodyYaw;
+			entity.headYaw = oldHeadYaw;
+			entity.prevHeadYaw = oldPrevHeadYaw;
 		}
+	}
+
+	private OtherClientPlayerEntity previewEntity(MinecraftClient client) {
+		if (client == null || client.player == null || client.world == null) return null;
+		ClientWorld world = client.world;
+		if (previewPlayer == null || previewPlayer.getWorld() != world) {
+			GameProfile profile = client.player.getGameProfile();
+			previewPlayer = new OtherClientPlayerEntity(world, profile);
+		}
+		previewPlayer.refreshPositionAndAngles(0.0D, 0.0D, 0.0D, modelYaw, -modelPitch);
+		previewPlayer.setSneaking(false);
+		previewPlayer.setSprinting(false);
+		ClientModelAttachmentPreview.activate(kind, currentPreset(), previewPlayer);
+		return previewPlayer;
 	}
 
 	private boolean inPreview(double mouseX, double mouseY) {
@@ -276,7 +296,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 	}
 
 	private void updatePreview() {
-		ClientModelAttachmentPreview.activate(kind, currentPreset());
+		ClientModelAttachmentPreview.activate(kind, currentPreset(), previewPlayer);
 	}
 
 	private C4PlacementPreset currentPreset() {

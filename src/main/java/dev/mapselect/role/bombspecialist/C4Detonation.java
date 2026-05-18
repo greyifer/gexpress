@@ -10,10 +10,13 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectSounds;
 import dev.mapselect.testing.GexpressTestState;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.particle.ParticleTypes;
@@ -48,6 +51,7 @@ public final class C4Detonation {
 
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(C4Detonation::tick);
+		ServerLivingEntityEvents.AFTER_DEATH.register(C4Detonation::afterDeath);
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
 			C4BackComponent comp = C4BackComponent.KEY.getNullable(world);
 			if (comp != null) comp.clearAll();
@@ -193,6 +197,7 @@ public final class C4Detonation {
 		long now = world.getTime();
 		MinecraftServer server = world.getServer();
 		List<UUID> expired = null;
+		List<UUID> removeOnly = null;
 
 		for (Map.Entry<UUID, Long> e : carriers.entrySet()) {
 			UUID id = e.getKey();
@@ -207,7 +212,18 @@ public final class C4Detonation {
 
 			ServerPlayerEntity carrier = server.getPlayerManager().getPlayer(id);
 			if (carrier == null || carrier.isRemoved()) continue;
+			if (!GameFunctions.isPlayerAliveAndSurvival(carrier)) {
+				if (removeOnly == null) removeOnly = new ArrayList<>();
+				removeOnly.add(id);
+				continue;
+			}
 			maybeBeep(comp, carrier, remaining);
+		}
+
+		if (removeOnly != null) {
+			for (UUID carrierId : removeOnly) {
+				comp.removeC4(carrierId);
+			}
 		}
 
 		if (expired != null) {
@@ -221,6 +237,12 @@ public final class C4Detonation {
 		}
 
 		tickThrownCharges(world, now);
+	}
+
+	private static void afterDeath(LivingEntity entity, DamageSource source) {
+		if (!(entity instanceof ServerPlayerEntity player)) return;
+		C4BackComponent comp = C4BackComponent.KEY.getNullable(player.getWorld());
+		if (comp != null) comp.removeC4(player.getUuid());
 	}
 
 	private static long beepInterval(double progress) {
@@ -475,6 +497,36 @@ public final class C4Detonation {
 
 	private static void clearThrownCharges() {
 		thrownCharges.clear();
+	}
+
+	public static TimeState snapshotForTimeRewind() {
+		Map<UUID, TimeState.Entry> entries = new ConcurrentHashMap<>();
+		for (Map.Entry<UUID, ThrownCharge> entry : thrownCharges.entrySet()) {
+			entries.put(entry.getKey(), TimeState.Entry.from(entry.getValue()));
+		}
+		return new TimeState(Map.copyOf(entries));
+	}
+
+	public static void restoreForTimeRewind(TimeState state) {
+		thrownCharges.clear();
+		if (state == null) return;
+		for (Map.Entry<UUID, TimeState.Entry> entry : state.thrownCharges().entrySet()) {
+			thrownCharges.put(entry.getKey(), entry.getValue().toThrownCharge());
+		}
+	}
+
+	public record TimeState(Map<UUID, Entry> thrownCharges) {
+		public record Entry(UUID owner, long armedAt, long detonationAt, Vec3d previousPos,
+				boolean stuck, long placedAt) {
+			private static Entry from(ThrownCharge charge) {
+				return new Entry(charge.owner(), charge.armedAt(), charge.detonationAt(),
+					charge.previousPos(), charge.stuck(), charge.placedAt());
+			}
+
+			private ThrownCharge toThrownCharge() {
+				return new ThrownCharge(owner, armedAt, detonationAt, previousPos, stuck, placedAt);
+			}
+		}
 	}
 
 	private record ThrownCharge(UUID owner, long armedAt, long detonationAt, Vec3d previousPos, boolean stuck, long placedAt) {

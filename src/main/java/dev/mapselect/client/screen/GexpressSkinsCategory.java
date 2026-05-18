@@ -309,7 +309,7 @@ public final class GexpressSkinsCategory {
 		private void equip(WeaponSkinType type, WeaponSkin skin) {
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.player == null || client.player.networkHandler == null) return;
-			client.player.networkHandler.sendChatCommand("g group skins equip " + type.id() + " " + skin.id());
+			client.player.networkHandler.sendChatCommand("g admin skins equip " + type.id() + " " + skin.id());
 		}
 
 		private boolean contains(double mouseX, double mouseY, int x, int y, int w, int h) {

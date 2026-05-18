@@ -22,6 +22,7 @@ import dev.mapselect.network.PuppetmasterStatePayload;
 import dev.mapselect.network.PuppetmasterTargetsPayload;
 import dev.mapselect.network.PuppetmasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
@@ -196,7 +197,6 @@ public final class PuppetmasterManager {
 		PuppetmasterStatePayload state = new PuppetmasterStatePayload(true,
 			puppetmaster.getUuid(), target.getUuid(), target.getId());
 		broadcastState(puppetmaster.getServerWorld(), state);
-		puppetmaster.setInvisible(true);
 		target.setSneaking(false);
 		target.setSprinting(false);
 		target.setVelocity(Vec3d.ZERO);
@@ -209,7 +209,7 @@ public final class PuppetmasterManager {
 		target.playerScreenHandler.syncState();
 
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(puppetmaster));
-		puppetmaster.getWorld().playSound(null, puppetmaster.getBlockPos(),
+		AbilitySounds.playTo(List.of(puppetmaster, target),
 			SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.75F, 0.55F);
 		AbilityCooldownSync.send(puppetmaster, AbilityCooldownPayload.PUPPETMASTER_CONTROL, durationTicks, durationTicks, true);
 		puppetmaster.sendMessage(Text.literal("Pulling " + target.getName().getString() + "'s strings."), true);
@@ -596,7 +596,8 @@ public final class PuppetmasterManager {
 	private static ArrayList<Modifier> copyModifiers(World world, UUID playerId) {
 		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
 		if (modifiers == null || playerId == null) return new ArrayList<>();
-		return new ArrayList<>(modifiers.getModifiers(playerId));
+		ArrayList<Modifier> current = modifiers.getModifiers(playerId);
+		return new ArrayList<>(current == null ? List.of() : current);
 	}
 
 	private static void applyModifierSwap(ServerWorld world, ServerPlayerEntity controller,
@@ -612,8 +613,8 @@ public final class PuppetmasterManager {
 			ServerPlayerEntity target, ControlSession session) {
 		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
 		if (modifiers == null) return;
-		setModifiers(modifiers, controller, modifiers.getModifiers(controller), session.controllerModifiers);
-		setModifiers(modifiers, target, modifiers.getModifiers(target), session.targetModifiers);
+		setModifiers(modifiers, controller, safeModifiers(modifiers, controller), session.controllerModifiers);
+		setModifiers(modifiers, target, safeModifiers(modifiers, target), session.targetModifiers);
 		modifiers.sync();
 	}
 
@@ -625,15 +626,15 @@ public final class PuppetmasterManager {
 		ServerWorld world = controller != null ? controller.getServerWorld() : target.getServerWorld();
 		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
 		if (modifiers == null) return;
-		if (controller != null) setModifiers(modifiers, controller, modifiers.getModifiers(controller), session.controllerModifiers);
-		if (target != null) setModifiers(modifiers, target, modifiers.getModifiers(target), session.targetModifiers);
+		if (controller != null) setModifiers(modifiers, controller, safeModifiers(modifiers, controller), session.controllerModifiers);
+		if (target != null) setModifiers(modifiers, target, safeModifiers(modifiers, target), session.targetModifiers);
 		modifiers.sync();
 	}
 
 	private static void setModifiers(WorldModifierComponent component, ServerPlayerEntity player,
 			List<Modifier> before, List<Modifier> after) {
 		if (component == null || player == null) return;
-		ArrayList<Modifier> current = component.getModifiers(player.getUuid());
+		ArrayList<Modifier> current = safeModifiers(component, player);
 		List<Modifier> oldValues = before == null ? List.of() : before;
 		List<Modifier> newValues = after == null ? List.of() : after;
 		for (Modifier modifier : oldValues) {
@@ -652,6 +653,12 @@ public final class PuppetmasterManager {
 			if (modifier == needle || (modifier != null && modifier.identifier().equals(needle.identifier()))) return true;
 		}
 		return false;
+	}
+
+	private static ArrayList<Modifier> safeModifiers(WorldModifierComponent component, ServerPlayerEntity player) {
+		if (component == null || player == null) return new ArrayList<>();
+		ArrayList<Modifier> current = component.getModifiers(player.getUuid());
+		return current == null ? new ArrayList<>() : current;
 	}
 
 	private static void safeAssignModifier(ServerPlayerEntity player, Modifier modifier) {

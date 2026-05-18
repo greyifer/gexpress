@@ -1,15 +1,19 @@
-# Grey's Express 1.5.3
+# Grey's Express 1.5.4
 
 ## Added
 
 - Added persistent player levels with 25 XP for playing a round and 50 bonus XP for winning; levels now show in tab names, player display names, and the out-of-game HUD.
 - Added the Godfather recruit picker so the primary ability can choose Mafioso or Janitor from one small menu.
+- Added `/gexpress` as a readable alias for the existing `/g` command tree.
 
 ## Changed
 
 - Takeover now assigns normal civilian-category roles to non-Godfathers, keeps purple and lime Mafia families separate, allows each Godfather up to three Mafiosos and three Janitors, and keeps recruited Mafia members on their side after their Godfather dies.
 - Dracula bat form now uses a live, upright bat camera and keeps flight active while transformed.
 - Scatter Brain now searches for safe RTP positions from map random spawns or the play area before teleporting players.
+- Admin and tuning commands now expose cleaner direct forms while keeping the old nested paths as aliases.
+- Command sources were reorganized into folders that match the player-facing command groups.
+- Reworked role and modifier distribution so configured requested counts are handled together, side limits no longer explode into every enabled role, and modifier requests are spread across players more fairly.
 
 ## Fixed
 
@@ -22,6 +26,7 @@
 - Fixed C4 and Wathe grenades killing through walls.
 - Fixed Juggernaut shield break detection for knife, bat, revolver, bullet, and projectile-style death reasons.
 - Fixed client render distance being left below 32 by other option writes.
+- Fixed the client repeatedly reapplying every sound category volume every tick after fades had already ended.
 
 # Grey's Express 1.5.2
 

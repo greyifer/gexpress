@@ -74,8 +74,7 @@ public final class SilentShadowManager {
 
 		player.addStatusEffect(new StatusEffectInstance(StatusEffects.SPEED,
 			durationTicks + 5, 0, false, false, false));
-		player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(),
-			SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 0.45F, 0.65F);
+		player.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 0.45F, 0.65F);
 		player.sendMessage(Text.literal("Shadow March."), true);
 	}
 
@@ -106,8 +105,7 @@ public final class SilentShadowManager {
 			}
 			if (now >= state.activeUntil()) {
 				comp.end(player, true);
-				player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(),
-					SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 0.55F, 0.85F);
+				player.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 0.55F, 0.85F);
 				player.sendMessage(Text.literal("Returned from Shadow March."), true);
 			}
 		}

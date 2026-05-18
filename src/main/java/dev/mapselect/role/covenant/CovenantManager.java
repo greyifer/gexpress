@@ -21,11 +21,7 @@ import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.passive.BatEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.s2c.play.SetCameraEntityS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -39,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 public final class CovenantManager {
@@ -215,20 +212,16 @@ public final class CovenantManager {
 		if (state != null) {
 			ticks = Math.max(0, ticks - 1);
 			batTicksByPlayer.put(id, ticks);
-			Entity entity = player.getServerWorld().getEntity(state.batId());
-			if (entity instanceof BatEntity bat) {
-				bat.setRoosting(false);
-				bat.setNoGravity(true);
-				bat.refreshPositionAndAngles(player.getX(), player.getY() + 0.6D, player.getZ(),
-					player.getYaw(), player.getPitch());
-				bat.setVelocity(player.getVelocity());
-			}
 			if (!player.getAbilities().allowFlying || !player.getAbilities().flying) {
 				player.getAbilities().allowFlying = true;
 				player.getAbilities().flying = true;
 				player.sendAbilitiesUpdate();
 			}
 			player.fallDistance = 0.0F;
+			if (player.isOnGround() && player.getVelocity().y < 0.08D) {
+				player.setVelocity(player.getVelocity().add(0.0D, 0.12D, 0.0D));
+				player.velocityModified = true;
+			}
 			if (ticks <= 0) endBat(player);
 		} else if (ticks < BAT_MAX) {
 			batTicksByPlayer.put(id, Math.min(BAT_MAX, ticks + 1));
@@ -236,38 +229,24 @@ public final class CovenantManager {
 	}
 
 	private static void startBat(ServerPlayerEntity player) {
-		BatEntity bat = EntityType.BAT.create(player.getServerWorld());
-		if (bat == null) return;
-		bat.refreshPositionAndAngles(player.getX(), player.getY() + 0.6D, player.getZ(),
-			player.getYaw(), player.getPitch());
-		bat.setInvulnerable(true);
-		bat.setSilent(true);
-		bat.setRoosting(false);
-		bat.setNoGravity(true);
-		bat.setAiDisabled(true);
-		player.getServerWorld().spawnEntity(bat);
-
-		BatState state = new BatState(player.getAbilities().allowFlying, player.getAbilities().flying,
-			player.isInvisible(), bat.getUuid());
+		BatState state = new BatState(player.getAbilities().allowFlying, player.getAbilities().flying);
 		batStates.put(player.getUuid(), state);
 		player.getAbilities().allowFlying = true;
 		player.getAbilities().flying = true;
-		player.setInvisible(true);
+		player.fallDistance = 0.0F;
+		player.setVelocity(player.getVelocity().add(0.0D, 0.16D, 0.0D));
+		player.velocityModified = true;
 		player.sendAbilitiesUpdate();
-		player.networkHandler.sendPacket(new SetCameraEntityS2CPacket(bat));
 	}
 
 	private static void endBat(ServerPlayerEntity player) {
 		if (player == null) return;
 		BatState state = batStates.remove(player.getUuid());
 		if (state == null) return;
-		Entity entity = player.getServerWorld().getEntity(state.batId());
-		if (entity != null) entity.discard();
 		player.getAbilities().allowFlying = state.allowFlying();
 		player.getAbilities().flying = state.flying();
-		player.setInvisible(state.invisible());
+		player.fallDistance = 0.0F;
 		player.sendAbilitiesUpdate();
-		player.networkHandler.sendPacket(new SetCameraEntityS2CPacket(player));
 	}
 
 	private static void fillBlood(ServerPlayerEntity player) {
@@ -358,11 +337,43 @@ public final class CovenantManager {
 		syncTicker = 0;
 	}
 
+	public static TimeState snapshotForTimeRewind() {
+		return new TimeState(Map.copyOf(bloodByPlayer), Map.copyOf(batTicksByPlayer), Set.copyOf(batStates.keySet()));
+	}
+
+	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
+		if (world != null) {
+			for (ServerPlayerEntity player : world.getPlayers()) {
+				endBat(player);
+			}
+		}
+		bloodByPlayer.clear();
+		batTicksByPlayer.clear();
+		batStates.clear();
+		if (state != null) {
+			bloodByPlayer.putAll(state.bloodByPlayer());
+			batTicksByPlayer.putAll(state.batTicksByPlayer());
+			for (UUID playerId : state.activeBatPlayers()) {
+				if (world == null) continue;
+				ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(playerId);
+				if (player == null || player.getWorld() != world) continue;
+				batStates.put(playerId, new BatState(false, false));
+				player.getAbilities().allowFlying = true;
+				player.getAbilities().flying = true;
+				player.sendAbilitiesUpdate();
+			}
+		}
+		if (world != null) syncAll(world);
+	}
+
+	public record TimeState(Map<UUID, Integer> bloodByPlayer, Map<UUID, Integer> batTicksByPlayer,
+	                        Set<UUID> activeBatPlayers) {}
+
 	private enum RoleKind {
 		NONE,
 		DRACULA,
 		VAMPIRE
 	}
 
-	private record BatState(boolean allowFlying, boolean flying, boolean invisible, UUID batId) {}
+	private record BatState(boolean allowFlying, boolean flying) {}
 }

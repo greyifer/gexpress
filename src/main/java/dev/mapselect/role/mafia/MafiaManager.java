@@ -187,8 +187,7 @@ public final class MafiaManager {
 			janitorCleanCooldownUntil.put(janitor.getUuid(), janitor.getWorld().getTime() + cleanCooldown);
 			AbilityCooldownSync.send(janitor, AbilityCooldownPayload.JANITOR_CLEAN, cleanCooldown, cleanCooldown, false);
 		}
-		janitor.getWorld().playSound(null, janitor.getBlockPos(), SoundEvents.BLOCK_WOOL_BREAK,
-			SoundCategory.PLAYERS, 0.85F, 0.65F);
+		janitor.playSoundToPlayer(SoundEvents.BLOCK_WOOL_BREAK, SoundCategory.PLAYERS, 0.85F, 0.65F);
 		janitor.sendMessage(Text.literal("Body cleaned.").formatted(Formatting.DARK_GRAY), true);
 	}
 
@@ -233,7 +232,7 @@ public final class MafiaManager {
 		int loaded = loadedBulletsByGodfather.getOrDefault(shooter.getUuid(), 0);
 		if (loaded <= 0) {
 			shooter.sendMessage(Text.literal("Out of bullets.").formatted(Formatting.GRAY), true);
-			shooter.getWorld().playSound(null, shooter.getBlockPos(), SoundEvents.UI_BUTTON_CLICK.value(),
+			shooter.playSoundToPlayer(SoundEvents.UI_BUTTON_CLICK.value(),
 				SoundCategory.PLAYERS, 0.35F, 0.65F);
 			syncAmmo(shooter);
 			return false;
@@ -260,7 +259,7 @@ public final class MafiaManager {
 		}
 		if (!player.getAbilities().creativeMode) stack.decrement(1);
 		loadedBulletsByGodfather.put(player.getUuid(), loaded + 1);
-		player.getWorld().playSound(null, player.getBlockPos(), SoundEvents.ITEM_CROSSBOW_LOADING_END.value(),
+		player.playSoundToPlayer(SoundEvents.ITEM_CROSSBOW_LOADING_END.value(),
 			SoundCategory.PLAYERS, 0.75F, 0.75F);
 		player.sendMessage(Text.literal("Loaded bullet (" + (loaded + 1) + "/" + max + ").")
 			.formatted(Formatting.GRAY), true);

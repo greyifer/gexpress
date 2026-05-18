@@ -143,8 +143,7 @@ public final class VultureManager {
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(vulture));
 		ServerPlayNetworking.send(target, new VultureStatePayload(true, vultureId, vulture.getId()));
 
-		vulture.getWorld().playSound(null, vulture.getBlockPos(), SoundEvents.ENTITY_PLAYER_BURP,
-			SoundCategory.PLAYERS, 0.9F, 0.65F);
+		vulture.playSoundToPlayer(SoundEvents.ENTITY_PLAYER_BURP, SoundCategory.PLAYERS, 0.9F, 0.65F);
 		boolean addedTime = addEatTimeBonus(vulture);
 		Text message = addedTime
 			? progressText(vulture).copy().append(Text.literal(" Timer +30s."))
@@ -249,9 +248,6 @@ public final class VultureManager {
 
 	private static void syncStashedCamera(ServerPlayerEntity target, ServerPlayerEntity vulture) {
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(vulture));
-		if (ServerPlayNetworking.canSend(target, VultureStatePayload.ID)) {
-			ServerPlayNetworking.send(target, new VultureStatePayload(true, vulture.getUuid(), vulture.getId()));
-		}
 	}
 
 	private static void onDisconnect(ServerPlayerEntity player, MinecraftServer server) {

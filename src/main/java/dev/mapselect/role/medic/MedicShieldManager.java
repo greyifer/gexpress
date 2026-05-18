@@ -10,6 +10,7 @@ import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.MedicShieldFlashPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.vulture.VultureManager;
@@ -27,6 +28,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 
+import java.util.List;
 import java.util.UUID;
 
 public final class MedicShieldManager {
@@ -80,8 +82,8 @@ public final class MedicShieldManager {
 			return;
 		}
 
-		medic.getWorld().playSound(null, target.getX(), target.getY(), target.getZ(),
-			SoundEvents.BLOCK_BEACON_POWER_SELECT, SoundCategory.PLAYERS, 0.75F, 1.7F);
+		AbilitySounds.playTo(List.of(medic, target), SoundEvents.BLOCK_BEACON_POWER_SELECT,
+			SoundCategory.PLAYERS, 0.75F, 1.7F);
 		medic.sendMessage(Text.literal("Shielded " + target.getName().getString() + "."), true);
 		target.sendMessage(Text.literal("A Medic shield is protecting you."), true);
 		SpyManager.recordInteraction(medic, target);
@@ -109,11 +111,11 @@ public final class MedicShieldManager {
 			comp.removeShield(victim.getUuid());
 		}
 
-		victim.getWorld().playSound(null, victim.getX(), victim.getY(), victim.getZ(),
-			broken ? SoundEvents.ITEM_SHIELD_BREAK : SoundEvents.ITEM_SHIELD_BLOCK,
-			SoundCategory.PLAYERS, 1.0F, broken ? 0.8F : 1.2F);
-
 		if (victim instanceof ServerPlayerEntity target) {
+			ServerPlayerEntity medic = medicId == null || target.getServer() == null
+				? null : target.getServer().getPlayerManager().getPlayer(medicId);
+			AbilitySounds.playTo(List.of(target, medic), broken ? SoundEvents.ITEM_SHIELD_BREAK : SoundEvents.ITEM_SHIELD_BLOCK,
+				SoundCategory.PLAYERS, 1.0F, broken ? 0.8F : 1.2F);
 			target.sendMessage(Text.literal(broken ? "Your Medic shield broke." : "Your Medic shield blocked the hit."), true);
 		}
 		flashMedic(victim.getWorld().getServer(), medicId, victim.getUuid(), broken);

@@ -9,6 +9,7 @@ import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
+import dev.mapselect.network.GexpressDevTuningPayload;
 import dev.mapselect.network.GexpressTaskConfigPayload;
 import dev.mapselect.network.PuppetmasterConfigPayload;
 import dev.mapselect.permissions.GexpressPermissions;
@@ -90,6 +91,8 @@ public final class GexpressOptionsScreen {
 		builder.category(GexpressClientCategory.build(parent, isOp, stage));
 		idx++;
 		builder.category(GexpressSkinsCategory.build(parent));
+		idx++;
+		builder.category(GexpressXpRoadmapCategory.build(parent));
 		idx++;
 
 		if (isDevPlayer()) {
@@ -207,13 +210,13 @@ public final class GexpressOptionsScreen {
 
 	private static void flushRoleModifierTuningCommands() {
 		pendingRoleChance.forEach((id, value) ->
-			stageChatCommand("g roles tuning role " + id + " chance " + value));
+			stageChatCommand("g roles tuning " + id + " chance " + value));
 		pendingRoleMax.forEach((id, value) ->
-			stageChatCommand("g roles tuning role " + id + " amount " + value));
+			stageChatCommand("g roles tuning " + id + " amount " + value));
 		pendingModifierChance.forEach((id, value) ->
-			stageChatCommand("g modifiers tuning modifier " + id + " chance " + value));
+			stageChatCommand("g modifiers tuning " + id + " chance " + value));
 		pendingModifierMax.forEach((id, value) ->
-			stageChatCommand("g modifiers tuning modifier " + id + " amount " + value));
+			stageChatCommand("g modifiers tuning " + id + " amount " + value));
 	}
 
 	private static int clamp(int value, int min, int max) {
@@ -353,6 +356,21 @@ public final class GexpressOptionsScreen {
 				GexpressConfig.getConversationTaskDurationSeconds(),
 				GexpressConfig.getConversationTaskRadiusBlocks(),
 				GexpressConfig.getConversationTaskVerticalToleranceBlocks()
+			));
+		}
+		if (ClientPlayNetworking.canSend(GexpressDevTuningPayload.ID)) {
+			ClientPlayNetworking.send(new GexpressDevTuningPayload(
+				GexpressConfig.getLevelRoundXp(),
+				GexpressConfig.getLevelWinXp(),
+				GexpressConfig.getLevelNeutralWinBonusXp(),
+				GexpressConfig.getLevelKillXp(),
+				GexpressConfig.getLevelCivilianTaskXp(),
+				GexpressConfig.getLevelBaseXp(),
+				GexpressConfig.getLevelXpIncrease(),
+				GexpressConfig.getLevelRoadmapDisplayLevels(),
+				GexpressConfig.getLevelXpOverridesSyncString(),
+				GexpressConfig.getLevelRewardRoadmapSyncString(),
+				GexpressConfig.getGrenadeLineOfSightPassThroughBlocksSyncString()
 			));
 		}
 		if (ClientPlayNetworking.canSend(PuppetmasterConfigPayload.ID)) {

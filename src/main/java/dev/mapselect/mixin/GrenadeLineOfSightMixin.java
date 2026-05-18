@@ -2,6 +2,8 @@ package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.entity.GrenadeEntity;
 import dev.doctor4t.wathe.game.GameFunctions;
+import dev.mapselect.config.GexpressConfig;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -19,6 +21,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(value = GrenadeEntity.class, remap = false)
 @SuppressWarnings("target")
 public abstract class GrenadeLineOfSightMixin {
+	private static final int MAX_PASS_THROUGH_HITS = 32;
+	private static final double STEP_PAST_HIT = 0.08D;
+
 	@Dynamic("Wathe's GrenadeEntity calls GameFunctions with named descriptors outside this project's mappings.")
 	@Redirect(
 		method = "method_7488(Lnet/minecraft/class_239;)V",
@@ -44,9 +49,22 @@ public abstract class GrenadeLineOfSightMixin {
 	}
 
 	private static boolean unobstructed(ServerWorld world, Vec3d from, Vec3d to, ServerPlayerEntity victim) {
-		BlockHitResult hit = world.raycast(new RaycastContext(from, to,
-			RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, victim));
-		if (hit.getType() == HitResult.Type.MISS) return true;
-		return hit.getPos().squaredDistanceTo(from) + 0.05D >= to.squaredDistanceTo(from);
+		Vec3d direction = to.subtract(from);
+		double totalDistanceSquared = direction.lengthSquared();
+		if (totalDistanceSquared <= 0.0001D) return true;
+		Vec3d step = direction.normalize().multiply(STEP_PAST_HIT);
+		Vec3d start = from;
+		for (int i = 0; i < MAX_PASS_THROUGH_HITS; i++) {
+			BlockHitResult hit = world.raycast(new RaycastContext(start, to,
+				RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, victim));
+			if (hit.getType() == HitResult.Type.MISS) return true;
+			if (hit.getPos().squaredDistanceTo(from) + 0.05D >= totalDistanceSquared) return true;
+			BlockState state = world.getBlockState(hit.getBlockPos());
+			if (!GexpressConfig.isGrenadeLineOfSightPassThrough(state)) return false;
+			Vec3d next = hit.getPos().add(step);
+			if (next.squaredDistanceTo(from) <= start.squaredDistanceTo(from) + 0.0001D) return false;
+			start = next;
+		}
+		return false;
 	}
 }

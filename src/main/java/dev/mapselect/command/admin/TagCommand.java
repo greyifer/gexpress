@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.admin;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.arguments.BoolArgumentType;
@@ -111,7 +111,9 @@ public class TagCommand {
 						.suggests(TagCommand::suggestBuiltinTags)
 						.executes(TagCommand::runTagReset))))
 			.then(CommandManager.literal("list")
-				.executes(TagCommand::runList));
+				.executes(TagCommand::runList))
+			.then(CommandManager.literal("permissions")
+				.executes(TagCommand::runPermissions));
 	}
 
 	private static CompletableFuture<Suggestions> suggestTags(CommandContext<ServerCommandSource> ctx,
@@ -143,8 +145,7 @@ public class TagCommand {
 
 	private static CompletableFuture<Suggestions> suggestPermissions(CommandContext<ServerCommandSource> ctx,
 			SuggestionsBuilder builder) {
-		return CommandSource.suggestMatching(List.of("admin", "host", "setup", "builder", "staff", "trusted", "owner"),
-			builder);
+		return CommandSource.suggestMatching(GexpressPermissions.permissionKeys(), builder);
 	}
 
 	private static int runSet(CommandContext<ServerCommandSource> ctx)
@@ -249,6 +250,15 @@ public class TagCommand {
 		}
 		src.sendFeedback(() -> Text.literal("Online tags: " + String.join(", ", rows)), false);
 		return rows.size();
+	}
+
+	private static int runPermissions(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		for (String permission : GexpressPermissions.permissionKeys()) {
+			String description = GexpressPermissions.permissionDescription(permission);
+			src.sendFeedback(() -> Text.literal(permission + " - " + description).formatted(Formatting.GRAY), false);
+		}
+		return GexpressPermissions.permissionKeys().size();
 	}
 
 	private static List<String> assignableTags(ServerCommandSource src) {

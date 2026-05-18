@@ -9,6 +9,7 @@ import dev.doctor4t.wathe.index.WatheEntities;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.AltruistUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
@@ -66,7 +67,7 @@ public final class AltruistManager {
 		TrainVoicePlugin.resetPlayer(target.getUuid());
 		target.sendMessage(Text.literal("The Altruist revived you."), true);
 
-		world.playSound(null, altruist.getBlockPos(), SoundEvents.BLOCK_BEACON_ACTIVATE,
+		AbilitySounds.playTo(java.util.List.of(altruist, target), SoundEvents.BLOCK_BEACON_ACTIVATE,
 			SoundCategory.PLAYERS, 0.9F, 1.35F);
 		GameFunctions.killPlayer(altruist, true, target, GameConstants.DeathReasons.GENERIC);
 		TrainVoicePlugin.addPlayer(altruist.getUuid());

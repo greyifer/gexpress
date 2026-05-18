@@ -18,8 +18,11 @@ import net.minecraft.world.World;
 
 import java.util.Locale;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class GexpressPermissions {
@@ -31,6 +34,16 @@ public final class GexpressPermissions {
 	public static final int STAFF_COLOR = 0x79B9A9;
 	public static final int CREATOR_COLOR = 0xD36BFF;
 	public static final int PASSENGER_COLOR = 0x3C8AC9;
+	public static final String PERMISSION_GAME_COMMANDS = "commands_game";
+	public static final String PERMISSION_SETUP_COMMANDS = "commands_setup";
+	public static final String PERMISSION_ROLE_COMMANDS = "commands_roles";
+	public static final String PERMISSION_MODIFIER_COMMANDS = "commands_modifiers";
+	public static final String PERMISSION_ADMIN_COMMANDS = "commands_admin";
+	public static final String PERMISSION_TAGS_EDIT = "tags_edit";
+	public static final String PERMISSION_TRUSTED = "trusted";
+	public static final String PERMISSION_STAFF = "staff";
+	public static final String PERMISSION_OWNER = "owner";
+	private static final Map<String, String> PERMISSION_DESCRIPTIONS = permissionDescriptions();
 
 	private GexpressPermissions() {}
 
@@ -56,33 +69,37 @@ public final class GexpressPermissions {
 	}
 
 	public static boolean isHostOrDev(PlayerEntity player) {
-		return isDev(player) || HostComponent.isHost(player) || hasTagPermission(player, "host");
+		return isDev(player) || HostComponent.isHost(player)
+			|| hasAnyTagPermission(player, PERMISSION_GAME_COMMANDS, "host");
 	}
 
 	public static boolean isTrusted(PlayerEntity player) {
 		return TrustedComponent.isTrusted(player) || effectiveTags(player).contains(PlayerTag.TRUSTED)
-			|| hasTagPermission(player, "trusted");
+			|| hasTagPermission(player, PERMISSION_TRUSTED);
 	}
 
 	public static boolean isBuilder(PlayerEntity player) {
-		return hasTagPermission(player, "builder") || hasTagPermission(player, "setup");
+		return hasAnyTagPermission(player, PERMISSION_SETUP_COMMANDS, "builder", "setup");
 	}
 
 	public static boolean isStaff(PlayerEntity player) {
-		return hasTagPermission(player, "staff");
+		return hasTagPermission(player, PERMISSION_STAFF);
 	}
 
 	public static boolean isOwner(PlayerEntity player) {
-		return hasTagPermission(player, "owner");
+		return hasTagPermission(player, PERMISSION_OWNER);
 	}
 
 	public static boolean canUseAdminCommands(ServerCommandSource source) {
 		PlayerEntity player = source.getPlayer();
-		return source.hasPermissionLevel(2) || isDev(player) || hasTagPermission(player, "admin");
+		return source.hasPermissionLevel(2) || isDev(player)
+			|| hasAnyTagPermission(player, PERMISSION_ADMIN_COMMANDS, "admin");
 	}
 
 	public static boolean canEditTags(ServerCommandSource source) {
-		return source.getEntity() instanceof PlayerEntity player && isDev(player);
+		if (source.hasPermissionLevel(2)) return true;
+		return source.getEntity() instanceof PlayerEntity player
+			&& (isDev(player) || hasAnyTagPermission(player, PERMISSION_TAGS_EDIT, PERMISSION_ADMIN_COMMANDS, "admin"));
 	}
 
 	public static boolean canUseHostCommands(ServerCommandSource source) {
@@ -92,6 +109,18 @@ public final class GexpressPermissions {
 	public static boolean canUseSetupCommands(ServerCommandSource source) {
 		ServerPlayerEntity player = source.getPlayer();
 		return canUseHostCommands(source) || isBuilder(player);
+	}
+
+	public static boolean canUseRoleCommands(ServerCommandSource source) {
+		PlayerEntity player = source.getPlayer();
+		return canUseHostCommands(source) || canUseAdminCommands(source)
+			|| hasTagPermission(player, PERMISSION_ROLE_COMMANDS);
+	}
+
+	public static boolean canUseModifierCommands(ServerCommandSource source) {
+		PlayerEntity player = source.getPlayer();
+		return canUseHostCommands(source) || canUseAdminCommands(source)
+			|| hasTagPermission(player, PERMISSION_MODIFIER_COMMANDS);
 	}
 
 	public static boolean canEditGameOptions(PlayerEntity player) {
@@ -121,8 +150,8 @@ public final class GexpressPermissions {
 		World world = server.getWorld(World.OVERWORLD);
 		PlayerTagComponent tags = world == null ? null : PlayerTagComponent.KEY.getNullable(world);
 		return tags != null && (tags.getTag(uuid) == PlayerTag.OWNER
-			|| tags.hasPermission(uuid, tags.getPlayerTags(uuid), "owner")
-			|| tags.hasPermission(uuid, tags.getPlayerTags(uuid), "admin"));
+			|| tags.hasPermission(uuid, tags.getPlayerTags(uuid), PERMISSION_OWNER)
+			|| tags.hasPermission(uuid, tags.getPlayerTags(uuid), PERMISSION_ADMIN_COMMANDS));
 	}
 
 	public static boolean hasBadge(PlayerEntity player) {
@@ -226,6 +255,48 @@ public final class GexpressPermissions {
 		if (player == null || player.getWorld() == null) return false;
 		PlayerTagComponent tags = PlayerTagComponent.KEY.getNullable(player.getWorld());
 		return tags != null && tags.hasPermission(player.getUuid(), effectiveTags(player), permission);
+	}
+
+	private static boolean hasAnyTagPermission(PlayerEntity player, String... permissions) {
+		if (permissions == null) return false;
+		for (String permission : permissions) {
+			if (hasTagPermission(player, permission)) return true;
+		}
+		return false;
+	}
+
+	public static String canonicalPermission(String raw) {
+		String key = PlayerTagComponent.normalizeCustomId(raw);
+		if (key == null) return null;
+		return switch (key) {
+			case "admin" -> PERMISSION_ADMIN_COMMANDS;
+			case "host" -> PERMISSION_GAME_COMMANDS;
+			case "setup", "builder" -> PERMISSION_SETUP_COMMANDS;
+			default -> key;
+		};
+	}
+
+	public static Map<String, String> permissionDescriptions() {
+		LinkedHashMap<String, String> out = new LinkedHashMap<>();
+		out.put(PERMISSION_GAME_COMMANDS, "Use /g game start/end commands.");
+		out.put(PERMISSION_SETUP_COMMANDS, "Use /g setup map, train, and RTP editing commands.");
+		out.put(PERMISSION_ROLE_COMMANDS, "Use /g roles tuning and role utility commands.");
+		out.put(PERMISSION_MODIFIER_COMMANDS, "Use /g modifiers tuning commands.");
+		out.put(PERMISSION_ADMIN_COMMANDS, "Use /g admin management, testing, and dev commands.");
+		out.put(PERMISSION_TAGS_EDIT, "Create tags and edit tag assignments, colors, priorities, and permissions.");
+		out.put(PERMISSION_TRUSTED, "Counts as Trusted for trusted-only bypasses and display.");
+		out.put(PERMISSION_STAFF, "Counts as Staff for display and staff checks.");
+		out.put(PERMISSION_OWNER, "Owner display tag; default Owner also receives every command permission.");
+		return Collections.unmodifiableMap(out);
+	}
+
+	public static List<String> permissionKeys() {
+		return List.copyOf(PERMISSION_DESCRIPTIONS.keySet());
+	}
+
+	public static String permissionDescription(String permission) {
+		String key = canonicalPermission(permission);
+		return key == null ? null : PERMISSION_DESCRIPTIONS.get(key);
 	}
 
 	public static Text tagBadge(PlayerTag tag) {

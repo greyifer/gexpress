@@ -486,7 +486,7 @@ public final class GexpressPlayersCategory {
 					|| tag == null || PlayerTag.DEV.id().equals(tag.id())
 					|| PlayerTag.PASSENGER.id().equals(tag.id())) return;
 			String action = selected ? "remove" : "add";
-			client.player.networkHandler.sendChatCommand("g group tag " + action + " " + tag.id() + " " + playerName);
+			client.player.networkHandler.sendChatCommand("g admin tag " + action + " " + tag.id() + " " + playerName);
 		}
 
 		private void submitLevelField(UUID playerId, String playerName, LevelFieldKind kind) {
@@ -497,7 +497,7 @@ public final class GexpressPlayersCategory {
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.player == null || client.player.networkHandler == null) return;
 			String subcommand = kind == LevelFieldKind.XP ? "xp" : "level";
-			client.player.networkHandler.sendChatCommand("g admin dev level " + subcommand + " " + playerName + " " + value);
+			client.player.networkHandler.sendChatCommand("g admin level " + subcommand + " " + playerName + " " + value);
 			focusedLevelField = null;
 		}
 

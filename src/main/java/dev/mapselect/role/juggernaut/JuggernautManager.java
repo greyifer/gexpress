@@ -221,8 +221,7 @@ public final class JuggernautManager {
 		long rechargeTicks = (long) GexpressConfig.getJuggernautShieldRechargeSeconds() * 20L;
 		shieldRechargeUntil.put(juggernaut.getUuid(), juggernaut.getWorld().getTime() + rechargeTicks);
 		syncShieldCooldown(juggernaut, rechargeTicks);
-		juggernaut.getWorld().playSound(null, juggernaut.getBlockPos(), SoundEvents.ITEM_SHIELD_BLOCK,
-			SoundCategory.PLAYERS, 0.9F, 0.85F);
+		juggernaut.playSoundToPlayer(SoundEvents.ITEM_SHIELD_BLOCK, SoundCategory.PLAYERS, 0.9F, 0.85F);
 		juggernaut.sendMessage(Text.literal("Juggernaut shield blocked the hit."), true);
 		return true;
 	}

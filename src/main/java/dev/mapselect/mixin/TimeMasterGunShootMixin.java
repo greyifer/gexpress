@@ -18,7 +18,7 @@ public abstract class TimeMasterGunShootMixin {
 	)
 	private void gexpress$blockFrozenGunShot(GunShootPayload payload,
 			ServerPlayNetworking.Context context, CallbackInfo ci) {
-		if (TimeMasterManager.isFrozen(context.player())) {
+		if (TimeMasterManager.isFrozen(context.player()) || TimeMasterManager.isRewinding(context.player())) {
 			ci.cancel();
 			return;
 		}

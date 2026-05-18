@@ -17,7 +17,7 @@ public abstract class TimeMasterKnifeStabMixin {
 	)
 	private void gexpress$blockFrozenKnifeStab(KnifeStabPayload payload,
 			ServerPlayNetworking.Context context, CallbackInfo ci) {
-		if (TimeMasterManager.isFrozen(context.player())) ci.cancel();
+		if (TimeMasterManager.isFrozen(context.player()) || TimeMasterManager.isRewinding(context.player())) ci.cancel();
 	}
 
 	@Inject(

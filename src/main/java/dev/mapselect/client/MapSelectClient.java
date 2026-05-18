@@ -7,6 +7,7 @@ import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
+import dev.mapselect.network.GexpressDevTuningPayload;
 import dev.mapselect.network.GexpressTaskConfigPayload;
 import dev.mapselect.network.PuppetmasterConfigPayload;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
@@ -32,9 +33,12 @@ import net.minecraft.sound.SoundCategory;
 
 public class MapSelectClient implements ClientModInitializer {
 	private static final SoundCategory[] SOUND_CATEGORIES = SoundCategory.values();
+	private static final float[] LAST_SOUND_VOLUMES = new float[SOUND_CATEGORIES.length];
+	private static boolean soundFadeActive;
 
 	@Override
 	public void onInitializeClient() {
+		java.util.Arrays.fill(LAST_SOUND_VOLUMES, -1.0F);
 		GexpressRoleAnnouncementTexts.register();
 		registerConfigReceiver();
 		ClientAbilityKeys.register();
@@ -96,12 +100,19 @@ public class MapSelectClient implements ClientModInitializer {
 			if (mc.player != null) DevWeaponSkinStamper.stamp(mc.player);
 
 			GameWorldComponent gc = GameWorldComponent.KEY.getNullable(world);
-			if (gc != null && gc.getFade() > 0) return;
-
-			for (SoundCategory cat : SOUND_CATEGORIES) {
-				float target = mc.options.getSoundVolume(cat);
-				mc.getSoundManager().updateSoundVolume(cat, target);
+			if (gc != null && gc.getFade() > 0) {
+				soundFadeActive = true;
+				return;
 			}
+
+			for (int i = 0; i < SOUND_CATEGORIES.length; i++) {
+				SoundCategory category = SOUND_CATEGORIES[i];
+				float target = mc.options.getSoundVolume(category);
+				if (!soundFadeActive && Float.compare(LAST_SOUND_VOLUMES[i], target) == 0) continue;
+				mc.getSoundManager().updateSoundVolume(category, target);
+				LAST_SOUND_VOLUMES[i] = target;
+			}
+			soundFadeActive = false;
 		});
 	}
 
@@ -114,6 +125,12 @@ public class MapSelectClient implements ClientModInitializer {
 			context.client().execute(() -> GexpressConfig.applyTaskConfig(payload.conversationEnabled(),
 				payload.conversationChancePercent(), payload.conversationDurationSeconds(),
 				payload.conversationRadiusBlocks(), payload.conversationVerticalToleranceBlocks())));
+		ClientPlayNetworking.registerGlobalReceiver(GexpressDevTuningPayload.ID, (payload, context) ->
+			context.client().execute(() -> GexpressConfig.applyDevTuning(payload.levelRoundXp(),
+				payload.levelWinXp(), payload.levelNeutralWinBonusXp(), payload.levelKillXp(),
+				payload.levelCivilianTaskXp(), payload.levelBaseXp(), payload.levelXpIncrease(),
+				payload.levelRoadmapDisplayLevels(), payload.levelXpOverrides(), payload.levelRewardRoadmap(),
+				payload.grenadeLineOfSightPassThroughBlocks())));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID, (payload, context) ->
 			context.client().execute(() -> GexpressConfig.puppetmasterCanKillOwnBody = payload.canKillOwnBody()));
 	}

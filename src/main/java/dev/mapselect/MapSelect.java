@@ -1,6 +1,6 @@
 package dev.mapselect;
 
-import dev.mapselect.command.GreyCommand;
+import dev.mapselect.command.GexpressCommand;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
 import dev.mapselect.game.FurnaceDupeGuard;
@@ -125,7 +125,7 @@ public class MapSelect implements ModInitializer {
 		GexpressConfigSyncHandler.register();
 		GexpressPresetsSyncHandler.register();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-			GreyCommand.register(dispatcher));
-		LOGGER.info("Grey's Express initialized - adding /g commands");
+			GexpressCommand.register(dispatcher));
+		LOGGER.info("Grey's Express initialized - adding /g and /gexpress commands");
 	}
 }

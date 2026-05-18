@@ -29,6 +29,10 @@ public final class GexpressDevCategory {
 		return ConfigCategory.createBuilder()
 			.name(Text.translatable("gui.gexpress.config.category.dev"))
 			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
+			.group(xpTuningGroup())
+			.group(levelXpOverridesOption())
+			.group(levelRewardRoadmapOption())
+			.group(grenadePassThroughBlocksOption())
 			.group(c4BackModelGroup())
 			.group(spyBugModelGroup())
 			.group(modelPlacementEditorGroup())
@@ -41,6 +45,56 @@ public final class GexpressDevCategory {
 			.group(tagEditorGroup())
 			.group(endScreenLayoutGroup())
 			.build();
+	}
+
+	private static OptionGroup xpTuningGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.xp_tuning"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.xp_tuning.tooltip")))
+			.collapsed(false)
+			.option(intOption("level_round_xp", 25, GexpressConfig::getLevelRoundXp,
+				v -> GexpressConfig.levelRoundXp = v,
+				GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX))
+			.option(intOption("level_win_xp", 25, GexpressConfig::getLevelWinXp,
+				v -> GexpressConfig.levelWinXp = v,
+				GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX))
+			.option(intOption("level_neutral_win_bonus_xp", 25, GexpressConfig::getLevelNeutralWinBonusXp,
+				v -> GexpressConfig.levelNeutralWinBonusXp = v,
+				GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX))
+			.option(intOption("level_kill_xp", 10, GexpressConfig::getLevelKillXp,
+				v -> GexpressConfig.levelKillXp = v,
+				GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX))
+			.option(intOption("level_civilian_task_xp", 5, GexpressConfig::getLevelCivilianTaskXp,
+				v -> GexpressConfig.levelCivilianTaskXp = v,
+				GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX))
+			.option(intOption("level_base_xp", 100, GexpressConfig::getLevelBaseXp,
+				v -> GexpressConfig.levelBaseXp = v,
+				GexpressConfig.LEVEL_XP_REQUIRED_MIN, GexpressConfig.LEVEL_XP_REQUIRED_MAX))
+			.option(intOption("level_xp_increase", 100, GexpressConfig::getLevelXpIncrease,
+				v -> GexpressConfig.levelXpIncrease = v,
+				0, GexpressConfig.LEVEL_XP_REQUIRED_MAX))
+			.option(intOption("level_roadmap_display_levels", 25, GexpressConfig::getLevelRoadmapDisplayLevels,
+				v -> GexpressConfig.levelRoadmapDisplayLevels = v,
+				GexpressConfig.LEVEL_ROADMAP_DISPLAY_MIN, GexpressConfig.LEVEL_ROADMAP_DISPLAY_MAX))
+			.build();
+	}
+
+	private static ListOption<String> levelXpOverridesOption() {
+		return stringListOption("level_xp_overrides", GexpressConfig::getLevelXpOverrideStrings,
+			GexpressConfig::setLevelXpOverrideStrings, () -> "5=750");
+	}
+
+	private static ListOption<String> levelRewardRoadmapOption() {
+		return stringListOption("level_reward_roadmap", GexpressConfig::getLevelRewardRoadmapStrings,
+			GexpressConfig::setLevelRewardRoadmapStrings,
+			() -> "5|Gold Skin|Unlocks or notes the reward for reaching level 5.");
+	}
+
+	private static ListOption<String> grenadePassThroughBlocksOption() {
+		return stringListOption("grenade_los_pass_through_blocks",
+			GexpressConfig::getGrenadeLineOfSightPassThroughBlockStrings,
+			GexpressConfig::setGrenadeLineOfSightPassThroughBlockStrings,
+			() -> "minecraft:glass");
 	}
 
 	private static OptionGroup c4BackModelGroup() {
@@ -308,6 +362,21 @@ public final class GexpressDevCategory {
 				.action((screen, option) -> MinecraftClient.getInstance()
 					.setScreen(new GexpressTagEditorScreen(screen)))
 				.build())
+			.build();
+	}
+
+	private static ListOption<String> stringListOption(String key, Supplier<List<String>> getter,
+			Consumer<List<String>> setter, Supplier<String> initial) {
+		return ListOption.<String>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.dev." + key))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev." + key + ".tooltip")))
+			.binding(List.of(), getter, values -> {
+				setter.accept(values);
+				GexpressOptionsScreen.pushGexpressConfigToServer();
+			})
+			.controller(StringControllerBuilder::create)
+			.initial(initial)
+			.collapsed(false)
 			.build();
 	}
 

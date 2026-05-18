@@ -2,6 +2,7 @@ package dev.mapselect.client;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.MapSelect;
 import dev.mapselect.client.screen.WeIcons;
 import dev.mapselect.config.GexpressConfig;
@@ -49,16 +50,16 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_HEX_KILL = hudIcon("ability_hex_kill");
 	private static final Identifier ICON_JUGGERNAUT_WEAPONS = hudIcon("ability_hex_kill");
 	private static final Identifier ICON_MASQUERADE = hudIcon("ability_masquerade");
-	private static final Identifier ICON_DANCING_CARTS = hudIcon("ability_masquerade");
-	private static final Identifier ICON_TIME_REWIND = hudIcon("ability_masquerade");
-	private static final Identifier ICON_TIME_FREEZE = hudIcon("ability_shadow_march");
+	private static final Identifier ICON_DANCING_CARTS = hudIcon("ability_dancing_carts");
+	private static final Identifier ICON_TIME_REWIND = hudIcon("ability_time_rewind");
+	private static final Identifier ICON_TIME_FREEZE = hudIcon("ability_time_freeze");
 	private static final Identifier ICON_PUPPET_STRINGS = hudIcon("ability_puppet_strings");
 	private static final Identifier ICON_PELICAN_SWALLOW = hudIcon("ability_pelican_swallow");
-	private static final Identifier ICON_SCATTER = hudIcon("ability_masquerade");
-	private static final Identifier ICON_TRACKER = hudIcon("ability_warlock_mark");
-	private static final Identifier ICON_ALTRUIST = hudIcon("ability_medic_shield");
-	private static final Identifier ICON_MAFIA = hudIcon("ability_puppet_strings");
-	private static final Identifier ICON_JANITOR_CLEAN = hudIcon("ability_medic_shield");
+	private static final Identifier ICON_SCATTER = hudIcon("ability_scatter");
+	private static final Identifier ICON_TRACKER = hudIcon("ability_track");
+	private static final Identifier ICON_ALTRUIST = hudIcon("ability_revive");
+	private static final Identifier ICON_MAFIA = hudIcon("ability_recruit_mafioso");
+	private static final Identifier ICON_JANITOR_CLEAN = hudIcon("ability_janitor");
 	private static final Map<String, SyncedCooldown> SYNCED = new HashMap<>();
 	private static Object syncedWorld;
 
@@ -87,8 +88,7 @@ public final class ClientAbilityCooldownHud {
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null || client.world == null || client.options.hudHidden) return;
-		if (!ClientRoleRevealState.canShowRoleHud(client) || !ClientRoleRevealState.canUseRoleAbility(client)
-				|| ClientVultureState.isLocalStashed(client)) return;
+		if (!isLocalPlayerAlive(client)) return;
 		checkSyncedWorld(client);
 
 		List<AbilityBar> bars = barsFor(client);
@@ -338,6 +338,16 @@ public final class ClientAbilityCooldownHud {
 			return game == null ? null : game.getRole(client.player);
 		} catch (Throwable ignored) {
 			return null;
+		}
+	}
+
+	private static boolean isLocalPlayerAlive(MinecraftClient client) {
+		if (client == null || client.player == null) return false;
+		if (ClientVultureState.isLocalStashed(client)) return true;
+		try {
+			return GameFunctions.isPlayerAliveAndSurvival(client.player);
+		} catch (Throwable ignored) {
+			return !client.player.isSpectator();
 		}
 	}
 

@@ -1,6 +1,7 @@
 package dev.mapselect.host;
 
 import dev.mapselect.MapSelect;
+import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
@@ -136,7 +137,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 
 	public boolean setBuiltinTagPermission(String id, String permission, boolean enabled) {
 		PlayerTag tag = PlayerTag.byId(id);
-		String key = normalizeCustomId(permission);
+		String key = GexpressPermissions.canonicalPermission(permission);
 		if (tag == null || key == null) return false;
 		BuiltinTagSettings current = getBuiltinTagSettings(tag);
 		LinkedHashSet<String> permissions = new LinkedHashSet<>(current.permissions());
@@ -181,16 +182,16 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	}
 
 	public boolean hasPermission(UUID uuid, Iterable<PlayerTag> builtinTags, String permission) {
-		String key = normalizeCustomId(permission);
+		String key = GexpressPermissions.canonicalPermission(permission);
 		if (key == null) return false;
 		if (builtinTags != null) {
 			for (PlayerTag tag : builtinTags) {
-				if (tag != null && permissions(tag).contains(key)) return true;
+				if (tag != null && containsPermission(permissions(tag), key)) return true;
 			}
 		}
 		for (String tagId : getPlayerCustomTags(uuid)) {
 			CustomTag tag = customTags.get(tagId);
-			if (tag != null && tag.permissions().contains(key)) return true;
+			if (tag != null && containsPermission(tag.permissions(), key)) return true;
 		}
 		return false;
 	}
@@ -249,7 +250,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 
 	public boolean setCustomTagPermission(String id, String permission, boolean enabled) {
 		CustomTag tag = getCustomTag(id);
-		String key = normalizeCustomId(permission);
+		String key = GexpressPermissions.canonicalPermission(permission);
 		if (tag == null || key == null) return false;
 		LinkedHashSet<String> permissions = new LinkedHashSet<>(tag.permissions());
 		boolean changed = enabled ? permissions.add(key) : permissions.remove(key);
@@ -296,7 +297,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			if (entry.contains("permissions")) {
 				permissions.clear();
 				for (int j = 0; j < permissionList.size(); j++) {
-					String permission = normalizeCustomId(permissionList.getString(j));
+					String permission = GexpressPermissions.canonicalPermission(permissionList.getString(j));
 					if (permission != null) permissions.add(permission);
 				}
 			}
@@ -313,7 +314,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			LinkedHashSet<String> permissions = new LinkedHashSet<>();
 			NbtList permissionList = entry.getList("permissions", NbtElement.STRING_TYPE);
 			for (int j = 0; j < permissionList.size(); j++) {
-				String permission = normalizeCustomId(permissionList.getString(j));
+				String permission = GexpressPermissions.canonicalPermission(permissionList.getString(j));
 				if (permission != null) permissions.add(permission);
 			}
 			customTags.put(id, new CustomTag(id, entry.getString("name"),
@@ -428,19 +429,69 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 	private static Set<String> defaultPermissions(PlayerTag tag) {
 		if (tag == null) return Set.of();
 		return switch (tag) {
-			case OWNER -> Set.of("owner", "admin", "host", "setup", "builder", "staff", "trusted");
-			case DEV -> Set.of("admin", "host", "setup", "builder", "staff", "trusted");
-			case STAFF -> Set.of("admin", "host", "setup", "builder", "staff");
-			case HOST -> Set.of("host", "setup", "builder");
-			case TRUSTED -> Set.of("trusted");
+			case OWNER -> Set.of(
+				GexpressPermissions.PERMISSION_OWNER,
+				GexpressPermissions.PERMISSION_ADMIN_COMMANDS,
+				GexpressPermissions.PERMISSION_TAGS_EDIT,
+				GexpressPermissions.PERMISSION_GAME_COMMANDS,
+				GexpressPermissions.PERMISSION_SETUP_COMMANDS,
+				GexpressPermissions.PERMISSION_ROLE_COMMANDS,
+				GexpressPermissions.PERMISSION_MODIFIER_COMMANDS,
+				GexpressPermissions.PERMISSION_STAFF,
+				GexpressPermissions.PERMISSION_TRUSTED
+			);
+			case DEV -> Set.of(
+				GexpressPermissions.PERMISSION_ADMIN_COMMANDS,
+				GexpressPermissions.PERMISSION_TAGS_EDIT,
+				GexpressPermissions.PERMISSION_GAME_COMMANDS,
+				GexpressPermissions.PERMISSION_SETUP_COMMANDS,
+				GexpressPermissions.PERMISSION_ROLE_COMMANDS,
+				GexpressPermissions.PERMISSION_MODIFIER_COMMANDS,
+				GexpressPermissions.PERMISSION_STAFF,
+				GexpressPermissions.PERMISSION_TRUSTED
+			);
+			case STAFF -> Set.of(
+				GexpressPermissions.PERMISSION_ADMIN_COMMANDS,
+				GexpressPermissions.PERMISSION_GAME_COMMANDS,
+				GexpressPermissions.PERMISSION_SETUP_COMMANDS,
+				GexpressPermissions.PERMISSION_ROLE_COMMANDS,
+				GexpressPermissions.PERMISSION_MODIFIER_COMMANDS,
+				GexpressPermissions.PERMISSION_STAFF
+			);
+			case HOST -> Set.of(
+				GexpressPermissions.PERMISSION_GAME_COMMANDS,
+				GexpressPermissions.PERMISSION_SETUP_COMMANDS,
+				GexpressPermissions.PERMISSION_ROLE_COMMANDS,
+				GexpressPermissions.PERMISSION_MODIFIER_COMMANDS
+			);
+			case TRUSTED -> Set.of(GexpressPermissions.PERMISSION_TRUSTED);
 			default -> Set.of();
 		};
+	}
+
+	private static boolean containsPermission(Set<String> permissions, String key) {
+		if (permissions == null || key == null) return false;
+		for (String permission : permissions) {
+			if (key.equals(GexpressPermissions.canonicalPermission(permission))) return true;
+		}
+		return false;
+	}
+
+	private static Set<String> canonicalPermissions(Set<String> permissions) {
+		LinkedHashSet<String> out = new LinkedHashSet<>();
+		if (permissions != null) {
+			for (String permission : permissions) {
+				String key = GexpressPermissions.canonicalPermission(permission);
+				if (key != null) out.add(key);
+			}
+		}
+		return Collections.unmodifiableSet(out);
 	}
 
 	public record BuiltinTagSettings(int color, int priority, Set<String> permissions) {
 		public BuiltinTagSettings {
 			color &= 0xFFFFFF;
-			permissions = Set.copyOf(permissions == null ? Set.of() : permissions);
+			permissions = canonicalPermissions(permissions);
 		}
 
 		public static BuiltinTagSettings from(PlayerTag tag) {
@@ -465,7 +516,7 @@ public class PlayerTagComponent implements AutoSyncedComponent {
 			id = normalizeCustomId(id);
 			displayName = displayName == null || displayName.isBlank() ? id : displayName.trim();
 			color &= 0xFFFFFF;
-			permissions = Set.copyOf(permissions == null ? Set.of() : permissions);
+			permissions = canonicalPermissions(permissions);
 		}
 
 		public CustomTag withDisplayName(String displayName) {

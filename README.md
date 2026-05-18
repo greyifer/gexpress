@@ -12,7 +12,8 @@ Using this mod outside of **The Harpy Express: Extended** may work, but it is no
 
 ## Commands
 
-All G'Express commands are under `/g`.
+All G'Express commands are under `/g`. `/gexpress` is a full alias for the same command tree.
+Legacy nested forms such as `/g admin dev ...`, `/g roles tuning role ...`, and `/g modifiers tuning modifier ...` still work.
 
 | Command | Purpose |
 |---|---|
@@ -28,8 +29,9 @@ All G'Express commands are under `/g`.
 | `/g setup map edit <name> wholemap <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the full map bounds. |
 | `/g setup map edit <name> playarea <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the playable area bounds. |
 | `/g setup map edit <name> template <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the reset template bounds. |
-| `/g setup map edit <name> freshair <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Marks an area as valid for Wathe's fresh-air task. |
-| `/g setup map edit <name> freshair clear` | Clears the saved fresh-air task area. |
+| `/g setup map edit <name> freshair add <corner1> <corner2> [sanityPercent] [outsideSounds]` | Adds a Fresh Air task area with optional sanity reward and outside ambience. |
+| `/g setup map edit <name> freshair list` | Lists saved Fresh Air task areas. |
+| `/g setup map edit <name> freshair clear` | Clears saved Fresh Air task areas. |
 | `/g setup map edit <name> offset <x> <y> <z>` | Sets the play area paste offset. |
 | `/g setup map edit <name> spectator <x> <y> <z> <yaw> <pitch>` | Sets the spectator spawn position. |
 | `/g setup map edit <name> readytrain here` | Sets the ready train preview position to your current position. |
@@ -56,14 +58,14 @@ All G'Express commands are under `/g`.
 | `/g roles c4 attach <players>` | Admin-attaches C4 to players. |
 | `/g roles c4 remove <players>` | Removes attached C4 from players. |
 | `/g roles c4 clear` | Clears all attached C4. |
-| `/g roles tuning role <id> chance <value>` | Sets a role assignment chance. |
-| `/g roles tuning role <id> max <value>` | Sets a role assignment maximum. |
-| `/g roles tuning role <id> amount <value>` | Alias for role max. |
+| `/g roles tuning <id> chance <value>` | Sets a role assignment chance. |
+| `/g roles tuning <id> max <value>` | Sets a role assignment maximum. |
+| `/g roles tuning <id> amount <value>` | Alias for role max. |
 | `/g roles test role <role> [players]` | Assigns a test role. |
 | `/g roles test role clear [players]` | Clears test roles. |
-| `/g modifiers tuning modifier <id> chance <value>` | Sets a modifier assignment chance. |
-| `/g modifiers tuning modifier <id> max <value>` | Sets a modifier assignment maximum. |
-| `/g modifiers tuning modifier <id> amount <value>` | Alias for modifier max. |
+| `/g modifiers tuning <id> chance <value>` | Sets a modifier assignment chance. |
+| `/g modifiers tuning <id> max <value>` | Sets a modifier assignment maximum. |
+| `/g modifiers tuning <id> amount <value>` | Alias for modifier max. |
 | `/g modifiers test add <modifier> [players]` / `/g modifiers test add <players> <modifier>` | Adds a test modifier. Suggestions hide modifiers the selected player already has. |
 | `/g modifiers test remove <modifier> [players]` / `/g modifiers test remove <players> <modifier>` | Removes a test modifier. Suggestions show only modifiers the selected player has. |
 | `/g modifiers test clear [players]` | Clears test modifiers. |
@@ -80,26 +82,26 @@ All G'Express commands are under `/g`.
 | `/g group voice mute <players>` / `/g group voice mute all` | Voice-mutes players or all non-privileged players. |
 | `/g group voice unmute <players>` / `/g group voice unmute all` | Removes voice mutes. |
 | `/g group voice list` | Lists voice-muted players. |
-| `/g admin dev c4back offset x/y/z <value>` | Tunes the C4 back model offset. |
-| `/g admin dev c4back rotation x/y/z <value>` | Tunes the C4 back model rotation. |
-| `/g admin dev c4back slant <value>` | Tunes the C4 back model diagonal slant. |
-| `/g admin dev c4back scale <value>` | Tunes the C4 back model size. |
-| `/g admin dev c4preset add [values]` | Adds a C4 placement preset from current settings or explicit values. |
-| `/g admin dev c4preset list` | Lists C4 placement presets. |
-| `/g admin dev c4preset remove <index>` | Removes a C4 placement preset. |
-| `/g admin dev c4preset clear` | Clears C4 placement presets. |
-| `/g admin dev roledesc <role> set <description>` | Overrides a G'Express role guidebook description. |
-| `/g admin dev roledesc <role> clear` | Clears a role description override. |
-| `/g admin dev shortsighted range <value>` | Tunes Short-sighted visibility range. |
-| `/g admin dev medicshield blockFlashTicks <value>` | Tunes Medic shield block flash duration. |
-| `/g admin dev medicshield breakFlashTicks <value>` | Tunes Medic shield break flash duration. |
-| `/g admin dev medicshield blockFlashAlpha <value>` | Tunes Medic shield block flash opacity. |
-| `/g admin dev medicshield breakFlashAlpha <value>` | Tunes Medic shield break flash opacity. |
-| `/g admin dev silentshadow alpha <value>` | Tunes The Silent shadow opacity. |
-| `/g admin dev traincart <preset> <corner1> <corner2>` | Adds a Dancing Carts region to a train preset. |
-| `/g admin dev traincart <preset> list` | Lists Dancing Carts regions for a train preset. |
-| `/g admin dev traincart <preset> remove <index>` | Removes a Dancing Carts region from a train preset. |
-| `/g admin dev traincart <preset> clear` | Clears Dancing Carts regions from a train preset. |
+| `/g admin c4back offset x/y/z <value>` | Tunes the C4 back model offset. |
+| `/g admin c4back rotation x/y/z <value>` | Tunes the C4 back model rotation. |
+| `/g admin c4back slant <value>` | Tunes the C4 back model diagonal slant. |
+| `/g admin c4back scale <value>` | Tunes the C4 back model size. |
+| `/g admin c4preset add [values]` | Adds a C4 placement preset from current settings or explicit values. |
+| `/g admin c4preset list` | Lists C4 placement presets. |
+| `/g admin c4preset remove <index>` | Removes a C4 placement preset. |
+| `/g admin c4preset clear` | Clears C4 placement presets. |
+| `/g admin roledesc <role> set <description>` | Overrides a G'Express role guidebook description. |
+| `/g admin roledesc <role> clear` | Clears a role description override. |
+| `/g admin shortsighted range <value>` | Tunes Short-sighted visibility range. |
+| `/g admin medicshield blockFlashTicks <value>` | Tunes Medic shield block flash duration. |
+| `/g admin medicshield breakFlashTicks <value>` | Tunes Medic shield break flash duration. |
+| `/g admin medicshield blockFlashAlpha <value>` | Tunes Medic shield block flash opacity. |
+| `/g admin medicshield breakFlashAlpha <value>` | Tunes Medic shield break flash opacity. |
+| `/g admin silentshadow alpha <value>` | Tunes The Silent shadow opacity. |
+| `/g admin traincart <preset> <corner1> <corner2>` | Adds a Dancing Carts region to a train preset. |
+| `/g admin traincart <preset> list` | Lists Dancing Carts regions for a train preset. |
+| `/g admin traincart <preset> remove <index>` | Removes a Dancing Carts region from a train preset. |
+| `/g admin traincart <preset> clear` | Clears Dancing Carts regions from a train preset. |
 
 ---
 
@@ -228,7 +230,7 @@ G'Express adds an ability HUD for role abilities.
 G'Express adds server-side tags for community presentation and custom cosmetics.
 
 - Host and Trusted tags can be managed through `/g group host` and `/g group trusted`.
-- Owner, Staff, Designer, Builder, and Passenger tags can be managed through `/g group tag`.
+- Owner, Staff, Host, Creator, Trusted, and custom tags can be managed through `/g group tag`.
 - Tag hierarchy is Owner, Dev, Staff, Host, Trusted, then Passenger.
 - The Trusted tag is gold-yellow and gives Trusted players custom Coca-Cola Revolver and Chicken Stick Knife models.
 - The Owner tag is dark teal and has full built-in G'Express permissions.
@@ -272,6 +274,8 @@ Tools for hosts and custom game setup.
 G'Express is made for **Minecraft 1.21.1** on **Fabric**.
 
 It should be installed on both the client and server.
+
+To build from source on Windows, install a Java 21 or newer JDK and run `.\gradlew.bat build` from the repo root. You do not need a separate Gradle install; the checked-in wrapper downloads the right Gradle distribution.
 
 ---
 

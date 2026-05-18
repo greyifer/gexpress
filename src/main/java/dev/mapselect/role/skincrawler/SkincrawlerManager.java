@@ -13,6 +13,7 @@ import dev.mapselect.network.AbilityCooldownPayload;
 import dev.mapselect.network.AbilityCooldownSync;
 import dev.mapselect.network.SkincrawlerSkinPayload;
 import dev.mapselect.network.SkincrawlerUsePayload;
+import dev.mapselect.network.TimeMasterFreezeStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.vulture.VultureManager;
 import dev.mapselect.testing.GexpressTestState;
@@ -95,10 +96,14 @@ public final class SkincrawlerManager {
 		if (!(victim instanceof ServerPlayerEntity player) || !isSkincrawler(player)) return true;
 		if (!GameConstants.DeathReasons.GUN.equals(reason)) return true;
 		long now = player.getWorld().getTime();
-		Stun current = stunned.get(player.getUuid());
-		if (current != null && current.untilTick() > now) return true;
-		stunned.put(player.getUuid(), new Stun(now + (long) GexpressConfig.getSkincrawlerStunSeconds() * 20L,
+		UUID currentSkin = skinSwaps.get(player.getUuid());
+		if (currentSkin == null || currentSkin.equals(player.getUuid())) return true;
+		skinSwaps.remove(player.getUuid());
+		if (player.getWorld() instanceof ServerWorld world) broadcast(world);
+		long duration = (long) GexpressConfig.getSkincrawlerStunSeconds() * 20L;
+		stunned.put(player.getUuid(), new Stun(now + duration,
 			player.getPos(), player.getYaw(), player.getPitch()));
+		syncStun(player, (int) Math.min(Integer.MAX_VALUE, duration));
 		player.sendMessage(Text.literal("You are stunned!"), true);
 		return false;
 	}
@@ -116,7 +121,11 @@ public final class SkincrawlerManager {
 		stunned.entrySet().removeIf(entry -> {
 			ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(entry.getKey());
 			Stun stun = entry.getValue();
-			if (player == null || player.getWorld() != world || stun.untilTick() <= now) return true;
+			if (player == null || player.getWorld() != world) return true;
+			if (stun.untilTick() <= now) {
+				syncStun(player, 0);
+				return true;
+			}
 			player.refreshPositionAndAngles(stun.pos().x, stun.pos().y, stun.pos().z, stun.yaw(), stun.pitch());
 			player.setVelocity(Vec3d.ZERO);
 			player.velocityModified = true;
@@ -205,6 +214,18 @@ public final class SkincrawlerManager {
 		SkincrawlerSkinPayload payload = new SkincrawlerSkinPayload(new HashMap<>(skinSwaps));
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (ServerPlayNetworking.canSend(player, SkincrawlerSkinPayload.ID)) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
+	private static void syncStun(ServerPlayerEntity target, int durationTicks) {
+		if (target == null || !(target.getWorld() instanceof ServerWorld world)) return;
+		TimeMasterFreezeStatePayload payload = durationTicks > 0
+			? new TimeMasterFreezeStatePayload(true, target.getUuid(), null, durationTicks)
+			: TimeMasterFreezeStatePayload.clear(target.getUuid());
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			if (ServerPlayNetworking.canSend(player, TimeMasterFreezeStatePayload.ID)) {
 				ServerPlayNetworking.send(player, payload);
 			}
 		}

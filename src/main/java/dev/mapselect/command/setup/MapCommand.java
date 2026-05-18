@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.setup;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.BoolArgumentType;
@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
-public class MapSelectCommand {
+public class MapCommand {
 
 	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseSetupCommands;
 	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseSetupCommands;
@@ -53,7 +53,7 @@ public class MapSelectCommand {
 	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildMapTree() {
-		SuggestionProvider<ServerCommandSource> nameSuggestions = MapSelectCommand::suggestPresetNames;
+		SuggestionProvider<ServerCommandSource> nameSuggestions = MapCommand::suggestPresetNames;
 
 		return CommandManager.literal("map")
 			.then(CommandManager.literal("create")
@@ -186,17 +186,17 @@ public class MapSelectCommand {
 												FloatArgumentType.getFloat(ctx, "pitch")))))))))
 					.then(CommandManager.literal("readytrain")
 						.then(CommandManager.literal("here")
-							.executes(MapSelectCommand::runEditReadyTrainHere))
+							.executes(MapCommand::runEditReadyTrainHere))
 						.then(CommandManager.literal("clear")
-							.executes(MapSelectCommand::runEditReadyTrainClear))
+							.executes(MapCommand::runEditReadyTrainClear))
 						.then(CommandManager.argument("corner", BlockPosArgumentType.blockPos())
 							.executes(ctx -> runEditReadyTrainCorner(ctx,
 								BlockPosArgumentType.getBlockPos(ctx, "corner")))))
 					.then(CommandManager.literal("randomspawns")
 						.then(CommandManager.literal("snapshot")
-							.executes(MapSelectCommand::runEditRandomSpawnsSnapshot))
+							.executes(MapCommand::runEditRandomSpawnsSnapshot))
 						.then(CommandManager.literal("clear")
-							.executes(MapSelectCommand::runEditRandomSpawnsClear)))
+							.executes(MapCommand::runEditRandomSpawnsClear)))
 					.then(CommandManager.literal("rooms")
 						.then(CommandManager.argument("count", IntegerArgumentType.integer(MapPreset.MIN_ROOM_COUNT, MapPreset.MAX_ROOM_COUNT))
 							.suggests(suggestFromPreset(p -> Integer.toString(MapPreset.normalizeRoomCount(p.roomCount))))
@@ -205,7 +205,7 @@ public class MapSelectCommand {
 								IntegerArgumentType.getInteger(ctx, "count")))))))
 			.then(CommandManager.literal("list")
 				.requires(OP_OR_HOST)
-				.executes(MapSelectCommand::runList))
+				.executes(MapCommand::runList))
 			.then(CommandManager.literal("show")
 				.requires(OP)
 				.then(CommandManager.argument("name", StringArgumentType.word())
@@ -322,7 +322,7 @@ public class MapSelectCommand {
 		return boxEditLiteral("freshair", p -> p.freshAirArea, BoxKind.FRESH_AIR)
 			.then(add)
 			.then(CommandManager.literal("list")
-				.executes(MapSelectCommand::runListFreshAirAreas));
+				.executes(MapCommand::runListFreshAirAreas));
 	}
 
 	private static SuggestionProvider<ServerCommandSource> suggestFromPreset(

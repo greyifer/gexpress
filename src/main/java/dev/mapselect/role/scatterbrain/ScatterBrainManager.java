@@ -30,6 +30,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
 
@@ -89,8 +90,9 @@ public final class ScatterBrainManager {
 		}
 
 		int scattered = 0;
+		Box playArea = currentPlayArea(world);
 		for (ServerPlayerEntity player : players) {
-			Vec3d safe = findSafePoint(world, player, points);
+			Vec3d safe = findSafePoint(world, player, points, playArea);
 			if (safe == null) continue;
 			float yaw = RANDOM.nextFloat() * 360.0F;
 			player.teleport(world, safe.x, safe.y, safe.z, yaw, player.getPitch());
@@ -107,21 +109,31 @@ public final class ScatterBrainManager {
 		long cooldown = (long) GexpressConfig.getScatterBrainCooldownSeconds() * 20L;
 		cooldownUntil.put(scatterBrain.getUuid(), world.getTime() + cooldown);
 		AbilityCooldownSync.send(scatterBrain, AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, cooldown, cooldown, false);
-		world.playSound(null, scatterBrain.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT,
-			SoundCategory.PLAYERS, 1.0F, 0.7F);
+		scatterBrain.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.0F, 0.7F);
 		scatterBrain.sendMessage(Text.literal("Scatter Brain."), true);
 	}
 
 	private static List<TargetPoint> targetPoints(ServerWorld world) {
 		List<TargetPoint> points = new ArrayList<>();
+		MapVariablesWorldComponent map = MapVariablesWorldComponent.KEY.getNullable(world);
+		Box playArea = map == null ? null : map.getPlayArea();
+		Vec3i playAreaOffset = map == null ? null : map.getPlayAreaOffset();
+		for (MapPreset.PosData spawn : MapPreset.randomSpawnsFrom(world)) {
+			TargetPoint point = TargetPoint.from(spawn, playArea, playAreaOffset);
+			if (point != null) points.add(point);
+		}
+		if (!points.isEmpty()) return points;
+
 		String currentMap = MapWeatherComponent.KEY.get(world).getCurrentMapName();
 		if (currentMap != null && !currentMap.isBlank()) {
 			try {
 				MapPreset preset = PresetStorage.load(world.getServer(), currentMap);
 				if (preset != null) {
+					preset.normalize();
 					if (preset.randomSpawnPositions != null) {
 						for (MapPreset.PosData spawn : preset.randomSpawnPositions) {
-							points.add(TargetPoint.from(spawn));
+							TargetPoint point = TargetPoint.from(spawn, preset);
+							if (point != null) points.add(point);
 						}
 					}
 				}
@@ -130,9 +142,7 @@ public final class ScatterBrainManager {
 		}
 		if (!points.isEmpty()) return points;
 
-		for (MapPreset.PosData spawn : MapPreset.randomSpawnsFrom(world)) points.add(TargetPoint.from(spawn));
 		if (points.isEmpty()) {
-			MapVariablesWorldComponent map = MapVariablesWorldComponent.KEY.getNullable(world);
 			if (map != null) addBoxPoints(points, map.getPlayArea(), 128);
 		}
 		return points;
@@ -150,7 +160,8 @@ public final class ScatterBrainManager {
 		}
 	}
 
-	private static Vec3d findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points) {
+	private static Vec3d findSafePoint(ServerWorld world, ServerPlayerEntity player, List<TargetPoint> points,
+			Box allowedArea) {
 		for (int attempt = 0; attempt < 160; attempt++) {
 			TargetPoint target = points.get(RANDOM.nextInt(points.size()));
 			int x = MathHelper.floor(target.x());
@@ -159,14 +170,14 @@ public final class ScatterBrainManager {
 				? MathHelper.floor(target.y())
 				: MathHelper.floor(player.getY());
 			int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
-			Vec3d safe = safeAround(world, player, new BlockPos(x, playerY, z), playerY, topY);
+			Vec3d safe = safeAround(world, player, new BlockPos(x, playerY, z), playerY, topY, allowedArea);
 			if (safe != null) return safe;
 		}
 		return null;
 	}
 
 	private static Vec3d safeAround(ServerWorld world, ServerPlayerEntity player, BlockPos origin, int playerY,
-			int topY) {
+			int topY, Box allowedArea) {
 		for (int radius = 0; radius <= 12; radius++) {
 			for (int dx = -radius; dx <= radius; dx++) {
 				for (int dz = -radius; dz <= radius; dz++) {
@@ -174,7 +185,7 @@ public final class ScatterBrainManager {
 					BlockPos pos = origin.add(dx, 0, dz);
 					double x = pos.getX() + 0.5D;
 					double z = pos.getZ() + 0.5D;
-					Vec3d safe = safeYInColumn(world, player, x, z, playerY, topY);
+					Vec3d safe = safeYInColumn(world, player, x, z, playerY, topY, allowedArea);
 					if (safe != null) return safe;
 				}
 			}
@@ -183,25 +194,39 @@ public final class ScatterBrainManager {
 	}
 
 	private static Vec3d safeYInColumn(ServerWorld world, ServerPlayerEntity player, double x, double z, int playerY,
-			int seedTopY) {
+			int seedTopY, Box allowedArea) {
 		int columnTopY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, MathHelper.floor(x), MathHelper.floor(z));
 		int minY = Math.max(world.getBottomY() + 1, Math.min(Math.min(playerY, seedTopY), columnTopY) - 18);
 		int maxY = Math.min(world.getTopY() - 2, Math.max(Math.max(playerY, seedTopY), columnTopY) + 18);
 		int[] seeds = { playerY, columnTopY, seedTopY, playerY + 1, playerY - 1, columnTopY + 1, columnTopY - 1 };
 		for (int seed : seeds) {
-			if (seed >= minY && seed <= maxY && isSafe(world, player, x, seed, z)) {
+			if (seed >= minY && seed <= maxY && isInArea(allowedArea, x, seed, z)
+					&& isSafe(world, player, x, seed, z)) {
 				return new Vec3d(x, seed, z);
 			}
 		}
 		for (int offset = 0; offset <= Math.max(maxY - playerY, playerY - minY); offset++) {
 			int up = playerY + offset;
-			if (up >= minY && up <= maxY && isSafe(world, player, x, up, z)) return new Vec3d(x, up, z);
+			if (up >= minY && up <= maxY && isInArea(allowedArea, x, up, z)
+					&& isSafe(world, player, x, up, z)) return new Vec3d(x, up, z);
 			int down = playerY - offset;
-			if (offset != 0 && down >= minY && down <= maxY && isSafe(world, player, x, down, z)) {
+			if (offset != 0 && down >= minY && down <= maxY && isInArea(allowedArea, x, down, z)
+					&& isSafe(world, player, x, down, z)) {
 				return new Vec3d(x, down, z);
 			}
 		}
 		return null;
+	}
+
+	private static boolean isInArea(Box area, double x, double y, double z) {
+		return area == null || (x >= area.minX && x <= area.maxX
+			&& y >= area.minY && y <= area.maxY
+			&& z >= area.minZ && z <= area.maxZ);
+	}
+
+	private static Box currentPlayArea(ServerWorld world) {
+		MapVariablesWorldComponent map = MapVariablesWorldComponent.KEY.getNullable(world);
+		return map == null ? null : map.getPlayArea();
 	}
 
 	private static boolean isSafe(ServerWorld world, ServerPlayerEntity player, double x, double y, double z) {
@@ -296,7 +321,25 @@ public final class ScatterBrainManager {
 		}
 
 		private static TargetPoint from(MapPreset.PosData pos) {
+			if (pos == null) return null;
 			return new TargetPoint(pos.x, pos.y, pos.z, pos.yaw, pos.pitch);
+		}
+
+		private static TargetPoint from(MapPreset.PosData pos, MapPreset preset) {
+			if (pos == null || preset == null || preset.playArea == null || preset.playAreaOffset == null) {
+				return from(pos);
+			}
+			return from(pos, preset.playArea.toBox(), preset.playAreaOffset.toVec3i());
+		}
+
+		private static TargetPoint from(MapPreset.PosData pos, Box playArea, Vec3i playAreaOffset) {
+			if (pos == null || playArea == null || playAreaOffset == null) return from(pos);
+			Vec3d original = new Vec3d(pos.x, pos.y, pos.z);
+			Vec3d translated = original.add(playAreaOffset.getX(), playAreaOffset.getY(), playAreaOffset.getZ());
+			if (!playArea.contains(original) && playArea.contains(translated)) {
+				return new TargetPoint(translated.x, translated.y, translated.z, pos.yaw, pos.pitch);
+			}
+			return from(pos);
 		}
 	}
 }

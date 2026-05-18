@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.roles;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -14,15 +14,15 @@ import net.minecraft.util.Formatting;
 
 import java.util.Collection;
 
-public final class VultureCommand {
-	private VultureCommand() {}
+public final class PelicanCommand {
+	private PelicanCommand() {}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("pelican")
 			.then(CommandManager.literal("leave")
-				.executes(VultureCommand::runLeave))
+				.executes(PelicanCommand::runLeave))
 			.then(CommandManager.literal("release")
-				.requires(GexpressPermissions::canUseHostCommands)
+				.requires(GexpressPermissions::canUseRoleCommands)
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.executes(ctx -> runRelease(ctx, EntityArgumentType.getPlayers(ctx, "players")))));
 	}

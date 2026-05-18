@@ -114,7 +114,7 @@ public final class DancingCartsManager {
 		previousPairs.put(world.getRegistryKey(), CartPair.fromMoves(moves));
 		setCooldown(world, harlequin.getUuid());
 		syncCooldown(harlequin, cooldownRemainingTicks(world, harlequin.getUuid()));
-		world.playSound(null, harlequin.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT,
+		harlequin.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT,
 			SoundCategory.PLAYERS, 0.9F, 0.85F);
 		harlequin.sendMessage(Text.literal("Dancing Carts. Uses left: " + usesLeft + "/"
 			+ GexpressConfig.getTricksterDancingCartsMaxUses() + "."), true);

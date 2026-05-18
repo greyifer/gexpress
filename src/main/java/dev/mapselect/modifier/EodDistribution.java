@@ -78,25 +78,42 @@ public final class EodDistribution {
 			UUID id = player.getUuid();
 			if (!mods.isModifier(player, MapSelectModifiers.EOD_SPECIALIST)) continue;
 
-			// Belt-and-suspenders: if the player already has Pliers (e.g. from a prior grant
-			// where our UUID memory got wiped), don't stack another one. Record the grant so
-			// we skip the inventory scan on future ticks.
-			if (player.getInventory().count(MapSelectItems.PLIERS) > 0) {
+			int pliers = player.getInventory().count(MapSelectItems.PLIERS);
+			if (pliers > 1) trimPliersToOne(player);
+			if (pliers > 0) {
 				granted.add(id);
 				continue;
 			}
-			if (granted.contains(id)) {
-				granted.remove(id);
-				MapSelect.LOGGER.debug("Re-handing missing Pliers to EOD Specialist {}", player.getName().getString());
-			}
+			if (granted.contains(id)) continue;
 
 			ItemStack stack = new ItemStack(MapSelectItems.PLIERS);
 			if (!player.getInventory().insertStack(stack)) {
-				// Inventory full — drop at feet rather than losing the tool silently.
-				player.dropItem(stack, false);
+				MapSelect.LOGGER.debug("Skipped EOD Pliers grant for {}; inventory is full",
+					player.getName().getString());
+				continue;
 			}
 			granted.add(id);
 			MapSelect.LOGGER.debug("Handed Pliers to EOD Specialist {}", player.getName().getString());
 		}
+	}
+
+	private static void trimPliersToOne(net.minecraft.server.network.ServerPlayerEntity player) {
+		int kept = 0;
+		boolean changed = false;
+		for (int slot = 0; slot < player.getInventory().size(); slot++) {
+			ItemStack stack = player.getInventory().getStack(slot);
+			if (stack.isEmpty() || !stack.isOf(MapSelectItems.PLIERS)) continue;
+			if (kept > 0) {
+				player.getInventory().setStack(slot, ItemStack.EMPTY);
+				changed = true;
+				continue;
+			}
+			kept = 1;
+			if (stack.getCount() > 1) {
+				stack.setCount(1);
+				changed = true;
+			}
+		}
+		if (changed) player.playerScreenHandler.syncState();
 	}
 }

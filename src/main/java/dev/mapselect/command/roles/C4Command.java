@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.roles;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -17,7 +17,7 @@ public class C4Command {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("c4")
-			.requires(GexpressPermissions::canUseAdminCommands)
+			.requires(GexpressPermissions::canUseRoleCommands)
 			.then(CommandManager.literal("attach")
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.executes(C4Command::runAttach)))

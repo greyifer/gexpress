@@ -1,4 +1,4 @@
-package dev.mapselect.command;
+package dev.mapselect.command.game;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.doctor4t.wathe.game.GameFunctions;
