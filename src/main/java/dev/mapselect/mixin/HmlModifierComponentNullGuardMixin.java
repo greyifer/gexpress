@@ -6,7 +6,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
@@ -20,7 +19,7 @@ public abstract class HmlModifierComponentNullGuardMixin {
 	public HashMap<UUID, ArrayList<Modifier>> modifiers;
 
 	@Inject(method = "getModifiers(Ljava/util/UUID;)Ljava/util/ArrayList;", at = @At("HEAD"))
-	private void gexpress$ensureModifierMap(UUID uuid, CallbackInfo ci) {
+	private void gexpress$ensureModifierMap(UUID uuid, CallbackInfoReturnable<ArrayList<Modifier>> cir) {
 		if (modifiers == null) modifiers = new HashMap<>();
 	}
 
