@@ -14,8 +14,10 @@ import org.ladysnake.cca.api.v3.component.ComponentRegistry;
 import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class LevelComponent implements AutoSyncedComponent {
@@ -26,6 +28,7 @@ public class LevelComponent implements AutoSyncedComponent {
 
 	private final World world;
 	private final Map<UUID, Integer> xpByPlayer = new LinkedHashMap<>();
+	private final Map<UUID, Set<Integer>> claimedRewardsByPlayer = new LinkedHashMap<>();
 
 	public LevelComponent(World world) {
 		this.world = world;
@@ -55,6 +58,24 @@ public class LevelComponent implements AutoSyncedComponent {
 
 	public int xpNeededForNextLevel(UUID playerId) {
 		return xpNeededForLevel(level(playerId));
+	}
+
+	public boolean hasClaimedReward(UUID playerId, int level) {
+		if (playerId == null || level <= 0) return false;
+		Set<Integer> claimed = claimedRewardsByPlayer.get(playerId);
+		return claimed != null && claimed.contains(level);
+	}
+
+	public Set<Integer> claimedRewards(UUID playerId) {
+		Set<Integer> claimed = playerId == null ? null : claimedRewardsByPlayer.get(playerId);
+		return claimed == null ? Set.of() : Collections.unmodifiableSet(claimed);
+	}
+
+	public boolean markRewardClaimed(UUID playerId, int level) {
+		if (playerId == null || level <= 0 || hasClaimedReward(playerId, level)) return false;
+		claimedRewardsByPlayer.computeIfAbsent(playerId, id -> new HashSet<>()).add(level);
+		KEY.sync(world);
+		return true;
 	}
 
 	public boolean addXp(UUID playerId, int amount) {
@@ -107,12 +128,22 @@ public class LevelComponent implements AutoSyncedComponent {
 	@Override
 	public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		xpByPlayer.clear();
+		claimedRewardsByPlayer.clear();
 		NbtList entries = tag.getList("players", NbtElement.COMPOUND_TYPE);
 		for (int i = 0; i < entries.size(); i++) {
 			NbtCompound entry = entries.getCompound(i);
 			UUID playerId = parseUuid(entry.getString("uuid"));
 			if (playerId == null) continue;
 			xpByPlayer.put(playerId, Math.max(0, entry.getInt("xp")));
+			NbtList claimed = entry.getList("claimedRewards", NbtElement.INT_TYPE);
+			if (!claimed.isEmpty()) {
+				Set<Integer> levels = new HashSet<>();
+				for (int j = 0; j < claimed.size(); j++) {
+					int level = claimed.getInt(j);
+					if (level > 0) levels.add(level);
+				}
+				if (!levels.isEmpty()) claimedRewardsByPlayer.put(playerId, levels);
+			}
 		}
 	}
 
@@ -123,6 +154,12 @@ public class LevelComponent implements AutoSyncedComponent {
 			NbtCompound out = new NbtCompound();
 			out.putString("uuid", entry.getKey().toString());
 			out.putInt("xp", Math.max(0, entry.getValue()));
+			Set<Integer> claimed = claimedRewardsByPlayer.get(entry.getKey());
+			if (claimed != null && !claimed.isEmpty()) {
+				NbtList claimedList = new NbtList();
+				claimed.stream().filter(level -> level > 0).sorted().forEach(level -> claimedList.add(net.minecraft.nbt.NbtInt.of(level)));
+				out.put("claimedRewards", claimedList);
+			}
 			entries.add(out);
 		}
 		tag.put("players", entries);

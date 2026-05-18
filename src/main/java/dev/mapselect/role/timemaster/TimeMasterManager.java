@@ -61,6 +61,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.screen.ScreenHandler;
@@ -72,6 +73,7 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.property.Property;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
@@ -1037,7 +1039,7 @@ public final class TimeMasterManager {
 			int experienceLevel, int totalExperience, float experienceProgress, int score,
 			List<StatusEffectInstance> effects, int shopBalance,
 			NbtCompound mood, NbtCompound poison, NbtCompound psycho, NbtCompound note,
-			ItemCooldownSnapshot cooldowns) {
+			ItemCooldownSnapshot cooldowns, UUID vehicleId, NbtCompound vehicleNbt) {
 
 		private static PlayerSnapshot capture(ServerPlayerEntity player, RegistryWrapper.WrapperLookup lookup) {
 			List<StatusEffectInstance> effects = new ArrayList<>();
@@ -1049,6 +1051,12 @@ public final class TimeMasterManager {
 			player.getHungerManager().writeNbt(hunger);
 			NbtCompound abilities = new NbtCompound();
 			player.getAbilities().writeNbt(abilities);
+			Entity vehicle = player.getVehicle();
+			NbtCompound vehicleNbt = vehicle == null ? null : vehicle.writeNbt(new NbtCompound()).copy();
+			if (vehicleNbt != null) {
+				Identifier vehicleType = Registries.ENTITY_TYPE.getId(vehicle.getType());
+				vehicleNbt.putString("id", vehicleType.toString());
+			}
 
 			return new PlayerSnapshot(
 				player.getUuid(),
@@ -1080,7 +1088,9 @@ public final class TimeMasterManager {
 				writeComponent(PlayerPoisonComponent.KEY.getNullable(player), lookup),
 				writeComponent(PlayerPsychoComponent.KEY.getNullable(player), lookup),
 				writeComponent(PlayerNoteComponent.KEY.getNullable(player), lookup),
-				ItemCooldownSnapshot.capture(player.getItemCooldownManager())
+				ItemCooldownSnapshot.capture(player.getItemCooldownManager()),
+				vehicle == null ? null : vehicle.getUuid(),
+				vehicleNbt
 			);
 		}
 
@@ -1129,6 +1139,24 @@ public final class TimeMasterManager {
 			PlayerNoteComponent.KEY.sync(player);
 			PlayerShopComponent.KEY.sync(player);
 			cooldowns.restore(player.getItemCooldownManager());
+			restoreVehicle(player);
+		}
+
+		private void restoreVehicle(ServerPlayerEntity player) {
+			if (vehicleId == null || vehicleNbt == null) return;
+			ServerWorld world = player.getServerWorld();
+			Entity vehicle = world.getEntity(vehicleId);
+			if (vehicle == null || vehicle.isRemoved()) {
+				NbtCompound tag = vehicleNbt.copy();
+				vehicle = EntityType.loadEntityWithPassengers(tag, world, entity -> {
+					entity.setUuid(vehicleId);
+					return world.spawnNewEntityAndPassengers(entity) ? entity : null;
+				});
+			}
+			if (vehicle == null || vehicle.isRemoved()) return;
+			vehicle.readNbt(vehicleNbt.copy());
+			vehicle.setUuid(vehicleId);
+			player.startRiding(vehicle, true);
 		}
 
 		private void applyVisualFrame(ServerPlayerEntity player) {

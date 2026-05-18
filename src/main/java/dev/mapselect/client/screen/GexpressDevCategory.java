@@ -87,7 +87,7 @@ public final class GexpressDevCategory {
 	private static ListOption<String> levelRewardRoadmapOption() {
 		return stringListOption("level_reward_roadmap", GexpressConfig::getLevelRewardRoadmapStrings,
 			GexpressConfig::setLevelRewardRoadmapStrings,
-			() -> "5|Gold Skin|Unlocks or notes the reward for reaching level 5.");
+			() -> "5|Gold Skin|Unlocks or notes the reward for reaching level 5.|g skin grant {player} revolver gold");
 	}
 
 	private static ListOption<String> grenadePassThroughBlocksOption() {

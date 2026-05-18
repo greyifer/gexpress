@@ -8,12 +8,18 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.command.admin.TagCommand;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.ClaimLevelRewardPayload;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 
@@ -30,6 +36,9 @@ public final class LevelManager {
 	private LevelManager() {}
 
 	public static void register() {
+		PayloadTypeRegistry.playC2S().register(ClaimLevelRewardPayload.ID, ClaimLevelRewardPayload.CODEC);
+		ServerPlayNetworking.registerGlobalReceiver(ClaimLevelRewardPayload.ID,
+			(payload, context) -> context.server().execute(() -> claimReward(context.player(), payload.level())));
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
 			recentKillXpAwards.clear();
 			grantRoundXp(world, game);
@@ -42,7 +51,50 @@ public final class LevelManager {
 					LevelComponent.KEY.sync(world);
 					TagCommand.refreshPlayerListName(handler.player);
 				}
-			}));
+		}));
+	}
+
+	private static void claimReward(ServerPlayerEntity player, int level) {
+		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
+		LevelComponent levels = LevelComponent.KEY.get(world);
+		int safeLevel = Math.max(1, level);
+		if (levels.level(player.getUuid()) < safeLevel) {
+			player.sendMessage(Text.literal("That level reward is still locked.").formatted(Formatting.GRAY), true);
+			return;
+		}
+		if (levels.hasClaimedReward(player.getUuid(), safeLevel)) {
+			player.sendMessage(Text.literal("You already claimed that reward.").formatted(Formatting.GRAY), true);
+			return;
+		}
+		GexpressConfig.LevelRoadmapEntry reward = GexpressConfig.getLevelRoadmapEntry(safeLevel);
+		if (!reward.configured()) {
+			player.sendMessage(Text.literal("No reward is configured for that level.").formatted(Formatting.GRAY), true);
+			return;
+		}
+		if (!runRewardCommand(player, reward, safeLevel)) return;
+		if (levels.markRewardClaimed(player.getUuid(), safeLevel)) {
+			player.sendMessage(Text.literal("Claimed " + reward.title() + ".").formatted(Formatting.GREEN), true);
+		}
+	}
+
+	private static boolean runRewardCommand(ServerPlayerEntity player, GexpressConfig.LevelRoadmapEntry reward, int level) {
+		String command = reward.command();
+		if (command == null || command.isBlank()) return true;
+		String parsed = command.strip();
+		while (parsed.startsWith("/")) parsed = parsed.substring(1).stripLeading();
+		parsed = parsed
+			.replace("{player}", player.getGameProfile().getName())
+			.replace("{uuid}", player.getUuidAsString())
+			.replace("{level}", Integer.toString(level));
+		if (parsed.isBlank()) return true;
+		try {
+			ServerCommandSource source = player.getCommandSource().withLevel(4).withSilent();
+			player.getServer().getCommandManager().executeWithPrefix(source, parsed);
+			return true;
+		} catch (Throwable t) {
+			player.sendMessage(Text.literal("Reward command failed.").formatted(Formatting.RED), true);
+			return false;
+		}
 	}
 
 	public static void grantCivilianTaskXp(ServerPlayerEntity player) {

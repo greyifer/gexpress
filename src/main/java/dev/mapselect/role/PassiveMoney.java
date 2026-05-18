@@ -63,7 +63,7 @@ public final class PassiveMoney {
 		}
 		if (game.canUseKillerFeatures(player)) return GexpressConfig.getPassiveIncomeKiller();
 		if (role.isInnocent()) {
-			return GexpressRoleShop.showsMoneyHud(player) ? GexpressConfig.getPassiveIncomeCivilian() : 0;
+			return GexpressConfig.getPassiveIncomeCivilian();
 		}
 		return GexpressConfig.getPassiveIncomeNeutral();
 	}

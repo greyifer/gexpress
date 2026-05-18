@@ -1,5 +1,6 @@
 package dev.mapselect.modifier;
 
+import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheItems;
@@ -26,6 +27,8 @@ public final class MutedNotesDistribution {
 
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(MutedNotesDistribution::tick);
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> reset());
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> reset());
 	}
 
 	private static void tick(ServerWorld world) {
@@ -34,8 +37,6 @@ public final class MutedNotesDistribution {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean activeGame = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
 		if (!activeGame && !GexpressTestState.hasModifierTesters()) {
-			if (!granted.isEmpty()) granted.clear();
-			ticksUntilNextCheck = 0;
 			return;
 		}
 
@@ -96,5 +97,10 @@ public final class MutedNotesDistribution {
 			}
 		}
 		if (changed) player.playerScreenHandler.syncState();
+	}
+
+	private static void reset() {
+		granted.clear();
+		ticksUntilNextCheck = 0;
 	}
 }

@@ -248,6 +248,9 @@ public final class VultureManager {
 
 	private static void syncStashedCamera(ServerPlayerEntity target, ServerPlayerEntity vulture) {
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(vulture));
+		if (ServerPlayNetworking.canSend(target, VultureStatePayload.ID)) {
+			ServerPlayNetworking.send(target, new VultureStatePayload(true, vulture.getUuid(), vulture.getId()));
+		}
 	}
 
 	private static void onDisconnect(ServerPlayerEntity player, MinecraftServer server) {
@@ -549,9 +552,6 @@ public final class VultureManager {
 		UUID receiverVulture = vultureByStashed.get(receiverId);
 		if (senderVulture != null) {
 			return !receiverId.equals(senderVulture) && !senderVulture.equals(receiverVulture);
-		}
-		if (receiverVulture != null) {
-			return !senderId.equals(receiverVulture);
 		}
 		return false;
 	}

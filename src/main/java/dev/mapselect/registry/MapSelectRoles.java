@@ -14,6 +14,7 @@ public final class MapSelectRoles {
 	public static final Identifier MEDIC_ID = Identifier.of(MapSelect.MOD_ID, "medic");
 	public static final Identifier SNITCH_ID = Identifier.of(MapSelect.MOD_ID, "snitch");
 	public static final Identifier SEER_ID = Identifier.of(MapSelect.MOD_ID, "seer");
+	public static final Identifier SNIFFER_ID = Identifier.of(MapSelect.MOD_ID, "sniffer");
 	public static final Identifier TIME_MASTER_ID = Identifier.of(MapSelect.MOD_ID, "time_master");
 	public static final Identifier THE_SILENT_ID = Identifier.of(MapSelect.MOD_ID, "the_silent");
 	public static final Identifier WARLOCK_ID = Identifier.of(MapSelect.MOD_ID, "warlock");
@@ -38,6 +39,7 @@ public final class MapSelectRoles {
 	public static Role MEDIC;
 	public static Role SNITCH;
 	public static Role SEER;
+	public static Role SNIFFER;
 	public static Role TIME_MASTER;
 	public static Role THE_SILENT;
 	public static Role WARLOCK;
@@ -95,6 +97,16 @@ public final class MapSelectRoles {
 		SEER = WatheRoles.registerRole(new Role(
 			SEER_ID,
 			0xD94B66, // red flash warning role
+			true,
+			false,
+			Role.MoodType.REAL,
+			CIVILIAN_STAMINA,
+			false
+		));
+
+		SNIFFER = WatheRoles.registerRole(new Role(
+			SNIFFER_ID,
+			0x9AC86B, // food-safety green, distinct from Medic support green
 			true,
 			false,
 			Role.MoodType.REAL,

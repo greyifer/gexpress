@@ -8,6 +8,7 @@ import dev.isxander.yacl3.gui.YACLScreen;
 import dev.isxander.yacl3.gui.tab.TabExt;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.level.LevelComponent;
+import dev.mapselect.network.ClaimLevelRewardPayload;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -18,6 +19,7 @@ import net.minecraft.client.gui.tab.Tab;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
@@ -27,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -112,6 +115,11 @@ public final class GexpressXpRoadmapCategory {
 		private int gridY;
 		private int gridW;
 		private int gridH;
+		private int claimX;
+		private int claimY;
+		private int claimW;
+		private int claimH;
+		private int claimLevel;
 
 		private XpRoadmapWidget(int x, int y, int width, int height) {
 			super(x, y, width, height, Text.translatable("gui.gexpress.config.category.xp_roadmap"));
@@ -144,7 +152,7 @@ public final class GexpressXpRoadmapCategory {
 			int listH = Math.max(0, contentBottom - listY);
 
 			drawDetail(context, client.textRenderer, snapshot, selectedLevel, detailX, detailY,
-				split ? detailW : headerW, detailH);
+				split ? detailW : headerW, detailH, mouseX, mouseY);
 			drawCards(context, client.textRenderer, snapshot, maxLevel, listX, listY, listW, listH, mouseX, mouseY);
 		}
 
@@ -175,11 +183,12 @@ public final class GexpressXpRoadmapCategory {
 		}
 
 		private void drawDetail(DrawContext context, TextRenderer textRenderer, PlayerXp snapshot, int level,
-				int x, int y, int w, int h) {
+				int x, int y, int w, int h, int mouseX, int mouseY) {
 			GexpressConfig.LevelRoadmapEntry reward = GexpressConfig.getLevelRoadmapEntry(level);
 			int totalXp = LevelComponent.totalXpForLevel(level);
 			int nextXp = LevelComponent.xpNeededForLevel(level);
 			Status status = status(level, snapshot.level());
+			claimLevel = 0;
 			context.fill(x, y, x + w, y + h, 0x44202630);
 			context.drawBorder(x, y, w, h, status.borderColor());
 			context.fill(x, y, x + 4, y + h, status.accentColor());
@@ -204,7 +213,10 @@ public final class GexpressXpRoadmapCategory {
 					x + 14, lineY, 0xFF8FA1B2);
 			}
 
-			if (h < 128) return;
+			if (h < 128) {
+				drawClaimButton(context, textRenderer, snapshot, reward, level, x + 14, y + h - 26, w - 28, mouseX, mouseY);
+				return;
+			}
 			lineY += 24;
 			context.drawTextWithShadow(textRenderer,
 				Text.translatable("gui.gexpress.config.xp_roadmap.reward").formatted(Formatting.GRAY),
@@ -220,10 +232,33 @@ public final class GexpressXpRoadmapCategory {
 				? reward.description()
 				: Text.translatable("gui.gexpress.config.xp_roadmap.no_reward_description").getString();
 			List<OrderedText> lines = textRenderer.wrapLines(Text.literal(description), w - 28);
-			int maxLines = Math.max(1, (y + h - lineY - 8) / 10);
+			int maxLines = Math.max(1, (y + h - lineY - 34) / 10);
 			for (int i = 0; i < Math.min(maxLines, lines.size()); i++) {
 				context.drawTextWithShadow(textRenderer, lines.get(i), x + 14, lineY + i * 10, 0xFFD7DEE6);
 			}
+			drawClaimButton(context, textRenderer, snapshot, reward, level, x + 14, y + h - 26, w - 28, mouseX, mouseY);
+		}
+
+		private void drawClaimButton(DrawContext context, TextRenderer textRenderer, PlayerXp snapshot,
+				GexpressConfig.LevelRoadmapEntry reward, int level, int x, int y, int w, int mouseX, int mouseY) {
+			if (!reward.configured() || level > snapshot.level()) return;
+			boolean claimed = snapshot.claimedRewards().contains(level);
+			claimX = x;
+			claimY = y;
+			claimW = w;
+			claimH = 18;
+			claimLevel = claimed ? 0 : level;
+			boolean hovered = !claimed && contains(mouseX, mouseY, claimX, claimY, claimW, claimH);
+			int fill = claimed ? 0x66343A42 : hovered ? 0xCC456D59 : 0xAA2F5D49;
+			int border = claimed ? 0x88727C86 : hovered ? 0xFFE1FFF0 : 0xCC8ADDB8;
+			Text label = claimed
+				? Text.translatable("gui.gexpress.config.xp_roadmap.claimed")
+				: Text.translatable("gui.gexpress.config.xp_roadmap.claim");
+			context.fill(claimX, claimY, claimX + claimW, claimY + claimH, fill);
+			context.drawBorder(claimX, claimY, claimW, claimH, border);
+			context.drawTextWithShadow(textRenderer, label,
+				claimX + claimW / 2 - textRenderer.getWidth(label) / 2, claimY + 5,
+				claimed ? 0xFF9CA7B2 : 0xFFFFFFFF);
 		}
 
 		private void drawCards(DrawContext context, TextRenderer textRenderer, PlayerXp snapshot, int maxLevel,
@@ -295,6 +330,11 @@ public final class GexpressXpRoadmapCategory {
 				selectedLevel = card.level();
 				return true;
 			}
+			if (button == 0 && claimLevel > 0 && contains(mouseX, mouseY, claimX, claimY, claimW, claimH)
+					&& ClientPlayNetworking.canSend(ClaimLevelRewardPayload.ID)) {
+				ClientPlayNetworking.send(new ClaimLevelRewardPayload(claimLevel));
+				return true;
+			}
 			return super.mouseClicked(mouseX, mouseY, button);
 		}
 
@@ -309,13 +349,13 @@ public final class GexpressXpRoadmapCategory {
 
 		private PlayerXp playerXp(MinecraftClient client) {
 			if (client.player == null || client.world == null) {
-				return new PlayerXp(1, 0, 0, LevelComponent.xpNeededForLevel(1));
+				return new PlayerXp(1, 0, 0, LevelComponent.xpNeededForLevel(1), Set.of());
 			}
 			UUID playerId = client.player.getUuid();
 			LevelComponent levels = LevelComponent.KEY.getNullable(client.world);
-			if (levels == null) return new PlayerXp(1, 0, 0, LevelComponent.xpNeededForLevel(1));
+			if (levels == null) return new PlayerXp(1, 0, 0, LevelComponent.xpNeededForLevel(1), Set.of());
 			return new PlayerXp(levels.level(playerId), levels.xp(playerId), levels.xpIntoLevel(playerId),
-				levels.xpNeededForNextLevel(playerId));
+				levels.xpNeededForNextLevel(playerId), levels.claimedRewards(playerId));
 		}
 
 		private Status status(int level, int currentLevel) {
@@ -341,7 +381,7 @@ public final class GexpressXpRoadmapCategory {
 		}
 	}
 
-	private record PlayerXp(int level, int totalXp, int levelXp, int neededXp) {}
+	private record PlayerXp(int level, int totalXp, int levelXp, int neededXp, Set<Integer> claimedRewards) {}
 
 	private record Status(Text text, int accentColor, int borderColor, int textColor) {}
 

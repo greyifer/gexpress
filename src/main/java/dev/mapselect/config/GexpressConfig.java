@@ -80,7 +80,7 @@ public final class GexpressConfig {
 
 	private GexpressConfig() {}
 
-	public record LevelRoadmapEntry(int level, String title, String description) {
+	public record LevelRoadmapEntry(int level, String title, String description, String command) {
 		public boolean configured() {
 			return title != null && !title.isBlank();
 		}
@@ -635,7 +635,7 @@ public final class GexpressConfig {
 		for (LevelRoadmapEntry entry : getLevelRoadmapEntries()) {
 			if (entry.level() == safeLevel) return entry;
 		}
-		return new LevelRoadmapEntry(safeLevel, "", "");
+		return new LevelRoadmapEntry(safeLevel, "", "", "");
 	}
 
 	public static int getPassiveIncomeKiller() {
@@ -2008,14 +2008,15 @@ public final class GexpressConfig {
 
 	private static LevelRoadmapEntry parseLevelRoadmapEntry(String raw) {
 		if (raw == null || raw.isBlank()) return null;
-		String[] parts = raw.split("\\|", 3);
+		String[] parts = raw.split("\\|", 4);
 		if (parts.length < 2) return null;
 		Integer level = parsePositiveInt(parts[0]);
 		if (level == null) return null;
 		String title = parts[1].strip();
 		String description = parts.length >= 3 ? parts[2].strip() : "";
+		String command = parts.length >= 4 ? parts[3].strip() : "";
 		if (title.isEmpty() && description.isEmpty()) return null;
-		return new LevelRoadmapEntry(level, title, description);
+		return new LevelRoadmapEntry(level, title, description, command);
 	}
 
 	private static Integer parsePositiveInt(String raw) {
