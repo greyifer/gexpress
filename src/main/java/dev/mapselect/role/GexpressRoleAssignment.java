@@ -149,13 +149,13 @@ public final class GexpressRoleAssignment {
 	private static void assignConfiguredRoles(GameWorldComponent game, List<ServerPlayerEntity> available,
 			Map<Role, Integer> assignedCounts) {
 		int killerSlots = remainingNormalRoleSlots(RolePool.KILLER, available, assignedCounts);
-		int assignedKillers = assignRoleRequests(game, available, assignedCounts,
-			rolePool(RolePool.KILLER), killerSlots);
-		if (countAssignedKillers(assignedCounts) == 0 && totalPlayerCount(available, assignedCounts) > 1) {
-			assignFallbackKillers(game, available, assignedCounts, Math.max(0, 1 - assignedKillers));
-		}
+		assignRoleRequests(game, available, assignedCounts, rolePool(RolePool.KILLER), killerSlots);
+		assignFallbackRole(game, available, assignedCounts, WatheRoles.KILLER,
+			remainingNormalRoleSlots(RolePool.KILLER, available, assignedCounts));
 
 		assignRoleRequests(game, available, assignedCounts, vigilantePool(),
+			remainingNormalRoleSlots(RolePool.VIGILANTE, available, assignedCounts));
+		assignFallbackRole(game, available, assignedCounts, WatheRoles.VIGILANTE,
 			remainingNormalRoleSlots(RolePool.VIGILANTE, available, assignedCounts));
 		assignRoleRequests(game, available, assignedCounts, rolePool(RolePool.NEUTRAL),
 			remainingNormalRoleSlots(RolePool.NEUTRAL, available, assignedCounts));
@@ -185,7 +185,7 @@ public final class GexpressRoleAssignment {
 
 	private static int sideRoleBudget(int configuredMax, int unlimitedSentinel, int scaledTarget) {
 		if (!GexpressConfig.useCustomRoleCounts()) {
-			return Math.min(configuredMax, scaledTarget);
+			return scaledTarget;
 		}
 		return configuredMax >= unlimitedSentinel ? scaledTarget : configuredMax;
 	}
@@ -224,25 +224,24 @@ public final class GexpressRoleAssignment {
 		return assignments;
 	}
 
-	private static void assignFallbackKillers(GameWorldComponent game, List<ServerPlayerEntity> available,
-			Map<Role, Integer> assignedCounts, int count) {
+	private static void assignFallbackRole(GameWorldComponent game, List<ServerPlayerEntity> available,
+			Map<Role, Integer> assignedCounts, Role role, int count) {
 		if (available.isEmpty() || count <= 0) return;
-		Role fallback = fallbackKillerRole();
-		if (fallback == null) return;
+		if (!canFillWithVanillaRole(role)) return;
 		for (int i = 0; i < count && !available.isEmpty(); i++) {
 			ServerPlayerEntity player = available.remove(RANDOM.nextInt(available.size()));
-			assignRole(game, player, fallback);
-			assignedCounts.merge(fallback, 1, Integer::sum);
+			assignRole(game, player, role);
+			assignedCounts.merge(role, 1, Integer::sum);
 		}
 	}
 
-	private static Role fallbackKillerRole() {
-		if (WatheRoles.KILLER != null && isAssignableRole(WatheRoles.KILLER) && !isRoleDisabled(WatheRoles.KILLER)) {
-			return WatheRoles.KILLER;
+	private static boolean canFillWithVanillaRole(Role role) {
+		if (role == null || !isAssignableRole(role) || isRoleDisabled(role) || role.identifier() == null) return false;
+		String id = role.identifier().toString();
+		if (RoleModifierTuningConfig.getRoleMax(id) <= 0 || !passes(RoleModifierTuningConfig.getRoleChance(id))) {
+			return false;
 		}
-		List<Role> pool = rolePool(RolePool.KILLER);
-		if (pool.isEmpty()) return null;
-		return pool.get(RANDOM.nextInt(pool.size()));
+		return true;
 	}
 
 	private static List<Role> requestedRoleTickets(List<Role> pool, Map<Role, Integer> assignedCounts) {
