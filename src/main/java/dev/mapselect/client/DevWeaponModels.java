@@ -40,6 +40,8 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	public static final Identifier BLUE_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_blue");
 	public static final Identifier PINK_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_pink");
 	public static final Identifier PLAID_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_plaid");
+	public static final Identifier BAMBOO_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_bamboo");
+	public static final Identifier ATOMIZER_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_atomizer");
 	public static final Identifier SHADOW_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_shadow");
 	public static final Identifier SHADOW_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shadow");
 	private static final Identifier NOELLES_FAKE_KNIFE = Identifier.of("noellesroles", "fake_knife");
@@ -50,7 +52,8 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 		pluginContext.addModels(DEV_KNIFE_MODEL, DEV_REVOLVER_MODEL, HOST_KNIFE_MODEL, HOST_REVOLVER_MODEL,
 			TRUSTED_KNIFE_MODEL, TRUSTED_REVOLVER_MODEL, PASSENGER_REVOLVER_MODEL, COLA_REVOLVER_MODEL,
 			GOLD_REVOLVER_MODEL, JEM_REVOLVER_MODEL, BLUE_REVOLVER_MODEL, PINK_REVOLVER_MODEL,
-			PLAID_REVOLVER_MODEL, SHADOW_KNIFE_MODEL, SHADOW_REVOLVER_MODEL);
+			PLAID_REVOLVER_MODEL, BAMBOO_REVOLVER_MODEL, ATOMIZER_REVOLVER_MODEL,
+			SHADOW_KNIFE_MODEL, SHADOW_REVOLVER_MODEL);
 	}
 
 	public static BakedModel resolve(BakedModelManager manager, ItemStack stack, LivingEntity entity) {
@@ -96,6 +99,8 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 				case BLUE -> BLUE_REVOLVER_MODEL;
 				case PINK -> PINK_REVOLVER_MODEL;
 				case PLAID -> PLAID_REVOLVER_MODEL;
+				case BAMBOO -> BAMBOO_REVOLVER_MODEL;
+				case ATOMIZER -> ATOMIZER_REVOLVER_MODEL;
 			};
 		}
 		return null;

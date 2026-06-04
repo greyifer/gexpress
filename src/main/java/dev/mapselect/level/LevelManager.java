@@ -9,7 +9,9 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.command.admin.TagCommand;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.currency.GcoinComponent;
+import dev.mapselect.game.RoundParticipantTracker;
 import dev.mapselect.network.ClaimLevelRewardPayload;
+import dev.mapselect.role.RoleTeams;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -33,7 +35,9 @@ import java.util.UUID;
 
 public final class LevelManager {
 	private static final int KILL_XP_DEDUP_TICKS = 20;
-	private static final int WIN_GCOIN_REWARD = 10;
+	private static final int CIVILIAN_WIN_GCOINS = 5;
+	private static final int KILLER_WIN_GCOINS = 10;
+	private static final int NEUTRAL_WIN_GCOINS = 15;
 	private static final Map<UUID, RecentKillAward> recentKillXpAwards = new HashMap<>();
 
 	private LevelManager() {}
@@ -117,6 +121,7 @@ public final class LevelManager {
 		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		if (game == null || !game.isRunning() || !isCivilianSide(game, player)) return;
+		if (!RoundParticipantTracker.isRoundParticipant(world, game, player.getUuid())) return;
 		LevelComponent levels = LevelComponent.KEY.get(world);
 		if (levels.addXp(player.getUuid(), GexpressConfig.getLevelCivilianTaskXp())) {
 			TagCommand.refreshPlayerListName(player);
@@ -132,16 +137,22 @@ public final class LevelManager {
 		Set<UUID> awarded = new LinkedHashSet<>();
 		for (GameRoundEndComponent.RoundEndData entry : roundEnd.getPlayers()) {
 			if (entry == null || entry.player() == null || !awarded.add(entry.player().getId())) continue;
+			UUID playerId = entry.player().getId();
+			if (!RoundParticipantTracker.isRoundParticipant(world, game, playerId)
+					|| RoundParticipantTracker.isRoundSpectator(world, game, playerId)) {
+				continue;
+			}
 			boolean won = roundEnd.didWin(entry.player().getId());
 			int amount = GexpressConfig.getLevelRoundXp() + (won ? GexpressConfig.getLevelWinXp() : 0);
-			ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(entry.player().getId());
-			if (won && player != null && isNeutralSide(game, player)) {
+			ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(playerId);
+			if (won && isNeutralSide(game, playerId)) {
 				amount += GexpressConfig.getLevelNeutralWinBonusXp();
 			}
-			levels.addXp(entry.player().getId(), amount);
+			levels.addXp(playerId, amount);
 			if (won) {
-				gcoins.add(entry.player().getId(), WIN_GCOIN_REWARD);
+				gcoins.add(playerId, winGcoinReward(game, playerId));
 			}
+			if (player != null) RoundParticipantTracker.captureSnapshot(player);
 		}
 		if (!awarded.isEmpty()) {
 			LevelComponent.KEY.sync(world);
@@ -175,6 +186,8 @@ public final class LevelManager {
 		if (game == null || !game.isRunning()) return;
 		if (!game.getRoles().containsKey(serverVictim.getUuid())
 				|| !game.getRoles().containsKey(serverKiller.getUuid())) return;
+		if (!RoundParticipantTracker.isRoundParticipant(world, game, serverVictim.getUuid())
+				|| !RoundParticipantTracker.isRoundParticipant(world, game, serverKiller.getUuid())) return;
 		if (wasRecentlyAwarded(serverVictim.getUuid(), serverKiller.getUuid(), world.getTime())) return;
 		LevelComponent levels = LevelComponent.KEY.get(world);
 		if (levels.addXp(serverKiller.getUuid(), GexpressConfig.getLevelKillXp())) {
@@ -201,6 +214,18 @@ public final class LevelManager {
 	private static boolean isNeutralSide(GameWorldComponent game, PlayerEntity player) {
 		Role role = game == null || player == null ? null : game.getRole(player);
 		return role != null && !role.canUseKiller() && !role.isInnocent();
+	}
+
+	private static boolean isNeutralSide(GameWorldComponent game, UUID playerId) {
+		String side = RoleTeams.sideKey(game, playerId);
+		return "neutral".equals(side);
+	}
+
+	private static int winGcoinReward(GameWorldComponent game, UUID playerId) {
+		String side = RoleTeams.sideKey(game, playerId);
+		if ("civilian".equals(side)) return CIVILIAN_WIN_GCOINS;
+		if ("neutral".equals(side)) return NEUTRAL_WIN_GCOINS;
+		return KILLER_WIN_GCOINS;
 	}
 
 	private record RecentKillAward(UUID killerId, long tick) {}

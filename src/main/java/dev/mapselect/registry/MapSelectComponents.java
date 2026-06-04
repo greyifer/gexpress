@@ -5,6 +5,7 @@ import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.host.TrustedComponent;
 import dev.mapselect.currency.GcoinComponent;
 import dev.mapselect.level.LevelComponent;
+import dev.mapselect.game.RoundParticipantComponent;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.medic.MedicShieldComponent;
 import dev.mapselect.role.silent.SilentShadowComponent;
@@ -27,6 +28,7 @@ public class MapSelectComponents implements WorldComponentInitializer {
 		registry.register(PlayerSkinComponent.KEY, PlayerSkinComponent::new);
 		registry.register(LevelComponent.KEY, LevelComponent::new);
 		registry.register(GcoinComponent.KEY, GcoinComponent::new);
+		registry.register(RoundParticipantComponent.KEY, RoundParticipantComponent::new);
 		registry.register(C4BackComponent.KEY, C4BackComponent::new);
 		registry.register(SpyBugComponent.KEY, SpyBugComponent::new);
 		registry.register(MedicShieldComponent.KEY, MedicShieldComponent::new);

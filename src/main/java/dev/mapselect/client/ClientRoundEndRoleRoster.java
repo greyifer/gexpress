@@ -8,12 +8,15 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ClientRoundEndRoleRoster {
 	private static final Map<UUID, String> ROLE_IDS = new ConcurrentHashMap<>();
 	private static final Map<UUID, Integer> LEVELS = new ConcurrentHashMap<>();
+	private static final Map<UUID, String> NAMES = new ConcurrentHashMap<>();
+	private static final Set<UUID> SPECTATORS = ConcurrentHashMap.newKeySet();
 
 	private ClientRoundEndRoleRoster() {}
 
@@ -24,6 +27,10 @@ public final class ClientRoundEndRoleRoster {
 				ROLE_IDS.putAll(payload.roleIds());
 				LEVELS.clear();
 				LEVELS.putAll(payload.levels());
+				NAMES.clear();
+				NAMES.putAll(payload.names());
+				SPECTATORS.clear();
+				SPECTATORS.addAll(payload.spectators());
 			}));
 	}
 
@@ -50,6 +57,15 @@ public final class ClientRoundEndRoleRoster {
 
 	public static int level(UUID playerId) {
 		return Math.max(1, playerId == null ? 1 : LEVELS.getOrDefault(playerId, 1));
+	}
+
+	public static String name(UUID playerId, String fallback) {
+		String name = playerId == null ? null : NAMES.get(playerId);
+		return name == null || name.isBlank() ? (fallback == null ? "" : fallback) : name;
+	}
+
+	public static boolean isSpectator(UUID playerId) {
+		return playerId != null && SPECTATORS.contains(playerId);
 	}
 
 	public static Map<UUID, String> roleIds() {

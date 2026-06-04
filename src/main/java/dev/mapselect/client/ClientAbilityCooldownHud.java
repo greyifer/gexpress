@@ -66,6 +66,7 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_SEER = ICON_TRACKER;
 	private static final Identifier ICON_CUPID = ICON_MASQUERADE;
 	private static final Identifier ICON_COVENANT_BITE = ICON_HEX_KILL;
+	private static final Identifier ICON_COVENANT_BAT = ICON_MASQUERADE;
 	private static final Identifier ICON_INSTINCT = ICON_TRACKER;
 	private static final Identifier ICON_ALTRUIST = hudIcon("ability_revive");
 	private static final Identifier ICON_BORROWED_SKIN = hudIcon("ability_borrowed_skin");
@@ -180,7 +181,7 @@ public final class ClientAbilityCooldownHud {
 			bars.add(cooldown(ICON_WARLOCK_MARK, mark, GexpressConfig.getWarlockMarkCooldownSeconds() * 20L,
 				0xFFD276FF, 0xFF602375));
 			bars.add(cooldown(ICON_HEX_KILL, kill, GexpressConfig.getWarlockKillCooldownSeconds() * 20L,
-				0xFFFF4A55, 0xFF7C151F));
+				0xFFFF4A55, 0xFF7C151F, "", true));
 		} else if (MapSelectRoles.JUGGERNAUT_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.JUGGERNAUT_WEAPONS, ICON_JUGGERNAUT_WEAPONS,
 				GexpressConfig.getJuggernautInitialCooldownSeconds() * 20L, 0xFFFF7A42, 0xFF7A2418));
@@ -249,6 +250,16 @@ public final class ClientAbilityCooldownHud {
 		} else if (MapSelectRoles.DRACULA_ID.equals(roleId) || MapSelectRoles.VAMPIRE_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.COVENANT_BITE, ICON_COVENANT_BITE,
 				GexpressConfig.getCovenantBiteCooldownSeconds() * 20L, 0xFFFF5B6F, 0xFF5F0814));
+			if (MapSelectRoles.DRACULA_ID.equals(roleId) && ClientCovenantState.hasActiveState()) {
+				long batTicks = Math.max(0L, ClientCovenantState.batRemainingTicks());
+				long batMax = Math.max(1L, ClientCovenantState.batMaxTicks());
+				if (ClientCovenantState.batForm()) {
+					bars.add(draining(ICON_COVENANT_BAT, batTicks, batMax, 0xFFB88BFF, 0xFF4A2868, true));
+				} else {
+					bars.add(cooldown(ICON_COVENANT_BAT, Math.max(0L, batMax - batTicks), batMax,
+						0xFFB88BFF, 0xFF4A2868, "", true));
+				}
+			}
 		} else if (MapSelectRoles.GODFATHER_ID.equals(roleId)) {
 			if (SYNCED.containsKey(AbilityCooldownPayload.GODFATHER_RECRUIT_MAFIOSO)) {
 				bars.add(syncedOrReady(AbilityCooldownPayload.GODFATHER_RECRUIT_MAFIOSO, ICON_MAFIA,
@@ -619,9 +630,14 @@ public final class ClientAbilityCooldownHud {
 	}
 
 	private static AbilityBar draining(Identifier icon, long remainingTicks, long totalTicks, int color, int darkColor) {
+		return draining(icon, remainingTicks, totalTicks, color, darkColor, false);
+	}
+
+	private static AbilityBar draining(Identifier icon, long remainingTicks, long totalTicks, int color, int darkColor,
+			boolean secondaryKey) {
 		long total = Math.max(1L, totalTicks);
 		float progress = Math.min(1.0F, remainingTicks / (float) total);
-		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, "", false, 0, 0, 0, 0);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, "", secondaryKey, 0, 0, 0, 0);
 	}
 
 	private static AbilityBar usesCooldown(Identifier icon, long remainingTicks, long totalTicks, int color,
@@ -721,11 +737,7 @@ public final class ClientAbilityCooldownHud {
 
 	private static String keyTextFor(AbilityBar bar) {
 		if (bar == null || bar.icon() == null) return "";
-		String path = bar.icon().getPath();
-		boolean secondary = bar.secondaryKey() || path.contains("hex_kill")
-			|| path.contains("time_freeze")
-			|| path.contains("dancing_carts");
-		return ClientAbilityKeys.displayName(secondary
+		return ClientAbilityKeys.displayName(bar.secondaryKey()
 			? ClientAbilityKeys.secondaryBinding()
 			: ClientAbilityKeys.primaryBinding());
 	}

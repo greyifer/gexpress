@@ -11,6 +11,7 @@ import dev.mapselect.game.CouchSleepHandler;
 import dev.mapselect.game.FriendlyFireGuard;
 import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.game.LastDeathShieldManager;
+import dev.mapselect.game.RoundParticipantTracker;
 import dev.mapselect.game.SpectatorMovementGuard;
 import dev.mapselect.game.StaticMapResetManager;
 import dev.mapselect.item.DevWeaponSkinStamper;
@@ -129,6 +130,7 @@ public class MapSelect implements ModInitializer {
 		MafiaManager.register();
 		KillerRoleInfoManager.register();
 		SpecialPairDistributionManager.register();
+		RoundParticipantTracker.register();
 		RoundEndRoleRosterSync.register();
 		FurnaceDupeGuard.register();
 		DevWeaponSkinStamper.register();

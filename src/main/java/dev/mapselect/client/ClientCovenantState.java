@@ -40,8 +40,16 @@ public final class ClientCovenantState {
 		return batTicks;
 	}
 
+	public static boolean hasActiveState() {
+		return active;
+	}
+
 	public static int batMaxTicks() {
 		return maxBatTicks;
+	}
+
+	public static boolean batForm() {
+		return batForm;
 	}
 
 	private static void apply(CovenantStatePayload payload) {
@@ -93,14 +101,6 @@ public final class ClientCovenantState {
 		drawVerticalBar(context, x, y, width, height, bloodTicks / (float) Math.max(1, maxBloodTicks),
 			0xFF2C060D, 0xFFB81832, 0xFFFF5B6F);
 		context.drawTextWithShadow(client.textRenderer, Text.literal("Blood"), x - 22, y - 12, 0xFFFFE7EA);
-
-		if (dracula) {
-			int batY = y + height + 16;
-			drawHorizontalBar(context, x - 46, batY, 54, 5, batTicks / (float) Math.max(1, maxBatTicks),
-				batForm ? 0xFF6E1230 : 0xFF332134, 0xFF895CC7, 0xFFD6B8FF);
-			String text = Math.max(0, (batTicks + 19) / 20) + "s";
-			context.drawTextWithShadow(client.textRenderer, text, x - 22, batY + 8, 0xFFD6B8FF);
-		}
 	}
 
 	private static void drawVerticalBar(DrawContext context, int x, int y, int width, int height,
@@ -113,18 +113,6 @@ public final class ClientCovenantState {
 		if (filled > 0) {
 			context.fill(x + 1, top, x + width - 1, y + height - 1, fill);
 			context.fill(x + 1, top, x + 2, y + height - 1, shine);
-		}
-	}
-
-	private static void drawHorizontalBar(DrawContext context, int x, int y, int width, int height,
-			float progress, int frame, int fill, int shine) {
-		float clamped = Math.max(0.0F, Math.min(1.0F, progress));
-		context.fill(x - 1, y - 1, x + width + 1, y + height + 1, 0xFF100306);
-		context.fill(x, y, x + width, y + height, frame);
-		int filled = Math.round((width - 2) * clamped);
-		if (filled > 0) {
-			context.fill(x + 1, y + 1, x + 1 + filled, y + height - 1, fill);
-			context.fill(x + 1, y + 1, x + 1 + filled, y + 2, shine);
 		}
 	}
 

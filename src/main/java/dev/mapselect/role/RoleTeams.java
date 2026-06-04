@@ -6,6 +6,8 @@ import dev.mapselect.registry.MapSelectRoles;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
 
+import java.util.UUID;
+
 public final class RoleTeams {
 	private RoleTeams() {}
 
@@ -25,12 +27,22 @@ public final class RoleTeams {
 
 	public static String sideKey(GameWorldComponent game, PlayerEntity player) {
 		Role role = role(game, player);
+		return sideKey(game, player, role);
+	}
+
+	public static String sideKey(GameWorldComponent game, UUID playerId) {
+		Role role = role(game, playerId);
+		return sideKey(game, null, role);
+	}
+
+	private static String sideKey(GameWorldComponent game, PlayerEntity player, Role role) {
 		if (role == null) return null;
 		Identifier id = role.identifier();
+		boolean killerFeatures = player != null && game != null && game.canUseKillerFeatures(player);
 		if (isMafia(id)) return "mafia";
 		if (isCovenant(id)) return "covenant";
-		if (role.isInnocent() && (game == null || !game.canUseKillerFeatures(player))) return "civilian";
-		if (role.canUseKiller() || (game != null && game.canUseKillerFeatures(player))) return "killer";
+		if (role.isInnocent() && !killerFeatures) return "civilian";
+		if (role.canUseKiller() || killerFeatures) return "killer";
 		return "neutral";
 	}
 
@@ -48,6 +60,11 @@ public final class RoleTeams {
 	private static Role role(GameWorldComponent game, PlayerEntity player) {
 		if (game == null || player == null) return null;
 		return game.getRole(player);
+	}
+
+	private static Role role(GameWorldComponent game, UUID playerId) {
+		if (game == null || playerId == null) return null;
+		return game.getRole(playerId);
 	}
 
 	private static boolean isMafia(Identifier id) {

@@ -7,6 +7,7 @@ import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.client.gui.RoleAnnouncementTexts;
 import dev.doctor4t.wathe.client.gui.RoundTextRenderer;
+import dev.doctor4t.wathe.client.WatheClient;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.client.ClientNeutralWinState;
@@ -14,9 +15,7 @@ import dev.mapselect.client.ClientRoundEndRoleRoster;
 import dev.mapselect.registry.MapSelectRoles;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.client.util.DefaultSkinHelper;
 import net.minecraft.entity.player.PlayerEntity;
@@ -83,6 +82,7 @@ public abstract class MafiaRoundEndRendererMixin {
 		int index = 0;
 		for (GameRoundEndComponent.RoundEndData entry : roundEnd.getPlayers()) {
 			if (entry == null || entry.player() == null || entry.role() == null) continue;
+			if (ClientRoundEndRoleRoster.isSpectator(entry.player().getId())) continue;
 			int columnX = index < maxRows ? leftX : rightX;
 			int rowY = y + (index % maxRows) * rowHeight;
 			Role actualRole = game.getRole(entry.player().getId());
@@ -149,6 +149,7 @@ public abstract class MafiaRoundEndRendererMixin {
 		Map<UUID, String> roleIds = ClientRoundEndRoleRoster.roleIds();
 		for (GameRoundEndComponent.RoundEndData entry : roundEnd.getPlayers()) {
 			if (entry == null || entry.player() == null) continue;
+			if (ClientRoundEndRoleRoster.isSpectator(entry.player().getId())) continue;
 			switch (gexpress$sectionFor(player, game, entry, roleIds)) {
 				case SECTION_CIVILIAN -> civilians.add(entry);
 				case SECTION_VIGILANTE -> vigilantes.add(entry);
@@ -234,7 +235,7 @@ public abstract class MafiaRoundEndRendererMixin {
 			int roleColor, int level, int x, int y) {
 		context.fill(x - 2, y - 1, x + 164, y + 17, 0x66000000);
 		drawHead(context, profile, x, y + 1);
-		String name = trim(renderer, profile.getName(), 80);
+		String name = trim(renderer, ClientRoundEndRoleRoster.name(profile.getId(), profile.getName()), 80);
 		String levelText = "LvL " + Math.max(1, level);
 		String roleName = trim(renderer, role == null ? "" : role.getString(), 72);
 		context.drawTextWithShadow(renderer, Text.literal(name), x + 18, y, 0xFFFFFFFF);
@@ -244,11 +245,9 @@ public abstract class MafiaRoundEndRendererMixin {
 
 	private static void drawHead(DrawContext context, GameProfile profile, int x, int y) {
 		Identifier texture = DefaultSkinHelper.getSkinTextures(profile.getId()).texture();
-		MinecraftClient client = MinecraftClient.getInstance();
-		ClientPlayNetworkHandler network = client == null ? null : client.getNetworkHandler();
-		if (network != null) {
-			PlayerListEntry entry = network.getPlayerListEntry(profile.getId());
-			if (entry != null) texture = entry.getSkinTextures().texture();
+		Object cached = WatheClient.PLAYER_ENTRIES_CACHE.get(profile.getId());
+		if (cached instanceof PlayerListEntry entry) {
+			texture = entry.getSkinTextures().texture();
 		}
 		context.drawTexture(texture, x, y, SECTION_HEAD_SIZE, SECTION_HEAD_SIZE, 8.0F, 8.0F, 8, 8, 64, 64);
 		context.drawTexture(texture, x, y, SECTION_HEAD_SIZE, SECTION_HEAD_SIZE, 40.0F, 8.0F, 8, 8, 64, 64);

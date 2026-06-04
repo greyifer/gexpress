@@ -263,6 +263,8 @@ public final class CovenantManager {
 		if (bat != null) {
 			bat.refreshPositionAndAngles(player.getX(), player.getY() + 0.4D, player.getZ(),
 				player.getYaw(), player.getPitch());
+			bat.setRoosting(false);
+			bat.setNoGravity(true);
 			bat.setAiDisabled(true);
 			bat.setInvulnerable(true);
 			bat.setSilent(true);
@@ -317,6 +319,8 @@ public final class CovenantManager {
 		entity.refreshPositionAndAngles(player.getX(), player.getY() + 0.4D, player.getZ(),
 			player.getYaw(), player.getPitch());
 		entity.setVelocity(player.getVelocity());
+		entity.setNoGravity(true);
+		if (entity instanceof BatEntity bat) bat.setRoosting(false);
 	}
 
 	private static void discardBatEntity(ServerPlayerEntity player, BatState state) {

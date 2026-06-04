@@ -3,6 +3,7 @@ package dev.mapselect.role;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.mapselect.game.RoundParticipantTracker;
 import dev.mapselect.level.LevelComponent;
 import dev.mapselect.network.RoundEndRoleRosterPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -13,8 +14,10 @@ import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class RoundEndRoleRosterSync {
@@ -32,15 +35,26 @@ public final class RoundEndRoleRosterSync {
 
 		Map<UUID, String> roleIds = new LinkedHashMap<>();
 		Map<UUID, Integer> levels = new LinkedHashMap<>();
+		Map<UUID, String> names = new LinkedHashMap<>();
+		Set<UUID> spectators = new LinkedHashSet<>();
 		LevelComponent levelComponent = LevelComponent.KEY.getNullable(world);
 		for (ServerPlayerEntity player : players) {
 			if (player == null) continue;
-			Role role = game.getRole(player);
+			RoundParticipantTracker.captureSnapshot(player);
+			boolean participant = RoundParticipantTracker.isRoundParticipant(world, game, player.getUuid());
+			if (!participant) {
+				spectators.add(player.getUuid());
+				RoundParticipantTracker.markSpectator(player);
+			}
+			Role role = participant ? game.getRole(player) : null;
 			Identifier id = role == null ? null : role.identifier();
 			roleIds.put(player.getUuid(), id == null ? "" : id.toString());
-			levels.put(player.getUuid(), levelComponent == null ? 1 : levelComponent.level(player.getUuid()));
+			int level = levelComponent == null ? 1 : levelComponent.level(player.getUuid());
+			levels.put(player.getUuid(), RoundParticipantTracker.snapshotLevel(world, player.getUuid(), level));
+			names.put(player.getUuid(), RoundParticipantTracker.snapshotName(world, player.getUuid(),
+				player.getGameProfile().getName()));
 		}
-		send(serverWorld, new RoundEndRoleRosterPayload(roleIds, levels));
+		send(serverWorld, new RoundEndRoleRosterPayload(roleIds, levels, names, spectators));
 	}
 
 	private static void clear(World world) {

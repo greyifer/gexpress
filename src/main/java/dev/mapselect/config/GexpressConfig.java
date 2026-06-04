@@ -2387,7 +2387,7 @@ public final class GexpressConfig {
 
 	private static List<String> defaultSkinCaseRows() {
 		return new ArrayList<>(List.of(
-			"gexpress|G'Express Case|100|gun:gold:60;;gun:jem:25;;knife:trusted:10;;knife:host:5"
+			"gexpress|G'Express Case|100|gun:gold:60;;gun:jem:25;;gun:bamboo:20;;gun:atomizer:20;;knife:trusted:10;;knife:host:5"
 		));
 	}
 
