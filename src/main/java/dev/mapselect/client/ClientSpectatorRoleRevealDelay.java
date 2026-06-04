@@ -26,6 +26,7 @@ public final class ClientSpectatorRoleRevealDelay {
 
 	public static boolean canSeeHoveredRoles(MinecraftClient client) {
 		if (ClientVultureState.isLocalStashed(client)) return false;
+		if (isPreRoleRevealSpectator(client)) return false;
 		if (!isDelayedSpectator(client)) return true;
 		if (client == null || client.world == null || spectatorSinceTick == Long.MIN_VALUE) return false;
 		return client.world.getTime() - spectatorSinceTick >= DELAY_TICKS;
@@ -38,11 +39,16 @@ public final class ClientSpectatorRoleRevealDelay {
 	}
 
 	public static boolean isWaitingForRoleReveal(MinecraftClient client) {
-		return isDelayedSpectator(client) && !canSeeHoveredRoles(client);
+		return isPreRoleRevealSpectator(client)
+			|| (isDelayedSpectator(client) && !canSeeHoveredRoles(client));
+	}
+
+	public static boolean shouldMaskRoleColors(MinecraftClient client) {
+		return isPreRoleRevealSpectator(client) || isWaitingForRoleReveal(client);
 	}
 
 	public static boolean shouldUseInstinctReveal(MinecraftClient client) {
-		return isWaitingForRoleReveal(client)
+		return shouldMaskRoleColors(client)
 			&& WatheClient.isInstinctEnabled();
 	}
 
@@ -103,6 +109,12 @@ public final class ClientSpectatorRoleRevealDelay {
 		} catch (Throwable ignored) {
 			return client.player.isSpectator();
 		}
+	}
+
+	private static boolean isPreRoleRevealSpectator(MinecraftClient client) {
+		return isRoundRunning(client)
+			&& isDelayedSpectator(client)
+			&& !ClientRoleRevealState.isRoleRevealSettled();
 	}
 
 	private static boolean isRoundRunning(MinecraftClient client) {

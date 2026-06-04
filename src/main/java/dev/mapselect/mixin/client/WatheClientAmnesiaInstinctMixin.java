@@ -72,7 +72,7 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 			return;
 		}
 		if (target instanceof PlayerEntity player) {
-			if (ClientSpectatorRoleRevealDelay.isWaitingForRoleReveal(client)) {
+			if (ClientSpectatorRoleRevealDelay.shouldMaskRoleColors(client)) {
 				cir.setReturnValue(ClientSpectatorRoleRevealDelay.shouldUseInstinctReveal(client)
 					? ClientSpectatorRoleRevealDelay.glowColor()
 					: -1);

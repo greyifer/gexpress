@@ -13,11 +13,11 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.client.ClientNeutralWinState;
 import dev.mapselect.client.ClientRoundEndRoleRoster;
 import dev.mapselect.registry.MapSelectRoles;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.client.util.DefaultSkinHelper;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -224,7 +224,7 @@ public abstract class MafiaRoundEndRendererMixin {
 		for (int i = 0; i < profiles.size(); i++) {
 			int headX = startX + (i % columns) * SECTION_HEAD_STEP_X;
 			int headY = y + 12 + (i / columns) * SECTION_HEAD_STEP_Y;
-			drawHead(context, profiles.get(i).player(), headX, headY);
+			drawHead(context, profiles.get(i).player(), headX, headY, profiles.get(i).wasDead());
 			if (profiles.get(i).wasDead()) drawDeathMark(context, renderer, headX, headY);
 		}
 		int rows = Math.max(1, (profiles.size() + columns - 1) / columns);
@@ -244,13 +244,28 @@ public abstract class MafiaRoundEndRendererMixin {
 	}
 
 	private static void drawHead(DrawContext context, GameProfile profile, int x, int y) {
-		Identifier texture = DefaultSkinHelper.getSkinTextures(profile.getId()).texture();
+		drawHead(context, profile, x, y, false);
+	}
+
+	private static void drawHead(DrawContext context, GameProfile profile, int x, int y, boolean dead) {
 		Object cached = WatheClient.PLAYER_ENTRIES_CACHE.get(profile.getId());
-		if (cached instanceof PlayerListEntry entry) {
-			texture = entry.getSkinTextures().texture();
-		}
-		context.drawTexture(texture, x, y, SECTION_HEAD_SIZE, SECTION_HEAD_SIZE, 8.0F, 8.0F, 8, 8, 64, 64);
-		context.drawTexture(texture, x, y, SECTION_HEAD_SIZE, SECTION_HEAD_SIZE, 40.0F, 8.0F, 8, 8, 64, 64);
+		if (!(cached instanceof PlayerListEntry entry)) return;
+		Identifier texture = entry.getSkinTextures().texture();
+		if (texture == null) return;
+		float offColour = dead ? 0.4F : 1.0F;
+		RenderSystem.enableBlend();
+		RenderSystem.setShaderColor(1.0F, offColour, offColour, 1.0F);
+		context.getMatrices().push();
+		context.getMatrices().translate(x, y, 0);
+		context.getMatrices().scale(2.0F, 2.0F, 1.0F);
+		context.drawTexture(texture, 0, 0, 8, 8, 8.0F, 8.0F, 8, 8, 64, 64);
+		context.getMatrices().push();
+		context.getMatrices().translate(-0.5D, -0.5D, 0.0D);
+		context.getMatrices().scale(1.125F, 1.125F, 1.0F);
+		context.drawTexture(texture, 0, 0, 8, 8, 40.0F, 8.0F, 8, 8, 64, 64);
+		context.getMatrices().pop();
+		context.getMatrices().pop();
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 	}
 
 	private static void drawDeathMark(DrawContext context, TextRenderer renderer, int x, int y) {

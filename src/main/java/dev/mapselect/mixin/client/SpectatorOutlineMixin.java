@@ -15,7 +15,7 @@ public abstract class SpectatorOutlineMixin {
 	private void gexpress$onlyUseInstinctForDelayedSpectatorOutlines(Entity entity,
 			CallbackInfoReturnable<Boolean> cir) {
 		MinecraftClient client = (MinecraftClient) (Object) this;
-		if (!(entity instanceof PlayerEntity) || !ClientSpectatorRoleRevealDelay.isWaitingForRoleReveal(client)) return;
+		if (!(entity instanceof PlayerEntity) || !ClientSpectatorRoleRevealDelay.shouldMaskRoleColors(client)) return;
 		if (entity.isGlowing()) return;
 		cir.setReturnValue(false);
 	}

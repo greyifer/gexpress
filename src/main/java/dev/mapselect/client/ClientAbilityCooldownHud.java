@@ -67,7 +67,6 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_CUPID = ICON_MASQUERADE;
 	private static final Identifier ICON_COVENANT_BITE = ICON_HEX_KILL;
 	private static final Identifier ICON_COVENANT_BAT = ICON_MASQUERADE;
-	private static final Identifier ICON_INSTINCT = ICON_TRACKER;
 	private static final Identifier ICON_ALTRUIST = hudIcon("ability_revive");
 	private static final Identifier ICON_BORROWED_SKIN = hudIcon("ability_borrowed_skin");
 	private static final Identifier ICON_SPY_BUG = hudIcon("ability_bug");
@@ -111,13 +110,10 @@ public final class ClientAbilityCooldownHud {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (ClientHudVisibility.shouldHide(client) || client.player == null || client.world == null) return;
 		boolean alive = isLocalPlayerAlive(client);
-		if (!alive && !ClientInstinctEnergy.shouldShow()) return;
+		if (!alive) return;
 		checkSyncedWorld(client);
 
 		List<AbilityBar> bars = alive ? new ArrayList<>(barsFor(client)) : new ArrayList<>();
-		if (ClientInstinctEnergy.shouldShow()) {
-			bars.add(instinctBar());
-		}
 		if (bars.isEmpty()) return;
 
 		float scale = GexpressConfig.getAbilityHudScalePercent() / 100.0F;
@@ -656,12 +652,6 @@ public final class ClientAbilityCooldownHud {
 
 	private static AbilityBar empty(Identifier icon, int color, int darkColor, boolean secondaryKey) {
 		return new AbilityBar(icon, 0L, 0.0F, color, darkColor, "", secondaryKey, 0, 0, 0, 0);
-	}
-
-	private static AbilityBar instinctBar() {
-		return new AbilityBar(ICON_INSTINCT, 0L, ClientInstinctEnergy.progress(),
-			0xFFB8FFC3, 0xFF225A34, ClientInstinctEnergy.isEmpty() ? "recharging" : "",
-			false, 0, 0, 0, 0);
 	}
 
 	private static void drawBar(DrawContext context, TextRenderer text, AbilityBar bar, int x, int y,
