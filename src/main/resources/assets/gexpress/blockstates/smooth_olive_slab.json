@@ -1,0 +1,13 @@
+﻿{
+  "variants": {
+    "type=bottom": {
+      "model": "gexpress:block/smooth_olive_slab"
+    },
+    "type=double": {
+      "model": "gexpress:block/smooth_olive"
+    },
+    "type=top": {
+      "model": "gexpress:block/smooth_olive_slab_top"
+    }
+  }
+}

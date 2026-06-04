@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/outer_stairs",
+  "textures": {
+    "bottom": "wathe:block/brown_moquette",
+    "side": "wathe:block/brown_moquette",
+    "top": "wathe:block/brown_moquette"
+  }
+}

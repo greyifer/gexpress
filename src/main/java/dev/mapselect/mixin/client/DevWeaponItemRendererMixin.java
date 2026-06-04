@@ -1,8 +1,8 @@
 package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.index.WatheItems;
-import dev.mapselect.client.DevWeaponModels;
 import dev.mapselect.client.ClientSilentShadowState;
+import dev.mapselect.client.DevWeaponModels;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.item.ItemModels;
 import net.minecraft.client.render.item.ItemRenderer;
@@ -42,6 +42,20 @@ public abstract class DevWeaponItemRendererMixin {
 	}
 
 	@Inject(method = "renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/render/model/json/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;Lnet/minecraft/world/World;III)V",
+		at = @At("HEAD"), cancellable = true)
+	private void gexpress$renderFakeKnifeWithRealSkin(LivingEntity entity, ItemStack stack,
+			ModelTransformationMode renderMode, boolean leftHanded, MatrixStack matrices,
+			net.minecraft.client.render.VertexConsumerProvider vertexConsumers, World world,
+			int light, int overlay, int seed, CallbackInfo ci) {
+		ItemStack renderStack = DevWeaponModels.fakeKnifeRenderStack(stack, entity);
+		if (renderStack == stack) return;
+		((ItemRenderer) (Object) this).renderItem(entity, renderStack, renderMode, leftHanded, matrices,
+			vertexConsumers, world, light, overlay, seed);
+		GEXPRESS_SHADOW_WEAPON_RENDER.remove();
+		ci.cancel();
+	}
+
+	@Inject(method = "renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/render/model/json/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;Lnet/minecraft/world/World;III)V",
 		at = @At("HEAD"))
 	private void gexpress$beginShadowWeaponRender(LivingEntity entity, ItemStack stack,
 			ModelTransformationMode renderMode, boolean leftHanded, MatrixStack matrices,
@@ -78,6 +92,6 @@ public abstract class DevWeaponItemRendererMixin {
 	private static boolean shouldShadowWeapon(LivingEntity entity, ItemStack stack) {
 		if (entity == null || stack == null || stack.isEmpty()) return false;
 		if (!ClientSilentShadowState.isShadowed(entity)) return false;
-		return stack.isOf(WatheItems.KNIFE) || stack.isOf(WatheItems.REVOLVER);
+		return DevWeaponModels.isKnifeLike(stack) || stack.isOf(WatheItems.REVOLVER);
 	}
 }

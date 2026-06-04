@@ -11,7 +11,10 @@ public enum WeaponSkin {
 	PASSENGER("passenger", "Default", 0x8EA1AD, false, Set.of(WeaponSkinType.GUN)),
 	COLA("cola", "Cola", 0xE63B34, false, Set.of(WeaponSkinType.GUN)),
 	GOLD("gold", "Gold", 0xF2C94C, false, Set.of(WeaponSkinType.GUN)),
-	JEM("jem", "Jem", 0x82D97A, false, Set.of(WeaponSkinType.GUN));
+	JEM("jem", "Jem", 0x82D97A, false, Set.of(WeaponSkinType.GUN)),
+	BLUE("blue", "Blue", 0x4AA8FF, false, Set.of(WeaponSkinType.GUN)),
+	PINK("pink", "Pink", 0xFF70C8, false, Set.of(WeaponSkinType.GUN)),
+	PLAID("plaid", "Plaid", 0xD8C1A2, false, Set.of(WeaponSkinType.GUN));
 
 	private final String id;
 	private final String displayName;

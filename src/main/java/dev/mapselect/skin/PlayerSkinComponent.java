@@ -14,6 +14,7 @@ import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +28,7 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 	private final World world;
 	private final Map<UUID, EnumMap<WeaponSkinType, LinkedHashSet<WeaponSkin>>> unlockedByPlayer = new java.util.LinkedHashMap<>();
 	private final Map<UUID, EnumMap<WeaponSkinType, WeaponSkin>> equippedByPlayer = new java.util.LinkedHashMap<>();
+	private final Map<UUID, Map<String, Integer>> casesByPlayer = new java.util.LinkedHashMap<>();
 
 	public PlayerSkinComponent(World world) {
 		this.world = world;
@@ -132,10 +134,46 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 		return true;
 	}
 
+	public Map<String, Integer> caseCounts(UUID playerId) {
+		if (playerId == null) return Map.of();
+		Map<String, Integer> cases = casesByPlayer.get(playerId);
+		return cases == null ? Map.of() : Collections.unmodifiableMap(cases);
+	}
+
+	public int caseCount(UUID playerId, String caseId) {
+		if (playerId == null || caseId == null) return 0;
+		Map<String, Integer> cases = casesByPlayer.get(playerId);
+		return cases == null ? 0 : Math.max(0, cases.getOrDefault(normalizeCaseId(caseId), 0));
+	}
+
+	public boolean giveCase(UUID playerId, String caseId, int amount) {
+		if (playerId == null || caseId == null || amount <= 0) return false;
+		return setCaseCount(playerId, caseId, caseCount(playerId, caseId) + amount);
+	}
+
+	public boolean removeCase(UUID playerId, String caseId, int amount) {
+		if (playerId == null || caseId == null || amount <= 0) return false;
+		return setCaseCount(playerId, caseId, Math.max(0, caseCount(playerId, caseId) - amount));
+	}
+
+	public boolean setCaseCount(UUID playerId, String caseId, int amount) {
+		if (playerId == null || caseId == null) return false;
+		String cleaned = normalizeCaseId(caseId);
+		if (cleaned.isEmpty()) return false;
+		Map<String, Integer> cases = casesByPlayer.computeIfAbsent(playerId, id -> new java.util.LinkedHashMap<>());
+		int next = Math.max(0, amount);
+		Integer previous = next <= 0 ? cases.remove(cleaned) : cases.put(cleaned, next);
+		if (cases.isEmpty()) casesByPlayer.remove(playerId);
+		boolean changed = previous == null ? next > 0 : previous != next;
+		if (changed) KEY.sync(world);
+		return changed;
+	}
+
 	@Override
 	public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		unlockedByPlayer.clear();
 		equippedByPlayer.clear();
+		casesByPlayer.clear();
 		NbtList unlocked = tag.getList("unlocked", NbtElement.COMPOUND_TYPE);
 		for (int i = 0; i < unlocked.size(); i++) {
 			NbtCompound entry = unlocked.getCompound(i);
@@ -157,6 +195,16 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 			if (playerId != null && type != null && isUnlocked(playerId, type, skin)) {
 				equippedByPlayer.computeIfAbsent(playerId, id -> new EnumMap<>(WeaponSkinType.class))
 					.put(type, skin.logical(type));
+			}
+		}
+		NbtList cases = tag.getList("cases", NbtElement.COMPOUND_TYPE);
+		for (int i = 0; i < cases.size(); i++) {
+			NbtCompound entry = cases.getCompound(i);
+			UUID playerId = parseUuid(entry.getString("player"));
+			String caseId = normalizeCaseId(entry.getString("case"));
+			int count = Math.max(0, entry.getInt("count"));
+			if (playerId != null && !caseId.isEmpty() && count > 0) {
+				casesByPlayer.computeIfAbsent(playerId, id -> new java.util.LinkedHashMap<>()).put(caseId, count);
 			}
 		}
 	}
@@ -188,6 +236,20 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 			}
 		}
 		tag.put("equipped", equipped);
+
+		NbtList cases = new NbtList();
+		for (Map.Entry<UUID, Map<String, Integer>> playerEntry : casesByPlayer.entrySet()) {
+			for (Map.Entry<String, Integer> caseEntry : playerEntry.getValue().entrySet()) {
+				int count = Math.max(0, caseEntry.getValue());
+				if (count <= 0) continue;
+				NbtCompound out = new NbtCompound();
+				out.putString("player", playerEntry.getKey().toString());
+				out.putString("case", caseEntry.getKey());
+				out.putInt("count", count);
+				cases.add(out);
+			}
+		}
+		tag.put("cases", cases);
 	}
 
 	private static UUID parseUuid(String raw) {
@@ -196,5 +258,10 @@ public class PlayerSkinComponent implements AutoSyncedComponent {
 		} catch (IllegalArgumentException ignored) {
 			return null;
 		}
+	}
+
+	private static String normalizeCaseId(String raw) {
+		if (raw == null) return "";
+		return raw.strip().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_\\-]", "_");
 	}
 }

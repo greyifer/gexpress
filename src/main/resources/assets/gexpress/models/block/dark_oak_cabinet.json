@@ -1,0 +1,9 @@
+﻿{
+  "parent": "gexpress:block/template_cabinet",
+  "textures": {
+    "bottom": "gexpress:block/dark_oak_cabinet_bottom",
+    "front": "gexpress:block/dark_oak_cabinet_front",
+    "side": "gexpress:block/dark_oak_cabinet_side",
+    "top": "gexpress:block/dark_oak_cabinet_top"
+  }
+}

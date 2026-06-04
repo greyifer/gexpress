@@ -54,7 +54,7 @@ public final class ClientTrackerState {
 		try {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			Role role = game == null ? null : game.getRole(client.player);
-			return role != null && MapSelectRoles.TRACKER_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.TRACKER_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

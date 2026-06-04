@@ -39,9 +39,9 @@ import dev.mapselect.role.skincrawler.SkincrawlerManager;
 import dev.mapselect.role.snitch.SnitchManager;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.spy.SpyBugComponent;
-import dev.mapselect.role.trickster.DancingCartsManager;
-import dev.mapselect.role.trickster.TricksterManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.harlequin.DancingCartsManager;
+import dev.mapselect.role.harlequin.HarlequinManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.role.warlock.WarlockComponent;
 import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.voice.VoiceMuteState;
@@ -85,7 +85,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -198,18 +197,19 @@ public final class TimeMasterManager {
 
 	private static void tryRewind(ServerPlayerEntity timeMaster) {
 		if (timeMaster == null || !(timeMaster.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
+		if (PelicanManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
 		if (!GexpressTestState.isRoleTester(timeMaster) && !GameFunctions.isPlayerAliveAndSurvival(timeMaster)) return;
 		if (!canTrack(world) || !isTimeMaster(timeMaster) || !isPlayable(timeMaster, timeMaster)) return;
 
 		TimeMasterComponent comp = TimeMasterComponent.KEY.get(world);
 		comp.ensurePlayer(timeMaster.getUuid());
-		if (comp.usesRemaining(timeMaster.getUuid()) <= 0) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(timeMaster);
+		if (!creativeBypass && comp.usesRemaining(timeMaster.getUuid()) <= 0) {
 			timeMaster.sendMessage(Text.literal("No rewinds left."), true);
 			return;
 		}
-		long cooldown = comp.cooldownRemainingTicks(timeMaster.getUuid());
-		if (cooldown > 0L) {
+		long cooldown = creativeBypass ? 0L : comp.cooldownRemainingTicks(timeMaster.getUuid());
+		if (!creativeBypass && cooldown > 0L) {
 			timeMaster.sendMessage(Text.literal("Time Master ready in " + secondsCeil(cooldown) + "s."), true);
 			return;
 		}
@@ -224,7 +224,7 @@ public final class TimeMasterManager {
 
 		int rewindSeconds = Math.min(configuredSeconds,
 			(int) Math.max(1L, (world.getTime() - snapshot.tick() + 19L) / 20L));
-		if (!comp.consume(timeMaster.getUuid())) return;
+		if (!creativeBypass && !comp.consume(timeMaster.getUuid())) return;
 
 		timeMaster.playSoundToPlayer(SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
 			SoundCategory.PLAYERS, 1.0F, 1.25F);
@@ -241,18 +241,19 @@ public final class TimeMasterManager {
 
 	private static void tryFreeze(ServerPlayerEntity timeMaster) {
 		if (timeMaster == null || !(timeMaster.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
+		if (PelicanManager.isStashed(timeMaster) || isFrozen(timeMaster)) return;
 		if (!GexpressTestState.isRoleTester(timeMaster) && !GameFunctions.isPlayerAliveAndSurvival(timeMaster)) return;
 		if (!canTrack(world) || !isTimeMaster(timeMaster) || !isPlayable(timeMaster, timeMaster)) return;
 
 		TimeMasterComponent comp = TimeMasterComponent.KEY.get(world);
 		comp.ensurePlayer(timeMaster.getUuid());
-		if (comp.freezeUsesRemaining(timeMaster.getUuid()) <= 0) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(timeMaster);
+		if (!creativeBypass && comp.freezeUsesRemaining(timeMaster.getUuid()) <= 0) {
 			timeMaster.sendMessage(Text.literal("No freezes left."), true);
 			return;
 		}
-		long cooldown = comp.freezeCooldownRemainingTicks(timeMaster.getUuid());
-		if (cooldown > 0L) {
+		long cooldown = creativeBypass ? 0L : comp.freezeCooldownRemainingTicks(timeMaster.getUuid());
+		if (!creativeBypass && cooldown > 0L) {
 			timeMaster.sendMessage(Text.literal("Freeze ready in " + secondsCeil(cooldown) + "s."), true);
 			return;
 		}
@@ -263,12 +264,12 @@ public final class TimeMasterManager {
 			return;
 		}
 		if (target == timeMaster) return;
-		if (VultureManager.isStashed(target) || !isPlayable(target, timeMaster)) return;
+		if (PelicanManager.isStashed(target) || !isPlayable(target, timeMaster)) return;
 		if (isFrozen(target)) {
 			timeMaster.sendMessage(Text.literal(target.getName().getString() + " is already frozen."), true);
 			return;
 		}
-		if (!comp.consumeFreeze(timeMaster.getUuid())) return;
+		if (!creativeBypass && !comp.consumeFreeze(timeMaster.getUuid())) return;
 
 		int durationTicks = GexpressConfig.getTimeMasterFreezeDurationSeconds() * 20;
 		ActiveFreeze freeze = ActiveFreeze.capture(world, timeMaster.getUuid(), target, durationTicks);
@@ -285,7 +286,7 @@ public final class TimeMasterManager {
 	private static ServerPlayerEntity findFreezeTarget(ServerPlayerEntity timeMaster) {
 		double range = GexpressConfig.getTimeMasterFreezeRange();
 		return AbilityTargeting.findLookTarget(timeMaster, timeMaster.getServerWorld().getPlayers(), range, 0.0D, true,
-			candidate -> !VultureManager.isStashed(candidate) && isPlayable(candidate, timeMaster));
+			candidate -> !PelicanManager.isStashed(candidate) && isPlayable(candidate, timeMaster));
 	}
 
 	private static void tickFreezes(ServerWorld world) {
@@ -427,7 +428,8 @@ public final class TimeMasterManager {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
 		if (game == null) return false;
 		Role role = game.getRole(player);
-		return role != null && MapSelectRoles.TIME_MASTER_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.TIME_MASTER_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.TIME_MASTER_ID));
 	}
 
 	private static boolean hasPlayableTimeMaster(ServerWorld world) {
@@ -453,6 +455,33 @@ public final class TimeMasterManager {
 
 	private static void readComponent(Component component, NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		if (component != null && tag != null) component.readFromNbt(tag.copy(), lookup);
+	}
+
+	private static NbtCompound captureVehicleNbt(Entity vehicle) {
+		if (vehicle == null) return null;
+		NbtCompound tag = vehicle.writeNbt(new NbtCompound()).copy();
+		Identifier vehicleType = Registries.ENTITY_TYPE.getId(vehicle.getType());
+		tag.putString("id", vehicleType.toString());
+		tag.remove("Passengers");
+		return tag;
+	}
+
+	private static Entity restoreVehicle(ServerPlayerEntity player, UUID vehicleId, NbtCompound vehicleNbt) {
+		if (player == null || vehicleId == null || vehicleNbt == null) return null;
+		ServerWorld world = player.getServerWorld();
+		Entity vehicle = world.getEntity(vehicleId);
+		if (vehicle == null || vehicle.isRemoved()) {
+			NbtCompound tag = vehicleNbt.copy();
+			vehicle = EntityType.loadEntityWithPassengers(tag, world, entity -> {
+				entity.setUuid(vehicleId);
+				return world.spawnNewEntityAndPassengers(entity) ? entity : null;
+			});
+		}
+		if (vehicle == null || vehicle.isRemoved()) return null;
+		vehicle.readNbt(vehicleNbt.copy());
+		vehicle.setUuid(vehicleId);
+		player.startRiding(vehicle, true);
+		return vehicle;
 	}
 
 	private static void syncScreen(ScreenHandler handler) {
@@ -683,10 +712,14 @@ public final class TimeMasterManager {
 	}
 
 	private record VisualPlayerSnapshot(UUID playerId, double x, double y, double z, float yaw, float pitch,
-			int selectedSlot, ItemStack mainHand, ItemStack offHand, boolean usingItem, Hand activeHand) {
+			int selectedSlot, ItemStack mainHand, ItemStack offHand, boolean usingItem, Hand activeHand,
+			UUID vehicleId, NbtCompound vehicleNbt, double vehicleX, double vehicleY, double vehicleZ,
+			float vehicleYaw, float vehiclePitch) {
 		private static VisualPlayerSnapshot capture(ServerPlayerEntity player) {
 			boolean usingItem = player.isUsingItem();
 			Hand activeHand = usingItem ? player.getActiveHand() : Hand.MAIN_HAND;
+			Entity vehicle = player.getVehicle();
+			NbtCompound vehicleNbt = captureVehicleNbt(vehicle);
 			return new VisualPlayerSnapshot(
 				player.getUuid(),
 				player.getX(),
@@ -698,24 +731,55 @@ public final class TimeMasterManager {
 				player.getMainHandStack().copy(),
 				player.getOffHandStack().copy(),
 				usingItem,
-				activeHand
+				activeHand,
+				vehicle == null ? null : vehicle.getUuid(),
+				vehicleNbt,
+				vehicle == null ? 0.0D : vehicle.getX(),
+				vehicle == null ? 0.0D : vehicle.getY(),
+				vehicle == null ? 0.0D : vehicle.getZ(),
+				vehicle == null ? 0.0F : vehicle.getYaw(),
+				vehicle == null ? 0.0F : vehicle.getPitch()
 			);
 		}
 
 		private void applyVisualFrame(ServerPlayerEntity player, VisualPlayerSnapshot next, float delta) {
 			VisualPlayerSnapshot heldState = next != null && delta >= 0.5F ? next : this;
-			player.stopRiding();
 			double frameX = next == null ? x : lerp(x, next.x(), delta);
 			double frameY = next == null ? y : lerp(y, next.y(), delta);
 			double frameZ = next == null ? z : lerp(z, next.z(), delta);
 			float frameYaw = next == null ? yaw : lerpYaw(yaw, next.yaw(), delta);
 			float framePitch = next == null ? pitch : (float) lerp(pitch, next.pitch(), delta);
-			player.teleport(player.getServerWorld(), frameX, frameY, frameZ, frameYaw, framePitch);
+			VehicleFrame vehicleFrame = vehicleFrame(next, delta);
+			if (vehicleFrame == null || !vehicleFrame.apply(player)) {
+				player.stopRiding();
+				player.teleport(player.getServerWorld(), frameX, frameY, frameZ, frameYaw, framePitch);
+			} else {
+				player.setYaw(frameYaw);
+				player.setPitch(framePitch);
+			}
 			player.setVelocity(Vec3d.ZERO);
 			player.velocityModified = true;
 			boolean changedHeldItem = heldState.applyHeldItems(player);
 			heldState.applyUsingItem(player);
 			if (changedHeldItem) syncScreen(player.playerScreenHandler);
+		}
+
+		private VehicleFrame vehicleFrame(VisualPlayerSnapshot next, float delta) {
+			if (vehicleId != null && next != null && vehicleId.equals(next.vehicleId())) {
+				return new VehicleFrame(
+					vehicleId,
+					delta >= 0.5F ? next.vehicleNbt() : vehicleNbt,
+					lerp(vehicleX, next.vehicleX(), delta),
+					lerp(vehicleY, next.vehicleY(), delta),
+					lerp(vehicleZ, next.vehicleZ(), delta),
+					lerpYaw(vehicleYaw, next.vehicleYaw(), delta),
+					(float) lerp(vehiclePitch, next.vehiclePitch(), delta)
+				);
+			}
+			VisualPlayerSnapshot source = next != null && delta >= 0.5F ? next : this;
+			if (source.vehicleId() == null || source.vehicleNbt() == null) return null;
+			return new VehicleFrame(source.vehicleId(), source.vehicleNbt(), source.vehicleX(), source.vehicleY(),
+				source.vehicleZ(), source.vehicleYaw(), source.vehiclePitch());
 		}
 
 		private boolean applyHeldItems(ServerPlayerEntity player) {
@@ -745,6 +809,19 @@ public final class TimeMasterManager {
 				player.stopUsingItem();
 				player.setCurrentHand(activeHand);
 			}
+		}
+	}
+
+	private record VehicleFrame(UUID vehicleId, NbtCompound vehicleNbt, double x, double y, double z,
+			float yaw, float pitch) {
+		private boolean apply(ServerPlayerEntity player) {
+			Entity vehicle = restoreVehicle(player, vehicleId, vehicleNbt);
+			if (vehicle == null || vehicle.isRemoved()) return false;
+			vehicle.refreshPositionAndAngles(x, y, z, yaw, pitch);
+			vehicle.setVelocity(Vec3d.ZERO);
+			vehicle.velocityModified = true;
+			if (player.getVehicle() != vehicle) player.startRiding(vehicle, true);
+			return true;
 		}
 	}
 
@@ -795,7 +872,7 @@ public final class TimeMasterManager {
 			Map<UUID, ItemEntitySnapshot> items, Map<UUID, BodyEntitySnapshot> bodies,
 			Map<BlockPos, BlockSnapshot> blocks,
 			JuggernautManager.TimeState juggernaut, SnitchManager.TimeState snitch,
-			VultureManager.TimeState vulture, PuppetmasterManager.TimeState puppetmaster,
+			PelicanManager.TimeState vulture, PuppetmasterManager.TimeState puppetmaster,
 			DancingCartsManager.TimeState dancingCarts,
 			BountyHunterManager.TimeState bountyHunter,
 			MafiaManager.TimeState mafia, SkincrawlerManager.TimeState skincrawler,
@@ -836,7 +913,7 @@ public final class TimeMasterManager {
 				blocks,
 				JuggernautManager.snapshotForTimeRewind(),
 				SnitchManager.snapshotForTimeRewind(),
-				VultureManager.snapshotForTimeRewind(),
+				PelicanManager.snapshotForTimeRewind(),
 				PuppetmasterManager.snapshotForTimeRewind(),
 				DancingCartsManager.snapshotForTimeRewind(world),
 				BountyHunterManager.snapshotForTimeRewind(),
@@ -901,8 +978,8 @@ public final class TimeMasterManager {
 			RegistryWrapper.WrapperLookup lookup = world.getRegistryManager();
 			MinecraftServer server = world.getServer();
 			PuppetmasterManager.clearForTimeRewind(server);
-			VultureManager.clearForTimeRewind(world);
-			TricksterManager.clearForTimeRewind(world);
+			PelicanManager.clearForTimeRewind(world);
+			HarlequinManager.clearForTimeRewind(world);
 			JuggernautManager.restoreForTimeRewind(juggernaut);
 			PuppetmasterManager.restoreForTimeRewind(puppetmaster);
 			BountyHunterManager.restoreForTimeRewind(bountyHunter);
@@ -940,7 +1017,7 @@ public final class TimeMasterManager {
 			readComponent(WarlockComponent.KEY.getNullable(world), warlock, lookup);
 			readComponent(VoiceMuteState.KEY.getNullable(world), voiceMute, lookup);
 			readComponent(LevelComponent.KEY.getNullable(world), level, lookup);
-			VultureManager.restoreForTimeRewind(world, vulture);
+			PelicanManager.restoreForTimeRewind(world, vulture);
 			GuardianAngelManager.restoreForTimeRewind(world, guardianAngel);
 			BodyguardManager.restoreForTimeRewind(world, bodyguard);
 			CovenantManager.restoreForTimeRewind(world, covenant);
@@ -1052,11 +1129,7 @@ public final class TimeMasterManager {
 			NbtCompound abilities = new NbtCompound();
 			player.getAbilities().writeNbt(abilities);
 			Entity vehicle = player.getVehicle();
-			NbtCompound vehicleNbt = vehicle == null ? null : vehicle.writeNbt(new NbtCompound()).copy();
-			if (vehicleNbt != null) {
-				Identifier vehicleType = Registries.ENTITY_TYPE.getId(vehicle.getType());
-				vehicleNbt.putString("id", vehicleType.toString());
-			}
+			NbtCompound vehicleNbt = captureVehicleNbt(vehicle);
 
 			return new PlayerSnapshot(
 				player.getUuid(),
@@ -1143,25 +1216,17 @@ public final class TimeMasterManager {
 		}
 
 		private void restoreVehicle(ServerPlayerEntity player) {
-			if (vehicleId == null || vehicleNbt == null) return;
-			ServerWorld world = player.getServerWorld();
-			Entity vehicle = world.getEntity(vehicleId);
-			if (vehicle == null || vehicle.isRemoved()) {
-				NbtCompound tag = vehicleNbt.copy();
-				vehicle = EntityType.loadEntityWithPassengers(tag, world, entity -> {
-					entity.setUuid(vehicleId);
-					return world.spawnNewEntityAndPassengers(entity) ? entity : null;
-				});
-			}
-			if (vehicle == null || vehicle.isRemoved()) return;
-			vehicle.readNbt(vehicleNbt.copy());
-			vehicle.setUuid(vehicleId);
-			player.startRiding(vehicle, true);
+			TimeMasterManager.restoreVehicle(player, vehicleId, vehicleNbt);
 		}
 
 		private void applyVisualFrame(ServerPlayerEntity player) {
-			player.stopRiding();
-			player.teleport(player.getServerWorld(), x, y, z, yaw, pitch);
+			if (vehicleId == null || vehicleNbt == null || TimeMasterManager.restoreVehicle(player, vehicleId, vehicleNbt) == null) {
+				player.stopRiding();
+				player.teleport(player.getServerWorld(), x, y, z, yaw, pitch);
+			} else {
+				player.setYaw(yaw);
+				player.setPitch(pitch);
+			}
 			player.setVelocity(Vec3d.ZERO);
 			player.velocityModified = true;
 		}

@@ -1,0 +1,6 @@
+{
+  "parent": "gexpress:block/template_floor_ledge",
+  "textures": {
+    "texture": "gexpress:block/muntz_ledge"
+  }
+}

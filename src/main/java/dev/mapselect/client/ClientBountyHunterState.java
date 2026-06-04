@@ -11,7 +11,6 @@ import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.util.DefaultSkinHelper;
-import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 
@@ -53,7 +52,7 @@ public final class ClientBountyHunterState {
 
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.textRenderer == null || client.options.hudHidden || alpha <= 0.02F) return;
+		if (ClientHudVisibility.shouldHide(client) || client.textRenderer == null || alpha <= 0.02F) return;
 		int a = Math.max(0, Math.min(255, Math.round(alpha * 255.0F)));
 		TextRenderer text = client.textRenderer;
 		int width = 104;

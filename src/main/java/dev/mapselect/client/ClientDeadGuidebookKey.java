@@ -30,7 +30,7 @@ public final class ClientDeadGuidebookKey {
 	}
 
 	private static boolean isLocalDeadParticipant(MinecraftClient client) {
-		if (ClientVultureState.isLocalStashed(client) || !client.player.isSpectator()) return false;
+		if (!ClientVultureState.isLocalStashed(client) && !client.player.isSpectator()) return false;
 		try {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			return game != null && game.getRoles().containsKey(client.player.getUuid());

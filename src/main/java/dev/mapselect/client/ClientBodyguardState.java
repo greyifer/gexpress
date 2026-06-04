@@ -70,7 +70,7 @@ public final class ClientBodyguardState {
 
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.textRenderer == null || client.player == null || client.options.hudHidden) return;
+		if (ClientHudVisibility.shouldHide(client) || client.textRenderer == null || client.player == null) return;
 		if (!isLocalBodyguard(client) || !ClientRoleRevealState.canShowRoleHud(client)) return;
 		renderTarget(context, client);
 		renderFeed(context, client);

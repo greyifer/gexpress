@@ -21,6 +21,7 @@ import net.minecraft.client.render.model.BakedModelManager;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 
 import java.util.UUID;
@@ -36,15 +37,20 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	public static final Identifier COLA_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_cola");
 	public static final Identifier GOLD_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_gold");
 	public static final Identifier JEM_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_jem");
+	public static final Identifier BLUE_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_blue");
+	public static final Identifier PINK_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_pink");
+	public static final Identifier PLAID_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_plaid");
 	public static final Identifier SHADOW_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_shadow");
 	public static final Identifier SHADOW_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shadow");
+	private static final Identifier NOELLES_FAKE_KNIFE = Identifier.of("noellesroles", "fake_knife");
 	public static final String SKIN_PREVIEW_KEY = "gexpress_skin_preview";
 
 	@Override
 	public void onInitializeModelLoader(Context pluginContext) {
 		pluginContext.addModels(DEV_KNIFE_MODEL, DEV_REVOLVER_MODEL, HOST_KNIFE_MODEL, HOST_REVOLVER_MODEL,
 			TRUSTED_KNIFE_MODEL, TRUSTED_REVOLVER_MODEL, PASSENGER_REVOLVER_MODEL, COLA_REVOLVER_MODEL,
-			GOLD_REVOLVER_MODEL, JEM_REVOLVER_MODEL, SHADOW_KNIFE_MODEL, SHADOW_REVOLVER_MODEL);
+			GOLD_REVOLVER_MODEL, JEM_REVOLVER_MODEL, BLUE_REVOLVER_MODEL, PINK_REVOLVER_MODEL,
+			PLAID_REVOLVER_MODEL, SHADOW_KNIFE_MODEL, SHADOW_REVOLVER_MODEL);
 	}
 
 	public static BakedModel resolve(BakedModelManager manager, ItemStack stack, LivingEntity entity) {
@@ -55,16 +61,16 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 
 	private static Identifier resolveId(ItemStack stack, LivingEntity entity) {
 		if (ClientSilentShadowState.isShadowed(entity)) {
-			if (stack.isOf(WatheItems.KNIFE)) return SHADOW_KNIFE_MODEL;
-			if (stack.isOf(WatheItems.REVOLVER)) return SHADOW_REVOLVER_MODEL;
+			if (isKnifeLike(stack)) return SHADOW_KNIFE_MODEL;
+			if (isGunLike(stack)) return SHADOW_REVOLVER_MODEL;
 		}
 		if (!usesDefaultWatheSkin(stack)) return null;
 
-		WeaponSkinType type = stack.isOf(WatheItems.KNIFE) ? WeaponSkinType.KNIFE
-			: stack.isOf(WatheItems.REVOLVER) ? WeaponSkinType.GUN : null;
+		WeaponSkinType type = isKnifeLike(stack) ? WeaponSkinType.KNIFE
+			: isGunLike(stack) ? WeaponSkinType.GUN : null;
 		WeaponSkin skin = resolveSkin(stack, entity);
 		if (skin == null || !skin.supports(type)) return null;
-		if (stack.isOf(WatheItems.KNIFE)) {
+		if (isKnifeLike(stack)) {
 			if (skin == WeaponSkin.DEFAULT) return null;
 			return switch (skin) {
 				case DEV -> DEV_KNIFE_MODEL;
@@ -73,7 +79,7 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 				default -> null;
 			};
 		}
-		if (stack.isOf(WatheItems.REVOLVER)) {
+		if (isGunLike(stack)) {
 			if (!GexpressConfig.use3dGunSkins()) {
 				return switch (skin.logical(WeaponSkinType.GUN)) {
 					case GOLD -> HOST_REVOLVER_MODEL;
@@ -87,6 +93,9 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 				case TRUSTED, COLA -> COLA_REVOLVER_MODEL;
 				case HOST, GOLD -> GOLD_REVOLVER_MODEL;
 				case JEM -> JEM_REVOLVER_MODEL;
+				case BLUE -> BLUE_REVOLVER_MODEL;
+				case PINK -> PINK_REVOLVER_MODEL;
+				case PLAID -> PLAID_REVOLVER_MODEL;
 			};
 		}
 		return null;
@@ -95,8 +104,8 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	private static WeaponSkin resolveSkin(ItemStack stack, LivingEntity entity) {
 		WeaponSkin preview = previewSkin(stack);
 		if (preview != null) return preview;
-		WeaponSkinType type = stack.isOf(WatheItems.KNIFE) ? WeaponSkinType.KNIFE
-			: stack.isOf(WatheItems.REVOLVER) ? WeaponSkinType.GUN : null;
+		WeaponSkinType type = isKnifeLike(stack) ? WeaponSkinType.KNIFE
+			: isGunLike(stack) ? WeaponSkinType.GUN : null;
 		if (entity instanceof PlayerEntity player) {
 			WeaponSkin equipped = equippedSkin(player.getUuid(), type);
 			if (equipped != null) return equipped;
@@ -133,6 +142,32 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 		} catch (Throwable ignored) {
 			return true;
 		}
+	}
+
+	public static boolean isKnifeLike(ItemStack stack) {
+		if (stack == null || stack.isEmpty()) return false;
+		return stack.isOf(WatheItems.KNIFE) || isNoellesFakeKnife(stack);
+	}
+
+	public static boolean isGunLike(ItemStack stack) {
+		return stack != null && !stack.isEmpty() && stack.isOf(WatheItems.REVOLVER);
+	}
+
+	public static ItemStack fakeKnifeRenderStack(ItemStack stack, LivingEntity entity) {
+		if (!isNoellesFakeKnife(stack) || entity == null) return stack;
+		ItemStack knife = WatheItems.KNIFE.getDefaultStack();
+		knife.set(WatheDataComponentTypes.OWNER, entity.getUuidAsString());
+		NbtComponent preview = stack.get(DataComponentTypes.CUSTOM_DATA);
+		if (preview != null && preview.copyNbt().contains(SKIN_PREVIEW_KEY)) {
+			knife.set(DataComponentTypes.CUSTOM_DATA, preview);
+		}
+		return knife;
+	}
+
+	private static boolean isNoellesFakeKnife(ItemStack stack) {
+		if (stack == null || stack.isEmpty()) return false;
+		Identifier id = Registries.ITEM.getId(stack.getItem());
+		return NOELLES_FAKE_KNIFE.equals(id) || "fake_knife".equals(id.getPath());
 	}
 
 	private static boolean isHostUuidString(String uuid) {

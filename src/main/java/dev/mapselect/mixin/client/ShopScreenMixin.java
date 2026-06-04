@@ -31,7 +31,7 @@ public abstract class ShopScreenMixin {
 		remap = false
 	)
 	private boolean gexpress$customShopRolesCanSeeShop(GameWorldComponent game, PlayerEntity player) {
-		return game.canUseKillerFeatures(player) || GexpressRoleShop.hasCustomShop(player);
+		return game.canUseKillerFeatures(player) || GexpressRoleShop.canUseKillerEconomy(player);
 	}
 
 	@Dynamic("LimitedInventoryScreen is compiled with intermediary method names in the Wathe jar.")

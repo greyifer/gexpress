@@ -3,13 +3,18 @@ package dev.mapselect.client;
 import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.item.DevWeaponSkinStamper;
+import dev.mapselect.client.effect.ClientBlackWhiteOverlay;
 import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.client.preset.ClientTrainPresetCache;
+import dev.mapselect.client.screen.GexpressSkinsCategory;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.GexpressConfigSyncPayload;
 import dev.mapselect.network.GexpressDevTuningPayload;
 import dev.mapselect.network.GexpressTaskConfigPayload;
 import dev.mapselect.network.PuppetmasterConfigPayload;
+import dev.mapselect.network.CoinBarrierEditOpenPayload;
+import dev.mapselect.network.SkinCaseResultPayload;
+import dev.mapselect.client.screen.CoinBarrierEditScreen;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import dev.mapselect.registry.MapSelectBlockEntities;
 import dev.mapselect.registry.MapSelectBlocks;
@@ -42,17 +47,23 @@ public class MapSelectClient implements ClientModInitializer {
 		GexpressRoleAnnouncementTexts.register();
 		registerConfigReceiver();
 		ClientAbilityKeys.register();
+		ClientInstinctEnergy.register();
+		ClientTutorialState.register();
 		ClientRenderDistanceGuard.register();
+		ClientSpectatorRoleRevealDelay.register();
+		ClientSpectatorVoiceKeys.register();
 		ClientLevelHud.register();
+		ClientStaminaBarFix.register();
 		ClientDeadGuidebookKey.register();
 		ClientFreshAirAmbienceState.register();
 		ClientShortSightedState.register();
-		ClientNightVisionState.register();
 		ClientMedicShieldState.register();
 		ClientMedicState.register();
 		ClientNeutralWinState.register();
+		ClientLoversState.register();
 		ClientSnitchState.register();
 		ClientSeerState.register();
+		ClientCupidState.register();
 		ClientTimeMasterState.register();
 		ClientTimeMasterFreezeState.register();
 		ClientTimeMasterRewindState.register();
@@ -68,6 +79,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientTrackerState.register();
 		ClientAltruistState.register();
 		ClientMafiaState.register();
+		ClientCopycatState.register();
 		ClientJanitorState.register();
 		ClientBountyHunterState.register();
 		ClientCovenantState.register();
@@ -76,13 +88,30 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientAbilityTargetState.register();
 		ClientRoundEndRoleRoster.register();
 		ClientAbilityCooldownHud.register();
+		ClientCoinBarrierHud.register();
+		ClientPlayNetworking.registerGlobalReceiver(CoinBarrierEditOpenPayload.ID, (payload, context) ->
+			context.client().execute(() -> context.client().setScreen(new CoinBarrierEditScreen(
+				context.client().currentScreen, payload.pos(), payload.price(), payload.title()))));
+		ClientKnifeChargeHud.register();
+		ClientBlackWhiteOverlay.register();
 		ClientPresetCache.registerClient();
 		ClientTrainPresetCache.registerClient();
 		ModelLoadingPlugin.register(new DevWeaponModels());
 		ParticleFactoryRegistry.getInstance().register(MapSelectParticles.SAND_DRIFT, SandDriftParticle.Factory::new);
 		BlockEntityRendererFactories.register(MapSelectBlockEntities.GREYIFER_PLUSH, GreyiferPlushBlockEntityRenderer::new);
+		BlockEntityRendererFactories.register(MapSelectBlockEntities.GOLD_BEVERAGE_PLATE, GoldBeveragePlateBlockEntityRenderer::new);
+		BlockEntityRendererFactories.register(MapSelectBlockEntities.FUSED_ORNAMENT, FusedOrnamentBlockEntityRenderer::new);
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GREYIFER_PLUSH, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.IWY_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.LUX_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.WTFJIMJIM_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.PIZZA_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.JEMSEA_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.PARROTMARROW_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.EVIEEVEEE_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.ASTRONOMIKYU_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GOLD_FOOD_PLATTER, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GOLD_DRINK_TRAY, RenderLayer.getCutout());
 
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, registrationHelper, context) -> {
 			if (entityRenderer instanceof PlayerEntityRenderer per) {
@@ -130,9 +159,14 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.levelWinXp(), payload.levelNeutralWinBonusXp(), payload.levelKillXp(),
 				payload.levelCivilianTaskXp(), payload.levelBaseXp(), payload.levelXpIncrease(),
 				payload.levelRoadmapDisplayLevels(), payload.levelXpOverrides(), payload.levelRewardRoadmap(),
-				payload.grenadeLineOfSightPassThroughBlocks())));
+				payload.levelTags(),
+				payload.grenadeLineOfSightPassThroughBlocks(),
+				payload.goldFoodPlatterPrice(), payload.goldDrinkTrayPrice(), payload.skinCaseRows(),
+				payload.mutedNotePrice())));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID, (payload, context) ->
 			context.client().execute(() -> GexpressConfig.puppetmasterCanKillOwnBody = payload.canKillOwnBody()));
+		ClientPlayNetworking.registerGlobalReceiver(SkinCaseResultPayload.ID, (payload, context) ->
+			context.client().execute(() -> GexpressSkinsCategory.handleCaseResult(payload)));
 	}
 
 	private static void applyConfigPayload(GexpressConfigSyncPayload payload) {
@@ -142,6 +176,15 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.c4FirstBeepSeconds(),
 				payload.wrongWirePercent(),
 				payload.grenadePrice(),
+				payload.bombSpecialistFirecrackerPrice(),
+				payload.bombSpecialistLockpickPrice(),
+				payload.bombSpecialistCrowbarPrice(),
+				payload.mafiosoKnifePrice(),
+				payload.mafiosoRevolverPrice(),
+				payload.janitorPoisonVialPrice(),
+				payload.janitorScorpionPrice(),
+				payload.burglarCrowbarPrice(),
+				payload.burglarLockpickPrice(),
 				payload.passiveIncomeKiller(),
 				payload.passiveIncomeCivilian(),
 				payload.passiveIncomeNeutral(),
@@ -214,6 +257,12 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.janitorCleanCooldownSeconds(),
 				payload.janitorRevolverCooldownAfterCleanSeconds(),
 				payload.janitorCleanCooldownAfterKillSeconds(),
+				payload.pickpocketMaxHoldSeconds(),
+				payload.pickpocketCoinsPerSecond(),
+				payload.pickpocketRange(),
+				payload.copycatCopyCooldownSeconds(),
+				payload.copycatCopyDurationSeconds(),
+				payload.copycatCopyRange(),
 				payload.useCustomRoleCounts(),
 				payload.maxKillerAmount(),
 				payload.maxVigilanteAmount(),
@@ -246,7 +295,17 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.medicShieldBlockFlashAlpha(),
 				payload.medicShieldBreakFlashAlpha(),
 				payload.silentShadowAlpha(),
-				payload.specialRoleOccurrence()
+				payload.specialRoleOccurrence(),
+				payload.seerCompareCooldownSeconds(),
+				payload.seerCompareRange(),
+				payload.cupidRequiredAlivePairs(),
+				payload.cupidPairCooldownSeconds(),
+				payload.cupidRange(),
+				payload.loversShowPartnerHud(),
+				payload.loversAllowMixedSidePairs(),
+				payload.covenantBiteCooldownSeconds(),
+				payload.vengefulSpiritReviveDelaySeconds(),
+				payload.vengefulSpiritRevengeSeconds()
 				);
 		GuidebookScreen.invalidateIfOpen();
 	}

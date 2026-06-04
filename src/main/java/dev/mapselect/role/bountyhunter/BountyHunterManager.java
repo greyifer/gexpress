@@ -3,6 +3,7 @@ package dev.mapselect.role.bountyhunter;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.api.event.GameEvents;
+import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
@@ -11,7 +12,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.BountyHunterStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -32,6 +33,7 @@ import java.util.Random;
 import java.util.UUID;
 
 public final class BountyHunterManager {
+	private static final int SAFE_PREPARATION_TICKS = 30 * 20;
 	private static final Random RANDOM = new Random();
 	private static final Map<UUID, UUID> targetByHunter = new HashMap<>();
 	private static final Map<UUID, Long> deadlineByHunter = new HashMap<>();
@@ -62,7 +64,7 @@ public final class BountyHunterManager {
 		tickGate = 0;
 
 		for (ServerPlayerEntity hunter : world.getPlayers()) {
-			if (!isBountyHunter(hunter) || VultureManager.isStashed(hunter) || !isPlayable(hunter, hunter)) {
+			if (!isBountyHunter(hunter) || PelicanManager.isStashed(hunter) || !isPlayable(hunter, hunter)) {
 				if (targetByHunter.containsKey(hunter.getUuid())) sendClear(hunter);
 				clearHunter(hunter.getUuid());
 				continue;
@@ -72,6 +74,12 @@ public final class BountyHunterManager {
 	}
 
 	private static void updateHunter(ServerWorld world, GameWorldComponent game, ServerPlayerEntity hunter) {
+		if (isSafePreparation(world, game)) {
+			if (targetByHunter.containsKey(hunter.getUuid())) sendClear(hunter);
+			targetByHunter.remove(hunter.getUuid());
+			deadlineByHunter.remove(hunter.getUuid());
+			return;
+		}
 		UUID hunterId = hunter.getUuid();
 		long now = world.getTime();
 		Long penaltyUntil = penaltyUntilByHunter.get(hunterId);
@@ -128,7 +136,7 @@ public final class BountyHunterManager {
 	private static List<ServerPlayerEntity> bountyCandidates(GameWorldComponent game, ServerPlayerEntity hunter) {
 		List<ServerPlayerEntity> out = new ArrayList<>();
 		for (ServerPlayerEntity player : hunter.getServerWorld().getPlayers()) {
-			if (player == hunter || VultureManager.isStashed(player) || !isPlayable(player, hunter)) continue;
+			if (player == hunter || PelicanManager.isStashed(player) || !isPlayable(player, hunter)) continue;
 			if (!isBountyCandidateSide(game, player)) continue;
 			out.add(player);
 		}
@@ -140,6 +148,9 @@ public final class BountyHunterManager {
 			return true;
 		}
 		if (!isBountyHunter(hunter)) return true;
+		if (isSafePreparation(hunter.getServerWorld(), GameWorldComponent.KEY.getNullable(hunter.getServerWorld()))) {
+			return true;
+		}
 		boolean bountyTarget = target.getUuid().equals(targetByHunter.get(hunter.getUuid()));
 		PlayerShopComponent shop = PlayerShopComponent.KEY.get(hunter);
 		if (bountyTarget) {
@@ -183,7 +194,7 @@ public final class BountyHunterManager {
 
 	private static boolean isValidTarget(GameWorldComponent game, ServerPlayerEntity hunter, ServerPlayerEntity target) {
 		if (target == null || target == hunter || target.getWorld() != hunter.getWorld()) return false;
-		if (VultureManager.isStashed(target) || !isPlayable(target, hunter)) return false;
+		if (PelicanManager.isStashed(target) || !isPlayable(target, hunter)) return false;
 		return !isKillerSide(game, target);
 	}
 
@@ -205,6 +216,14 @@ public final class BountyHunterManager {
 			return DeadPlayerStatus.isLivingRoundParticipant(serverPlayer);
 		}
 		return GameFunctions.isPlayerAliveAndSurvival(player);
+	}
+
+	private static boolean isSafePreparation(ServerWorld world, GameWorldComponent game) {
+		if (world == null || game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) return false;
+		GameTimeComponent time = GameTimeComponent.KEY.getNullable(world);
+		if (time == null || time.resetTime <= 0 || time.getTime() <= 0) return false;
+		int elapsed = time.resetTime - time.getTime();
+		return elapsed >= 0 && elapsed < SAFE_PREPARATION_TICKS;
 	}
 
 	private static void throttledMessage(ServerWorld world, ServerPlayerEntity hunter, Text message) {
@@ -267,7 +286,4 @@ public final class BountyHunterManager {
 	public record TimeState(Map<UUID, UUID> targetByHunter, Map<UUID, Long> deadlineByHunter,
 			Map<UUID, Long> penaltyUntilByHunter, Map<UUID, Long> nextMessageTickByHunter) {}
 
-	private static long secondsCeil(long ticks) {
-		return Math.max(1L, (ticks + 19L) / 20L);
-	}
 }

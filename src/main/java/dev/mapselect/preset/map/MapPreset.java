@@ -38,6 +38,8 @@ public class MapPreset {
 	public String defaultTrainPreset;
 	public OffsetData lobbyTrainCorner;
 	public int roomCount = DEFAULT_ROOM_COUNT;
+	public Boolean couchSleepingEnabled = Boolean.TRUE;
+	public Boolean staticMapEnabled = Boolean.FALSE;
 	public List<PosData> randomSpawnPositions = new ArrayList<>();
 
 	public static MapPreset from(MapVariablesWorldComponent c) {
@@ -120,6 +122,8 @@ public class MapPreset {
 
 		if (weather == null) weather = WeatherType.NONE;
 		roomCount = normalizeRoomCount(roomCount);
+		if (couchSleepingEnabled == null) couchSleepingEnabled = Boolean.TRUE;
+		if (staticMapEnabled == null) staticMapEnabled = Boolean.FALSE;
 		if (fogColor != null) fogColor = fogColor & 0xFFFFFF;
 		if (defaultTrainPreset != null) {
 			defaultTrainPreset = defaultTrainPreset.trim();
@@ -140,6 +144,14 @@ public class MapPreset {
 	public int normalizedRoomCount() {
 		normalize();
 		return roomCount;
+	}
+
+	public boolean isCouchSleepingEnabled() {
+		return couchSleepingEnabled == null || couchSleepingEnabled;
+	}
+
+	public boolean isStaticMapEnabled() {
+		return staticMapEnabled != null && staticMapEnabled;
 	}
 
 	private static BoxData normalizeBox(BoxData b) {

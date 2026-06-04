@@ -8,7 +8,11 @@ import net.minecraft.util.Identifier;
 
 /** Bidirectional snapshot of live G'Express settings. */
 public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4FirstBeepSeconds, int wrongWirePercent,
-		int grenadePrice, int passiveIncomeKiller, int passiveIncomeCivilian, int passiveIncomeNeutral,
+		int grenadePrice, int bombSpecialistFirecrackerPrice, int bombSpecialistLockpickPrice,
+		int bombSpecialistCrowbarPrice, int mafiosoKnifePrice, int mafiosoRevolverPrice,
+		int janitorPoisonVialPrice, int janitorScorpionPrice, int burglarCrowbarPrice,
+		int burglarLockpickPrice,
+		int passiveIncomeKiller, int passiveIncomeCivilian, int passiveIncomeNeutral,
 		int passiveIncomeVigilante, int passiveIncomeMafia,
 		int medicShieldCooldownSeconds, boolean medicShieldKnifeBreaks,
 		int silentShadowDurationSeconds, int silentShadowCooldownSeconds,
@@ -38,6 +42,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int mafiaRecruitRange, int mafiaReplacementCooldownSeconds, int mafiaRevolverKillCooldownSeconds,
 		int janitorCleanRange, int janitorCleanCooldownSeconds, int janitorRevolverCooldownAfterCleanSeconds,
 		int janitorCleanCooldownAfterKillSeconds,
+		int pickpocketMaxHoldSeconds, int pickpocketCoinsPerSecond, int pickpocketRange,
+		int copycatCopyCooldownSeconds, int copycatCopyDurationSeconds, int copycatCopyRange,
 		boolean useCustomRoleCounts, int maxKillerAmount, int maxVigilanteAmount,
 		int maxNeutralAmount, int maxModifiersPerPlayer,
 		int playersPerKiller, int playersPerVigilante, int playersPerNeutral,
@@ -51,10 +57,24 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		float shortSightedFogRange,
 		int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
 		int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
-		float silentShadowAlpha, String specialRoleOccurrence) implements CustomPayload {
+		float silentShadowAlpha, String specialRoleOccurrence,
+		int seerCompareCooldownSeconds, int seerCompareRange,
+		int cupidRequiredAlivePairs, int cupidPairCooldownSeconds, int cupidRange,
+		boolean loversShowPartnerHud, boolean loversAllowMixedSidePairs,
+		int covenantBiteCooldownSeconds,
+		int vengefulSpiritReviveDelaySeconds, int vengefulSpiritRevengeSeconds) implements CustomPayload {
 
-	private static final int WIRE_VERSION = 4;
+	private static final int WIRE_VERSION = 7;
 	private static final String DEFAULT_SPECIAL_ROLE_OCCURRENCE = "both";
+	private static final int DEFAULT_BOMB_SPECIALIST_FIRECRACKER_PRICE = 10;
+	private static final int DEFAULT_BOMB_SPECIALIST_LOCKPICK_PRICE = 50;
+	private static final int DEFAULT_BOMB_SPECIALIST_CROWBAR_PRICE = 25;
+	private static final int DEFAULT_MAFIOSO_KNIFE_PRICE = 200;
+	private static final int DEFAULT_MAFIOSO_REVOLVER_PRICE = 350;
+	private static final int DEFAULT_JANITOR_POISON_VIAL_PRICE = 100;
+	private static final int DEFAULT_JANITOR_SCORPION_PRICE = 125;
+	private static final int DEFAULT_BURGLAR_CROWBAR_PRICE = 25;
+	private static final int DEFAULT_BURGLAR_LOCKPICK_PRICE = 50;
 
 	public static final CustomPayload.Id<GexpressConfigSyncPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "config_sync_v2"));
@@ -84,6 +104,15 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		buf.writeInt(payload.c4FirstBeepSeconds());
 		buf.writeInt(payload.wrongWirePercent());
 		buf.writeInt(payload.grenadePrice());
+		buf.writeInt(payload.bombSpecialistFirecrackerPrice());
+		buf.writeInt(payload.bombSpecialistLockpickPrice());
+		buf.writeInt(payload.bombSpecialistCrowbarPrice());
+		buf.writeInt(payload.mafiosoKnifePrice());
+		buf.writeInt(payload.mafiosoRevolverPrice());
+		buf.writeInt(payload.janitorPoisonVialPrice());
+		buf.writeInt(payload.janitorScorpionPrice());
+		buf.writeInt(payload.burglarCrowbarPrice());
+		buf.writeInt(payload.burglarLockpickPrice());
 		buf.writeInt(payload.passiveIncomeKiller());
 		buf.writeInt(payload.passiveIncomeCivilian());
 		buf.writeInt(payload.passiveIncomeNeutral());
@@ -156,6 +185,12 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		buf.writeInt(payload.janitorCleanCooldownSeconds());
 		buf.writeInt(payload.janitorRevolverCooldownAfterCleanSeconds());
 		buf.writeInt(payload.janitorCleanCooldownAfterKillSeconds());
+		buf.writeInt(payload.pickpocketMaxHoldSeconds());
+		buf.writeInt(payload.pickpocketCoinsPerSecond());
+		buf.writeInt(payload.pickpocketRange());
+		buf.writeInt(payload.copycatCopyCooldownSeconds());
+		buf.writeInt(payload.copycatCopyDurationSeconds());
+		buf.writeInt(payload.copycatCopyRange());
 		buf.writeBoolean(payload.useCustomRoleCounts());
 		buf.writeInt(payload.maxKillerAmount());
 		buf.writeInt(payload.maxVigilanteAmount());
@@ -189,37 +224,74 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		buf.writeInt(payload.medicShieldBreakFlashAlpha());
 		buf.writeFloat(payload.silentShadowAlpha());
 		buf.writeString(payload.specialRoleOccurrence(), 32);
+		buf.writeInt(payload.seerCompareCooldownSeconds());
+		buf.writeInt(payload.seerCompareRange());
+		buf.writeInt(payload.cupidRequiredAlivePairs());
+		buf.writeInt(payload.cupidPairCooldownSeconds());
+		buf.writeInt(payload.cupidRange());
+		buf.writeBoolean(payload.loversShowPartnerHud());
+		buf.writeBoolean(payload.loversAllowMixedSidePairs());
+		buf.writeInt(payload.covenantBiteCooldownSeconds());
+		buf.writeInt(payload.vengefulSpiritReviveDelaySeconds());
+		buf.writeInt(payload.vengefulSpiritRevengeSeconds());
 	}
 
 	private static GexpressConfigSyncPayload decodeVersioned(PacketByteBuf buf) {
 		int version = buf.readVarInt();
-		if (version == 3) return decodeFields(buf, true, false);
+		if (version == 3) return decodeFields(buf, true, false, false, false, false);
+		if (version == 4) return decodeFields(buf, true, true, false, false, false);
+		if (version == 5) return decodeFields(buf, true, true, true, false, false);
+		if (version == 6) return decodeFields(buf, true, true, true, true, false);
 		if (version != WIRE_VERSION) {
 			throw new IllegalArgumentException("Unsupported G'Express config sync version " + version);
 		}
-		return decodeFields(buf, true, true);
+		return decodeFields(buf, true, true, true, true, true);
 	}
 
 	private static GexpressConfigSyncPayload decodeLegacy(PacketByteBuf buf) {
 		int start = buf.readerIndex();
 		try {
-			GexpressConfigSyncPayload payload = decodeFields(buf, true, false);
+			GexpressConfigSyncPayload payload = decodeFields(buf, true, true, true, true, true);
+			if (buf.readableBytes() == 0) return payload;
+		} catch (RuntimeException ignored) {
+			// Fall back to the previous unversioned layout.
+		}
+		buf.readerIndex(start);
+		try {
+			GexpressConfigSyncPayload payload = decodeFields(buf, true, true, true, false, false);
+			if (buf.readableBytes() == 0) return payload;
+		} catch (RuntimeException ignored) {
+			// Fall back to the pre-special-role wire layout below.
+		}
+		buf.readerIndex(start);
+		try {
+			GexpressConfigSyncPayload payload = decodeFields(buf, true, false, false, false, false);
 			if (buf.readableBytes() == 0) return payload;
 		} catch (RuntimeException ignored) {
 			// Fall back to the pre-Guardian-Angel wire layout below.
 		}
 		buf.readerIndex(start);
-		return decodeFields(buf, false, false);
+		return decodeFields(buf, false, false, false, false, false);
 	}
 
 	private static GexpressConfigSyncPayload decodeFields(PacketByteBuf buf, boolean includesGuardianAngelSetting,
-			boolean includesSpecialRoleOccurrence) {
+			boolean includesSpecialRoleOccurrence, boolean includesPickpocketCopycatSettings,
+			boolean includesRoleShopPrices, boolean includesNewRoleSettings) {
 		return new GexpressConfigSyncPayload(
 			buf.readInt(), // c4Price
 			buf.readInt(), // c4FuseSeconds
 			buf.readInt(), // c4FirstBeepSeconds
 			buf.readInt(), // wrongWirePercent
 			buf.readInt(), // grenadePrice
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_BOMB_SPECIALIST_FIRECRACKER_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_BOMB_SPECIALIST_LOCKPICK_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_BOMB_SPECIALIST_CROWBAR_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_MAFIOSO_KNIFE_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_MAFIOSO_REVOLVER_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_JANITOR_POISON_VIAL_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_JANITOR_SCORPION_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_BURGLAR_CROWBAR_PRICE,
+			includesRoleShopPrices ? buf.readInt() : DEFAULT_BURGLAR_LOCKPICK_PRICE,
 			buf.readInt(), // passiveIncomeKiller
 			buf.readInt(), // passiveIncomeCivilian
 			buf.readInt(), // passiveIncomeNeutral
@@ -292,6 +364,12 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // janitorCleanCooldownSeconds
 			buf.readInt(), // janitorRevolverCooldownAfterCleanSeconds
 			buf.readInt(), // janitorCleanCooldownAfterKillSeconds
+			includesPickpocketCopycatSettings ? buf.readInt() : 6, // pickpocketMaxHoldSeconds
+			includesPickpocketCopycatSettings ? buf.readInt() : 12, // pickpocketCoinsPerSecond
+			includesPickpocketCopycatSettings ? buf.readInt() : 4, // pickpocketRange
+			includesPickpocketCopycatSettings ? buf.readInt() : 45, // copycatCopyCooldownSeconds
+			includesPickpocketCopycatSettings ? buf.readInt() : 120, // copycatCopyDurationSeconds
+			includesPickpocketCopycatSettings ? buf.readInt() : 16, // copycatCopyRange
 			buf.readBoolean(), // useCustomRoleCounts
 			buf.readInt(), // maxKillerAmount
 			buf.readInt(), // maxVigilanteAmount
@@ -324,7 +402,17 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // medicShieldBlockFlashAlpha
 			buf.readInt(), // medicShieldBreakFlashAlpha
 			buf.readFloat(), // silentShadowAlpha
-			includesSpecialRoleOccurrence ? buf.readString(32) : DEFAULT_SPECIAL_ROLE_OCCURRENCE
+			includesSpecialRoleOccurrence ? buf.readString(32) : DEFAULT_SPECIAL_ROLE_OCCURRENCE,
+			includesNewRoleSettings ? buf.readInt() : 45, // seerCompareCooldownSeconds
+			includesNewRoleSettings ? buf.readInt() : 4, // seerCompareRange
+			includesNewRoleSettings ? buf.readInt() : 3, // cupidRequiredAlivePairs
+			includesNewRoleSettings ? buf.readInt() : 20, // cupidPairCooldownSeconds
+			includesNewRoleSettings ? buf.readInt() : 4, // cupidRange
+			includesNewRoleSettings ? buf.readBoolean() : true, // loversShowPartnerHud
+			includesNewRoleSettings && buf.readBoolean(), // loversAllowMixedSidePairs
+			includesNewRoleSettings ? buf.readInt() : 15, // covenantBiteCooldownSeconds
+			includesNewRoleSettings ? buf.readInt() : 15, // vengefulSpiritReviveDelaySeconds
+			includesNewRoleSettings ? buf.readInt() : 30 // vengefulSpiritRevengeSeconds
 		);
 	}
 

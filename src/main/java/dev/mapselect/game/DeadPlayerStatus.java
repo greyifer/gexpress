@@ -2,7 +2,7 @@ package dev.mapselect.game;
 
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
@@ -11,7 +11,7 @@ public final class DeadPlayerStatus {
 	private DeadPlayerStatus() {}
 
 	public static boolean isDeadRoundParticipant(ServerPlayerEntity player) {
-		if (player == null || player.getWorld() == null || VultureManager.isStashed(player)) return false;
+		if (player == null || player.getWorld() == null || PelicanManager.isStashed(player)) return false;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
 		if (game == null || !isRunningOrStopping(game) || !game.getRoles().containsKey(player.getUuid())) {
 			return false;
@@ -21,7 +21,7 @@ public final class DeadPlayerStatus {
 	}
 
 	public static boolean isLivingRoundParticipant(ServerPlayerEntity player) {
-		if (player == null || player.getWorld() == null || VultureManager.isStashed(player)) return false;
+		if (player == null || player.getWorld() == null || PelicanManager.isStashed(player)) return false;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
 		return game != null
 			&& isRunningOrStopping(game)

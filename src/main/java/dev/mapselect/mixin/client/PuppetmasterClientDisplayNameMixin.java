@@ -3,6 +3,7 @@ package dev.mapselect.mixin.client;
 import dev.mapselect.client.ClientPuppetmasterState;
 import dev.mapselect.client.ClientSkincrawlerState;
 import dev.mapselect.client.ClientTricksterState;
+import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
@@ -30,7 +31,7 @@ public abstract class PuppetmasterClientDisplayNameMixin {
 		if (client == null || client.world == null) return;
 		for (PlayerEntity player : client.world.getPlayers()) {
 			if (replacementId.equals(player.getUuid())) {
-				cir.setReturnValue(Text.literal(player.getName().getString()));
+				cir.setReturnValue(GexpressPermissions.displayName(player));
 				return;
 			}
 		}

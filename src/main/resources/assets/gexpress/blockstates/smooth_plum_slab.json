@@ -1,0 +1,14 @@
+﻿{
+  "variants": {
+    "type=bottom": {
+      "model": "gexpress:block/smooth_plum_slab"
+    },
+    "type=double": {
+      "model": "gexpress:block/smooth_plum"
+    },
+    "type=top": {
+      "model": "gexpress:block/smooth_plum_slab_top"
+    }
+  }
+}
+

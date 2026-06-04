@@ -61,7 +61,7 @@ public final class ClientSkincrawlerState {
 		try {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			Role role = game == null ? null : game.getRole(client.player);
-			return role != null && MapSelectRoles.SKINCRAWLER_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.SKINCRAWLER_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

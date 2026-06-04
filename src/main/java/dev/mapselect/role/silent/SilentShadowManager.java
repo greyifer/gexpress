@@ -7,7 +7,7 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.ShadowMarchUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -47,7 +47,7 @@ public final class SilentShadowManager {
 
 	private static void tryActivate(ServerPlayerEntity player) {
 		if (player == null || player.getWorld().isClient) return;
-		if (VultureManager.isStashed(player)) return;
+		if (PelicanManager.isStashed(player)) return;
 		if (!canUseSilentHere(player.getWorld(), player) || !isSilent(player)) return;
 		if (!isPlayableForSilent(player)) return;
 
@@ -59,14 +59,15 @@ public final class SilentShadowManager {
 			return;
 		}
 
-		long cooldown = comp.cooldownRemainingTicks(player.getUuid());
-		if (cooldown > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(player);
+		long cooldown = creativeBypass ? 0L : comp.cooldownRemainingTicks(player.getUuid());
+		if (!creativeBypass && cooldown > 0L) {
 			player.sendMessage(Text.literal("Shadow March ready in " + secondsCeil(cooldown) + "s."), true);
 			return;
 		}
 
 		int durationTicks = GexpressConfig.getSilentShadowDurationSeconds() * 20;
-		int cooldownTicks = GexpressConfig.getSilentShadowCooldownSeconds() * 20;
+		int cooldownTicks = creativeBypass ? 0 : GexpressConfig.getSilentShadowCooldownSeconds() * 20;
 		if (!comp.activate(player, durationTicks, cooldownTicks)) {
 			player.sendMessage(Text.literal("Shadow March failed."), true);
 			return;
@@ -98,7 +99,7 @@ public final class SilentShadowManager {
 				comp.remove(playerId);
 				continue;
 			}
-			if (VultureManager.isStashed(player) || !canUseSilentHere(world, player)
+			if (PelicanManager.isStashed(player) || !canUseSilentHere(world, player)
 					|| !isPlayableForSilent(player) || !isSilent(player)) {
 				comp.end(player, false);
 				continue;
@@ -116,7 +117,8 @@ public final class SilentShadowManager {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
 		if (game == null) return false;
 		Role role = game.getRole(player);
-		return role != null && MapSelectRoles.THE_SILENT_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.THE_SILENT_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.THE_SILENT_ID));
 	}
 
 	private static boolean isActiveGame(World world) {

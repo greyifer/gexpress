@@ -229,10 +229,11 @@ public final class C4Detonation {
 		if (expired != null) {
 			for (UUID carrierId : expired) {
 				ServerPlayerEntity carrier = server.getPlayerManager().getPlayer(carrierId);
+				ServerPlayerEntity owner = server.getPlayerManager().getPlayer(comp.getOwner(carrierId));
 				comp.removeC4(carrierId);
 				if (carrier == null || carrier.isRemoved()) continue;
 				if (!(carrier.getWorld() instanceof ServerWorld currentWorld)) continue;
-				detonateAt(currentWorld, carrier, carrier);
+				detonateAt(currentWorld, carrier, owner);
 			}
 		}
 
@@ -365,7 +366,7 @@ public final class C4Detonation {
 
 		C4BackComponent comp = C4BackComponent.KEY.getNullable(world);
 		if (comp == null || comp.hasC4(target.getUuid())) return false;
-		if (!comp.addC4(target.getUuid())) return false;
+		if (!comp.addC4(target.getUuid(), charge.owner())) return false;
 		entity.discard();
 		world.playSound(null, target.getX(), target.getY(), target.getZ(),
 			SoundEvents.ENTITY_TNT_PRIMED, SoundCategory.PLAYERS, 0.8F, 1.3F);

@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "gexpress:block/purple_moquette_slab"
+    },
+    "type=double": {
+      "model": "gexpress:block/purple_moquette"
+    },
+    "type=top": {
+      "model": "gexpress:block/purple_moquette_slab_top"
+    }
+  }
+}

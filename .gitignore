@@ -2,6 +2,7 @@
 /.gradle/
 /build/
 **/build/
+/bin/
 
 # Minecraft/Fabric run output
 /run/
@@ -31,3 +32,7 @@ desktop.ini
 
 # Local dependency jars are resolved from Maven/Modrinth in Gradle.
 /libs/
+
+# Local Codex workspace helpers
+/.codex/
+/.codex-jdk21/

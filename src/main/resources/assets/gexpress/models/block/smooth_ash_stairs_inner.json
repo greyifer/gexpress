@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/inner_stairs",
+  "textures": {
+    "bottom": "gexpress:block/smooth_ash",
+    "side": "gexpress:block/smooth_ash",
+    "top": "gexpress:block/smooth_ash"
+  }
+}

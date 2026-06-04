@@ -1,0 +1,8 @@
+﻿{
+  "parent": "minecraft:block/stairs",
+  "textures": {
+    "bottom": "gexpress:block/smooth_olive",
+    "side": "gexpress:block/smooth_olive",
+    "top": "gexpress:block/smooth_olive"
+  }
+}

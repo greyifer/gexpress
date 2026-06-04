@@ -21,7 +21,8 @@ public abstract class GexpressCustomModeMoodRendererMixin {
 	)
 	private static GameMode gexpress$renderMoodHudForCustomModes(GameWorldComponent game,
 			Operation<GameMode> original) {
-		if (GexpressGameModes.isAmnesia(game) || GexpressGameModes.isTakeover(game)) {
+		if (GexpressGameModes.isAmnesia(game) || GexpressGameModes.isTakeover(game)
+				|| GexpressGameModes.isTest(game)) {
 			return WatheGameModes.MURDER;
 		}
 		return original.call(game);
@@ -35,7 +36,8 @@ public abstract class GexpressCustomModeMoodRendererMixin {
 		MinecraftClient client = MinecraftClient.getInstance();
 		GameWorldComponent game = client == null || client.world == null
 			? null : GameWorldComponent.KEY.getNullable(client.world);
-		if (GexpressGameModes.isAmnesia(game) || GexpressGameModes.isTakeover(game)) {
+		if (GexpressGameModes.isAmnesia(game) || GexpressGameModes.isTakeover(game)
+				|| GexpressGameModes.isTest(game)) {
 			return Role.MoodType.REAL;
 		}
 		return original;

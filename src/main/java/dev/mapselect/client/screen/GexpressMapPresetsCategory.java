@@ -7,10 +7,10 @@ import dev.isxander.yacl3.api.ListOption;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.OptionGroup;
+import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
-import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.weather.WeatherType;
 import net.minecraft.client.MinecraftClient;
@@ -71,6 +71,22 @@ public final class GexpressMapPresetsCategory {
 
 		category.group(buildRandomSpawnActions(name, edit));
 		category.group(buildRandomSpawnsGroup(edit));
+
+		OptionGroup.Builder features = OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.map.features").formatted(Formatting.YELLOW));
+		features.option(Option.<Boolean>createBuilder()
+			.name(fieldLabel("couchSleepingEnabled"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.map.couchSleepingEnabled.tooltip")))
+			.binding(true, edit::isCouchSleepingEnabled, v -> edit.couchSleepingEnabled = v)
+			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true))
+			.build());
+		features.option(Option.<Boolean>createBuilder()
+			.name(fieldLabel("staticMapEnabled"))
+			.description(OptionDescription.of(Text.literal("Tracks and restores changed blocks inside wholeMapArea after a round.")))
+			.binding(false, edit::isStaticMapEnabled, v -> edit.staticMapEnabled = v)
+			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true))
+			.build());
+		category.group(features.build());
 
 		OptionGroup.Builder visuals = OptionGroup.createBuilder()
 			.name(Text.translatable("gui.gexpress.config.group.map.visuals").formatted(Formatting.YELLOW));
@@ -192,6 +208,8 @@ public final class GexpressMapPresetsCategory {
 		copy.defaultTrainPreset = src.defaultTrainPreset;
 		copy.lobbyTrainCorner = cloneOffset(src.lobbyTrainCorner);
 		copy.roomCount = MapPreset.normalizeRoomCount(src.roomCount);
+		copy.couchSleepingEnabled = src.isCouchSleepingEnabled();
+		copy.staticMapEnabled = src.isStaticMapEnabled();
 		copy.randomSpawnPositions = new ArrayList<>();
 		if (src.randomSpawnPositions != null) {
 			for (MapPreset.PosData p : src.randomSpawnPositions) {
@@ -255,6 +273,7 @@ public final class GexpressMapPresetsCategory {
 	private static void ensureNonNullShapes(MapPreset p) {
 		if (p.weather == null) p.weather = WeatherType.NONE;
 		p.roomCount = MapPreset.normalizeRoomCount(p.roomCount);
+		if (p.staticMapEnabled == null) p.staticMapEnabled = Boolean.FALSE;
 		if (p.randomSpawnPositions == null) p.randomSpawnPositions = new ArrayList<>();
 		if (p.freshAirAreas == null) p.freshAirAreas = new ArrayList<>();
 	}

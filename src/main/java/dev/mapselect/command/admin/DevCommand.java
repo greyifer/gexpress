@@ -58,19 +58,7 @@ public final class DevCommand {
 
 		return root
 			.requires(DEV)
-			.then(CommandManager.literal("level")
-				.then(CommandManager.literal("xp")
-					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
-						.then(CommandManager.argument("amount", IntegerArgumentType.integer(0))
-							.executes(ctx -> runLevelXp(ctx,
-								GameProfileArgumentType.getProfileArgument(ctx, "players"),
-								IntegerArgumentType.getInteger(ctx, "amount"))))))
-				.then(CommandManager.literal("level")
-					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
-						.then(CommandManager.argument("level", IntegerArgumentType.integer(1))
-							.executes(ctx -> runLevelSet(ctx,
-								GameProfileArgumentType.getProfileArgument(ctx, "players"),
-								IntegerArgumentType.getInteger(ctx, "level")))))))
+			.then(levelCommandTree())
 			.then(CommandManager.literal("c4back")
 				.then(CommandManager.literal("offset")
 					.then(floatSetting("x", GexpressConfig.C4_BACK_OFFSET_MIN, GexpressConfig.C4_BACK_OFFSET_MAX,
@@ -165,6 +153,35 @@ public final class DevCommand {
 								BlockPosArgumentType.getBlockPos(ctx, "corner2")))))));
 	}
 
+	private static LiteralArgumentBuilder<ServerCommandSource> levelCommandTree() {
+		return CommandManager.literal("level")
+			.then(CommandManager.literal("xp")
+				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+					.then(CommandManager.argument("amount", IntegerArgumentType.integer(0))
+						.executes(ctx -> runLevelXp(ctx,
+							GameProfileArgumentType.getProfileArgument(ctx, "players"),
+							IntegerArgumentType.getInteger(ctx, "amount"))))))
+			.then(CommandManager.literal("level")
+				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+					.then(CommandManager.argument("level", IntegerArgumentType.integer(1))
+						.executes(ctx -> runLevelSet(ctx,
+							GameProfileArgumentType.getProfileArgument(ctx, "players"),
+							IntegerArgumentType.getInteger(ctx, "level"))))))
+			.then(CommandManager.literal("reset")
+				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+					.executes(ctx -> runLevelReset(ctx,
+						GameProfileArgumentType.getProfileArgument(ctx, "players")))))
+			.then(CommandManager.literal("rewards")
+				.then(CommandManager.literal("reset")
+					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+						.executes(ctx -> runLevelRewardResetAll(ctx,
+							GameProfileArgumentType.getProfileArgument(ctx, "players")))
+						.then(CommandManager.argument("level", IntegerArgumentType.integer(1))
+							.executes(ctx -> runLevelRewardResetLevel(ctx,
+								GameProfileArgumentType.getProfileArgument(ctx, "players"),
+								IntegerArgumentType.getInteger(ctx, "level")))))));
+	}
+
 	private static int runLevelXp(CommandContext<ServerCommandSource> ctx, Collection<GameProfile> profiles,
 			int progress) {
 		ServerCommandSource src = ctx.getSource();
@@ -200,6 +217,54 @@ public final class DevCommand {
 		final int finalChanged = changed;
 		src.sendFeedback(() -> Text.literal("Set level to " + level + " for "
 				+ finalChanged + " player(s).").formatted(Formatting.GREEN), true);
+		return changed;
+	}
+
+	private static int runLevelReset(CommandContext<ServerCommandSource> ctx, Collection<GameProfile> profiles) {
+		ServerCommandSource src = ctx.getSource();
+		LevelComponent levels = LevelComponent.KEY.get(src.getWorld());
+		int changed = 0;
+		for (GameProfile profile : profiles) {
+			if (profile == null || profile.getId() == null) continue;
+			levels.resetPlayer(profile.getId());
+			refreshLevelDisplay(src, profile);
+			changed++;
+		}
+		final int finalChanged = changed;
+		src.sendFeedback(() -> Text.literal("Reset level, XP, and claimed roadmap rewards for "
+				+ finalChanged + " player(s).").formatted(Formatting.YELLOW), true);
+		return changed;
+	}
+
+	private static int runLevelRewardResetAll(CommandContext<ServerCommandSource> ctx,
+			Collection<GameProfile> profiles) {
+		ServerCommandSource src = ctx.getSource();
+		LevelComponent levels = LevelComponent.KEY.get(src.getWorld());
+		int changed = 0;
+		for (GameProfile profile : profiles) {
+			if (profile == null || profile.getId() == null) continue;
+			levels.resetClaimedRewards(profile.getId());
+			changed++;
+		}
+		final int finalChanged = changed;
+		src.sendFeedback(() -> Text.literal("Reset claimed XP Roadmap rewards for "
+				+ finalChanged + " player(s).").formatted(Formatting.YELLOW), true);
+		return changed;
+	}
+
+	private static int runLevelRewardResetLevel(CommandContext<ServerCommandSource> ctx,
+			Collection<GameProfile> profiles, int level) {
+		ServerCommandSource src = ctx.getSource();
+		LevelComponent levels = LevelComponent.KEY.get(src.getWorld());
+		int changed = 0;
+		for (GameProfile profile : profiles) {
+			if (profile == null || profile.getId() == null) continue;
+			levels.resetClaimedReward(profile.getId(), level);
+			changed++;
+		}
+		final int finalChanged = changed;
+		src.sendFeedback(() -> Text.literal("Reset level " + level + " XP Roadmap reward claim for "
+				+ finalChanged + " player(s).").formatted(Formatting.YELLOW), true);
 		return changed;
 	}
 

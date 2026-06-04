@@ -26,6 +26,10 @@ public final class GexpressTestState {
 		return player != null && ROLE_TESTERS.contains(player.getUuid());
 	}
 
+	public static boolean hasCreativeAbilityBypass(PlayerEntity player) {
+		return isRoleTester(player) && player.isCreative();
+	}
+
 	public static boolean hasRoleTesters() {
 		return !ROLE_TESTERS.isEmpty();
 	}

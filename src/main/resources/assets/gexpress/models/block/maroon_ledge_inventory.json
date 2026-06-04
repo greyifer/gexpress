@@ -1,0 +1,137 @@
+﻿{
+    "parent":  "block/block",
+    "textures":  {
+                     "particle":  "gexpress:block/maroon_ledge",
+                     "ledge":  "gexpress:block/maroon_ledge"
+                 },
+    "elements":  [
+                     {
+                         "from":  [
+                                      0,
+                                      0,
+                                      0
+                                  ],
+                         "to":  [
+                                    16,
+                                    2,
+                                    2
+                                ],
+                         "faces":  {
+                                       "down":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "up":  {
+                                                  "texture":  "#ledge"
+                                              },
+                                       "north":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "south":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "west":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "east":  {
+                                                    "texture":  "#ledge"
+                                                }
+                                   }
+                     },
+                     {
+                         "from":  [
+                                      14,
+                                      0,
+                                      2
+                                  ],
+                         "to":  [
+                                    16,
+                                    2,
+                                    14
+                                ],
+                         "faces":  {
+                                       "down":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "up":  {
+                                                  "texture":  "#ledge"
+                                              },
+                                       "north":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "south":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "west":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "east":  {
+                                                    "texture":  "#ledge"
+                                                }
+                                   }
+                     },
+                     {
+                         "from":  [
+                                      0,
+                                      0,
+                                      14
+                                  ],
+                         "to":  [
+                                    16,
+                                    2,
+                                    16
+                                ],
+                         "faces":  {
+                                       "down":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "up":  {
+                                                  "texture":  "#ledge"
+                                              },
+                                       "north":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "south":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "west":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "east":  {
+                                                    "texture":  "#ledge"
+                                                }
+                                   }
+                     },
+                     {
+                         "from":  [
+                                      0,
+                                      0,
+                                      2
+                                  ],
+                         "to":  [
+                                    2,
+                                    2,
+                                    14
+                                ],
+                         "faces":  {
+                                       "down":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "up":  {
+                                                  "texture":  "#ledge"
+                                              },
+                                       "north":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "south":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "west":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "east":  {
+                                                    "texture":  "#ledge"
+                                                }
+                                   }
+                     }
+                 ]
+}

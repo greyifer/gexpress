@@ -83,7 +83,7 @@ public class C4Item extends Item {
 			target.getName().getString(), user.getName().getString(),
 			fuseSeconds, world.getTime() + (long) (firstBeepSeconds + fuseSeconds) * 20L, world.getTime());
 
-		if (!comp.addC4(target.getUuid())) return ActionResult.FAIL;
+		if (!comp.addC4(target.getUuid(), user.getUuid())) return ActionResult.FAIL;
 
 		if (!user.getAbilities().creativeMode) {
 			stack.decrement(1);

@@ -11,7 +11,7 @@ import dev.mapselect.network.WarlockMarkPayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -48,7 +48,7 @@ public final class WarlockManager {
 
 	private static void tryMark(ServerPlayerEntity warlock) {
 		if (warlock == null || warlock.getWorld().isClient) return;
-		if (VultureManager.isStashed(warlock)) return;
+		if (PelicanManager.isStashed(warlock)) return;
 		if (!canUseWarlockHere(warlock.getWorld(), warlock) || !isWarlock(warlock)) return;
 		ServerPlayerEntity target = findLookTarget(warlock, MARK_RANGE);
 		if (target == null) {
@@ -69,8 +69,9 @@ public final class WarlockManager {
 			return;
 		}
 
-		long remaining = comp.markCooldownRemainingTicks(warlock.getUuid());
-		if (remaining > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(warlock);
+		long remaining = creativeBypass ? 0L : comp.markCooldownRemainingTicks(warlock.getUuid());
+		if (!creativeBypass && remaining > 0L) {
 			warlock.sendMessage(Text.literal("Mark ready in " + secondsCeil(remaining) + "s."), true);
 			return;
 		}
@@ -79,6 +80,7 @@ public final class WarlockManager {
 			warlock.sendMessage(Text.literal("Could not mark target."), true);
 			return;
 		}
+		if (creativeBypass) comp.reduceMarkCooldown(warlock.getUuid(), Long.MAX_VALUE);
 
 		warlock.playSoundToPlayer(SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.7F, 0.55F);
 		warlock.sendMessage(Text.literal("Marked " + target.getName().getString() + "."), true);
@@ -87,7 +89,7 @@ public final class WarlockManager {
 
 	private static void tryHexKill(ServerPlayerEntity warlock) {
 		if (warlock == null || warlock.getWorld().isClient) return;
-		if (VultureManager.isStashed(warlock)) return;
+		if (PelicanManager.isStashed(warlock)) return;
 		if (!canUseWarlockHere(warlock.getWorld(), warlock) || !isWarlock(warlock)) return;
 		if (!isPlayableForWarlock(warlock, warlock)) return;
 
@@ -100,8 +102,9 @@ public final class WarlockManager {
 			return;
 		}
 
-		long cooldown = comp.killCooldownRemainingTicks(warlock.getUuid());
-		if (cooldown > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(warlock);
+		long cooldown = creativeBypass ? 0L : comp.killCooldownRemainingTicks(warlock.getUuid());
+		if (!creativeBypass && cooldown > 0L) {
 			warlock.sendMessage(Text.literal("Hex ready in " + secondsCeil(cooldown) + "s."), true);
 			return;
 		}
@@ -125,7 +128,7 @@ public final class WarlockManager {
 		playShot(warlock);
 		GameFunctions.killPlayer(victim, true, warlock, GameConstants.DeathReasons.GUN);
 		SpyManager.recordInteraction(warlock, victim);
-		comp.setKillCooldown(warlock.getUuid());
+		if (!creativeBypass) comp.setKillCooldown(warlock.getUuid());
 		comp.removeMark(warlock.getUuid());
 		warlock.sendMessage(Text.literal("The mark killed " + victim.getName().getString() + "."), true);
 	}
@@ -172,7 +175,7 @@ public final class WarlockManager {
 			ServerPlayerEntity marked = markId == null ? null : server.getPlayerManager().getPlayer(markId);
 			if (warlock == null || marked == null
 					|| marked.getWorld() != world
-					|| VultureManager.isStashed(warlock)
+					|| PelicanManager.isStashed(warlock)
 					|| !canUseWarlockHere(world, warlock)
 					|| !isPlayableForWarlock(warlock, warlock)
 					|| !isPlayableForWarlock(marked, warlock)
@@ -187,7 +190,8 @@ public final class WarlockManager {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
 		if (game == null) return false;
 		Role role = game.getRole(player);
-		return role != null && MapSelectRoles.WARLOCK_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.WARLOCK_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.WARLOCK_ID));
 	}
 
 	private static boolean isActiveGame(World world) {

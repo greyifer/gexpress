@@ -14,7 +14,7 @@ import dev.mapselect.network.SpyStatusPayload;
 import dev.mapselect.network.SpyUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.bodyguard.BodyguardManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.task.ConversationTask;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -56,7 +56,7 @@ public final class SpyManager {
 
 	private static void tryBug(ServerPlayerEntity spy) {
 		if (spy == null || !(spy.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(spy) || !isSpy(spy) || !canUseHere(world, spy)
+		if (PelicanManager.isStashed(spy) || !isSpy(spy) || !canUseHere(world, spy)
 				|| !isPlayable(spy, spy)) return;
 		Bug activeBug = bugsBySpy.get(spy.getUuid());
 		if (activeBug != null && activeBug.expiresAtTick() > world.getTime()) {
@@ -171,7 +171,7 @@ public final class SpyManager {
 		ServerPlayerEntity best = null;
 		double bestDistanceSq = Double.MAX_VALUE;
 		for (ServerPlayerEntity candidate : spy.getServerWorld().getPlayers()) {
-			if (candidate == spy || VultureManager.isStashed(candidate) || !isPlayable(candidate, spy)) continue;
+			if (candidate == spy || PelicanManager.isStashed(candidate) || !isPlayable(candidate, spy)) continue;
 			var hit = candidate.getBoundingBox().raycast(eye, end);
 			if (hit.isEmpty() || !spy.canSee(candidate)) continue;
 			double distanceSq = eye.squaredDistanceTo(hit.get());
@@ -207,7 +207,8 @@ public final class SpyManager {
 	private static boolean isSpy(PlayerEntity player) {
 		GameWorldComponent game = player == null ? null : GameWorldComponent.KEY.getNullable(player.getWorld());
 		Role role = game == null ? null : game.getRole(player);
-		return role != null && MapSelectRoles.SPY_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.SPY_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.SPY_ID));
 	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {

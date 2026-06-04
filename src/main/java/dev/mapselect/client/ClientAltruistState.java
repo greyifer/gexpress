@@ -38,7 +38,7 @@ public final class ClientAltruistState {
 		try {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			Role role = game == null ? null : game.getRole(client.player);
-			return role != null && MapSelectRoles.ALTRUIST_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.ALTRUIST_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

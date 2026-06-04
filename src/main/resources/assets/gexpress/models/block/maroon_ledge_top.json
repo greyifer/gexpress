@@ -1,0 +1,6 @@
+{
+  "parent": "gexpress:block/template_floor_ledge_top",
+  "textures": {
+    "texture": "gexpress:block/maroon_ledge"
+  }
+}

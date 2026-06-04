@@ -2,7 +2,7 @@ package dev.mapselect.mixin;
 
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
@@ -20,7 +20,8 @@ public abstract class PuppetmasterControlledMovementMixin {
 
 	@Inject(method = "onPlayerMove", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockControlledMovement(PlayerMoveC2SPacket packet, CallbackInfo ci) {
-		if (PuppetmasterManager.isControlled(player) || VultureManager.isStashed(player)
+		if (PuppetmasterManager.isControlled(player) || PuppetmasterManager.isController(player)
+				|| PelicanManager.isStashed(player)
 				|| TimeMasterManager.isFrozen(player)) {
 			ci.cancel();
 		}
@@ -28,7 +29,8 @@ public abstract class PuppetmasterControlledMovementMixin {
 
 	@Inject(method = "onPlayerInput", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockControlledInput(PlayerInputC2SPacket packet, CallbackInfo ci) {
-		if (PuppetmasterManager.isControlled(player) || VultureManager.isStashed(player)
+		if (PuppetmasterManager.isControlled(player) || PuppetmasterManager.isController(player)
+				|| PelicanManager.isStashed(player)
 				|| TimeMasterManager.isFrozen(player)) {
 			ci.cancel();
 		}

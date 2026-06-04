@@ -6,7 +6,6 @@ import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameConstants;
-import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.registry.MapSelectRoles;
@@ -61,7 +60,9 @@ public final class PassiveMoney {
 				|| MapSelectRoles.GODFATHER_ID.equals(id)) {
 			return GexpressConfig.getPassiveIncomeNeutral();
 		}
-		if (game.canUseKillerFeatures(player)) return GexpressConfig.getPassiveIncomeKiller();
+		if (GexpressRoleShop.canUseKillerEconomy(role) || game.canUseKillerFeatures(player)) {
+			return GexpressConfig.getPassiveIncomeKiller();
+		}
 		if (role.isInnocent()) {
 			return GexpressConfig.getPassiveIncomeCivilian();
 		}

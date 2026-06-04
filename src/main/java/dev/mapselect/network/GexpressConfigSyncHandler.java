@@ -1,6 +1,7 @@
 package dev.mapselect.network;
 
 import dev.mapselect.MapSelect;
+import dev.mapselect.command.admin.TagCommand;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -27,6 +28,8 @@ public final class GexpressConfigSyncHandler {
 		PayloadTypeRegistry.playS2C().register(GexpressTaskConfigPayload.ID, GexpressTaskConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressDevTuningPayload.ID, GexpressDevTuningPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SkinCaseResultPayload.ID, SkinCaseResultPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(TestOverlayPayload.ID, TestOverlayPayload.CODEC);
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> sendConfigTo(handler.player)));
@@ -46,6 +49,11 @@ public final class GexpressConfigSyncHandler {
 					GexpressConfigSyncPayload before = currentPayload();
 					GexpressConfig.apply(payload.c4Price(), payload.c4FuseSeconds(),
 						payload.c4FirstBeepSeconds(), payload.wrongWirePercent(), payload.grenadePrice(),
+						payload.bombSpecialistFirecrackerPrice(), payload.bombSpecialistLockpickPrice(),
+						payload.bombSpecialistCrowbarPrice(), payload.mafiosoKnifePrice(),
+						payload.mafiosoRevolverPrice(), payload.janitorPoisonVialPrice(),
+						payload.janitorScorpionPrice(), payload.burglarCrowbarPrice(),
+						payload.burglarLockpickPrice(),
 						payload.passiveIncomeKiller(), payload.passiveIncomeCivilian(),
 						payload.passiveIncomeNeutral(), payload.passiveIncomeVigilante(), payload.passiveIncomeMafia(),
 						payload.medicShieldCooldownSeconds(), payload.medicShieldKnifeBreaks(),
@@ -83,7 +91,11 @@ public final class GexpressConfigSyncHandler {
 						payload.mafiaReplacementCooldownSeconds(), payload.mafiaRevolverKillCooldownSeconds(),
 						payload.janitorCleanRange(), payload.janitorCleanCooldownSeconds(),
 						payload.janitorRevolverCooldownAfterCleanSeconds(),
-						payload.janitorCleanCooldownAfterKillSeconds(), payload.useCustomRoleCounts(),
+						payload.janitorCleanCooldownAfterKillSeconds(),
+						payload.pickpocketMaxHoldSeconds(), payload.pickpocketCoinsPerSecond(),
+						payload.pickpocketRange(), payload.copycatCopyCooldownSeconds(),
+						payload.copycatCopyDurationSeconds(), payload.copycatCopyRange(),
+						payload.useCustomRoleCounts(),
 						payload.maxKillerAmount(), payload.maxVigilanteAmount(),
 						payload.maxNeutralAmount(), payload.maxModifiersPerPlayer(),
 						payload.playersPerKiller(), payload.playersPerVigilante(), payload.playersPerNeutral(),
@@ -97,7 +109,12 @@ public final class GexpressConfigSyncHandler {
 						payload.shortSightedFogRange(),
 						payload.medicShieldBlockFlashTicks(), payload.medicShieldBreakFlashTicks(),
 						payload.medicShieldBlockFlashAlpha(), payload.medicShieldBreakFlashAlpha(),
-						payload.silentShadowAlpha(), payload.specialRoleOccurrence());
+						payload.silentShadowAlpha(), payload.specialRoleOccurrence(),
+						payload.seerCompareCooldownSeconds(), payload.seerCompareRange(),
+						payload.cupidRequiredAlivePairs(), payload.cupidPairCooldownSeconds(), payload.cupidRange(),
+						payload.loversShowPartnerHud(), payload.loversAllowMixedSidePairs(),
+						payload.covenantBiteCooldownSeconds(),
+						payload.vengefulSpiritReviveDelaySeconds(), payload.vengefulSpiritRevengeSeconds());
 					GexpressConfigSyncPayload after = currentPayload();
 					if (after.equals(before)) return;
 
@@ -197,11 +214,17 @@ public final class GexpressConfigSyncHandler {
 						payload.levelNeutralWinBonusXp(), payload.levelKillXp(), payload.levelCivilianTaskXp(),
 						payload.levelBaseXp(), payload.levelXpIncrease(), payload.levelRoadmapDisplayLevels(),
 						payload.levelXpOverrides(), payload.levelRewardRoadmap(),
-						payload.grenadeLineOfSightPassThroughBlocks());
+						payload.levelTags(),
+						payload.grenadeLineOfSightPassThroughBlocks(),
+						payload.goldFoodPlatterPrice(), payload.goldDrinkTrayPrice(), payload.skinCaseRows(),
+						payload.mutedNotePrice());
 					GexpressDevTuningPayload after = currentDevTuningPayload();
 					if (after.equals(before)) return;
 
 					GexpressConfig.save();
+					for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+						TagCommand.refreshPlayerListName(player);
+					}
 					MapSelect.LOGGER.info("G'Express dev tuning updated by {}: xp=[round {}, win {}, neutral {}, kill {}, task {}, base {}, inc {}, roadmapLevels {}], grenadePassThrough={}",
 						sender.getName().getString(),
 						GexpressConfig.getLevelRoundXp(),
@@ -311,6 +334,15 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getC4FirstBeepSeconds(),
 			GexpressConfig.getWrongWirePercent(),
 			GexpressConfig.getGrenadePrice(),
+			GexpressConfig.getBombSpecialistFirecrackerPrice(),
+			GexpressConfig.getBombSpecialistLockpickPrice(),
+			GexpressConfig.getBombSpecialistCrowbarPrice(),
+			GexpressConfig.getMafiosoKnifePrice(),
+			GexpressConfig.getMafiosoRevolverPrice(),
+			GexpressConfig.getJanitorPoisonVialPrice(),
+			GexpressConfig.getJanitorScorpionPrice(),
+			GexpressConfig.getBurglarCrowbarPrice(),
+			GexpressConfig.getBurglarLockpickPrice(),
 			GexpressConfig.getPassiveIncomeKiller(),
 			GexpressConfig.getPassiveIncomeCivilian(),
 			GexpressConfig.getPassiveIncomeNeutral(),
@@ -383,6 +415,12 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getJanitorCleanCooldownSeconds(),
 			GexpressConfig.getJanitorRevolverCooldownAfterCleanSeconds(),
 			GexpressConfig.getJanitorCleanCooldownAfterKillSeconds(),
+			GexpressConfig.getPickpocketMaxHoldSeconds(),
+			GexpressConfig.getPickpocketCoinsPerSecond(),
+			GexpressConfig.getPickpocketRange(),
+			GexpressConfig.getCopycatCopyCooldownSeconds(),
+			GexpressConfig.getCopycatCopyDurationSeconds(),
+			GexpressConfig.getCopycatCopyRange(),
 			GexpressConfig.useCustomRoleCounts(),
 			GexpressConfig.getMaxKillerAmount(),
 			GexpressConfig.getMaxVigilanteAmount(),
@@ -415,7 +453,17 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getMedicShieldBlockFlashAlpha(),
 			GexpressConfig.getMedicShieldBreakFlashAlpha(),
 			GexpressConfig.getSilentShadowAlpha(),
-			GexpressConfig.getSpecialRoleOccurrenceId()
+			GexpressConfig.getSpecialRoleOccurrenceId(),
+			GexpressConfig.getSeerCompareCooldownSeconds(),
+			GexpressConfig.getSeerCompareRange(),
+			GexpressConfig.getCupidRequiredAlivePairs(),
+			GexpressConfig.getCupidPairCooldownSeconds(),
+			GexpressConfig.getCupidRange(),
+			GexpressConfig.shouldShowLoverHud(),
+			GexpressConfig.canLoversPairAcrossSides(),
+			GexpressConfig.getCovenantBiteCooldownSeconds(),
+			GexpressConfig.getVengefulSpiritReviveDelaySeconds(),
+			GexpressConfig.getVengefulSpiritRevengeSeconds()
 		);
 	}
 
@@ -441,7 +489,12 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getLevelRoadmapDisplayLevels(),
 			GexpressConfig.getLevelXpOverridesSyncString(),
 			GexpressConfig.getLevelRewardRoadmapSyncString(),
-			GexpressConfig.getGrenadeLineOfSightPassThroughBlocksSyncString()
+			GexpressConfig.getLevelTagsSyncString(),
+			GexpressConfig.getGrenadeLineOfSightPassThroughBlocksSyncString(),
+			GexpressConfig.getGoldFoodPlatterPrice(),
+			GexpressConfig.getGoldDrinkTrayPrice(),
+			GexpressConfig.getSkinCaseRowsSyncString(),
+			GexpressConfig.getMutedNotePrice()
 		);
 	}
 }

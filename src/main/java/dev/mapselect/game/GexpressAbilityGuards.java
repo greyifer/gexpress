@@ -5,6 +5,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.network.AltruistUsePayload;
 import dev.mapselect.network.CovenantBatPayload;
 import dev.mapselect.network.CovenantBitePayload;
+import dev.mapselect.network.CupidUsePayload;
 import dev.mapselect.network.GuardianAngelShieldUsePayload;
 import dev.mapselect.network.MafiaActionPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
@@ -13,6 +14,7 @@ import dev.mapselect.network.PuppetmasterSelectPayload;
 import dev.mapselect.network.PuppetmasterUsePayload;
 import dev.mapselect.network.ScatterBrainUsePayload;
 import dev.mapselect.network.ShadowMarchUsePayload;
+import dev.mapselect.network.SeerCompareUsePayload;
 import dev.mapselect.network.SkincrawlerUsePayload;
 import dev.mapselect.network.SpyUsePayload;
 import dev.mapselect.network.TimeMasterFreezeUsePayload;
@@ -38,6 +40,7 @@ public final class GexpressAbilityGuards {
 		AltruistUsePayload.ID,
 		CovenantBatPayload.ID,
 		CovenantBitePayload.ID,
+		CupidUsePayload.ID,
 		GuardianAngelShieldUsePayload.ID,
 		MafiaActionPayload.ID,
 		MedicShieldUsePayload.ID,
@@ -45,6 +48,7 @@ public final class GexpressAbilityGuards {
 		PuppetmasterSelectPayload.ID,
 		PuppetmasterUsePayload.ID,
 		ScatterBrainUsePayload.ID,
+		SeerCompareUsePayload.ID,
 		ShadowMarchUsePayload.ID,
 		SkincrawlerUsePayload.ID,
 		SpyUsePayload.ID,
@@ -72,9 +76,11 @@ public final class GexpressAbilityGuards {
 	}
 
 	public static boolean shouldBlockAbilityPayload(ServerPlayerEntity player, CustomPayload payload) {
+		if (GexpressTestState.hasCreativeAbilityBypass(player)) return false;
 		return player != null && payload != null
-			&& !GexpressTestState.isRoleTester(player)
 			&& ABILITY_PAYLOADS.contains(payload.getId())
-			&& (DeadPlayerStatus.isDeadRoundParticipant(player) || TimeMasterManager.isRewinding(player));
+			&& (DeadPlayerStatus.isDeadRoundParticipant(player)
+				|| TimeMasterManager.isRewinding(player)
+				|| isSafePreparation(player.getWorld()));
 	}
 }

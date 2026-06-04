@@ -13,6 +13,8 @@ public final class ClientAbilityKeys {
 	private static KeyBinding secondaryBinding;
 	private static KeyBinding guidebookBinding;
 	private static KeyBinding guidebookTabBinding;
+	private static KeyBinding spectatorVoicePreviousBinding;
+	private static KeyBinding spectatorVoiceNextBinding;
 	private static Field boundKeyField;
 	private static boolean lookedUpBoundKeyField;
 
@@ -44,6 +46,18 @@ public final class ClientAbilityKeys {
 			GLFW.GLFW_KEY_TAB,
 			"category.gexpress"
 		));
+		spectatorVoicePreviousBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+			"key.gexpress.spectator_voice_previous",
+			InputUtil.Type.KEYSYM,
+			GLFW.GLFW_KEY_LEFT_BRACKET,
+			"category.gexpress"
+		));
+		spectatorVoiceNextBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+			"key.gexpress.spectator_voice_next",
+			InputUtil.Type.KEYSYM,
+			GLFW.GLFW_KEY_RIGHT_BRACKET,
+			"category.gexpress"
+		));
 	}
 
 	public static KeyBinding primaryBinding() {
@@ -62,6 +76,14 @@ public final class ClientAbilityKeys {
 		return guidebookTabBinding;
 	}
 
+	public static KeyBinding spectatorVoicePreviousBinding() {
+		return spectatorVoicePreviousBinding;
+	}
+
+	public static KeyBinding spectatorVoiceNextBinding() {
+		return spectatorVoiceNextBinding;
+	}
+
 	public static boolean matches(KeyBinding binding, int keyCode, int scanCode) {
 		if (binding == null) return false;
 		InputUtil.Key key = boundKey(binding);
@@ -73,6 +95,12 @@ public final class ClientAbilityKeys {
 	}
 
 	public static boolean isDown(MinecraftClient client, KeyBinding binding) {
+		boolean down = isPhysicallyDown(client, binding);
+		if (ClientCopycatState.shouldSuppressBorrowedSecondary(client, binding, down)) return false;
+		return down;
+	}
+
+	private static boolean isPhysicallyDown(MinecraftClient client, KeyBinding binding) {
 		if (binding == null) return false;
 		InputUtil.Key key = boundKey(binding);
 		if (key == null || client == null || client.getWindow() == null) return binding.isPressed();
@@ -92,15 +120,12 @@ public final class ClientAbilityKeys {
 		return binding.isPressed();
 	}
 
-	private static KeyBinding staticKeyBinding(String className, String fieldName) {
+	public static String displayName(KeyBinding binding) {
+		if (binding == null) return "";
 		try {
-			Class<?> cls = Class.forName(className);
-			Field field = cls.getDeclaredField(fieldName);
-			field.setAccessible(true);
-			Object value = field.get(null);
-			return value instanceof KeyBinding binding ? binding : null;
+			return binding.getBoundKeyLocalizedText().getString();
 		} catch (Throwable ignored) {
-			return null;
+			return "";
 		}
 	}
 

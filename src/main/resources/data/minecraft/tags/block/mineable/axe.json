@@ -1,0 +1,25 @@
+{
+	"replace": false,
+	"values": [
+		"gexpress:acacia_cabinet",
+		"gexpress:birch_cabinet",
+		"gexpress:cherry_cabinet",
+		"gexpress:dark_oak_cabinet",
+		"gexpress:jungle_cabinet",
+		"gexpress:mangrove_cabinet",
+		"gexpress:olive_planks",
+		"gexpress:olive_planks_stairs",
+		"gexpress:olive_planks_slab",
+		"gexpress:olive_planks_panel",
+		"gexpress:smooth_olive",
+		"gexpress:smooth_olive_stairs",
+		"gexpress:smooth_olive_slab",
+		"gexpress:smooth_olive_panel",
+		"gexpress:olive_herringbone",
+		"gexpress:olive_herringbone_stairs",
+		"gexpress:olive_herringbone_slab",
+		"gexpress:olive_herringbone_panel",
+		"gexpress:oak_cabinet",
+		"gexpress:spruce_cabinet"
+	]
+}

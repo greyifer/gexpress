@@ -1,0 +1,7 @@
+﻿{
+  "parent": "gexpress:block/template_panel",
+  "textures": {
+    "all": "gexpress:block/smooth_plum"
+  }
+}
+

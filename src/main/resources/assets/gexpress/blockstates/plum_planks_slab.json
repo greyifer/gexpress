@@ -1,0 +1,14 @@
+﻿{
+  "variants": {
+    "type=bottom": {
+      "model": "gexpress:block/plum_planks_slab"
+    },
+    "type=double": {
+      "model": "gexpress:block/plum_planks"
+    },
+    "type=top": {
+      "model": "gexpress:block/plum_planks_slab_top"
+    }
+  }
+}
+

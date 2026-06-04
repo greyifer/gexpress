@@ -63,7 +63,7 @@ public final class ClientMedicShieldState {
 		if (flashTicks <= 0 || flashMaxTicks <= 0) return;
 
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.getWindow() == null) return;
+		if (ClientHudVisibility.shouldHide(client) || client.getWindow() == null) return;
 
 		float progress = flashTicks / (float) flashMaxTicks;
 		int alpha = Math.max(0, Math.min(255, Math.round(flashMaxAlpha * progress)));

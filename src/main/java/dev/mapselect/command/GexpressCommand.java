@@ -3,6 +3,8 @@ package dev.mapselect.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.mapselect.command.admin.DevCommand;
+import dev.mapselect.command.admin.ForceCommand;
+import dev.mapselect.command.admin.GcoinCommand;
 import dev.mapselect.command.admin.HostCommand;
 import dev.mapselect.command.admin.SkinCommand;
 import dev.mapselect.command.admin.TagCommand;
@@ -12,7 +14,6 @@ import dev.mapselect.command.admin.TuningCommand;
 import dev.mapselect.command.admin.VoiceCommand;
 import dev.mapselect.command.game.EndCommand;
 import dev.mapselect.command.game.StartCommand;
-import dev.mapselect.command.roles.C4Command;
 import dev.mapselect.command.roles.PelicanCommand;
 import dev.mapselect.command.setup.MapCommand;
 import dev.mapselect.command.setup.RtpCommand;
@@ -37,23 +38,21 @@ public final class GexpressCommand {
 				.then(MapCommand.buildMapTree())
 				.then(TrainCommand.buildTree())
 				.then(RtpCommand.buildTree()))
+			.then(TestCommand.buildTree())
 			.then(CommandManager.literal("roles")
 				.then(TuningCommand.buildRoleTree())
-				.then(TestCommand.buildRoleTestSubTree())
-				.then(PelicanCommand.buildTree())
-				.then(C4Command.buildTree()))
+				.then(PelicanCommand.buildTree()))
 			.then(CommandManager.literal("modifiers")
-				.then(TuningCommand.buildModifierTree())
-				.then(TestCommand.buildModifierTestSubTree()))
+				.then(TuningCommand.buildModifierTree()))
+			.then(ForceCommand.buildTree())
+			.then(SkinCommand.buildPublicTree())
 			.then(DevCommand.appendTo(CommandManager.literal("admin")
 				.then(HostCommand.buildTree())
 				.then(TrustedCommand.buildTree())
 				.then(TagCommand.buildTree())
 				.then(SkinCommand.buildTree())
+				.then(GcoinCommand.buildTree())
 				.then(VoiceCommand.buildTree())
-				.then(TestCommand.buildRoleTestTree())
-				.then(TestCommand.buildModifierTestTree())
-				.then(TestCommand.buildTaskTestTree())
 				.then(DevCommand.buildTree())));
 	}
 }

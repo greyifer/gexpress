@@ -13,8 +13,7 @@ import java.util.UUID;
 public abstract class TrainVoiceDeadGroupMixin {
 	@Inject(method = "addPlayer", at = @At("HEAD"), cancellable = true)
 	private static void gexpress$onlyActualDeadPlayersJoinDeadVoice(UUID playerId, CallbackInfo ci) {
-		if (!DeadVoiceGroupManager.canJoinDeadVoice(playerId)) {
-			ci.cancel();
-		}
+		DeadVoiceGroupManager.handleWatheAddPlayer(playerId);
+		ci.cancel();
 	}
 }

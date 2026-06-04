@@ -1,0 +1,9 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "gexpress:block/fused_ornamented_block"
+      }
+    }
+  ]
+}

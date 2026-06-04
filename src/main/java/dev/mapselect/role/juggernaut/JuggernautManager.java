@@ -93,7 +93,7 @@ public final class JuggernautManager {
 		UUID id = juggernaut.getUuid();
 		int kills = killCounts.merge(id, 1, Integer::sum);
 		int stage = stageForKills(kills);
-		int cooldownTicks = cooldownTicksAtStage(stage);
+		int cooldownTicks = GexpressTestState.hasCreativeAbilityBypass(juggernaut) ? 0 : cooldownTicksAtStage(stage);
 		pendingCooldowns.put(id, cooldownTicks);
 		if (stage >= SHIELD_STAGE && !shieldRechargeUntil.containsKey(id)) {
 			AbilityCooldownSync.clear(juggernaut, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
@@ -163,7 +163,7 @@ public final class JuggernautManager {
 	}
 
 	private static void applyWeaponCooldown(ServerPlayerEntity player, int cooldownTicks) {
-		int ticks = Math.max(0, cooldownTicks);
+		int ticks = GexpressTestState.hasCreativeAbilityBypass(player) ? 0 : Math.max(0, cooldownTicks);
 		player.getItemCooldownManager().set(WatheItems.KNIFE, ticks);
 		player.getItemCooldownManager().set(WatheItems.REVOLVER, ticks);
 		if (ticks > 0) {
@@ -216,6 +216,13 @@ public final class JuggernautManager {
 		if (remaining > 0L) {
 			syncShieldCooldown(juggernaut, remaining);
 			return false;
+		}
+
+		if (GexpressTestState.hasCreativeAbilityBypass(juggernaut)) {
+			AbilityCooldownSync.clear(juggernaut, AbilityCooldownPayload.JUGGERNAUT_SHIELD);
+			juggernaut.playSoundToPlayer(SoundEvents.ITEM_SHIELD_BLOCK, SoundCategory.PLAYERS, 0.9F, 0.85F);
+			juggernaut.sendMessage(Text.literal("Juggernaut shield blocked the hit."), true);
+			return true;
 		}
 
 		long rechargeTicks = (long) GexpressConfig.getJuggernautShieldRechargeSeconds() * 20L;

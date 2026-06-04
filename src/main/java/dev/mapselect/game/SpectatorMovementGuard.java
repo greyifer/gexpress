@@ -2,7 +2,7 @@ package dev.mapselect.game;
 
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -20,7 +20,7 @@ public final class SpectatorMovementGuard {
 		if (world.getRegistryKey() != World.OVERWORLD) return;
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (player.interactionManager.getGameMode() != GameMode.SPECTATOR) continue;
-			if (VultureManager.isStashed(player) || PuppetmasterManager.isControlled(player)
+			if (PelicanManager.isStashed(player) || PuppetmasterManager.isControlled(player)
 					|| TimeMasterManager.isFrozen(player)) {
 				continue;
 			}

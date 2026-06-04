@@ -222,12 +222,19 @@ public final class GexpressXpRoadmapCategory {
 				Text.translatable("gui.gexpress.config.xp_roadmap.reward").formatted(Formatting.GRAY),
 				x + 14, lineY, 0xFF9FB0BF);
 			lineY += 14;
-			String title = reward.configured()
-				? reward.title()
-				: Text.translatable("gui.gexpress.config.xp_roadmap.no_reward").getString();
-			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(title, w - 28)),
-				x + 14, lineY, reward.configured() ? 0xFFFFD57A : 0xFF7D8792);
-			lineY += 14;
+			if (reward.configured()) {
+				for (String title : reward.rewardTitles()) {
+					context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(title, w - 28)),
+						x + 14, lineY, 0xFFFFD57A);
+					lineY += 12;
+				}
+				lineY += 2;
+			} else {
+				String title = Text.translatable("gui.gexpress.config.xp_roadmap.no_reward").getString();
+				context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(title, w - 28)),
+					x + 14, lineY, 0xFF7D8792);
+				lineY += 14;
+			}
 			String description = reward.configured()
 				? reward.description()
 				: Text.translatable("gui.gexpress.config.xp_roadmap.no_reward_description").getString();
@@ -316,7 +323,7 @@ public final class GexpressXpRoadmapCategory {
 				x + 12, y + 39, 0xFFB8C6D4);
 			GexpressConfig.LevelRoadmapEntry reward = GexpressConfig.getLevelRoadmapEntry(level);
 			String rewardText = reward.configured()
-				? reward.title()
+				? String.join(" + ", reward.rewardTitles())
 				: Text.translatable("gui.gexpress.config.xp_roadmap.no_reward").getString();
 			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(rewardText, w - 24)),
 				x + 12, y + 58, reward.configured() ? 0xFFFFD57A : 0xFF79838E);

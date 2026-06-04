@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "gexpress:block/smooth_ash_slab"
+    },
+    "type=double": {
+      "model": "gexpress:block/smooth_ash"
+    },
+    "type=top": {
+      "model": "gexpress:block/smooth_ash_slab_top"
+    }
+  }
+}

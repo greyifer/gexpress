@@ -1,0 +1,9 @@
+﻿{
+  "parent": "gexpress:block/template_cabinet",
+  "textures": {
+    "bottom": "gexpress:block/cherry_cabinet_bottom",
+    "front": "gexpress:block/cherry_cabinet_front",
+    "side": "gexpress:block/cherry_cabinet_side",
+    "top": "gexpress:block/cherry_cabinet_top"
+  }
+}

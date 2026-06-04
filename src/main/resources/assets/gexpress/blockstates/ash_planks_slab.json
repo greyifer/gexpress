@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "gexpress:block/ash_planks_slab"
+    },
+    "type=double": {
+      "model": "gexpress:block/ash_planks"
+    },
+    "type=top": {
+      "model": "gexpress:block/ash_planks_slab_top"
+    }
+  }
+}

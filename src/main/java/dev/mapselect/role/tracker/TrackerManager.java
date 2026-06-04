@@ -13,7 +13,7 @@ import dev.mapselect.network.TrackerUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -52,12 +52,13 @@ public final class TrackerManager {
 
 	private static void tryTrack(ServerPlayerEntity tracker) {
 		if (tracker == null || !(tracker.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(tracker) || !isTracker(tracker)
+		if (PelicanManager.isStashed(tracker) || !isTracker(tracker)
 				|| !canUseHere(world, tracker) || !isPlayable(tracker, tracker)) {
 			return;
 		}
-		long remaining = cooldownRemaining(tracker);
-		if (remaining > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(tracker);
+		long remaining = creativeBypass ? 0L : cooldownRemaining(tracker);
+		if (!creativeBypass && remaining > 0L) {
 			AbilityCooldownSync.send(tracker, AbilityCooldownPayload.TRACKER_TRACK, remaining,
 				(long) GexpressConfig.getTrackerCooldownSeconds() * 20L, false);
 			tracker.sendMessage(Text.literal("Tracker ready in " + secondsCeil(remaining) + "s."), true);
@@ -83,8 +84,12 @@ public final class TrackerManager {
 			tracker.sendMessage(Text.literal("Stopped tracking " + target.getName().getString() + "."), true);
 		}
 		long cooldown = (long) GexpressConfig.getTrackerCooldownSeconds() * 20L;
-		cooldownUntil.put(tracker.getUuid(), world.getTime() + cooldown);
-		AbilityCooldownSync.send(tracker, AbilityCooldownPayload.TRACKER_TRACK, cooldown, cooldown, false);
+		if (creativeBypass) {
+			AbilityCooldownSync.clear(tracker, AbilityCooldownPayload.TRACKER_TRACK);
+		} else {
+			cooldownUntil.put(tracker.getUuid(), world.getTime() + cooldown);
+			AbilityCooldownSync.send(tracker, AbilityCooldownPayload.TRACKER_TRACK, cooldown, cooldown, false);
+		}
 		sync(tracker);
 	}
 
@@ -109,7 +114,7 @@ public final class TrackerManager {
 	private static ServerPlayerEntity findTarget(ServerPlayerEntity tracker) {
 		double range = GexpressConfig.getTrackerRange();
 		return AbilityTargeting.findLookTarget(tracker, tracker.getServerWorld().getPlayers(), range, 0.0D, true,
-			candidate -> !VultureManager.isStashed(candidate) && isPlayable(candidate, tracker));
+			candidate -> !PelicanManager.isStashed(candidate) && isPlayable(candidate, tracker));
 	}
 
 	private static void sync(ServerPlayerEntity tracker) {
@@ -160,7 +165,8 @@ public final class TrackerManager {
 	private static boolean isTracker(PlayerEntity player) {
 		GameWorldComponent game = player == null ? null : GameWorldComponent.KEY.getNullable(player.getWorld());
 		Role role = game == null ? null : game.getRole(player);
-		return role != null && MapSelectRoles.TRACKER_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.TRACKER_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.TRACKER_ID));
 	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {

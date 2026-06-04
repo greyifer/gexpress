@@ -4,8 +4,6 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.client.WatheClient;
 import dev.doctor4t.wathe.game.GameFunctions;
-import dev.mapselect.MapSelect;
-import dev.mapselect.mixin.client.GameRendererAccessor;
 import dev.mapselect.network.MafiaActionPayload;
 import dev.mapselect.network.MafiaAmmoPayload;
 import dev.mapselect.network.MafiaIntroPayload;
@@ -36,14 +34,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class ClientMafiaState {
 	private static final int FAMILY_GLOW_COLOR = 0x8C8C8C;
-	private static final Identifier BLACK_WHITE_SHADER = Identifier.of(MapSelect.MOD_ID, "shaders/post/mafia_black_white.json");
 	private static final ItemStack BULLET_STACK = MapSelectItems.BULLET.getDefaultStack();
 	private static final Random WEATHER_RANDOM = new Random();
 	private static final Set<UUID> familyIds = ConcurrentHashMap.newKeySet();
 	private static boolean wasPrimaryDown;
 	private static boolean wasSecondaryDown;
 	private static int introTicks;
-	private static boolean shaderActive;
 	private static int loadedBullets;
 	private static int maxBullets = 3;
 	private static int familyGlowColor = FAMILY_GLOW_COLOR;
@@ -94,8 +90,7 @@ public final class ClientMafiaState {
 	private static boolean isFamilyInstinctEnabled(MinecraftClient client) {
 		return client != null
 			&& client.player != null
-			&& WatheClient.instinctKeybind != null
-			&& WatheClient.instinctKeybind.isPressed()
+			&& WatheClient.isInstinctEnabled()
 			&& isRoundRunning(client)
 			&& !ClientVultureState.isLocalStashed(client)
 			&& GameFunctions.isPlayerAliveAndSurvival(client.player);
@@ -105,14 +100,9 @@ public final class ClientMafiaState {
 		if (introTicks > 0) introTicks--;
 		updateMafiaIntro(client);
 		updateMafiaWeather(client);
-		if (ClientVultureState.isLocalStashed(client)) {
-			blackWhiteStrength = 1.0F;
-		} else {
-			blackWhiteStrength = MathHelper.lerp(0.045F, blackWhiteStrength, shouldUseBlackWhite(client) ? 1.0F : 0.0F);
-		}
+		blackWhiteStrength = MathHelper.lerp(0.045F, blackWhiteStrength, shouldUseBlackWhite(client) ? 1.0F : 0.0F);
 		if (blackWhiteStrength < 0.01F) blackWhiteStrength = 0.0F;
 		if (blackWhiteStrength > 0.99F) blackWhiteStrength = 1.0F;
-		updateBlackWhiteShader(client);
 		ammoAlpha = MathHelper.lerp(0.22F, ammoAlpha, shouldShowAmmo(client) ? 1.0F : 0.0F);
 		if (client == null || client.player == null || client.world == null
 				|| client.currentScreen != null || ClientVultureState.isLocalStashed(client)
@@ -142,6 +132,19 @@ public final class ClientMafiaState {
 			wasSecondaryDown = false;
 			return;
 		}
+		if (MapSelectRoles.PICKPOCKET_ID.equals(roleId)) {
+			boolean primary = isDown(client, ClientAbilityKeys.primaryBinding());
+			if (ClientPlayNetworking.canSend(MafiaActionPayload.ID)) {
+				if (primary && !wasPrimaryDown) {
+					ClientPlayNetworking.send(new MafiaActionPayload(MafiaActionPayload.PICKPOCKET_START));
+				} else if (!primary && wasPrimaryDown) {
+					ClientPlayNetworking.send(new MafiaActionPayload(MafiaActionPayload.PICKPOCKET_STOP));
+				}
+			}
+			wasPrimaryDown = primary;
+			wasSecondaryDown = false;
+			return;
+		}
 		wasPrimaryDown = false;
 		wasSecondaryDown = false;
 	}
@@ -152,15 +155,8 @@ public final class ClientMafiaState {
 
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.options.hudHidden) return;
-		renderDarkOverlay(context);
+		if (ClientHudVisibility.shouldHide(client)) return;
 		renderAmmo(context, client);
-	}
-
-	private static void renderDarkOverlay(DrawContext context) {
-		if (blackWhiteStrength <= 0.02F) return;
-		int alpha = Math.max(0, Math.min(76, Math.round(76.0F * blackWhiteStrength)));
-		context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), alpha << 24);
 	}
 
 	private static void renderAmmo(DrawContext context, MinecraftClient client) {
@@ -174,42 +170,6 @@ public final class ClientMafiaState {
 		int y = context.getScaledWindowHeight() - 92;
 		context.drawItem(BULLET_STACK, x, y - 4);
 		context.drawTextWithShadow(client.textRenderer, text, x + iconSize + gap, y, 0x00E6C35A | (alpha << 24));
-	}
-
-	private static void updateBlackWhiteShader(MinecraftClient client) {
-		boolean shouldUseShader = blackWhiteStrength > 0.02F;
-		if (client == null || client.gameRenderer == null) {
-			shaderActive = false;
-			return;
-		}
-		if (shouldUseShader && shaderActive && client.gameRenderer.getPostProcessor() == null) {
-			shaderActive = false;
-		}
-		if (shouldUseShader == shaderActive) {
-			updateShaderStrength(client);
-			return;
-		}
-		try {
-			if (shouldUseShader) {
-				((GameRendererAccessor) client.gameRenderer).gexpress$loadPostProcessor(BLACK_WHITE_SHADER);
-				shaderActive = true;
-			} else {
-				client.gameRenderer.disablePostProcessor();
-				shaderActive = false;
-			}
-		} catch (Throwable ignored) {
-			shaderActive = false;
-		}
-		updateShaderStrength(client);
-	}
-
-	private static void updateShaderStrength(MinecraftClient client) {
-		if (!shaderActive || client == null || client.gameRenderer == null
-				|| client.gameRenderer.getPostProcessor() == null) {
-			return;
-		}
-		client.gameRenderer.getPostProcessor().setUniforms("Saturation",
-			MathHelper.clamp(1.0F - blackWhiteStrength, 0.0F, 1.0F));
 	}
 
 	public static boolean shouldSuppressWatheRiser() {
@@ -231,10 +191,13 @@ public final class ClientMafiaState {
 	}
 
 	private static boolean shouldUseBlackWhite(MinecraftClient client) {
-		return ClientVultureState.isLocalStashed(client)
-			|| (isLocalMafia(client) && isRoundRunning(client) && client != null && client.player != null
-				&& !ClientVultureState.isLocalStashed(client)
-				&& GameFunctions.isPlayerAliveAndSurvival(client.player));
+		return isLocalMafia(client) && isRoundRunning(client) && client != null && client.player != null
+			&& !ClientVultureState.isLocalStashed(client)
+			&& GameFunctions.isPlayerAliveAndSurvival(client.player);
+	}
+
+	public static float blackWhiteStrength() {
+		return blackWhiteStrength;
 	}
 
 	public static boolean shouldUseMafiaWeather() {
@@ -335,7 +298,9 @@ public final class ClientMafiaState {
 		Identifier id = localRoleId(client);
 		if (MapSelectRoles.GODFATHER_ID.equals(id)
 			|| MapSelectRoles.MAFIOSO_ID.equals(id)
-			|| MapSelectRoles.JANITOR_ID.equals(id)) {
+			|| MapSelectRoles.JANITOR_ID.equals(id)
+			|| MapSelectRoles.PICKPOCKET_ID.equals(id)
+			|| MapSelectRoles.BURGLAR_ID.equals(id)) {
 			return true;
 		}
 		return client != null && client.player != null && familyIds.contains(client.player.getUuid());

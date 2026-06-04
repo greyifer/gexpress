@@ -33,6 +33,7 @@ public final class StartCommand {
 			.then(mode("modded", () -> Harpymodloader.MODDED_GAMEMODE))
 			.then(mode("amnesia", () -> GexpressGameModes.AMNESIA))
 			.then(mode("takeover", () -> GexpressGameModes.TAKEOVER))
+			.then(mode("test", () -> GexpressGameModes.TEST))
 			.then(mode("discovery", () -> WatheGameModes.DISCOVERY))
 			.then(mode("loose_ends", () -> WatheGameModes.LOOSE_ENDS))
 			.then(mode("murder", () -> WatheGameModes.MURDER));
@@ -78,7 +79,7 @@ public final class StartCommand {
 			return 0;
 		}
 
-		int resolvedMinutes = minutes >= 0 ? minutes : gameMode.defaultStartTime;
+		int resolvedMinutes = minutes >= 0 ? minutes : defaultStartMinutes(gameMode);
 		int ticks = GameConstants.getInTicks(resolvedMinutes, seconds);
 		Runnable start = () -> GameFunctions.startGame(src.getWorld(), gameMode, mapEffect, ticks);
 
@@ -104,6 +105,12 @@ public final class StartCommand {
 			|| gameMode == WatheGameModes.DISCOVERY
 			|| mapEffect == WatheMapEffects.HARPY_EXPRESS_SUNDOWN
 			|| mapEffect == WatheMapEffects.HARPY_EXPRESS_DAY;
+	}
+
+	private static int defaultStartMinutes(GameMode gameMode) {
+		return GexpressGameModes.isTest(gameMode)
+			? GexpressGameModes.TEST_DEFAULT_START_MINUTES
+			: gameMode.defaultStartTime;
 	}
 
 	private static String label(GameMode mode) {

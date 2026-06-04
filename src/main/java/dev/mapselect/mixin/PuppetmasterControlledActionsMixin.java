@@ -1,9 +1,10 @@
 package dev.mapselect.mixin;
 
+import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.game.GexpressAbilityGuards;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.minecraft.network.packet.c2s.common.CustomPayloadC2SPacket;
 import net.minecraft.network.packet.c2s.play.BookUpdateC2SPacket;
 import net.minecraft.network.packet.c2s.play.ButtonClickC2SPacket;
@@ -25,11 +26,16 @@ import net.minecraft.network.packet.c2s.play.SlotChangedStateC2SPacket;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.Locale;
+import java.util.Set;
 
 @Mixin(ServerPlayNetworkHandler.class)
 public abstract class PuppetmasterControlledActionsMixin {
@@ -58,7 +64,9 @@ public abstract class PuppetmasterControlledActionsMixin {
 
 	@Inject(method = "onHandSwing", at = @At("HEAD"), cancellable = true)
 	private void gexpress$redirectHandSwing(HandSwingC2SPacket packet, CallbackInfo ci) {
-		if (isLocked(player)) ci.cancel();
+		if (isLocked(player)) {
+			ci.cancel();
+		}
 	}
 
 	@Inject(method = "onUpdateSelectedSlot", at = @At("HEAD"), cancellable = true)
@@ -98,11 +106,19 @@ public abstract class PuppetmasterControlledActionsMixin {
 
 	@Inject(method = "onCommandExecution", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockCommandExecution(CommandExecutionC2SPacket packet, CallbackInfo ci) {
+		if (shouldBlockPrivateMessage(player, packet.command())) {
+			ci.cancel();
+			return;
+		}
 		if (isLocked(player) && !isAllowedLockedCommand(packet.command())) ci.cancel();
 	}
 
 	@Inject(method = "onChatCommandSigned", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockSignedCommand(ChatCommandSignedC2SPacket packet, CallbackInfo ci) {
+		if (shouldBlockPrivateMessage(player, packet.command())) {
+			ci.cancel();
+			return;
+		}
 		if (isLocked(player) && !isAllowedLockedCommand(packet.command())) ci.cancel();
 	}
 
@@ -136,11 +152,36 @@ public abstract class PuppetmasterControlledActionsMixin {
 	}
 
 	private static boolean isLocked(ServerPlayerEntity player) {
-		return PuppetmasterManager.isControlled(player) || VultureManager.isStashed(player)
+		return PuppetmasterManager.isControlled(player) || PelicanManager.isStashed(player)
 			|| TimeMasterManager.isFrozen(player);
 	}
 
 	private static boolean isAllowedLockedCommand(String command) {
 		return "g roles pelican leave".equals(command) || "g pelican leave".equals(command);
 	}
+
+	private static boolean shouldBlockPrivateMessage(ServerPlayerEntity player, String command) {
+		if (player == null || command == null || !isRoundInProgress(player)) return false;
+		String trimmed = command.trim();
+		if (trimmed.startsWith("/")) trimmed = trimmed.substring(1);
+		String root = trimmed.split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
+		if (!PRIVATE_MESSAGE_COMMANDS.contains(root)) return false;
+		player.sendMessage(Text.literal("Private messages are disabled while a game is running.")
+			.formatted(Formatting.RED), false);
+		return true;
+	}
+
+	private static boolean isRoundInProgress(ServerPlayerEntity player) {
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
+		if (game == null) return false;
+		GameWorldComponent.GameStatus status = game.getGameStatus();
+		return status == GameWorldComponent.GameStatus.STARTING
+			|| status == GameWorldComponent.GameStatus.ACTIVE
+			|| status == GameWorldComponent.GameStatus.STOPPING;
+	}
+
+	private static final Set<String> PRIVATE_MESSAGE_COMMANDS = Set.of(
+		"msg", "message", "tell", "w", "whisper", "pm", "dm", "r", "reply", "teammsg", "tm",
+		"minecraft:msg", "minecraft:message", "minecraft:tell", "minecraft:w", "minecraft:teammsg"
+	);
 }

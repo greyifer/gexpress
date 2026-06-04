@@ -66,8 +66,7 @@ public final class ClientWarlockState {
 
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null || client.world == null
-				|| client.options.hudHidden
+		if (ClientHudVisibility.shouldHide(client) || client.player == null || client.world == null
 				|| ClientVultureState.isLocalStashed(client) || !ClientRoleRevealState.canUseRoleAbility(client)
 				|| !shouldHandleWarlock(client)) return;
 		if (!hasLocalMark(client)) return;
@@ -114,7 +113,7 @@ public final class ClientWarlockState {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			if (game == null) return false;
 			Role role = game.getRole(client.player);
-			return role != null && MapSelectRoles.WARLOCK_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.WARLOCK_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

@@ -1,9 +1,11 @@
 package dev.mapselect.modifier;
 
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.agmas.harpymodloader.component.WorldModifierComponent;
+import org.agmas.harpymodloader.events.ModifierAssigned;
 import org.agmas.harpymodloader.modifiers.Modifier;
 
 import java.util.List;
@@ -32,5 +34,17 @@ public final class ModifierUtils {
 			if (modifier != null && modifierId.equals(modifier.identifier())) return true;
 		}
 		return false;
+	}
+
+	public static boolean addIfMissing(ServerPlayerEntity player, Modifier modifier) {
+		if (player == null || modifier == null || modifier.identifier() == null || player.getWorld() == null) {
+			return false;
+		}
+		WorldModifierComponent component = WorldModifierComponent.KEY.getNullable(player.getWorld());
+		if (component == null || has(player, modifier.identifier())) return false;
+		component.addModifier(player.getUuid(), modifier);
+		ModifierAssigned.EVENT.invoker().assignModifier(player, modifier);
+		component.sync();
+		return true;
 	}
 }

@@ -6,6 +6,7 @@ import dev.isxander.yacl3.api.CustomTabProvider;
 import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.gui.YACLScreen;
 import dev.isxander.yacl3.gui.tab.TabExt;
+import dev.mapselect.currency.GcoinComponent;
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.level.LevelComponent;
@@ -117,6 +118,7 @@ public final class GexpressPlayersCategory {
 		private static final int TAG_BUTTON_GAP = 4;
 		private static final int CHANGE_BUTTON_WIDTH = 92;
 		private static final int LEVEL_EDITOR_HEIGHT = 58;
+		private static final int GCOIN_EDITOR_HEIGHT = 80;
 		private static final int LEVEL_FIELD_WIDTH = 62;
 		private static final int LEVEL_APPLY_WIDTH = 38;
 		private static final PlayerTag[] BUILTIN_TAGS = {
@@ -208,8 +210,9 @@ public final class GexpressPlayersCategory {
 			if (expanded) {
 				int detailX = x + 38;
 				int detailWidth = rowWidth - 44;
+				int editorHeight = editorHeight(client);
 				drawLevelEditor(context, client, id, name, detailX, y + ROW_HEIGHT - 2, detailWidth, mouseX, mouseY);
-				drawTagDropdown(context, client, id, name, tags, detailX, y + ROW_HEIGHT + LEVEL_EDITOR_HEIGHT - 4,
+				drawTagDropdown(context, client, id, name, tags, detailX, y + ROW_HEIGHT + editorHeight - 4,
 					detailWidth, mouseX, mouseY);
 			}
 		}
@@ -245,14 +248,20 @@ public final class GexpressPlayersCategory {
 				int x, int y, int editorWidth, int mouseX, int mouseY) {
 			LevelSnapshot snapshot = levelSnapshot(client, playerId);
 			LevelDraft draft = levelDraft(playerId, snapshot);
-			context.fill(x, y + 4, x + editorWidth, y + LEVEL_EDITOR_HEIGHT - 8, 0x33212A35);
-			context.drawBorder(x, y + 4, editorWidth, LEVEL_EDITOR_HEIGHT - 12, 0x55758AA0);
+			boolean showGcoin = showGcoin(client);
+			int editorHeight = editorHeight(client);
+			context.fill(x, y + 4, x + editorWidth, y + editorHeight - 8, 0x33212A35);
+			context.drawBorder(x, y + 4, editorWidth, editorHeight - 12, 0x55758AA0);
 			context.drawTextWithShadow(client.textRenderer, Text.literal("Level"), x + 8, y + 12, 0xFFB8C3CC);
 			context.drawTextWithShadow(client.textRenderer, Text.literal("XP"), x + 8, y + 33, 0xFFB8C3CC);
+			if (showGcoin) {
+				context.drawTextWithShadow(client.textRenderer, Text.literal("G'Coin"), x + 8, y + 54, 0xFFFFD56E);
+			}
 
-			int fieldX = x + 56;
+			int fieldX = x + 64;
 			int levelY = y + 8;
 			int xpY = y + 29;
+			int gcoinY = y + 50;
 			drawLevelField(context, client, playerId, playerName, LevelFieldKind.LEVEL, draft.levelText,
 				fieldX, levelY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
 			drawLevelApply(context, client, playerId, playerName, LevelFieldKind.LEVEL,
@@ -264,6 +273,12 @@ public final class GexpressPlayersCategory {
 				fieldX + LEVEL_FIELD_WIDTH + 7, xpY + 5, 0xFF8FA1B2);
 			drawLevelApply(context, client, playerId, playerName, LevelFieldKind.XP,
 				fieldX + LEVEL_FIELD_WIDTH + 52, xpY, mouseX, mouseY);
+			if (showGcoin) {
+				drawLevelField(context, client, playerId, playerName, LevelFieldKind.GCOIN, draft.gcoinText,
+					fieldX, gcoinY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
+				drawLevelApply(context, client, playerId, playerName, LevelFieldKind.GCOIN,
+					fieldX + LEVEL_FIELD_WIDTH + 5, gcoinY, mouseX, mouseY);
+			}
 
 			int barX = Math.min(x + editorWidth - 114, fieldX + LEVEL_FIELD_WIDTH + 96);
 			int barY = y + 16;
@@ -273,7 +288,7 @@ public final class GexpressPlayersCategory {
 			context.fill(barX, barY, barX + barW, barY + 5, 0xAA0B1016);
 			context.fill(barX, barY, barX + Math.round(barW * progress), barY + 5, 0xFF7CC9A2);
 			context.drawTextWithShadow(client.textRenderer,
-				Text.literal("Lv " + snapshot.level() + "  " + snapshot.levelXp() + "/" + snapshot.neededXp()),
+				Text.literal("LvL " + snapshot.level() + "  " + snapshot.levelXp() + "/" + snapshot.neededXp()),
 				barX, barY + 10, 0xFFB8C3CC);
 		}
 
@@ -407,7 +422,7 @@ public final class GexpressPlayersCategory {
 				return true;
 			}
 			if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-				String value = focusedLevelField.kind() == LevelFieldKind.XP ? draft.xpText : draft.levelText;
+				String value = draft.get(focusedLevelField.kind());
 				value = value == null || value.isEmpty() ? "" : value.substring(0, value.length() - 1);
 				draft.set(focusedLevelField.kind(), value);
 				return true;
@@ -454,8 +469,12 @@ public final class GexpressPlayersCategory {
 			int optionCount = editableTags(client).size();
 			int columns = dropdownColumns(rowWidth - 44);
 			int rows = (optionCount + columns - 1) / columns;
-			return ROW_HEIGHT + LEVEL_EDITOR_HEIGHT + 8 + rows * TAG_BUTTON_HEIGHT
+			return ROW_HEIGHT + editorHeight(client) + 8 + rows * TAG_BUTTON_HEIGHT
 				+ Math.max(0, rows - 1) * TAG_BUTTON_GAP;
+		}
+
+		private int editorHeight(MinecraftClient client) {
+			return showGcoin(client) ? GCOIN_EDITOR_HEIGHT : LEVEL_EDITOR_HEIGHT;
 		}
 
 		private int dropdownColumns(int dropdownWidth) {
@@ -492,12 +511,16 @@ public final class GexpressPlayersCategory {
 		private void submitLevelField(UUID playerId, String playerName, LevelFieldKind kind) {
 			LevelDraft draft = levelDrafts.get(playerId);
 			if (draft == null) return;
-			Integer value = parsePositiveInt(kind == LevelFieldKind.XP ? draft.xpText : draft.levelText);
+			Integer value = parsePositiveInt(draft.get(kind));
 			if (value == null) return;
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.player == null || client.player.networkHandler == null) return;
-			String subcommand = kind == LevelFieldKind.XP ? "xp" : "level";
-			client.player.networkHandler.sendChatCommand("g admin level " + subcommand + " " + playerName + " " + value);
+			if (kind == LevelFieldKind.GCOIN) {
+				client.player.networkHandler.sendChatCommand("g admin gcoin set " + playerName + " " + value);
+			} else {
+				String subcommand = kind == LevelFieldKind.XP ? "xp" : "level";
+				client.player.networkHandler.sendChatCommand("g admin level " + subcommand + " " + playerName + " " + value);
+			}
 			focusedLevelField = null;
 		}
 
@@ -516,17 +539,29 @@ public final class GexpressPlayersCategory {
 			if (focusedLevelField == null || !focusedLevelField.matches(playerId, LevelFieldKind.LEVEL)) {
 				draft.levelText = Integer.toString(snapshot.level());
 			}
+			if (focusedLevelField == null || !focusedLevelField.matches(playerId, LevelFieldKind.GCOIN)) {
+				draft.gcoinText = Integer.toString(gcoinBalance(MinecraftClient.getInstance(), playerId));
+			}
 			return draft;
 		}
 
 		private void appendDigits(LevelDraft draft, LevelFieldKind kind, String raw) {
 			if (raw == null || raw.isEmpty()) return;
-			StringBuilder out = new StringBuilder(kind == LevelFieldKind.XP ? draft.xpText : draft.levelText);
+			StringBuilder out = new StringBuilder(draft.get(kind));
 			for (int i = 0; i < raw.length() && out.length() < 9; i++) {
 				char c = raw.charAt(i);
 				if (Character.isDigit(c)) out.append(c);
 			}
 			draft.set(kind, out.toString());
+		}
+
+		private boolean showGcoin(MinecraftClient client) {
+			return client != null && client.world != null;
+		}
+
+		private int gcoinBalance(MinecraftClient client, UUID playerId) {
+			GcoinComponent gcoins = client == null || client.world == null ? null : GcoinComponent.KEY.getNullable(client.world);
+			return gcoins == null ? 0 : gcoins.balance(playerId);
 		}
 
 		private Integer parsePositiveInt(String raw) {
@@ -608,18 +643,31 @@ public final class GexpressPlayersCategory {
 
 	private enum LevelFieldKind {
 		XP,
-		LEVEL
+		LEVEL,
+		GCOIN
 	}
 
 	private static final class LevelDraft {
 		private String xpText = "";
 		private String levelText = "";
+		private String gcoinText = "";
+
+		private String get(LevelFieldKind kind) {
+			return switch (kind) {
+				case XP -> xpText;
+				case LEVEL -> levelText;
+				case GCOIN -> gcoinText;
+			};
+		}
 
 		private void set(LevelFieldKind kind, String value) {
+			String cleaned = value == null ? "" : value;
 			if (kind == LevelFieldKind.XP) {
-				xpText = value == null ? "" : value;
+				xpText = cleaned;
+			} else if (kind == LevelFieldKind.LEVEL) {
+				levelText = cleaned;
 			} else {
-				levelText = value == null ? "" : value;
+				gcoinText = cleaned;
 			}
 		}
 	}

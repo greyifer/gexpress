@@ -11,9 +11,7 @@ import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.Camera;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.option.KeyBinding;
@@ -35,17 +33,12 @@ public final class ClientPuppetmasterState {
 	private static int puppetSelectedSlot = 0;
 	private static int backedUpSelectedSlot = -1;
 	private static boolean hotbarInitialized;
-	private static boolean hasControllerBodyPose;
-	private static double controllerBodyX;
-	private static double controllerBodyY;
-	private static double controllerBodyZ;
-	private static float controllerBodyYaw;
-	private static float controllerBodyPitch;
-	private static float controllerBodyHeadYaw;
-	private static float controllerBodyBodyYaw;
 	private static float puppetYaw;
 	private static float puppetPitch;
 	private static boolean hasPuppetLook;
+	private static boolean hasControllerLookAnchor;
+	private static float controllerLookAnchorYaw;
+	private static float controllerLookAnchorPitch;
 	private static boolean wasAbilityDown;
 	private static int targetRefreshTicks;
 
@@ -78,8 +71,8 @@ public final class ClientPuppetmasterState {
 			puppetHotbar = List.of();
 			puppetSelectedSlot = 0;
 			hotbarInitialized = false;
-			hasControllerBodyPose = false;
 			hasPuppetLook = false;
+			hasControllerLookAnchor = false;
 			if (client.player != null) client.setCameraEntity(client.player);
 			return;
 		}
@@ -88,6 +81,7 @@ public final class ClientPuppetmasterState {
 		targetEntityId = payload.targetEntityId();
 		if (isLocalController(client)) {
 			backupSelectedSlot(client);
+			captureControllerLookAnchor(client);
 		}
 	}
 
@@ -141,7 +135,8 @@ public final class ClientPuppetmasterState {
 		}
 
 		if (activeController) {
-			if (client.getCameraEntity() != client.player) client.setCameraEntity(client.player);
+			AbstractClientPlayerEntity target = getTargetPlayer(client);
+			if (target != null && client.getCameraEntity() != target) client.setCameraEntity(target);
 			syncLookFromLocal(client);
 			sendInput(client);
 		}
@@ -168,12 +163,13 @@ public final class ClientPuppetmasterState {
 		boolean use = ClientAbilityKeys.isDown(client, client.options.useKey);
 		int selectedSlot = client.player.getInventory().selectedSlot;
 		if (hasSyncedHotbar()) puppetSelectedSlot = selectedSlot;
+		applyLocalPrediction(client, sideways, forward, jump, sneak, sprint);
 		ClientPlayNetworking.send(new PuppetmasterInputPayload(sideways, forward, jump, sneak, sprint, use, puppetYaw, puppetPitch, selectedSlot));
 	}
 
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null || client.options.hudHidden) return;
+		if (ClientHudVisibility.shouldHide(client) || client.player == null) return;
 		if (ClientRoleRevealState.canUseRoleAbility(client) && isLocalTarget(client)) {
 			int alpha = 88;
 			int color = (alpha << 24) | 0xB00018;
@@ -184,8 +180,25 @@ public final class ClientPuppetmasterState {
 	public static void syncLookFromLocal(MinecraftClient client) {
 		if (client == null || client.player == null || !isLocalController(client)) return;
 		initializePuppetLook(client);
-		puppetYaw = MathHelper.wrapDegrees(client.player.getYaw());
-		puppetPitch = MathHelper.clamp(client.player.getPitch(), -90.0F, 90.0F);
+		captureControllerLookAnchor(client);
+		float deltaYaw = MathHelper.wrapDegrees(client.player.getYaw() - controllerLookAnchorYaw);
+		float deltaPitch = client.player.getPitch() - controllerLookAnchorPitch;
+		if (Math.abs(deltaYaw) > 0.001F || Math.abs(deltaPitch) > 0.001F) {
+			puppetYaw = MathHelper.wrapDegrees(puppetYaw + deltaYaw);
+			puppetPitch = MathHelper.clamp(puppetPitch + deltaPitch, -90.0F, 90.0F);
+			restoreControllerLook(client);
+		}
+		applyLocalLook(client);
+	}
+
+	public static void applyMouseLook(MinecraftClient client, double deltaX, double deltaY) {
+		if (client == null || client.player == null || !isLocalController(client)) return;
+		initializePuppetLook(client);
+		captureControllerLookAnchor(client);
+		puppetYaw = MathHelper.wrapDegrees(puppetYaw + (float) deltaX * 0.15F);
+		puppetPitch = MathHelper.clamp(puppetPitch + (float) deltaY * 0.15F, -90.0F, 90.0F);
+		restoreControllerLook(client);
+		applyLocalLook(client);
 	}
 
 	public static boolean isLocalController(MinecraftClient client) {
@@ -200,9 +213,6 @@ public final class ClientPuppetmasterState {
 	}
 
 	public static UUID replacementFor(UUID playerId) {
-		if (playerId == null || controllerId == null || targetId == null) return null;
-		if (playerId.equals(controllerId)) return targetId;
-		if (playerId.equals(targetId)) return controllerId;
 		return null;
 	}
 
@@ -236,39 +246,6 @@ public final class ClientPuppetmasterState {
 		return !puppetHotbar.isEmpty();
 	}
 
-	private static void renderControllerBody(MinecraftClient client, net.minecraft.client.util.math.MatrixStack matrices,
-			Camera camera, float tickDelta, net.minecraft.client.render.VertexConsumerProvider consumers) {
-		if (client == null || client.player == null || !isLocalController(client)) return;
-		if (camera == null || camera.getFocusedEntity() == client.player) return;
-
-		double x = (hasControllerBodyPose ? controllerBodyX : client.player.getX()) - camera.getPos().x;
-		double y = (hasControllerBodyPose ? controllerBodyY : client.player.getY()) - camera.getPos().y;
-		double z = (hasControllerBodyPose ? controllerBodyZ : client.player.getZ()) - camera.getPos().z;
-		float yaw = net.minecraft.util.math.MathHelper.lerp(tickDelta, client.player.prevYaw, client.player.getYaw());
-		float renderYaw = hasControllerBodyPose ? controllerBodyBodyYaw : yaw;
-		float oldYaw = client.player.getYaw();
-		float oldPitch = client.player.getPitch();
-		float oldHeadYaw = client.player.headYaw;
-		float oldBodyYaw = client.player.bodyYaw;
-		matrices.push();
-		try {
-			if (hasControllerBodyPose) {
-				client.player.setYaw(controllerBodyYaw);
-				client.player.setPitch(controllerBodyPitch);
-				client.player.setHeadYaw(controllerBodyHeadYaw);
-				client.player.setBodyYaw(controllerBodyBodyYaw);
-			}
-			client.getEntityRenderDispatcher().render(client.player, x, y, z, renderYaw, tickDelta, matrices, consumers,
-				client.getEntityRenderDispatcher().getLight(client.player, tickDelta));
-		} finally {
-			client.player.setYaw(oldYaw);
-			client.player.setPitch(oldPitch);
-			client.player.setHeadYaw(oldHeadYaw);
-			client.player.setBodyYaw(oldBodyYaw);
-			matrices.pop();
-		}
-	}
-
 	public static boolean isLocalTarget(MinecraftClient client) {
 		return client != null && client.player != null && targetId != null
 			&& targetId.equals(client.player.getUuid());
@@ -282,25 +259,13 @@ public final class ClientPuppetmasterState {
 		puppetHotbar = List.of();
 		puppetSelectedSlot = 0;
 		hotbarInitialized = false;
-		hasControllerBodyPose = false;
 		hasPuppetLook = false;
+		hasControllerLookAnchor = false;
 	}
 
 	private static void backupSelectedSlot(MinecraftClient client) {
 		if (client == null || client.player == null || backedUpSelectedSlot >= 0) return;
 		backedUpSelectedSlot = client.player.getInventory().selectedSlot;
-	}
-
-	private static void captureControllerBodyPose(MinecraftClient client) {
-		if (client == null || client.player == null) return;
-		controllerBodyX = client.player.getX();
-		controllerBodyY = client.player.getY();
-		controllerBodyZ = client.player.getZ();
-		controllerBodyYaw = client.player.getYaw();
-		controllerBodyPitch = client.player.getPitch();
-		controllerBodyHeadYaw = client.player.headYaw;
-		controllerBodyBodyYaw = client.player.bodyYaw;
-		hasControllerBodyPose = true;
 	}
 
 	private static void initializePuppetLook(MinecraftClient client) {
@@ -311,35 +276,53 @@ public final class ClientPuppetmasterState {
 		hasPuppetLook = true;
 	}
 
-	private static void moveDriverToPuppet(MinecraftClient client, Entity target) {
-		if (client == null || client.player == null || target == null) return;
-		client.player.updatePositionAndAngles(target.getX(), target.getY(), target.getZ(), puppetYaw, puppetPitch);
-		client.player.setVelocity(target.getVelocity());
-		client.player.lastRenderX = target.lastRenderX;
-		client.player.lastRenderY = target.lastRenderY;
-		client.player.lastRenderZ = target.lastRenderZ;
+	private static void captureControllerLookAnchor(MinecraftClient client) {
+		if (hasControllerLookAnchor || client == null || client.player == null) return;
+		controllerLookAnchorYaw = client.player.getYaw();
+		controllerLookAnchorPitch = client.player.getPitch();
+		hasControllerLookAnchor = true;
 	}
 
-	private static void applyPuppetLookToLocalPlayer(MinecraftClient client) {
-		if (client == null || client.player == null || !hasPuppetLook) return;
-		client.player.setYaw(puppetYaw);
-		client.player.prevYaw = puppetYaw;
-		client.player.setPitch(puppetPitch);
-		client.player.prevPitch = puppetPitch;
-		client.player.setHeadYaw(puppetYaw);
-		client.player.prevHeadYaw = puppetYaw;
-		client.player.setBodyYaw(puppetYaw);
-		client.player.prevBodyYaw = puppetYaw;
+	private static void restoreControllerLook(MinecraftClient client) {
+		if (!hasControllerLookAnchor || client == null || client.player == null) return;
+		client.player.setYaw(controllerLookAnchorYaw);
+		client.player.setPitch(controllerLookAnchorPitch);
+		client.player.setHeadYaw(controllerLookAnchorYaw);
+		client.player.setBodyYaw(controllerLookAnchorYaw);
 	}
 
-	private static void restoreControllerBodyTransform(MinecraftClient client) {
-		if (client == null || client.player == null || !hasControllerBodyPose) return;
-		client.player.updatePositionAndAngles(controllerBodyX, controllerBodyY, controllerBodyZ,
-			controllerBodyYaw, controllerBodyPitch);
-		client.player.setHeadYaw(controllerBodyHeadYaw);
-		client.player.prevHeadYaw = controllerBodyHeadYaw;
-		client.player.setBodyYaw(controllerBodyBodyYaw);
-		client.player.prevBodyYaw = controllerBodyBodyYaw;
+	private static void applyLocalLook(MinecraftClient client) {
+		AbstractClientPlayerEntity target = getTargetPlayer(client);
+		if (target == null) return;
+		target.setYaw(puppetYaw);
+		target.setPitch(puppetPitch);
+		target.setHeadYaw(puppetYaw);
+		target.setBodyYaw(puppetYaw);
+	}
+
+	private static void applyLocalPrediction(MinecraftClient client, float sideways, float forward, boolean jumping,
+			boolean sneaking, boolean sprinting) {
+		AbstractClientPlayerEntity target = getTargetPlayer(client);
+		if (target == null) return;
+		applyLocalLook(client);
+		target.setSneaking(sneaking);
+		target.setSprinting(sprinting && forward > 0.5F && !sneaking);
+		float magnitude = MathHelper.sqrt(sideways * sideways + forward * forward);
+		if (magnitude > 1.0F) {
+			sideways /= magnitude;
+			forward /= magnitude;
+		}
+		double yawRad = puppetYaw * (Math.PI / 180.0D);
+		double sin = Math.sin(yawRad);
+		double cos = Math.cos(yawRad);
+		double speed = sneaking ? 0.08D : sprinting ? 0.22D : 0.15D;
+		double velocityX = (sideways * cos - forward * sin) * speed;
+		double velocityZ = (forward * cos + sideways * sin) * speed;
+		double velocityY = target.getVelocity().y;
+		if (jumping && target.isOnGround()) {
+			velocityY = 0.42D;
+		}
+		target.setVelocity(velocityX, velocityY, velocityZ);
 	}
 
 	private static void restoreSelectedSlot(MinecraftClient client) {
@@ -353,7 +336,7 @@ public final class ClientPuppetmasterState {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			if (game == null) return false;
 			Role role = game.getRole(client.player);
-			return role != null && MapSelectRoles.PUPPETMASTER_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.PUPPETMASTER_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

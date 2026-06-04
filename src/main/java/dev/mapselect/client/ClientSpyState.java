@@ -65,7 +65,7 @@ public final class ClientSpyState {
 
 	private static void render(DrawContext context, net.minecraft.client.render.RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.textRenderer == null || client.player == null || client.options.hudHidden) return;
+		if (ClientHudVisibility.shouldHide(client) || client.textRenderer == null || client.player == null) return;
 		if (!ClientRoleRevealState.canShowRoleHud(client) || !isLocalSpy(client)) return;
 		long now = now();
 		FEED.removeIf(line -> line.expiresAtTick() <= now);
@@ -93,7 +93,7 @@ public final class ClientSpyState {
 		try {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			Role role = game == null ? null : game.getRole(client.player);
-			return role != null && MapSelectRoles.SPY_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.SPY_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

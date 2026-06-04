@@ -30,6 +30,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 	private final Map<UUID, Long> readOnlyCarriers = Collections.unmodifiableMap(carriers);
 	private final Map<UUID, Long> plantedAt = new LinkedHashMap<>();
 	private final Map<UUID, Integer> presetIndexes = new LinkedHashMap<>();
+	private final Map<UUID, UUID> owners = new LinkedHashMap<>();
 
 	public C4BackComponent(World world) {
 		this.world = world;
@@ -48,17 +49,26 @@ public class C4BackComponent implements AutoSyncedComponent {
 		return addC4(uuid, GexpressConfig.getC4FuseSeconds() * 20L);
 	}
 
+	public boolean addC4(UUID uuid, UUID owner) {
+		return addC4(uuid, GexpressConfig.getC4FuseSeconds() * 20L, owner);
+	}
+
 	/**
 	 * Attach with a specific fuse length in ticks. Used by the /g roles c4 attach command
 	 * when we want to honor live config changes without requiring a server restart.
 	 */
 	public boolean addC4(UUID uuid, long fuseTicks) {
+		return addC4(uuid, fuseTicks, null);
+	}
+
+	public boolean addC4(UUID uuid, long fuseTicks, UUID owner) {
 		if (uuid == null || carriers.containsKey(uuid)) return false;
 		long firstBeepDelayTicks = Math.max(0L, (long) GexpressConfig.getC4FirstBeepSeconds() * 20L);
 		long detonationAt = world.getTime() + firstBeepDelayTicks + Math.max(1L, fuseTicks);
 		carriers.put(uuid, detonationAt);
 		plantedAt.put(uuid, world.getTime());
 		presetIndexes.put(uuid, choosePlacementPresetIndex());
+		owners.put(uuid, owner == null ? uuid : owner);
 		KEY.sync(this.world);
 		return true;
 	}
@@ -67,6 +77,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 		if (uuid == null || carriers.remove(uuid) == null) return false;
 		plantedAt.remove(uuid);
 		presetIndexes.remove(uuid);
+		owners.remove(uuid);
 		KEY.sync(this.world);
 		return true;
 	}
@@ -76,6 +87,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 		carriers.clear();
 		plantedAt.clear();
 		presetIndexes.clear();
+		owners.clear();
 		KEY.sync(this.world);
 		return true;
 	}
@@ -98,15 +110,22 @@ public class C4BackComponent implements AutoSyncedComponent {
 		return Math.max(0, presetIndexes.getOrDefault(uuid, 0));
 	}
 
+	public UUID getOwner(UUID carrierUuid) {
+		if (carrierUuid == null) return null;
+		return owners.getOrDefault(carrierUuid, carrierUuid);
+	}
+
 	@Override
 	public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
 		carriers.clear();
 		plantedAt.clear();
 		presetIndexes.clear();
+		owners.clear();
 		NbtList list = tag.getList("carriers", NbtElement.COMPOUND_TYPE);
 		for (int i = 0; i < list.size(); i++) {
 			NbtCompound entry = list.getCompound(i);
 			String uuidStr = entry.getString("uuid");
+			String ownerStr = entry.contains("owner_uuid") ? entry.getString("owner_uuid") : uuidStr;
 			long detonationAt = entry.getLong("detonation_tick");
 			long plantedTick = entry.contains("planted_tick")
 				? entry.getLong("planted_tick")
@@ -119,6 +138,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 				carriers.put(uuid, detonationAt);
 				plantedAt.put(uuid, plantedTick);
 				presetIndexes.put(uuid, presetIndex);
+				owners.put(uuid, parseUuidOrFallback(ownerStr, uuid));
 			} catch (IllegalArgumentException ignored) {
 			}
 		}
@@ -133,6 +153,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 					carriers.putIfAbsent(uuid, fallback);
 					plantedAt.putIfAbsent(uuid, world.getTime());
 					presetIndexes.putIfAbsent(uuid, 0);
+					owners.putIfAbsent(uuid, uuid);
 				} catch (IllegalArgumentException ignored) {
 				}
 			}
@@ -145,6 +166,7 @@ public class C4BackComponent implements AutoSyncedComponent {
 		for (Map.Entry<UUID, Long> e : carriers.entrySet()) {
 			NbtCompound entry = new NbtCompound();
 			entry.putString("uuid", e.getKey().toString());
+			entry.putString("owner_uuid", owners.getOrDefault(e.getKey(), e.getKey()).toString());
 			entry.putLong("detonation_tick", e.getValue());
 			entry.putLong("planted_tick", plantedAt.getOrDefault(e.getKey(), world.getTime()));
 			entry.putInt("preset_index", presetIndexes.getOrDefault(e.getKey(), 0));
@@ -157,6 +179,15 @@ public class C4BackComponent implements AutoSyncedComponent {
 		int count = GexpressConfig.getC4PlacementPresetCount();
 		if (count <= 1) return 0;
 		return this.world.getRandom().nextInt(count);
+	}
+
+	private static UUID parseUuidOrFallback(String raw, UUID fallback) {
+		if (raw == null || raw.isBlank()) return fallback;
+		try {
+			return UUID.fromString(raw);
+		} catch (IllegalArgumentException ignored) {
+			return fallback;
+		}
 	}
 
 	public static boolean hasC4(PlayerEntity player) {

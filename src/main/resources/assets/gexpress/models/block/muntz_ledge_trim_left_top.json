@@ -1,0 +1,6 @@
+{
+  "parent": "gexpress:block/template_floor_ledge_trim_left_top",
+  "textures": {
+    "texture": "gexpress:block/muntz_ledge"
+  }
+}

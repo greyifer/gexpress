@@ -78,6 +78,31 @@ public class LevelComponent implements AutoSyncedComponent {
 		return true;
 	}
 
+	public boolean resetClaimedRewards(UUID playerId) {
+		if (playerId == null) return false;
+		boolean changed = claimedRewardsByPlayer.remove(playerId) != null;
+		if (changed) KEY.sync(world);
+		return changed;
+	}
+
+	public boolean resetClaimedReward(UUID playerId, int level) {
+		if (playerId == null || level <= 0) return false;
+		Set<Integer> claimed = claimedRewardsByPlayer.get(playerId);
+		if (claimed == null || !claimed.remove(level)) return false;
+		if (claimed.isEmpty()) claimedRewardsByPlayer.remove(playerId);
+		KEY.sync(world);
+		return true;
+	}
+
+	public boolean resetPlayer(UUID playerId) {
+		if (playerId == null) return false;
+		boolean xpChanged = xpByPlayer.remove(playerId) != null;
+		boolean rewardsChanged = claimedRewardsByPlayer.remove(playerId) != null;
+		boolean changed = xpChanged || rewardsChanged;
+		if (changed) KEY.sync(world);
+		return changed;
+	}
+
 	public boolean addXp(UUID playerId, int amount) {
 		if (playerId == null || amount <= 0) return false;
 		int next = Math.max(0, xp(playerId) + amount);

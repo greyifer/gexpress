@@ -23,12 +23,12 @@ public abstract class BombSpecialistShopMixin {
 			CallbackInfoReturnable<List<RoleItem>> cir) {
 		if ("gexpress:bomb_specialist".equals(roleId)) {
 			cir.setReturnValue(List.of(
-			new RoleItem("c4", "item.gexpress.c4", GexpressConfig.getC4Price()),
-			new RoleItem("grenade", "item.wathe.grenade", GexpressConfig.getGrenadePrice()),
-			new RoleItem("firecracker", "item.wathe.firecracker", 10),
-			new RoleItem("lockpick", "item.wathe.lockpick", 50),
-			new RoleItem("crowbar", "item.wathe.crowbar", 25),
-			new RoleItem("note", "item.wathe.note", 10)
+				new RoleItem("c4", "item.gexpress.c4", GexpressConfig.getC4Price()),
+				new RoleItem("grenade", "item.wathe.grenade", GexpressConfig.getGrenadePrice()),
+				new RoleItem("firecracker", "item.wathe.firecracker", GexpressConfig.getBombSpecialistFirecrackerPrice()),
+				new RoleItem("lockpick", "item.wathe.lockpick", GexpressConfig.getBombSpecialistLockpickPrice()),
+				new RoleItem("crowbar", "item.wathe.crowbar", GexpressConfig.getBombSpecialistCrowbarPrice()),
+				new RoleItem("note", "item.wathe.note", GexpressConfig.getMutedNotePrice())
 			));
 			return;
 		}
@@ -41,16 +41,31 @@ public abstract class BombSpecialistShopMixin {
 		}
 		if ("gexpress:mafioso".equals(roleId)) {
 			cir.setReturnValue(List.of(
-				new RoleItem("knife", "item.wathe.knife", 200),
-				new RoleItem("revolver", "item.wathe.revolver", 350),
+				new RoleItem("knife", "item.wathe.knife", GexpressConfig.getMafiosoKnifePrice()),
+				new RoleItem("revolver", "item.wathe.revolver", GexpressConfig.getMafiosoRevolverPrice()),
 				new RoleItem("grenade", "item.wathe.grenade", GexpressConfig.getGrenadePrice())
 			));
 			return;
 		}
 		if ("gexpress:janitor".equals(roleId)) {
 			cir.setReturnValue(List.of(
-				new RoleItem("poison_vial", "item.wathe.poison_vial", 100)
+				new RoleItem("poison_vial", "item.wathe.poison_vial", GexpressConfig.getJanitorPoisonVialPrice()),
+				new RoleItem("scorpion", "item.wathe.scorpion", GexpressConfig.getJanitorScorpionPrice())
 			));
+			return;
+		}
+		if ("gexpress:pickpocket".equals(roleId)) {
+			cir.setReturnValue(List.of(
+				new RoleItem("note", "item.wathe.note", GexpressConfig.getMutedNotePrice())
+			));
+			return;
+		}
+		if ("gexpress:burglar".equals(roleId)) {
+			cir.setReturnValue(List.of(
+				new RoleItem("crowbar", "item.wathe.crowbar", GexpressConfig.getBurglarCrowbarPrice()),
+				new RoleItem("lockpick", "item.wathe.lockpick", GexpressConfig.getBurglarLockpickPrice())
+			));
+			return;
 		}
 	}
 
@@ -65,7 +80,9 @@ public abstract class BombSpecialistShopMixin {
 		if ("gexpress:bomb_specialist".equals(roleId)
 				|| "gexpress:godfather".equals(roleId)
 				|| "gexpress:mafioso".equals(roleId)
-				|| "gexpress:janitor".equals(roleId)) {
+				|| "gexpress:janitor".equals(roleId)
+				|| "gexpress:pickpocket".equals(roleId)
+				|| "gexpress:burglar".equals(roleId)) {
 			cir.setReturnValue(Boolean.TRUE);
 		}
 	}

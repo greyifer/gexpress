@@ -6,6 +6,20 @@
       "ascent": 9,
       "height": 12,
       "chars": ["\uE215"]
+    },
+    {
+      "type": "bitmap",
+      "file": "gexpress:gui/guidebook/sprites/mafia.png",
+      "ascent": 9,
+      "height": 12,
+      "chars": ["\uE500"]
+    },
+    {
+      "type": "bitmap",
+      "file": "gexpress:gui/guidebook/sprites/covenant.png",
+      "ascent": 9,
+      "height": 12,
+      "chars": ["\uE501"]
     }
   ]
 }

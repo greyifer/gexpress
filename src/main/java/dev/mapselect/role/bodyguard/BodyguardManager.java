@@ -15,7 +15,7 @@ import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.BodyguardFeedPayload;
 import dev.mapselect.network.BodyguardStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -66,16 +66,7 @@ public final class BodyguardManager {
 		if (!(world instanceof ServerWorld serverWorld) || game == null) return;
 		for (ServerPlayerEntity bodyguard : serverWorld.getPlayers()) {
 			if (!isBodyguard(bodyguard)) continue;
-			ServerPlayerEntity target = chooseTarget(serverWorld, game, bodyguard);
-			if (target == null) {
-				bodyguard.sendMessage(Text.literal("Bodyguard could not find a protection target.")
-					.formatted(Formatting.GRAY), true);
-				continue;
-			}
-			targetByBodyguard.put(bodyguard.getUuid(), target.getUuid());
-			bodyguard.sendMessage(Text.literal("Protect " + target.getName().getString() + ".")
-				.formatted(Formatting.BLUE), false);
-			sendState(bodyguard, target);
+			assignTarget(serverWorld, game, bodyguard, true);
 		}
 	}
 
@@ -91,17 +82,21 @@ public final class BodyguardManager {
 		}
 
 		for (ServerPlayerEntity bodyguard : world.getPlayers()) {
-			if (!isBodyguard(bodyguard) || VultureManager.isStashed(bodyguard)
+			if (!isBodyguard(bodyguard) || PelicanManager.isStashed(bodyguard)
 					|| !isPlayable(bodyguard, bodyguard)) {
 				removeIssuedRevolver(bodyguard);
 				sendClear(bodyguard);
 				continue;
 			}
 			UUID targetId = targetByBodyguard.get(bodyguard.getUuid());
+			if (targetId == null && game != null) {
+				ServerPlayerEntity assigned = assignTarget(world, game, bodyguard, true);
+				targetId = assigned == null ? null : assigned.getUuid();
+			}
 			ServerPlayerEntity target = targetId == null ? null : world.getServer().getPlayerManager().getPlayer(targetId);
 			boolean inRange = target != null
 				&& target.getWorld() == world
-				&& !VultureManager.isStashed(target)
+				&& !PelicanManager.isStashed(target)
 				&& isPlayable(target, bodyguard)
 				&& bodyguard.squaredDistanceTo(target) <= PROTECTION_RANGE_SQUARED;
 			if (inRange) ensureRevolver(bodyguard);
@@ -112,10 +107,30 @@ public final class BodyguardManager {
 		nextLineTick.entrySet().removeIf(entry -> entry.getValue() <= world.getTime() - 20L * 10L);
 	}
 
+	private static ServerPlayerEntity assignTarget(ServerWorld world, GameWorldComponent game,
+			ServerPlayerEntity bodyguard, boolean notify) {
+		ServerPlayerEntity target = chooseTarget(world, game, bodyguard);
+		if (target == null) {
+			if (notify) {
+				bodyguard.sendMessage(Text.literal("Bodyguard could not find a protection target.")
+					.formatted(Formatting.GRAY), true);
+			}
+			sendClear(bodyguard);
+			return null;
+		}
+		targetByBodyguard.put(bodyguard.getUuid(), target.getUuid());
+		if (notify) {
+			bodyguard.sendMessage(Text.literal("Protect " + target.getName().getString() + ".")
+				.formatted(Formatting.BLUE), false);
+		}
+		sendState(bodyguard, target);
+		return target;
+	}
+
 	private static ServerPlayerEntity chooseTarget(ServerWorld world, GameWorldComponent game, ServerPlayerEntity bodyguard) {
 		List<ServerPlayerEntity> candidates = new ArrayList<>();
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (player == bodyguard || VultureManager.isStashed(player) || !isPlayable(player, bodyguard)) continue;
+			if (player == bodyguard || PelicanManager.isStashed(player) || !isPlayable(player, bodyguard)) continue;
 			if (GexpressConfig.isBodyguardProtectOnlyCivilians() && !isCivilianSide(game, player)) continue;
 			candidates.add(player);
 		}

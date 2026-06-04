@@ -2,6 +2,7 @@ package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.client.gui.RoleNameRenderer;
 import dev.mapselect.client.ClientPuppetmasterState;
+import dev.mapselect.client.ClientSpectatorRoleRevealDelay;
 import dev.mapselect.client.ClientSilentShadowState;
 import dev.mapselect.client.ClientVultureState;
 import net.minecraft.client.MinecraftClient;
@@ -26,6 +27,7 @@ public abstract class SilentShadowRoleNameRendererMixin {
 		Entity entity = hitResult.getEntity();
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (entity instanceof PlayerEntity && (ClientSilentShadowState.isShadowed(entity)
+				|| !ClientSpectatorRoleRevealDelay.canSeeHoveredRoles(client)
 				|| ClientVultureState.isLocalStashed(client)
 				|| ClientPuppetmasterState.isLocalController(client)
 				|| ClientPuppetmasterState.isLocalTarget(client))) {

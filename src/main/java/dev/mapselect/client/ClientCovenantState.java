@@ -80,7 +80,7 @@ public final class ClientCovenantState {
 
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null || client.options.hudHidden) return;
+		if (ClientHudVisibility.shouldHide(client) || client.player == null) return;
 		if (!active || !isLocalCovenant(client) || !ClientRoleRevealState.canShowRoleHud(client)
 				|| ClientVultureState.isLocalStashed(client)) {
 			return;
@@ -130,11 +130,12 @@ public final class ClientCovenantState {
 
 	private static boolean isLocalCovenant(MinecraftClient client) {
 		Identifier id = localRoleId(client);
+		id = ClientCopycatState.effectiveRoleId(client, id);
 		return MapSelectRoles.DRACULA_ID.equals(id) || MapSelectRoles.VAMPIRE_ID.equals(id);
 	}
 
 	private static boolean isLocalDracula(MinecraftClient client) {
-		return MapSelectRoles.DRACULA_ID.equals(localRoleId(client));
+		return MapSelectRoles.DRACULA_ID.equals(ClientCopycatState.effectiveRoleId(client, localRoleId(client)));
 	}
 
 	private static Identifier localRoleId(MinecraftClient client) {

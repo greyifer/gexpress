@@ -1,0 +1,14 @@
+﻿{
+  "variants": {
+    "type=bottom": {
+      "model": "gexpress:block/plum_herringbone_slab"
+    },
+    "type=double": {
+      "model": "gexpress:block/plum_herringbone"
+    },
+    "type=top": {
+      "model": "gexpress:block/plum_herringbone_slab_top"
+    }
+  }
+}
+

@@ -1,0 +1,9 @@
+﻿{
+  "parent": "minecraft:block/slab",
+  "textures": {
+    "bottom": "gexpress:block/smooth_plum",
+    "side": "gexpress:block/smooth_plum",
+    "top": "gexpress:block/smooth_plum"
+  }
+}
+

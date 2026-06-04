@@ -57,7 +57,6 @@ public final class MutedNotesDistribution {
 			if (!modifiers.isModifier(player, MapSelectModifiers.MUTED)) continue;
 
 			int notes = player.getInventory().count(WatheItems.NOTE);
-			if (notes > STARTING_NOTES) trimNotesToStartingCount(player);
 			if (notes >= STARTING_NOTES) {
 				granted.add(id);
 				continue;
@@ -76,27 +75,6 @@ public final class MutedNotesDistribution {
 			MapSelect.LOGGER.debug("Handed {} note(s) to muted player {}", Math.max(0, missing),
 				player.getName().getString());
 		}
-	}
-
-	private static void trimNotesToStartingCount(net.minecraft.server.network.ServerPlayerEntity player) {
-		int remainingAllowed = STARTING_NOTES;
-		boolean changed = false;
-		for (int slot = 0; slot < player.getInventory().size(); slot++) {
-			ItemStack stack = player.getInventory().getStack(slot);
-			if (stack.isEmpty() || !stack.isOf(WatheItems.NOTE)) continue;
-			if (remainingAllowed <= 0) {
-				player.getInventory().setStack(slot, ItemStack.EMPTY);
-				changed = true;
-				continue;
-			}
-			int keep = Math.min(stack.getCount(), remainingAllowed);
-			remainingAllowed -= keep;
-			if (stack.getCount() != keep) {
-				stack.setCount(keep);
-				changed = true;
-			}
-		}
-		if (changed) player.playerScreenHandler.syncState();
 	}
 
 	private static void reset() {

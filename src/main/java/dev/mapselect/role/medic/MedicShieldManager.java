@@ -5,7 +5,6 @@ import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
-import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.network.MedicShieldFlashPayload;
 import dev.mapselect.network.MedicShieldUsePayload;
@@ -13,7 +12,7 @@ import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -29,6 +28,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 public final class MedicShieldManager {
@@ -47,7 +47,7 @@ public final class MedicShieldManager {
 
 	private static void tryShield(ServerPlayerEntity medic) {
 		if (medic == null || medic.getWorld().isClient) return;
-		if (VultureManager.isStashed(medic)) return;
+		if (PelicanManager.isStashed(medic)) return;
 		ServerPlayerEntity target = findLookTarget(medic);
 		if (target == null) {
 			medic.sendMessage(Text.literal("No living player close enough to shield."), true);
@@ -65,8 +65,9 @@ public final class MedicShieldManager {
 		MedicShieldComponent comp = MedicShieldComponent.KEY.getNullable(medic.getWorld());
 		if (comp == null) return;
 
-		long remaining = comp.cooldownRemainingTicks(medic.getUuid());
-		if (remaining > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(medic);
+		long remaining = creativeBypass ? 0L : comp.cooldownRemainingTicks(medic.getUuid());
+		if (!creativeBypass && remaining > 0L) {
 			medic.sendMessage(Text.literal("Shield ready in " + secondsCeil(remaining) + "s."), true);
 			return;
 		}
@@ -81,6 +82,7 @@ public final class MedicShieldManager {
 			medic.sendMessage(Text.literal("Could not apply shield."), true);
 			return;
 		}
+		if (creativeBypass) comp.reduceCooldown(medic.getUuid(), Long.MAX_VALUE);
 
 		AbilitySounds.playTo(List.of(medic, target), SoundEvents.BLOCK_BEACON_POWER_SELECT,
 			SoundCategory.PLAYERS, 0.75F, 1.7F);
@@ -96,30 +98,33 @@ public final class MedicShieldManager {
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (victim == null || victim.getWorld().isClient) return true;
-		if (!GameConstants.DeathReasons.KNIFE.equals(reason) && !GameConstants.DeathReasons.GUN.equals(reason)) {
-			return true;
-		}
+		if (!isShieldBreakingHit(reason)) return true;
 
 		MedicShieldComponent comp = MedicShieldComponent.KEY.getNullable(victim.getWorld());
 		if (comp == null || !comp.hasShield(victim.getUuid())) return true;
 
-		boolean broken = GameConstants.DeathReasons.GUN.equals(reason)
-			|| (GameConstants.DeathReasons.KNIFE.equals(reason)
-				&& GexpressConfig.doesMedicShieldKnifeBreaks());
 		UUID medicId = comp.getMedicForTarget(victim.getUuid());
-		if (broken) {
-			comp.removeShield(victim.getUuid());
-		}
+		comp.removeShield(victim.getUuid());
 
 		if (victim instanceof ServerPlayerEntity target) {
 			ServerPlayerEntity medic = medicId == null || target.getServer() == null
 				? null : target.getServer().getPlayerManager().getPlayer(medicId);
-			AbilitySounds.playTo(List.of(target, medic), broken ? SoundEvents.ITEM_SHIELD_BREAK : SoundEvents.ITEM_SHIELD_BLOCK,
-				SoundCategory.PLAYERS, 1.0F, broken ? 0.8F : 1.2F);
-			target.sendMessage(Text.literal(broken ? "Your Medic shield broke." : "Your Medic shield blocked the hit."), true);
+			List<ServerPlayerEntity> recipients = medic == null ? List.of(target) : List.of(target, medic);
+			AbilitySounds.playTo(recipients, SoundEvents.ITEM_SHIELD_BREAK, SoundCategory.PLAYERS, 1.0F, 0.8F);
+			target.sendMessage(Text.literal("Your Medic shield broke."), true);
 		}
-		flashMedic(victim.getWorld().getServer(), medicId, victim.getUuid(), broken);
+		flashMedic(victim.getWorld().getServer(), medicId, victim.getUuid(), true);
 		return false;
+	}
+
+	private static boolean isShieldBreakingHit(Identifier reason) {
+		if (GameConstants.DeathReasons.KNIFE.equals(reason) || GameConstants.DeathReasons.GUN.equals(reason)) {
+			return true;
+		}
+		if (reason == null) return false;
+		String path = reason.getPath().toLowerCase(Locale.ROOT);
+		return path.contains("knife") || path.contains("stab") || path.contains("gun")
+			|| path.contains("bullet") || path.contains("revolver");
 	}
 
 	private static void tick(ServerWorld world) {
@@ -161,7 +166,8 @@ public final class MedicShieldManager {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
 		if (game == null) return false;
 		Role role = game.getRole(player);
-		return role != null && MapSelectRoles.MEDIC_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.MEDIC_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.MEDIC_ID));
 	}
 
 	private static boolean isActiveGame(World world) {

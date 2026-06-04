@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "wathe:block/red_moquette",
+    "side": "wathe:block/red_moquette",
+    "top": "wathe:block/red_moquette"
+  }
+}

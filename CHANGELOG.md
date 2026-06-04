@@ -1,32 +1,141 @@
+# Grey's Express 1.6.7
+
+## Added
+
+- Added the Lovers modifier with soul-link deaths, lover HUD visibility config, and optional mixed-side pairings.
+- Added Cupid as a neutral role that can link two players into a lover duo and win through a configurable number of alive lover duos.
+- Added Vengeful Spirit as a civilian role that can respawn at their death spot and hunt their killer for a configurable revenge window.
+- Added the Astronomikyu Plush block and item.
+- Added a Seer compare ability that checks two nearby players and reports whether they are on the same team.
+
+## Changed
+
+- Updated ability HUD/keybind displays to follow the configured G'Express keybinds and show money costs as a single price.
+- Changed instinct from hold-to-drain into a tap ability with a timed active window and recharge.
+- Slowed Covenant blood drain and added bite cooldowns for vampire and Dracula roles.
+- Changed Dracula's bat ability to spawn a bat entity for bat form.
+- Let players inside a Pelican body open the guidebook with the configured guidebook key.
+
+## Fixed
+
+- Made plush sounds local to the player who clicks the plush.
+- Fixed plush head-top texture orientation across plush models.
+- Fixed spectator instinct before role reveal so player glows are green instead of role-colored, while keeping role colors after reveal.
+- Removed guidebook wording that called out configurable values in role, modifier, and item descriptions.
+- Removed unused source files, stray generated output, and orphaned Night Vision sync code.
+
+# Grey's Express 1.5.9
+
+## Changed
+- Bumped the release version to 1.5.9.
+- Replaced the Play of the Game dot-map replay/export path with real client-side gameplay footage capture that encodes the selected highlight directly to an MP4 file.
+- Updated the Play of the Game tab to list and open saved MP4 videos from the local plays folder instead of rendering fake replay cards.
+- Added FFmpeg auto-discovery for Winget installs so Play of the Game MP4 encoding works even before the launcher picks up a refreshed PATH.
+- Added a bundled Java MP4 encoder fallback so Play of the Game exports still work when the player does not have FFmpeg installed.
+- Added a bundled Flashback-style JavaCV/FFmpeg encoder path so Play of the Game MP4 export no longer depends on a player-installed FFmpeg executable.
+- Added a per-selected-clip delete action to the Play of the Game tab, including cleanup for that clip's cached preview frames.
+- Changed round-end Play of the Game to fade through an Overwatch-style title card, play the captured highlight frames, then fade back out before returning to the lobby.
+
+## Fixed
+- Fixed bundled Java Play of the Game exports writing MP4 files without a finalized movie atom, which made them appear unsupported or corrupted.
+- Fixed the end-of-round Play of the Game flow opening the saved-video detail screen instead of the automatic highlight presentation.
+- Fixed partial Play of the Game MP4 files being published after interrupted or failed encodes; videos are now written to temp files and validated before appearing in the plays folder.
+
+# Grey's Express 1.5.8
+
+## Added
+- Added a Play of the Game system that captures round highlights, chooses the strongest kill window, plays it at round end, and saves it locally.
+- Added a Play of the Game options tab where saved highlights can be rewatched or exported as MP4 files.
+
+## Fixed
+- Fixed safe-preparation ability blocking accidentally disabling broad killer features such as killer shop access, killer instinct, and money HUD state.
+- Fixed starting shop balances so killer and custom killer-shop roles get their opening money from their assigned role instead of a temporary ability-gated feature check.
+- Fixed killer-only and civilian-only modifier assignment checks to respect assigned custom killer roles directly.
+
+# Grey's Express 1.5.7
+
+## Added
+
+- Added an autoclicker guard that kicks non-creative players when their click rate spikes far beyond normal play.
+
+## Changed
+
+- Blocked role ability use during safe preparation on both the client hotkey path and server payload checks.
+- Disabled private message command aliases while a round is starting, active, or stopping.
+- Let creative role testers use test roles without ability cooldowns or max-use limits.
+- Disabled role and modifier testing commands while a game is running.
+
+## Fixed
+
+- Fixed Harlequin Masquerade not returning the Harlequin to the original activation position when shot or stabbed.
+- Fixed Harlequin Masquerade not playing the Jevil laugh globally when broken by a shot or stab.
+- Fixed Masquerade pulling sleeping players out of beds and leaving those beds unusable.
+- Removed killer instinct from the Licensed Villain neutral role path.
+
+# Grey's Express 1.5.6
+
+## Added
+
+- Added Acacia, Birch, Cherry, Dark Oak, Jungle, Mangrove, Oak, and Spruce Cabinet blocks using the new cabinet texture set.
+- Added a dedicated Grey's Express creative tab with the Greyifer Plush as its icon.
+- Added all G'Express special blocks and custom utility items to the new creative tab for easier map building and testing.
+- Added cabinet blockstates, item models, loot tables, and axe-mining tags so the new cabinets place, render, drop, and break like normal wood blocks.
+- Added persistent out-of-game G'Coin balances, admin give/remove/set commands, Players-tab editing, and a Skins-tab balance display.
+- Added admin level reset commands for resetting a player's XP/level and clearing XP Roadmap claim history.
+- Added earned level tags as a separate Tag Editor section, shown as a third player badge after normal tags.
+
+## Changed
+
+- Made Wathe couch sleeping toggleable per map preset, with creative players always allowed to use it for setup and testing.
+- Reworked XP Roadmap reward setup into a structured editor with separate reward, description, and claim-command fields.
+- Let XP Roadmap levels grant multiple visible rewards and run multiple claim commands from the new reward editor.
+- Let Owner-tagged players access the Dev tab.
+- Renamed the live Players-tab action from Tags to Edit since it now covers tags, XP, and G'Coin.
+- Renamed the server role manager files/classes from Vulture/Trickster to Pelican/Harlequin while keeping existing network/config IDs compatible.
+- Moved the player XP/level HUD to the bottom right and added the out-of-game G'Coin amount plus coin icon above it.
+- Changed player level labels from `Lv` to `LvL` in shared player name displays and level editor UI.
+
+## Fixed
+
+- Fixed Snitch reveal HUDs exposing exact killer roles and killer-side Snitch warnings disappearing after the Snitch completes their tasks.
+- Fixed Wathe couch sleeping facing the player away from the connected couch block.
+- Fixed sneak-right-clicking Wathe couches with another couch item blocking normal couch placement.
+- Fixed the G'Coin world component missing its Cardinal Components metadata declaration, which crashed clients during startup.
+- Fixed Puppetmaster-controlled avatar deaths killing the Puppetmaster instead of the controlled target.
+- Fixed Puppetmaster leaving behind a corpse decoy or invisible colliding controlled player, removed the max-use limit, and stopped injecting a temporary knife/inventory swap during control.
+
 # Grey's Express 1.5.4
 
 ## Added
 
-- Added persistent player levels with 25 XP for playing a round and 50 bonus XP for winning; levels now show in tab names, player display names, and the out-of-game HUD.
-- Added the Godfather recruit picker so the primary ability can choose Mafioso or Janitor from one small menu.
-- Added `/gexpress` as a readable alias for the existing `/g` command tree.
+- Added /gexpress as a full alias for the /g command tree.
+- Added a proper player-facing XP Roadmap menu with current progress, level cards, locked/unlocked states, and reward details.
+- Added Dev-tab XP tuning for round XP, win XP, neutral win bonus XP, kill XP, civilian task XP, level curves, XP overrides, and level reward roadmap entries.
+- Added Dev-tab grenade pass-through block settings for grenade line-of-sight exceptions.
+- Added inline level and XP editing tools to the Players tab.
+- Added ability HUD icons for newer role abilities.
 
 ## Changed
 
-- Takeover now assigns normal civilian-category roles to non-Godfathers, keeps purple and lime Mafia families separate, allows each Godfather up to three Mafiosos and three Janitors, and keeps recruited Mafia members on their side after their Godfather dies.
-- Dracula bat form now uses a live, upright bat camera and keeps flight active while transformed.
-- Scatter Brain now searches for safe RTP positions from map random spawns or the play area before teleporting players.
-- Admin and tuning commands now expose cleaner direct forms while keeping the old nested paths as aliases.
-- Command sources were reorganized into folders that match the player-facing command groups.
-- Reworked role and modifier distribution so configured requested counts are handled together, side limits no longer explode into every enabled role, and modifier requests are spread across players more fairly.
+- Reorganized command groups into clearer buckets: game, roles, modifiers, setup, and admin.
+- Reworked role and modifier distribution so configured role amounts behave as requested counts, side limits are respected, and modifiers spread more fairly across players.
+- Reworked role/modifier tuning command paths and restored testing commands under the newer command structure.
+- Reworked the tag editor and permissions UI to expose clearer, more complete permission controls.
+- Reworked the 3D model placement screen so the preview model renders properly and left-click dragging rotates the preview.
+- Rebalanced XP rewards: wins now grant +25 XP, neutral wins add another +25 XP, kills grant +10 XP, and civilian tasks grant +5 XP.
 
 ## Fixed
 
-- Fixed ability cooldown bars and ability-key checks being tied to the role reveal timer instead of only hiding while dead, in safe time, or inside a Pelican.
-- Fixed Pelican belly camera state flashing, swallowed shield state carrying onto Pelican views, swallowed Snitch progress being overwritten, and swallowed players being re-synced correctly after reconnect.
-- Fixed Spy and Bodyguard interaction feeds firing from ordinary right-clicks such as food or drink use.
-- Fixed EOD Specialist pliers and Muted notes not being reissued when their initial grant was missed or lost.
-- Fixed Amnesia killer instinct revealing other killers with a glow.
-- Fixed Time Master server-side ability use while dead.
-- Fixed C4 and Wathe grenades killing through walls.
-- Fixed Juggernaut shield break detection for knife, bat, revolver, bullet, and projectile-style death reasons.
-- Fixed client render distance being left below 32 by other option writes.
-- Fixed the client repeatedly reapplying every sound category volume every tick after fades had already ended.
+- Fixed private ability sounds playing globally for roles like Medic.
+- Fixed a startup crash caused by the Harpy modifier null-guard mixin.
+- Fixed modifier data sometimes returning null and crashing player rendering.
+- Fixed Bodyguard revolvers dropping or being removed after gun kills.
+- Fixed Muted notes and EOD Specialist pliers duplicating or being granted infinitely.
+- Fixed Dracula bat transformation getting stuck or leaving the player unable to move properly.
+- Fixed Skincrawler gunshot behavior: the first shot strips the disguise and hard-stuns them, while a shot in their own skin kills them.
+- Fixed Takeover and Amnesia players missing sanity/tasks in custom game modes.
+- Fixed C4 staying attached to spectators/dead players after the carrier dies.
+- Improved Time Master rewind safety so damage is blocked during rewind playback and more round state is restored.
 
 # Grey's Express 1.5.2
 

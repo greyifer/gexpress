@@ -1,0 +1,41 @@
+﻿{
+    "parent":  "block/block",
+    "textures":  {
+                     "particle":  "gexpress:block/gold_ledge",
+                     "ledge":  "gexpress:block/gold_ledge"
+                 },
+    "elements":  [
+                     {
+                         "from":  [
+                                      0,
+                                      0,
+                                      2
+                                  ],
+                         "to":  [
+                                    2,
+                                    2,
+                                    14
+                                ],
+                         "faces":  {
+                                       "down":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "up":  {
+                                                  "texture":  "#ledge"
+                                              },
+                                       "north":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "south":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "west":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "east":  {
+                                                    "texture":  "#ledge"
+                                                }
+                                   }
+                     }
+                 ]
+}

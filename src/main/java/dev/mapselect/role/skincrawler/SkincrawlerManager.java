@@ -15,7 +15,7 @@ import dev.mapselect.network.SkincrawlerSkinPayload;
 import dev.mapselect.network.SkincrawlerUsePayload;
 import dev.mapselect.network.TimeMasterFreezeStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -32,6 +32,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,10 +61,11 @@ public final class SkincrawlerManager {
 
 	private static void tryStealSkin(ServerPlayerEntity skincrawler) {
 		if (skincrawler == null || !(skincrawler.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(skincrawler) || !isSkincrawler(skincrawler)
+		if (PelicanManager.isStashed(skincrawler) || !isSkincrawler(skincrawler)
 				|| !canUseHere(world, skincrawler) || !GameFunctions.isPlayerAliveAndSurvival(skincrawler)) return;
-		long remaining = cooldownRemaining(skincrawler);
-		if (remaining > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(skincrawler);
+		long remaining = creativeBypass ? 0L : cooldownRemaining(skincrawler);
+		if (!creativeBypass && remaining > 0L) {
 			AbilityCooldownSync.send(skincrawler, AbilityCooldownPayload.SKINCRAWLER_STEAL,
 				remaining, (long) GexpressConfig.getSkincrawlerCooldownSeconds() * 20L, false);
 			return;
@@ -86,26 +88,53 @@ public final class SkincrawlerManager {
 		preservedBodyOwners.put(body.getUuid(), previousSkin);
 		skinSwaps.put(skincrawler.getUuid(), stolenSkin);
 		long cooldown = (long) GexpressConfig.getSkincrawlerCooldownSeconds() * 20L;
-		cooldownUntil.put(skincrawler.getUuid(), world.getTime() + cooldown);
-		AbilityCooldownSync.send(skincrawler, AbilityCooldownPayload.SKINCRAWLER_STEAL, cooldown, cooldown, false);
+		if (creativeBypass) {
+			AbilityCooldownSync.clear(skincrawler, AbilityCooldownPayload.SKINCRAWLER_STEAL);
+		} else {
+			cooldownUntil.put(skincrawler.getUuid(), world.getTime() + cooldown);
+			AbilityCooldownSync.send(skincrawler, AbilityCooldownPayload.SKINCRAWLER_STEAL, cooldown, cooldown, false);
+		}
 		skincrawler.sendMessage(Text.literal("Skin stolen."), true);
 		broadcast(world);
 	}
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (!(victim instanceof ServerPlayerEntity player) || !isSkincrawler(player)) return true;
-		if (!GameConstants.DeathReasons.GUN.equals(reason)) return true;
+		if (!isUnmaskingHit(reason)) return true;
 		long now = player.getWorld().getTime();
 		UUID currentSkin = skinSwaps.get(player.getUuid());
 		if (currentSkin == null || currentSkin.equals(player.getUuid())) return true;
 		skinSwaps.remove(player.getUuid());
 		if (player.getWorld() instanceof ServerWorld world) broadcast(world);
-		long duration = (long) GexpressConfig.getSkincrawlerStunSeconds() * 20L;
-		stunned.put(player.getUuid(), new Stun(now + duration,
-			player.getPos(), player.getYaw(), player.getPitch()));
-		syncStun(player, (int) Math.min(Integer.MAX_VALUE, duration));
-		player.sendMessage(Text.literal("You are stunned!"), true);
+		if (isGunHit(reason)) {
+			long duration = (long) GexpressConfig.getSkincrawlerStunSeconds() * 20L;
+			stunned.put(player.getUuid(), new Stun(now + duration,
+				player.getPos(), player.getYaw(), player.getPitch()));
+			syncStun(player, (int) Math.min(Integer.MAX_VALUE, duration));
+			player.sendMessage(Text.literal("You are stunned!"), true);
+		} else {
+			player.sendMessage(Text.literal("Your borrowed skin was torn away!"), true);
+		}
 		return false;
+	}
+
+	private static boolean isUnmaskingHit(Identifier reason) {
+		return isGunHit(reason) || isKnifeHit(reason);
+	}
+
+	private static boolean isGunHit(Identifier reason) {
+		if (GameConstants.DeathReasons.GUN.equals(reason)) return true;
+		String path = reasonPath(reason);
+		return path.contains("gun") || path.contains("shot");
+	}
+
+	private static boolean isKnifeHit(Identifier reason) {
+		String path = reasonPath(reason);
+		return path.contains("knife") || path.contains("stab");
+	}
+
+	private static String reasonPath(Identifier reason) {
+		return reason == null ? "" : reason.getPath().toLowerCase(Locale.ROOT);
 	}
 
 	private static void tick(ServerWorld world) {
@@ -164,7 +193,8 @@ public final class SkincrawlerManager {
 	private static boolean isSkincrawler(PlayerEntity player) {
 		GameWorldComponent game = player == null ? null : GameWorldComponent.KEY.getNullable(player.getWorld());
 		Role role = game == null ? null : game.getRole(player);
-		return role != null && MapSelectRoles.SKINCRAWLER_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.SKINCRAWLER_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.SKINCRAWLER_ID));
 	}
 
 	public static UUID replacementFor(UUID playerId) {

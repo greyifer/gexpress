@@ -57,7 +57,7 @@ public final class ClientJuggernautState {
 
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.textRenderer == null || client.options.hudHidden || alpha <= 0.02F) return;
+		if (ClientHudVisibility.shouldHide(client) || client.textRenderer == null || alpha <= 0.02F) return;
 		TextRenderer text = client.textRenderer;
 		int a = Math.max(0, Math.min(255, Math.round(alpha * 255.0F)));
 		int width = 118;

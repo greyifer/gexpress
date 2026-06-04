@@ -1,0 +1,6 @@
+{
+  "parent": "gexpress:block/template_panel",
+  "textures": {
+    "all": "wathe:block/red_moquette"
+  }
+}

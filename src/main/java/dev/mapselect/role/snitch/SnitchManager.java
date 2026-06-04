@@ -1,7 +1,6 @@
 package dev.mapselect.role.snitch;
 
 import dev.doctor4t.wathe.api.Role;
-import dev.doctor4t.wathe.api.WatheRoles;
 import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerMoodComponent;
@@ -10,7 +9,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.SnitchProgressPayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.testing.GexpressTestState;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -27,6 +26,8 @@ import java.util.UUID;
 
 public final class SnitchManager {
 	private static final int GLOW_REFRESH_INTERVAL_TICKS = 10;
+	private static final String GENERIC_KILLER_LABEL = "Killer";
+	private static final int GENERIC_KILLER_COLOR = 0xFF3535;
 
 	private static final Map<UUID, Integer> lastTaskCounts = new HashMap<>();
 	private static final Map<UUID, Integer> completedTasks = new HashMap<>();
@@ -83,7 +84,7 @@ public final class SnitchManager {
 			if (!isSnitch(game, player) || !isPlayable(player)) continue;
 			UUID id = player.getUuid();
 			presentSnitches.add(id);
-			if (VultureManager.isStashed(player)) {
+			if (PelicanManager.isStashed(player)) {
 				int completed = completedTasks.getOrDefault(id, 0);
 				int required = GexpressConfig.getSnitchTasksRequired();
 				syncSnitchInfo(player, game, world, Math.min(completed, required), required);
@@ -130,8 +131,7 @@ public final class SnitchManager {
 
 	private static void revealKillers(ServerPlayerEntity snitch, GameWorldComponent game, ServerWorld world) {
 		revealedSnitches.add(snitch.getUuid());
-		warnedSnitches.remove(snitch.getUuid());
-		clearSnitchGlow(snitch, world);
+		syncKillerWarnings(world, game);
 		syncKillerGlowsToSnitch(snitch, game, world);
 		syncSnitchInfo(snitch, game, world, GexpressConfig.getSnitchTasksRequired(),
 			GexpressConfig.getSnitchTasksRequired());
@@ -141,7 +141,7 @@ public final class SnitchManager {
 		if (!warnedSnitches.add(snitch.getUuid())) return;
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (player == snitch || !isPlayable(player) || !isKillerTeam(game, player)) continue;
-			syncKillerWarningInfo(player, snitch);
+			syncKillerWarningInfo(player, world);
 			glowViewersBySnitch.computeIfAbsent(snitch.getUuid(), id -> new HashSet<>()).add(player.getUuid());
 		}
 	}
@@ -149,11 +149,11 @@ public final class SnitchManager {
 	private static void refreshWarnedGlows(ServerWorld world, GameWorldComponent game, Set<UUID> presentSnitches) {
 		for (UUID snitchId : Set.copyOf(warnedSnitches)) {
 			ServerPlayerEntity snitch = world.getServer().getPlayerManager().getPlayer(snitchId);
-			if (snitch == null || !presentSnitches.contains(snitchId) || !isPlayable(snitch)
-					|| revealedSnitches.contains(snitchId)) {
+			if (snitch == null || !presentSnitches.contains(snitchId) || !isPlayable(snitch)) {
 				if (snitch != null) clearSnitchGlow(snitch, world);
 				else glowViewersBySnitch.remove(snitchId);
 				warnedSnitches.remove(snitchId);
+				syncKillerWarnings(world, game);
 				continue;
 			}
 			syncGlowToKillers(snitch, game, world);
@@ -165,7 +165,7 @@ public final class SnitchManager {
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (player == snitch || !isPlayable(player) || !isKillerTeam(game, player)) continue;
 			currentViewers.add(player.getUuid());
-			syncKillerWarningInfo(player, snitch);
+			syncKillerWarningInfo(player, world);
 		}
 
 		Set<UUID> previousViewers = glowViewersBySnitch.computeIfAbsent(snitch.getUuid(), id -> new HashSet<>());
@@ -178,6 +178,14 @@ public final class SnitchManager {
 		}
 		previousViewers.clear();
 		previousViewers.addAll(currentViewers);
+	}
+
+	private static void syncKillerWarnings(ServerWorld world, GameWorldComponent game) {
+		if (world == null || game == null) return;
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			if (!isPlayable(player) || !isKillerTeam(game, player)) continue;
+			syncKillerWarningInfo(player, world);
+		}
 	}
 
 	private static void refreshRevealedKillerGlows(ServerWorld world, GameWorldComponent game, Set<UUID> presentSnitches) {
@@ -230,15 +238,8 @@ public final class SnitchManager {
 			revealed ? killerInfoLines(game, world) : List.of());
 	}
 
-	private static void syncKillerWarningInfo(ServerPlayerEntity killer, ServerPlayerEntity snitch) {
-		sendInfo(killer, 0, GexpressConfig.getSnitchTasksRequired(), false, List.of(
-			new SnitchProgressPayload.InfoLine(
-				snitch.getUuid(),
-				snitch.getGameProfile().getName(),
-				"Snitch",
-				MapSelectRoles.SNITCH == null ? 0xE6B83D : MapSelectRoles.SNITCH.color()
-			)
-		));
+	private static void syncKillerWarningInfo(ServerPlayerEntity killer, ServerWorld world) {
+		sendInfo(killer, 0, GexpressConfig.getSnitchTasksRequired(), false, warnedSnitchInfoLines(world));
 	}
 
 	private static void clearInfo(ServerPlayerEntity player) {
@@ -260,12 +261,26 @@ public final class SnitchManager {
 		List<SnitchProgressPayload.InfoLine> lines = new java.util.ArrayList<>();
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (!isPlayable(player) || !isKillerTeam(game, player)) continue;
-			Role role = game.getRole(player);
 			lines.add(new SnitchProgressPayload.InfoLine(
 				player.getUuid(),
 				player.getGameProfile().getName(),
-				roleDisplayName(role),
-				role == null ? 0xFF5555 : role.color()
+				GENERIC_KILLER_LABEL,
+				GENERIC_KILLER_COLOR
+			));
+		}
+		return lines;
+	}
+
+	private static List<SnitchProgressPayload.InfoLine> warnedSnitchInfoLines(ServerWorld world) {
+		List<SnitchProgressPayload.InfoLine> lines = new java.util.ArrayList<>();
+		for (UUID snitchId : warnedSnitches) {
+			ServerPlayerEntity snitch = world.getServer().getPlayerManager().getPlayer(snitchId);
+			if (snitch == null || !isPlayable(snitch)) continue;
+			lines.add(new SnitchProgressPayload.InfoLine(
+				snitch.getUuid(),
+				snitch.getGameProfile().getName(),
+				"Snitch",
+				MapSelectRoles.SNITCH == null ? 0xE6B83D : MapSelectRoles.SNITCH.color()
 			));
 		}
 		return lines;
@@ -294,31 +309,9 @@ public final class SnitchManager {
 		return role != null && (role.canUseKiller() || game.canUseKillerFeatures(player));
 	}
 
-	private static String roleDisplayName(Role role) {
-		if (role == null || role.identifier() == null) return "Unknown";
-		if (role == WatheRoles.KILLER) return "Killer";
-		if (role == WatheRoles.VIGILANTE) return "Vigilante";
-		if (MapSelectRoles.BOMB_SPECIALIST_ID.equals(role.identifier())) return "Bomb Specialist";
-		if (MapSelectRoles.THE_SILENT_ID.equals(role.identifier())) return "The Silent";
-		if (MapSelectRoles.WARLOCK_ID.equals(role.identifier())) return "Warlock";
-		if (MapSelectRoles.TRICKSTER_ID.equals(role.identifier())) return "Harlequin";
-		if (MapSelectRoles.PUPPETMASTER_ID.equals(role.identifier())) return "Puppetmaster";
-		if (MapSelectRoles.JUGGERNAUT_ID.equals(role.identifier())) return "Juggernaut";
-		if (MapSelectRoles.VULTURE_ID.equals(role.identifier())) return "Pelican";
-		String path = role.identifier().getPath().replace('_', ' ');
-		StringBuilder out = new StringBuilder(path.length());
-		boolean capitalize = true;
-		for (int i = 0; i < path.length(); i++) {
-			char c = path.charAt(i);
-			out.append(capitalize ? Character.toUpperCase(c) : c);
-			capitalize = c == ' ';
-		}
-		return out.toString();
-	}
-
 	private static boolean isPlayable(ServerPlayerEntity player) {
 		return GameFunctions.isPlayerAliveAndSurvival(player)
-			|| VultureManager.isStashed(player)
+			|| PelicanManager.isStashed(player)
 			|| GexpressTestState.isRoleTester(player);
 	}
 

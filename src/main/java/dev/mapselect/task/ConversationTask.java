@@ -3,7 +3,7 @@ package dev.mapselect.task;
 import dev.doctor4t.wathe.cca.PlayerMoodComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -72,7 +72,7 @@ public final class ConversationTask implements PlayerMoodComponent.TrainTask {
 		int verticalTolerance = GexpressConfig.getConversationTaskVerticalToleranceBlocks();
 
 		for (ServerPlayerEntity other : serverPlayer.getServerWorld().getPlayers()) {
-			if (other == serverPlayer || other.getWorld() != world || VultureManager.isStashed(other)) continue;
+			if (other == serverPlayer || other.getWorld() != world || PelicanManager.isStashed(other)) continue;
 			if (!GameFunctions.isPlayerAliveAndSurvival(other)) continue;
 			if (Math.abs(other.getY() - serverPlayer.getY()) > verticalTolerance + 0.5D) continue;
 			double dx = other.getX() - serverPlayer.getX();

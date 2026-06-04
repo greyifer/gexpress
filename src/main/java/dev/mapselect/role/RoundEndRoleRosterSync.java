@@ -3,6 +3,7 @@ package dev.mapselect.role;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.mapselect.level.LevelComponent;
 import dev.mapselect.network.RoundEndRoleRosterPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -30,13 +31,16 @@ public final class RoundEndRoleRosterSync {
 		if (game == null) return;
 
 		Map<UUID, String> roleIds = new LinkedHashMap<>();
+		Map<UUID, Integer> levels = new LinkedHashMap<>();
+		LevelComponent levelComponent = LevelComponent.KEY.getNullable(world);
 		for (ServerPlayerEntity player : players) {
 			if (player == null) continue;
 			Role role = game.getRole(player);
 			Identifier id = role == null ? null : role.identifier();
 			roleIds.put(player.getUuid(), id == null ? "" : id.toString());
+			levels.put(player.getUuid(), levelComponent == null ? 1 : levelComponent.level(player.getUuid()));
 		}
-		send(serverWorld, new RoundEndRoleRosterPayload(roleIds));
+		send(serverWorld, new RoundEndRoleRosterPayload(roleIds, levels));
 	}
 
 	private static void clear(World world) {

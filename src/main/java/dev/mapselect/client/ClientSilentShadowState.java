@@ -54,7 +54,7 @@ public final class ClientSilentShadowState {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			if (game == null) return false;
 			Role role = game.getRole(client.player);
-			return role != null && MapSelectRoles.THE_SILENT_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.THE_SILENT_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

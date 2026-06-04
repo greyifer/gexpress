@@ -13,7 +13,6 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheEntities;
 import dev.doctor4t.wathe.index.WatheItems;
-import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.game.GexpressGameModes;
@@ -29,7 +28,7 @@ import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.role.spy.SpyManager;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -70,6 +69,8 @@ public final class MafiaManager {
 	private static final Map<UUID, Integer> loadedBulletsByGodfather = new HashMap<>();
 	private static final Map<UUID, Long> janitorCleanCooldownUntil = new HashMap<>();
 	private static final Map<UUID, Integer> pendingRevolverCooldown = new HashMap<>();
+	private static final Map<UUID, PickpocketHold> activePickpockets = new HashMap<>();
+	private static final List<DelayedMoneyNotice> delayedMoneyNotices = new ArrayList<>();
 	private static int syncTick;
 
 	private MafiaManager() {}
@@ -113,24 +114,38 @@ public final class MafiaManager {
 			tryRecruit(player, SlotType.MAFIOSO);
 		} else if (action == MafiaActionPayload.RECRUIT_JANITOR) {
 			tryRecruit(player, SlotType.JANITOR);
+		} else if (action == MafiaActionPayload.RECRUIT_PICKPOCKET) {
+			tryRecruit(player, SlotType.PICKPOCKET);
+		} else if (action == MafiaActionPayload.RECRUIT_BURGLAR) {
+			tryRecruit(player, SlotType.BURGLAR);
 		} else if (action == MafiaActionPayload.CLEAN_BODY) {
 			tryClean(player);
+		} else if (action == MafiaActionPayload.PICKPOCKET_START) {
+			startPickpocket(player);
+		} else if (action == MafiaActionPayload.PICKPOCKET_STOP) {
+			finishPickpocket(player, false);
 		}
 	}
 
 	private static void tryRecruit(ServerPlayerEntity godfather, SlotType type) {
 		if (!canUseHere(godfather.getWorld(), godfather) || !isGodfather(godfather)
-				|| VultureManager.isStashed(godfather) || !GameFunctions.isPlayerAliveAndSurvival(godfather)) {
+				|| PelicanManager.isStashed(godfather)
+				|| (!GexpressTestState.isRoleTester(godfather) && !GameFunctions.isPlayerAliveAndSurvival(godfather))) {
 			return;
 		}
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(godfather);
 		Slots slots = slotsByGodfather.computeIfAbsent(godfather.getUuid(), id -> new Slots());
+		if (livingFamilyCount(godfather.getServerWorld(), godfather.getUuid(), slots) >= 3) {
+			godfather.sendMessage(Text.literal("The family already has 3 living members.").formatted(Formatting.GRAY), true);
+			return;
+		}
 		int limit = memberLimit(godfather, type);
-		if (livingMemberCount(godfather.getServerWorld(), slots, type) >= limit) {
+		if (occupiedMemberCount(slots, type) >= limit) {
 			godfather.sendMessage(Text.literal(type.displayName() + " slots are full.").formatted(Formatting.GRAY), true);
 			return;
 		}
-		long remaining = replacementRemaining(godfather, slots, type);
-		if (remaining > 0L) {
+		long remaining = creativeBypass ? 0L : replacementRemaining(godfather, slots, type);
+		if (!creativeBypass && remaining > 0L) {
 			syncRecruitCooldown(godfather, slots, type, remaining);
 			godfather.sendMessage(Text.literal(type.displayName() + " replacement ready in "
 				+ secondsCeil(remaining) + "s.").formatted(Formatting.GRAY), true);
@@ -147,7 +162,12 @@ public final class MafiaManager {
 		}
 
 		Role oldRole = currentRole(target);
-		Role newRole = type == SlotType.MAFIOSO ? MapSelectRoles.MAFIOSO : MapSelectRoles.JANITOR;
+		Role newRole = switch (type) {
+			case MAFIOSO -> MapSelectRoles.MAFIOSO;
+			case JANITOR -> MapSelectRoles.JANITOR;
+			case PICKPOCKET -> MapSelectRoles.PICKPOCKET;
+			case BURGLAR -> MapSelectRoles.BURGLAR;
+		};
 		if (newRole == null) return;
 		assignRole(target, newRole);
 		previousRoleByMember.put(target.getUuid(), oldRole == null ? WatheRoles.CIVILIAN : oldRole);
@@ -165,11 +185,13 @@ public final class MafiaManager {
 
 	private static void tryClean(ServerPlayerEntity janitor) {
 		if (!canUseHere(janitor.getWorld(), janitor) || !isJanitor(janitor)
-				|| VultureManager.isStashed(janitor) || !GameFunctions.isPlayerAliveAndSurvival(janitor)) {
+				|| PelicanManager.isStashed(janitor)
+				|| (!GexpressTestState.isRoleTester(janitor) && !GameFunctions.isPlayerAliveAndSurvival(janitor))) {
 			return;
 		}
-		long remaining = janitorCleanRemaining(janitor);
-		if (remaining > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(janitor);
+		long remaining = creativeBypass ? 0L : janitorCleanRemaining(janitor);
+		if (!creativeBypass && remaining > 0L) {
 			AbilityCooldownSync.send(janitor, AbilityCooldownPayload.JANITOR_CLEAN, remaining,
 				(long) GexpressConfig.getJanitorCleanCooldownSeconds() * 20L, false);
 			janitor.sendMessage(Text.literal("Clean ready in " + secondsCeil(remaining) + "s.")
@@ -183,12 +205,127 @@ public final class MafiaManager {
 		}
 		body.discard();
 		int cleanCooldown = GexpressConfig.getJanitorCleanCooldownSeconds() * 20;
-		if (cleanCooldown > 0) {
+		if (!creativeBypass && cleanCooldown > 0) {
 			janitorCleanCooldownUntil.put(janitor.getUuid(), janitor.getWorld().getTime() + cleanCooldown);
 			AbilityCooldownSync.send(janitor, AbilityCooldownPayload.JANITOR_CLEAN, cleanCooldown, cleanCooldown, false);
+		} else {
+			AbilityCooldownSync.clear(janitor, AbilityCooldownPayload.JANITOR_CLEAN);
 		}
 		janitor.playSoundToPlayer(SoundEvents.BLOCK_WOOL_BREAK, SoundCategory.PLAYERS, 0.85F, 0.65F);
 		janitor.sendMessage(Text.literal("Body cleaned.").formatted(Formatting.DARK_GRAY), true);
+	}
+
+	private static void startPickpocket(ServerPlayerEntity thief) {
+		if (!canUseHere(thief.getWorld(), thief) || !isPickpocket(thief)
+				|| PelicanManager.isStashed(thief)
+				|| (!GexpressTestState.isRoleTester(thief) && !GameFunctions.isPlayerAliveAndSurvival(thief))) {
+			return;
+		}
+		if (activePickpockets.containsKey(thief.getUuid())) return;
+		boolean testing = GexpressTestState.isRoleTester(thief);
+		ServerPlayerEntity target = AbilityTargeting.findLookTarget(thief, thief.getServerWorld().getPlayers(),
+			GexpressConfig.getPickpocketRange(), 0.45D, true,
+			candidate -> candidate != thief
+				&& !isMafiaRole(candidate)
+				&& !PelicanManager.isStashed(candidate)
+				&& (testing ? !candidate.isSpectator() : DeadPlayerStatus.isLivingRoundParticipant(candidate)));
+		if (target == null) {
+			thief.sendMessage(Text.literal("No pocket close enough.").formatted(Formatting.GRAY), true);
+			return;
+		}
+		long now = thief.getWorld().getTime();
+		int maxTicks = GexpressConfig.getPickpocketMaxHoldSeconds() * 20;
+		activePickpockets.put(thief.getUuid(), new PickpocketHold(target.getUuid(), now, now));
+		AbilityCooldownSync.send(thief, AbilityCooldownPayload.PICKPOCKET_STEAL, maxTicks, maxTicks, true);
+		thief.sendMessage(Text.literal("Stealing from " + target.getName().getString() + "...")
+			.formatted(Formatting.DARK_GRAY), true);
+	}
+
+	private static void tickPickpockets(ServerWorld world) {
+		if (!delayedMoneyNotices.isEmpty()) {
+			long now = world.getTime();
+			delayedMoneyNotices.removeIf(notice -> {
+				if (now < notice.dueTick()) return false;
+				ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(notice.playerId());
+				if (target != null && target.getWorld() == world) {
+					target.sendMessage(Text.literal("You notice " + notice.amount() + " coins are missing.")
+						.formatted(Formatting.RED), true);
+				}
+				return true;
+			});
+		}
+		if (activePickpockets.isEmpty()) return;
+		List<UUID> active = new ArrayList<>(activePickpockets.keySet());
+		for (UUID thiefId : active) {
+			ServerPlayerEntity thief = world.getServer().getPlayerManager().getPlayer(thiefId);
+			PickpocketHold hold = activePickpockets.get(thiefId);
+			if (thief == null || hold == null || thief.getWorld() != world || !isPickpocket(thief)
+					|| PelicanManager.isStashed(thief)) {
+				finishPickpocket(world, thiefId, true);
+				continue;
+			}
+			ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(hold.targetId());
+			long elapsed = Math.max(0L, world.getTime() - hold.startTick());
+			if (target == null || target.getWorld() != world || !DeadPlayerStatus.isLivingRoundParticipant(target)
+					|| thief.squaredDistanceTo(target) > GexpressConfig.getPickpocketRange() * GexpressConfig.getPickpocketRange()
+					|| elapsed >= (long) GexpressConfig.getPickpocketMaxHoldSeconds() * 20L) {
+				finishPickpocket(thief, true);
+				continue;
+			}
+			if (elapsed >= 40L && world.getTime() - hold.lastWarningTick() >= 20L) {
+				hold.lastWarningTick(world.getTime());
+				target.sendMessage(Text.literal("Someone is going through your pockets.")
+					.formatted(Formatting.YELLOW), true);
+			}
+		}
+	}
+
+	private static void finishPickpocket(ServerPlayerEntity thief, boolean forced) {
+		if (thief == null) return;
+		finishPickpocket(thief.getServerWorld(), thief.getUuid(), forced);
+	}
+
+	private static void finishPickpocket(ServerWorld world, UUID thiefId, boolean forced) {
+		PickpocketHold hold = activePickpockets.remove(thiefId);
+		if (hold == null || world == null) return;
+		ServerPlayerEntity thief = world.getServer().getPlayerManager().getPlayer(thiefId);
+		ServerPlayerEntity target = world.getServer().getPlayerManager().getPlayer(hold.targetId());
+		if (thief != null) AbilityCooldownSync.clear(thief, AbilityCooldownPayload.PICKPOCKET_STEAL);
+		if (target == null || target.getWorld() != world) return;
+		long elapsed = Math.max(0L, world.getTime() - hold.startTick());
+		if (elapsed < 10L && !forced) return;
+		int seconds = Math.max(1, (int) Math.ceil(elapsed / 20.0D));
+		int wanted = Math.min(seconds, GexpressConfig.getPickpocketMaxHoldSeconds())
+			* GexpressConfig.getPickpocketCoinsPerSecond();
+		PlayerShopComponent targetShop = PlayerShopComponent.KEY.get(target);
+		int stolen = Math.min(Math.max(0, targetShop.balance), Math.max(0, wanted));
+		if (stolen <= 0) {
+			if (thief != null) thief.sendMessage(Text.literal("Nothing to steal.").formatted(Formatting.GRAY), true);
+			return;
+		}
+		targetShop.setBalance(targetShop.balance - stolen);
+		PlayerShopComponent.KEY.sync(target);
+		List<ServerPlayerEntity> recipients = familyRecipients(world, thiefId);
+		if (recipients.isEmpty()) return;
+		int share = stolen / recipients.size();
+		int remainder = stolen % recipients.size();
+		for (int i = 0; i < recipients.size(); i++) {
+			ServerPlayerEntity recipient = recipients.get(i);
+			int amount = share + (i == 0 ? remainder : 0);
+			PlayerShopComponent shop = PlayerShopComponent.KEY.get(recipient);
+			shop.addToBalance(amount);
+			PlayerShopComponent.KEY.sync(recipient);
+			recipient.sendMessage(Text.literal("Pickpocket split: +" + amount + " coins.")
+				.formatted(Formatting.DARK_GRAY), true);
+		}
+		int subtleThreshold = GexpressConfig.getPickpocketCoinsPerSecond() * 3;
+		if (stolen <= subtleThreshold) {
+			delayedMoneyNotices.add(new DelayedMoneyNotice(target.getUuid(), world.getTime() + 200L, stolen));
+		} else {
+			target.sendMessage(Text.literal("You were pickpocketed for " + stolen + " coins!")
+				.formatted(Formatting.RED), true);
+		}
+		if (thief != null) SpyManager.recordInteraction(thief, target);
 	}
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
@@ -200,7 +337,8 @@ public final class MafiaManager {
 					return false;
 				}
 			}
-			if ((isMafioso(attacker) || isJanitor(attacker)) && GameConstants.DeathReasons.GUN.equals(reason)) {
+			if ((isMafioso(attacker) || isJanitor(attacker) || isPickpocket(attacker) || isBurglar(attacker))
+					&& GameConstants.DeathReasons.GUN.equals(reason)) {
 				pendingRevolverCooldown.put(attacker.getUuid(),
 					GexpressConfig.getMafiaRevolverKillCooldownSeconds() * 20);
 			}
@@ -215,7 +353,8 @@ public final class MafiaManager {
 				}
 			}
 		}
-		if (victim instanceof ServerPlayerEntity dead && (isMafioso(dead) || isJanitor(dead))) {
+		if (victim instanceof ServerPlayerEntity dead
+				&& (isMafioso(dead) || isJanitor(dead) || isPickpocket(dead) || isBurglar(dead))) {
 			onMemberDeath(dead);
 		}
 		if (victim instanceof ServerPlayerEntity dead && isGodfather(dead)) {
@@ -270,6 +409,11 @@ public final class MafiaManager {
 
 	public static void afterGunShot(ServerPlayerEntity shooter) {
 		if (shooter == null) return;
+		if (GexpressTestState.hasCreativeAbilityBypass(shooter)) {
+			pendingRevolverCooldown.remove(shooter.getUuid());
+			suppressMafiaRevolverCooldown(shooter);
+			return;
+		}
 		if (isGodfather(shooter)) {
 			suppressMafiaRevolverCooldown(shooter);
 			return;
@@ -384,6 +528,8 @@ public final class MafiaManager {
 			return;
 		}
 
+		tickPickpockets(world);
+
 		if (++syncTick < 10) return;
 		syncTick = 0;
 		for (ServerPlayerEntity player : world.getPlayers()) {
@@ -397,7 +543,7 @@ public final class MafiaManager {
 				syncAmmo(player);
 			} else if (isJanitor(player)) {
 				syncJanitorCleanCooldown(player);
-			} else if (isMafioso(player)) {
+			} else if (isMafioso(player) || isPickpocket(player) || isBurglar(player)) {
 				sync(player);
 			}
 		}
@@ -418,6 +564,13 @@ public final class MafiaManager {
 		if (slots.remove(SlotType.JANITOR, member.getUuid())) {
 			slots.janitorReadyTick = ready;
 		}
+		if (slots.remove(SlotType.PICKPOCKET, member.getUuid())) {
+			slots.pickpocketReadyTick = ready;
+		}
+		if (slots.remove(SlotType.BURGLAR, member.getUuid())) {
+			slots.burglarReadyTick = ready;
+		}
+		lockAllRecruitSlots(slots, ready);
 		ServerPlayerEntity godfather = member.getServer().getPlayerManager().getPlayer(godfatherId);
 		if (godfather != null) {
 			godfather.sendMessage(Text.literal("A family slot will reopen in "
@@ -425,6 +578,14 @@ public final class MafiaManager {
 			syncRecruitCooldowns(godfather);
 		}
 		syncFamily(member.getServerWorld(), godfatherId);
+	}
+
+	private static void lockAllRecruitSlots(Slots slots, long readyTick) {
+		if (slots == null || readyTick <= 0L) return;
+		slots.mafiosoReadyTick = Math.max(slots.mafiosoReadyTick, readyTick);
+		slots.janitorReadyTick = Math.max(slots.janitorReadyTick, readyTick);
+		slots.pickpocketReadyTick = Math.max(slots.pickpocketReadyTick, readyTick);
+		slots.burglarReadyTick = Math.max(slots.burglarReadyTick, readyTick);
 	}
 
 	private static void onGodfatherDeath(ServerPlayerEntity godfather) {
@@ -445,6 +606,12 @@ public final class MafiaManager {
 			restoreMemberAfterGodfatherDeath(godfather.getServerWorld(), memberId);
 		}
 		for (UUID memberId : slots.members(SlotType.JANITOR)) {
+			restoreMemberAfterGodfatherDeath(godfather.getServerWorld(), memberId);
+		}
+		for (UUID memberId : slots.members(SlotType.PICKPOCKET)) {
+			restoreMemberAfterGodfatherDeath(godfather.getServerWorld(), memberId);
+		}
+		for (UUID memberId : slots.members(SlotType.BURGLAR)) {
 			restoreMemberAfterGodfatherDeath(godfather.getServerWorld(), memberId);
 		}
 		if (ServerPlayNetworking.canSend(godfather, MafiaStatePayload.ID)) {
@@ -468,7 +635,7 @@ public final class MafiaManager {
 
 	private static ServerPlayerEntity findTarget(ServerPlayerEntity user, double range) {
 		return AbilityTargeting.findLookTarget(user, user.getServerWorld().getPlayers(), range, 0.0D, true,
-			candidate -> !VultureManager.isStashed(candidate) && DeadPlayerStatus.isLivingRoundParticipant(candidate));
+			candidate -> !PelicanManager.isStashed(candidate) && DeadPlayerStatus.isLivingRoundParticipant(candidate));
 	}
 
 	private static PlayerBodyEntity findBody(ServerPlayerEntity janitor) {
@@ -532,7 +699,7 @@ public final class MafiaManager {
 	}
 
 	public static boolean isMafiaRole(PlayerEntity player) {
-		return isGodfather(player) || isMafioso(player) || isJanitor(player);
+		return isGodfather(player) || isMafioso(player) || isJanitor(player) || isPickpocket(player) || isBurglar(player);
 	}
 
 	public static boolean isMafiaRole(Role role) {
@@ -540,7 +707,9 @@ public final class MafiaManager {
 		Identifier id = role.identifier();
 		return MapSelectRoles.GODFATHER_ID.equals(id)
 			|| MapSelectRoles.MAFIOSO_ID.equals(id)
-			|| MapSelectRoles.JANITOR_ID.equals(id);
+			|| MapSelectRoles.JANITOR_ID.equals(id)
+			|| MapSelectRoles.PICKPOCKET_ID.equals(id)
+			|| MapSelectRoles.BURGLAR_ID.equals(id);
 	}
 
 	public static boolean isGodfather(PlayerEntity player) {
@@ -556,6 +725,16 @@ public final class MafiaManager {
 	public static boolean isJanitor(PlayerEntity player) {
 		Role role = currentRole(player);
 		return role != null && MapSelectRoles.JANITOR_ID.equals(role.identifier());
+	}
+
+	public static boolean isPickpocket(PlayerEntity player) {
+		Role role = currentRole(player);
+		return role != null && MapSelectRoles.PICKPOCKET_ID.equals(role.identifier());
+	}
+
+	public static boolean isBurglar(PlayerEntity player) {
+		Role role = currentRole(player);
+		return role != null && MapSelectRoles.BURGLAR_ID.equals(role.identifier());
 	}
 
 	public static UUID familyRoot(UUID playerId) {
@@ -608,13 +787,32 @@ public final class MafiaManager {
 		return count;
 	}
 
+	private static int livingFamilyCount(ServerWorld world, UUID godfatherId, Slots slots) {
+		int count = isLivingPlayer(world, godfatherId) ? 1 : 0;
+		for (SlotType type : SlotType.values()) {
+			count += livingMemberCount(world, slots, type);
+		}
+		return count;
+	}
+
+	private static int occupiedMemberCount(Slots slots, SlotType type) {
+		return slots == null ? 0 : slots.members(type).size();
+	}
+
 	private static long replacementRemaining(ServerPlayerEntity godfather, Slots slots, SlotType type) {
-		long ready = type == SlotType.MAFIOSO ? slots.mafiosoReadyTick : slots.janitorReadyTick;
+		long ready = switch (type) {
+			case MAFIOSO -> slots.mafiosoReadyTick;
+			case JANITOR -> slots.janitorReadyTick;
+			case PICKPOCKET -> slots.pickpocketReadyTick;
+			case BURGLAR -> slots.burglarReadyTick;
+		};
 		if (ready <= 0L) return 0L;
 		long remaining = ready - godfather.getWorld().getTime();
 		if (remaining <= 0L) {
 			if (type == SlotType.MAFIOSO) slots.mafiosoReadyTick = 0L;
-			else slots.janitorReadyTick = 0L;
+			else if (type == SlotType.JANITOR) slots.janitorReadyTick = 0L;
+			else if (type == SlotType.PICKPOCKET) slots.pickpocketReadyTick = 0L;
+			else slots.burglarReadyTick = 0L;
 			return 0L;
 		}
 		return remaining;
@@ -638,6 +836,8 @@ public final class MafiaManager {
 			if (slots != null) {
 				reduceRecruitCooldown(player, slots, SlotType.MAFIOSO, ticks);
 				reduceRecruitCooldown(player, slots, SlotType.JANITOR, ticks);
+				reduceRecruitCooldown(player, slots, SlotType.PICKPOCKET, ticks);
+				reduceRecruitCooldown(player, slots, SlotType.BURGLAR, ticks);
 			}
 		}
 		if (isJanitor(player)) {
@@ -656,7 +856,9 @@ public final class MafiaManager {
 		if (remaining <= 0L) return;
 		long next = Math.max(0L, remaining - ticks);
 		if (type == SlotType.MAFIOSO) slots.mafiosoReadyTick = next <= 0L ? 0L : godfather.getWorld().getTime() + next;
-		else slots.janitorReadyTick = next <= 0L ? 0L : godfather.getWorld().getTime() + next;
+		else if (type == SlotType.JANITOR) slots.janitorReadyTick = next <= 0L ? 0L : godfather.getWorld().getTime() + next;
+		else if (type == SlotType.PICKPOCKET) slots.pickpocketReadyTick = next <= 0L ? 0L : godfather.getWorld().getTime() + next;
+		else slots.burglarReadyTick = next <= 0L ? 0L : godfather.getWorld().getTime() + next;
 		syncRecruitCooldown(godfather, slots, type, next);
 	}
 
@@ -665,12 +867,19 @@ public final class MafiaManager {
 		if (slots == null) return;
 		syncRecruitCooldown(godfather, slots, SlotType.MAFIOSO, replacementRemaining(godfather, slots, SlotType.MAFIOSO));
 		syncRecruitCooldown(godfather, slots, SlotType.JANITOR, replacementRemaining(godfather, slots, SlotType.JANITOR));
+		syncRecruitCooldown(godfather, slots, SlotType.PICKPOCKET,
+			replacementRemaining(godfather, slots, SlotType.PICKPOCKET));
+		syncRecruitCooldown(godfather, slots, SlotType.BURGLAR,
+			replacementRemaining(godfather, slots, SlotType.BURGLAR));
 	}
 
 	private static void syncRecruitCooldown(ServerPlayerEntity godfather, Slots slots, SlotType type, long remaining) {
-		String key = type == SlotType.MAFIOSO
-			? AbilityCooldownPayload.GODFATHER_RECRUIT_MAFIOSO
-			: AbilityCooldownPayload.GODFATHER_RECRUIT_JANITOR;
+		String key = switch (type) {
+			case MAFIOSO -> AbilityCooldownPayload.GODFATHER_RECRUIT_MAFIOSO;
+			case JANITOR -> AbilityCooldownPayload.GODFATHER_RECRUIT_JANITOR;
+			case PICKPOCKET -> AbilityCooldownPayload.GODFATHER_RECRUIT_PICKPOCKET;
+			case BURGLAR -> AbilityCooldownPayload.GODFATHER_RECRUIT_BURGLAR;
+		};
 		if (remaining <= 0L) AbilityCooldownSync.clear(godfather, key);
 		else AbilityCooldownSync.send(godfather, key, remaining,
 			(long) GexpressConfig.getMafiaReplacementCooldownSeconds() * 20L, false);
@@ -716,8 +925,27 @@ public final class MafiaManager {
 		if (slots != null) {
 			out.addAll(slots.members(SlotType.MAFIOSO));
 			out.addAll(slots.members(SlotType.JANITOR));
+			out.addAll(slots.members(SlotType.PICKPOCKET));
+			out.addAll(slots.members(SlotType.BURGLAR));
 		}
 		return out;
+	}
+
+	private static List<ServerPlayerEntity> familyRecipients(ServerWorld world, UUID thiefId) {
+		List<ServerPlayerEntity> recipients = new ArrayList<>();
+		Set<UUID> family = familyIds(familyRoot(thiefId));
+		if (family.isEmpty() && thiefId != null) family = Set.of(thiefId);
+		for (UUID id : family) {
+			ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(id);
+			if (player != null && player.getWorld() == world && DeadPlayerStatus.isLivingRoundParticipant(player)) {
+				recipients.add(player);
+			}
+		}
+		if (recipients.isEmpty() && thiefId != null) {
+			ServerPlayerEntity thief = world.getServer().getPlayerManager().getPlayer(thiefId);
+			if (thief != null && thief.getWorld() == world) recipients.add(thief);
+		}
+		return recipients;
 	}
 
 	private static void sendIntro(ServerPlayerEntity player) {
@@ -733,6 +961,8 @@ public final class MafiaManager {
 		loadedBulletsByGodfather.clear();
 		janitorCleanCooldownUntil.clear();
 		pendingRevolverCooldown.clear();
+		activePickpockets.clear();
+		delayedMoneyNotices.clear();
 		syncTick = 0;
 		if (world instanceof ServerWorld serverWorld) {
 			for (ServerPlayerEntity player : serverWorld.getPlayers()) {
@@ -754,7 +984,9 @@ public final class MafiaManager {
 		return new TimeState(slots, new HashMap<>(godfatherByMember),
 			new HashMap<>(previousRoleByMember), new HashMap<>(loadedBulletsByGodfather),
 			new HashMap<>(janitorCleanCooldownUntil),
-			new HashMap<>(pendingRevolverCooldown));
+			new HashMap<>(pendingRevolverCooldown),
+			new HashMap<>(activePickpockets),
+			List.copyOf(delayedMoneyNotices));
 	}
 
 	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
@@ -772,6 +1004,8 @@ public final class MafiaManager {
 		loadedBulletsByGodfather.putAll(state.loadedBulletsByGodfather());
 		janitorCleanCooldownUntil.putAll(state.janitorCleanCooldownUntil());
 		pendingRevolverCooldown.putAll(state.pendingRevolverCooldown());
+		activePickpockets.putAll(state.activePickpockets());
+		delayedMoneyNotices.addAll(state.delayedMoneyNotices());
 		restoreRemovedMembers(world, currentMembers, previousRoleByMember);
 		restoreActiveMemberRoles(world);
 		for (UUID godfatherId : slotsByGodfather.keySet()) syncFamily(world, godfatherId);
@@ -807,6 +1041,8 @@ public final class MafiaManager {
 			if (slots == null) continue;
 			if (slots.contains(SlotType.MAFIOSO, member.getUuid())) assignRole(member, MapSelectRoles.MAFIOSO);
 			if (slots.contains(SlotType.JANITOR, member.getUuid())) assignRole(member, MapSelectRoles.JANITOR);
+			if (slots.contains(SlotType.PICKPOCKET, member.getUuid())) assignRole(member, MapSelectRoles.PICKPOCKET);
+			if (slots.contains(SlotType.BURGLAR, member.getUuid())) assignRole(member, MapSelectRoles.BURGLAR);
 		}
 	}
 
@@ -816,7 +1052,9 @@ public final class MafiaManager {
 
 	private enum SlotType {
 		MAFIOSO("Mafioso"),
-		JANITOR("Janitor");
+		JANITOR("Janitor"),
+		PICKPOCKET("Pickpocket"),
+		BURGLAR("Burglar");
 
 		private final String displayName;
 
@@ -832,11 +1070,20 @@ public final class MafiaManager {
 	private static final class Slots {
 		private final List<UUID> mafiosos = new ArrayList<>();
 		private final List<UUID> janitors = new ArrayList<>();
+		private final List<UUID> pickpockets = new ArrayList<>();
+		private final List<UUID> burglars = new ArrayList<>();
 		private long mafiosoReadyTick;
 		private long janitorReadyTick;
+		private long pickpocketReadyTick;
+		private long burglarReadyTick;
 
 		private List<UUID> members(SlotType type) {
-			return type == SlotType.MAFIOSO ? mafiosos : janitors;
+			return switch (type) {
+				case MAFIOSO -> mafiosos;
+				case JANITOR -> janitors;
+				case PICKPOCKET -> pickpockets;
+				case BURGLAR -> burglars;
+			};
 		}
 
 		private boolean contains(SlotType type, UUID playerId) {
@@ -852,14 +1099,22 @@ public final class MafiaManager {
 			if (type == SlotType.MAFIOSO) {
 				mafiosos.add(playerId);
 				mafiosoReadyTick = 0L;
-			} else {
+			} else if (type == SlotType.JANITOR) {
 				janitors.add(playerId);
 				janitorReadyTick = 0L;
+			} else if (type == SlotType.PICKPOCKET) {
+				pickpockets.add(playerId);
+				pickpocketReadyTick = 0L;
+			} else {
+				burglars.add(playerId);
+				burglarReadyTick = 0L;
 			}
 		}
 
 		private SlotsSnapshot snapshot() {
-			return new SlotsSnapshot(List.copyOf(mafiosos), List.copyOf(janitors), mafiosoReadyTick, janitorReadyTick);
+			return new SlotsSnapshot(List.copyOf(mafiosos), List.copyOf(janitors), List.copyOf(pickpockets),
+				List.copyOf(burglars), mafiosoReadyTick, janitorReadyTick, pickpocketReadyTick,
+				burglarReadyTick);
 		}
 
 		private static Slots from(SlotsSnapshot snapshot) {
@@ -867,8 +1122,12 @@ public final class MafiaManager {
 			if (snapshot != null) {
 				if (snapshot.mafiosos() != null) slots.mafiosos.addAll(snapshot.mafiosos());
 				if (snapshot.janitors() != null) slots.janitors.addAll(snapshot.janitors());
+				if (snapshot.pickpockets() != null) slots.pickpockets.addAll(snapshot.pickpockets());
+				if (snapshot.burglars() != null) slots.burglars.addAll(snapshot.burglars());
 				slots.mafiosoReadyTick = snapshot.mafiosoReadyTick();
 				slots.janitorReadyTick = snapshot.janitorReadyTick();
+				slots.pickpocketReadyTick = snapshot.pickpocketReadyTick();
+				slots.burglarReadyTick = snapshot.burglarReadyTick();
 			}
 			return slots;
 		}
@@ -877,8 +1136,41 @@ public final class MafiaManager {
 	public record TimeState(Map<UUID, SlotsSnapshot> slotsByGodfather, Map<UUID, UUID> godfatherByMember,
 			Map<UUID, Role> previousRoleByMember, Map<UUID, Integer> loadedBulletsByGodfather,
 			Map<UUID, Long> janitorCleanCooldownUntil,
-			Map<UUID, Integer> pendingRevolverCooldown) {}
+			Map<UUID, Integer> pendingRevolverCooldown,
+			Map<UUID, PickpocketHold> activePickpockets,
+			List<DelayedMoneyNotice> delayedMoneyNotices) {}
 
-	public record SlotsSnapshot(List<UUID> mafiosos, List<UUID> janitors,
-			long mafiosoReadyTick, long janitorReadyTick) {}
+	public record SlotsSnapshot(List<UUID> mafiosos, List<UUID> janitors, List<UUID> pickpockets,
+			List<UUID> burglars, long mafiosoReadyTick, long janitorReadyTick, long pickpocketReadyTick,
+			long burglarReadyTick) {}
+
+	public static final class PickpocketHold {
+		private final UUID targetId;
+		private final long startTick;
+		private long lastWarningTick;
+
+		private PickpocketHold(UUID targetId, long startTick, long lastWarningTick) {
+			this.targetId = targetId;
+			this.startTick = startTick;
+			this.lastWarningTick = lastWarningTick;
+		}
+
+		private UUID targetId() {
+			return targetId;
+		}
+
+		private long startTick() {
+			return startTick;
+		}
+
+		private long lastWarningTick() {
+			return lastWarningTick;
+		}
+
+		private void lastWarningTick(long value) {
+			lastWarningTick = value;
+		}
+	}
+
+	public record DelayedMoneyNotice(UUID playerId, long dueTick, int amount) {}
 }

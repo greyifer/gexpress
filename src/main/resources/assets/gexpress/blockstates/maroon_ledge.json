@@ -1,0 +1,20 @@
+{
+  "multipart": [
+    { "when": { "north": "true", "west": "false", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge" } },
+    { "when": { "north": "true", "west": "true", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left" } },
+    { "when": { "east": "true", "north": "false", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge", "y": 90 } },
+    { "when": { "east": "true", "north": "true", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left", "y": 90 } },
+    { "when": { "south": "true", "east": "false", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge", "y": 180 } },
+    { "when": { "south": "true", "east": "true", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left", "y": 180 } },
+    { "when": { "west": "true", "south": "false", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge", "y": 270 } },
+    { "when": { "west": "true", "south": "true", "top": "false" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left", "y": 270 } },
+    { "when": { "north": "true", "west": "false", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_top" } },
+    { "when": { "north": "true", "west": "true", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left_top" } },
+    { "when": { "east": "true", "north": "false", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_top", "y": 90 } },
+    { "when": { "east": "true", "north": "true", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left_top", "y": 90 } },
+    { "when": { "south": "true", "east": "false", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_top", "y": 180 } },
+    { "when": { "south": "true", "east": "true", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left_top", "y": 180 } },
+    { "when": { "west": "true", "south": "false", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_top", "y": 270 } },
+    { "when": { "west": "true", "south": "true", "top": "true" }, "apply": { "model": "gexpress:block/maroon_ledge_trim_left_top", "y": 270 } }
+  ]
+}

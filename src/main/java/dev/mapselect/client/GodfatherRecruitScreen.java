@@ -28,6 +28,20 @@ public final class GodfatherRecruitScreen extends Screen {
 		0xFF65D69A,
 		MafiaActionPayload.RECRUIT_JANITOR
 	);
+	private static final RoleChoice PICKPOCKET = new RoleChoice(
+		"Pickpocket",
+		"Money thief",
+		"Turns the target into a thief who can steal and split money for the family.",
+		0xFFB8C0C8,
+		MafiaActionPayload.RECRUIT_PICKPOCKET
+	);
+	private static final RoleChoice BURGLAR = new RoleChoice(
+		"Burglar",
+		"Tool specialist",
+		"Turns the target into a burglar with a crowbar and lockpick shop.",
+		0xFF9DA8B3,
+		MafiaActionPayload.RECRUIT_BURGLAR
+	);
 
 	public GodfatherRecruitScreen() {
 		super(Text.literal("Family Recruitment"));
@@ -53,10 +67,10 @@ public final class GodfatherRecruitScreen extends Screen {
 		context.drawCenteredTextWithShadow(textRenderer,
 			Text.literal("Choose the role your target joins as").formatted(Formatting.GRAY),
 			width / 2, layout.panelY() + 33, 0xFF9BA3AE);
-		drawChoice(context, MAFIOSO, layout.leftCardX(), layout.cardY(), layout.cardWidth(), layout.cardHeight(),
-			mouseX, mouseY);
-		drawChoice(context, JANITOR, layout.rightCardX(), layout.cardY(), layout.cardWidth(), layout.cardHeight(),
-			mouseX, mouseY);
+		drawChoice(context, MAFIOSO, layout.cardX(0), layout.cardY(), layout.cardWidth(), layout.cardHeight(), mouseX, mouseY);
+		drawChoice(context, JANITOR, layout.cardX(1), layout.cardY(), layout.cardWidth(), layout.cardHeight(), mouseX, mouseY);
+		drawChoice(context, PICKPOCKET, layout.cardX(2), layout.cardY(), layout.cardWidth(), layout.cardHeight(), mouseX, mouseY);
+		drawChoice(context, BURGLAR, layout.cardX(3), layout.cardY(), layout.cardWidth(), layout.cardHeight(), mouseX, mouseY);
 		context.drawCenteredTextWithShadow(textRenderer,
 			Text.literal("Look at a player before choosing.").formatted(Formatting.DARK_GRAY),
 			width / 2, layout.panelY() + layout.panelHeight() - 18, 0xFF707B86);
@@ -65,12 +79,20 @@ public final class GodfatherRecruitScreen extends Screen {
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		Layout layout = layout();
-		if (contains(mouseX, mouseY, layout.leftCardX(), layout.cardY(), layout.cardWidth(), layout.cardHeight())) {
+		if (contains(mouseX, mouseY, layout.cardX(0), layout.cardY(), layout.cardWidth(), layout.cardHeight())) {
 			recruit(MAFIOSO.action());
 			return true;
 		}
-		if (contains(mouseX, mouseY, layout.rightCardX(), layout.cardY(), layout.cardWidth(), layout.cardHeight())) {
+		if (contains(mouseX, mouseY, layout.cardX(1), layout.cardY(), layout.cardWidth(), layout.cardHeight())) {
 			recruit(JANITOR.action());
+			return true;
+		}
+		if (contains(mouseX, mouseY, layout.cardX(2), layout.cardY(), layout.cardWidth(), layout.cardHeight())) {
+			recruit(PICKPOCKET.action());
+			return true;
+		}
+		if (contains(mouseX, mouseY, layout.cardX(3), layout.cardY(), layout.cardWidth(), layout.cardHeight())) {
+			recruit(BURGLAR.action());
 			return true;
 		}
 		return super.mouseClicked(mouseX, mouseY, button);
@@ -110,17 +132,16 @@ public final class GodfatherRecruitScreen extends Screen {
 	}
 
 	private Layout layout() {
-		int panelWidth = Math.min(width - 48, 430);
-		int cardGap = 14;
-		int cardWidth = Math.max(132, (panelWidth - 46 - cardGap) / 2);
+		int panelWidth = Math.min(width - 48, 560);
+		int cardGap = 10;
+		int cardWidth = Math.max(104, (panelWidth - 46 - cardGap * 3) / 4);
 		int cardHeight = 88;
 		int panelHeight = 172;
 		int panelX = width / 2 - panelWidth / 2;
 		int panelY = height / 2 - panelHeight / 2;
 		int leftCardX = panelX + 23;
 		int cardY = panelY + 58;
-		return new Layout(panelX, panelY, panelWidth, panelHeight, leftCardX,
-			leftCardX + cardWidth + cardGap, cardY, cardWidth, cardHeight);
+		return new Layout(panelX, panelY, panelWidth, panelHeight, leftCardX, cardGap, cardY, cardWidth, cardHeight);
 	}
 
 	private boolean contains(double mouseX, double mouseY, int x, int y, int w, int h) {
@@ -130,5 +151,9 @@ public final class GodfatherRecruitScreen extends Screen {
 	private record RoleChoice(String name, String subtitle, String description, int color, int action) {}
 
 	private record Layout(int panelX, int panelY, int panelWidth, int panelHeight, int leftCardX,
-			int rightCardX, int cardY, int cardWidth, int cardHeight) {}
+			int cardGap, int cardY, int cardWidth, int cardHeight) {
+		private int cardX(int index) {
+			return leftCardX + (cardWidth + cardGap) * index;
+		}
+	}
 }

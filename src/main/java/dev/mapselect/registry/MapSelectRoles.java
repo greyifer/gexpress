@@ -14,6 +14,8 @@ public final class MapSelectRoles {
 	public static final Identifier MEDIC_ID = Identifier.of(MapSelect.MOD_ID, "medic");
 	public static final Identifier SNITCH_ID = Identifier.of(MapSelect.MOD_ID, "snitch");
 	public static final Identifier SEER_ID = Identifier.of(MapSelect.MOD_ID, "seer");
+	public static final Identifier CUPID_ID = Identifier.of(MapSelect.MOD_ID, "cupid");
+	public static final Identifier VENGEFUL_SPIRIT_ID = Identifier.of(MapSelect.MOD_ID, "vengeful_spirit");
 	public static final Identifier SNIFFER_ID = Identifier.of(MapSelect.MOD_ID, "sniffer");
 	public static final Identifier TIME_MASTER_ID = Identifier.of(MapSelect.MOD_ID, "time_master");
 	public static final Identifier THE_SILENT_ID = Identifier.of(MapSelect.MOD_ID, "the_silent");
@@ -32,6 +34,9 @@ public final class MapSelectRoles {
 	public static final Identifier GODFATHER_ID = Identifier.of(MapSelect.MOD_ID, "godfather");
 	public static final Identifier MAFIOSO_ID = Identifier.of(MapSelect.MOD_ID, "mafioso");
 	public static final Identifier JANITOR_ID = Identifier.of(MapSelect.MOD_ID, "janitor");
+	public static final Identifier PICKPOCKET_ID = Identifier.of(MapSelect.MOD_ID, "pickpocket");
+	public static final Identifier BURGLAR_ID = Identifier.of(MapSelect.MOD_ID, "burglar");
+	public static final Identifier COPYCAT_ID = Identifier.of(MapSelect.MOD_ID, "copycat");
 	public static final Identifier DRACULA_ID = Identifier.of(MapSelect.MOD_ID, "dracula");
 	public static final Identifier VAMPIRE_ID = Identifier.of(MapSelect.MOD_ID, "vampire");
 
@@ -39,6 +44,8 @@ public final class MapSelectRoles {
 	public static Role MEDIC;
 	public static Role SNITCH;
 	public static Role SEER;
+	public static Role CUPID;
+	public static Role VENGEFUL_SPIRIT;
 	public static Role SNIFFER;
 	public static Role TIME_MASTER;
 	public static Role THE_SILENT;
@@ -57,6 +64,9 @@ public final class MapSelectRoles {
 	public static Role GODFATHER;
 	public static Role MAFIOSO;
 	public static Role JANITOR;
+	public static Role PICKPOCKET;
+	public static Role BURGLAR;
+	public static Role COPYCAT;
 	public static Role DRACULA;
 	public static Role VAMPIRE;
 
@@ -97,6 +107,26 @@ public final class MapSelectRoles {
 		SEER = WatheRoles.registerRole(new Role(
 			SEER_ID,
 			0xD94B66, // red flash warning role
+			true,
+			false,
+			Role.MoodType.REAL,
+			CIVILIAN_STAMINA,
+			false
+		));
+
+		CUPID = WatheRoles.registerRole(new Role(
+			CUPID_ID,
+			0xF06AA8,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		VENGEFUL_SPIRIT = WatheRoles.registerRole(new Role(
+			VENGEFUL_SPIRIT_ID,
+			0xB8D6FF,
 			true,
 			false,
 			Role.MoodType.REAL,
@@ -277,6 +307,36 @@ public final class MapSelectRoles {
 		JANITOR = WatheRoles.registerRole(new Role(
 			JANITOR_ID,
 			0x7A7A7A,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		PICKPOCKET = WatheRoles.registerRole(new Role(
+			PICKPOCKET_ID,
+			0x535A61,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		BURGLAR = WatheRoles.registerRole(new Role(
+			BURGLAR_ID,
+			0x59616A,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		COPYCAT = WatheRoles.registerRole(new Role(
+			COPYCAT_ID,
+			0x9B7BEA,
 			false,
 			false,
 			Role.MoodType.FAKE,

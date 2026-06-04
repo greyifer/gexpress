@@ -1,0 +1,41 @@
+﻿{
+    "parent":  "block/block",
+    "textures":  {
+                     "particle":  "gexpress:block/maroon_ledge",
+                     "ledge":  "gexpress:block/maroon_ledge"
+                 },
+    "elements":  [
+                     {
+                         "from":  [
+                                      0,
+                                      0,
+                                      14
+                                  ],
+                         "to":  [
+                                    14,
+                                    2,
+                                    16
+                                ],
+                         "faces":  {
+                                       "down":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "up":  {
+                                                  "texture":  "#ledge"
+                                              },
+                                       "north":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "south":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "west":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "east":  {
+                                                    "texture":  "#ledge"
+                                                }
+                                   }
+                     }
+                 ]
+}

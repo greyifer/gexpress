@@ -7,10 +7,12 @@ import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public final class ClientAbilityTargetState {
@@ -37,20 +39,47 @@ public final class ClientAbilityTargetState {
 		if (!ClientRoleRevealState.canUseRoleAbility(client)) return;
 		TargetSpec spec = targetSpec(client);
 		if (spec == null) return;
-		if (client.crosshairTarget == null || client.crosshairTarget.getType() != HitResult.Type.ENTITY) return;
-		if (!(((EntityHitResult) client.crosshairTarget).getEntity() instanceof AbstractClientPlayerEntity target)) return;
-		if (target == client.player || target.isSpectator() || !target.isAlive() || target.isInvisible()
-				|| target.isRemoved() || !client.player.canSee(target)) return;
-		if (client.player.getEyePos().squaredDistanceTo(target.getEyePos()) > spec.range() * spec.range()) return;
+		AbstractClientPlayerEntity target = findLookTarget(client, spec);
+		if (target == null) return;
 		targetId = target.getUuid();
 		targetColor = spec.color();
+	}
+
+	private static AbstractClientPlayerEntity findLookTarget(MinecraftClient client, TargetSpec spec) {
+		Vec3d start = client.player.getEyePos();
+		Vec3d end = start.add(client.player.getRotationVec(1.0F).multiply(spec.range()));
+		AbstractClientPlayerEntity best = null;
+		double bestDistance = Double.MAX_VALUE;
+		for (AbstractClientPlayerEntity candidate : client.world.getPlayers()) {
+			if (candidate == client.player || candidate.isSpectator() || !candidate.isAlive()
+					|| candidate.isInvisible() || candidate.isRemoved()) continue;
+			Optional<Vec3d> hit = candidate.getBoundingBox().raycast(start, end);
+			if (hit.isEmpty() || isBlocked(client, start, hit.get())) continue;
+			double distance = start.squaredDistanceTo(hit.get());
+			if (distance < bestDistance) {
+				best = candidate;
+				bestDistance = distance;
+			}
+		}
+		return best;
+	}
+
+	private static boolean isBlocked(MinecraftClient client, Vec3d start, Vec3d target) {
+		HitResult hit = client.world.raycast(new RaycastContext(start, target,
+			RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, client.player));
+		return hit != null && hit.getType() == HitResult.Type.BLOCK
+			&& start.squaredDistanceTo(hit.getPos()) + 1.0E-7D < start.squaredDistanceTo(target);
 	}
 
 	private static TargetSpec targetSpec(MinecraftClient client) {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 		Role role = game == null ? null : game.getRole(client.player);
 		Identifier id = role == null ? null : role.identifier();
+		id = ClientCopycatState.effectiveRoleId(client, id);
 		if (id == null) return null;
+		if (MapSelectRoles.COPYCAT_ID.equals(id)) {
+			return new TargetSpec(GexpressConfig.getCopycatCopyRange(), 0xC9B5FF);
+		}
 		if (MapSelectRoles.WARLOCK_ID.equals(id)) return new TargetSpec(4.0D, 0xB94CFF);
 		if (MapSelectRoles.VULTURE_ID.equals(id)) return new TargetSpec(3.15D, 0xA8C94A);
 		if (MapSelectRoles.TIME_MASTER_ID.equals(id)) return new TargetSpec(GexpressConfig.getTimeMasterFreezeRange(), 0x66D9FF);

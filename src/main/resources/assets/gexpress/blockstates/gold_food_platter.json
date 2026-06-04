@@ -1,0 +1,10 @@
+{
+	"variants": {
+		"paid=false": {
+			"model": "gexpress:block/gold_food_platter"
+		},
+		"paid=true": {
+			"model": "gexpress:block/gold_food_platter"
+		}
+	}
+}

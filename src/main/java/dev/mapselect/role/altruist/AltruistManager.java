@@ -1,6 +1,7 @@
 package dev.mapselect.role.altruist;
 
 import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.doctor4t.wathe.entity.PlayerBodyEntity;
 import dev.doctor4t.wathe.game.GameConstants;
@@ -8,9 +9,11 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheEntities;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.AltruistUsePayload;
+import dev.mapselect.modifier.ModifierUtils;
+import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilitySounds;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -26,8 +29,13 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 public final class AltruistManager {
 	private static final double LOOK_RADIUS_SQUARED = 1.25D;
+	private static final Set<UUID> REVIVED_MUTED = ConcurrentHashMap.newKeySet();
 
 	private AltruistManager() {}
 
@@ -35,12 +43,20 @@ public final class AltruistManager {
 		PayloadTypeRegistry.playC2S().register(AltruistUsePayload.ID, AltruistUsePayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(AltruistUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryRevive(context.player())));
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> REVIVED_MUTED.clear());
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> REVIVED_MUTED.clear());
+	}
+
+	public static boolean isRevivedMuted(UUID playerId) {
+		return playerId != null && REVIVED_MUTED.contains(playerId);
 	}
 
 	private static void tryRevive(ServerPlayerEntity altruist) {
 		if (altruist == null || !(altruist.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(altruist) || !isAltruist(altruist)
-				|| !canUseHere(world, altruist) || !GameFunctions.isPlayerAliveAndSurvival(altruist)) {
+		boolean roleTester = GexpressTestState.isRoleTester(altruist);
+		if (PelicanManager.isStashed(altruist) || !isAltruist(altruist)
+				|| !canUseHere(world, altruist)
+				|| (!roleTester && !GameFunctions.isPlayerAliveAndSurvival(altruist))) {
 			return;
 		}
 		PlayerBodyEntity body = findBody(altruist);
@@ -65,12 +81,16 @@ public final class AltruistManager {
 		target.velocityModified = true;
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(target));
 		TrainVoicePlugin.resetPlayer(target.getUuid());
+		ModifierUtils.addIfMissing(target, MapSelectModifiers.MUTED);
+		REVIVED_MUTED.add(target.getUuid());
 		target.sendMessage(Text.literal("The Altruist revived you."), true);
 
 		AbilitySounds.playTo(java.util.List.of(altruist, target), SoundEvents.BLOCK_BEACON_ACTIVATE,
 			SoundCategory.PLAYERS, 0.9F, 1.35F);
-		GameFunctions.killPlayer(altruist, true, target, GameConstants.DeathReasons.GENERIC);
-		TrainVoicePlugin.addPlayer(altruist.getUuid());
+		if (!GexpressTestState.hasCreativeAbilityBypass(altruist)) {
+			GameFunctions.killPlayer(altruist, true, target, GameConstants.DeathReasons.GENERIC);
+			TrainVoicePlugin.addPlayer(altruist.getUuid());
+		}
 	}
 
 	private static PlayerBodyEntity findBody(ServerPlayerEntity altruist) {
@@ -94,7 +114,8 @@ public final class AltruistManager {
 	private static boolean isAltruist(PlayerEntity player) {
 		GameWorldComponent game = player == null ? null : GameWorldComponent.KEY.getNullable(player.getWorld());
 		Role role = game == null ? null : game.getRole(player);
-		return role != null && MapSelectRoles.ALTRUIST_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.ALTRUIST_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.ALTRUIST_ID));
 	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {

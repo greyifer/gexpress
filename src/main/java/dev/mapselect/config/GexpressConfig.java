@@ -5,6 +5,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import dev.mapselect.MapSelect;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
+import dev.mapselect.skin.WeaponSkin;
+import dev.mapselect.skin.WeaponSkinType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -84,6 +86,38 @@ public final class GexpressConfig {
 		public boolean configured() {
 			return title != null && !title.isBlank();
 		}
+
+		public List<String> rewardTitles() {
+			return splitRewardParts(title);
+		}
+
+		public List<String> commands() {
+			return splitRewardCommands(command);
+		}
+	}
+
+	public record LevelTagEntry(int level, String displayName, int color, int priority) {
+		public boolean configured() {
+			return level > 0 && displayName != null && !displayName.isBlank();
+		}
+	}
+
+	public record SkinCaseReward(WeaponSkinType type, WeaponSkin skin, int weight) {
+		public boolean configured() {
+			return type != null && skin != null && skin.supports(type) && skin != WeaponSkin.DEFAULT && weight > 0;
+		}
+	}
+
+	public record SkinCaseEntry(String id, String displayName, int price, List<SkinCaseReward> rewards) {
+		public boolean configured() {
+			return id != null && !id.isBlank() && displayName != null && !displayName.isBlank() && !rewards.isEmpty();
+		}
+
+		public int totalWeight() {
+			int total = 0;
+			for (SkinCaseReward reward : rewards) total += Math.max(0, reward.weight());
+			return total;
+		}
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -97,6 +131,34 @@ public final class GexpressConfig {
 	public static int wrongWirePercent = 20;
 	/** Cost in coins for a Grenade in the Bomb Specialist's shop. */
 	public static int grenadePrice = 150;
+	/** Cost in coins for a Firecracker in the Bomb Specialist's shop. */
+	public static int bombSpecialistFirecrackerPrice = 10;
+	/** Cost in coins for a Lockpick in the Bomb Specialist's shop. */
+	public static int bombSpecialistLockpickPrice = 50;
+	/** Cost in coins for a Crowbar in the Bomb Specialist's shop. */
+	public static int bombSpecialistCrowbarPrice = 25;
+	/** Cost in coins for a Knife in the Mafioso shop. */
+	public static int mafiosoKnifePrice = 200;
+	/** Cost in coins for a Revolver in the Mafioso shop. */
+	public static int mafiosoRevolverPrice = 350;
+	/** Cost in coins for a Poison Vial in the Janitor shop. */
+	public static int janitorPoisonVialPrice = 100;
+	/** Cost in coins for a Scorpion in the Janitor shop. */
+	public static int janitorScorpionPrice = 125;
+	/** Cost in coins for a Crowbar in the Burglar shop. */
+	public static int burglarCrowbarPrice = 25;
+	/** Cost in coins for a Lockpick in the Burglar shop. */
+	public static int burglarLockpickPrice = 50;
+	/** Cost in coins for notes bought by players with the Muted modifier. */
+	public static int mutedNotePrice = 10;
+	/** Discord bot HTTP endpoint used by servers to forward in-game bug reports. */
+	public static String bugReportDiscordEndpoint = "";
+	/** Shared secret sent to the Discord bot endpoint. Keep server-side only. */
+	public static String bugReportDiscordSecret = "";
+	/** Coins charged by a paid golden food platter when a player takes food. */
+	public static int goldFoodPlatterPrice = 25;
+	/** Coins charged by a paid golden drink tray when a player takes a drink. */
+	public static int goldDrinkTrayPrice = 25;
 	/** Blocks/tags/patterns the grenade line-of-sight check ignores when tracing through the map. */
 	public static List<String> grenadeLineOfSightPassThroughBlocks = defaultGrenadePassThroughBlocks();
 	/** Coins paid every Wathe passive-income tick to killer-team roles. */
@@ -193,6 +255,10 @@ public final class GexpressConfig {
 	public static int trackerRange = 24;
 	/** Seconds before Tracker can change a tracked target again. */
 	public static int trackerCooldownSeconds = 10;
+	/** Seconds before Seer can compare another pair. */
+	public static int seerCompareCooldownSeconds = 45;
+	/** Maximum block range for Seer's team comparison target search. */
+	public static int seerCompareRange = 4;
 	/** Maximum block range for Altruist's revive target search. */
 	public static int altruistRange = 4;
 	/** Seconds before Bounty Hunter's current bounty expires and changes. */
@@ -243,6 +309,34 @@ public final class GexpressConfig {
 	public static int janitorRevolverCooldownAfterCleanSeconds = 45;
 	/** Seconds killing a player puts Janitor cleanup on cooldown. */
 	public static int janitorCleanCooldownAfterKillSeconds = 45;
+	/** Maximum seconds a Pickpocket can keep stealing in one hold. */
+	public static int pickpocketMaxHoldSeconds = 6;
+	/** Coins stolen per second while Pickpocket is holding on a target. */
+	public static int pickpocketCoinsPerSecond = 12;
+	/** Maximum block range for Pickpocket stealing. */
+	public static int pickpocketRange = 4;
+	/** Seconds Copycat waits after a copied ability expires before copying again. */
+	public static int copycatCopyCooldownSeconds = 45;
+	/** Seconds Copycat keeps the copied ability. */
+	public static int copycatCopyDurationSeconds = 120;
+	/** Maximum block range for Copycat copying. */
+	public static int copycatCopyRange = 16;
+	/** Alive lover duos Cupid needs to win. */
+	public static int cupidRequiredAlivePairs = 3;
+	/** Seconds before Cupid can link another pair after a successful duo. */
+	public static int cupidPairCooldownSeconds = 20;
+	/** Maximum block range for Cupid's love target search. */
+	public static int cupidRange = 4;
+	/** Whether lovers see their partner in the bottom-left HUD. */
+	public static boolean loversShowPartnerHud = true;
+	/** Whether lovers can be paired across civilian and killer/neutral sides. */
+	public static boolean loversAllowMixedSidePairs = false;
+	/** Seconds before Dracula or Vampire can bite again. */
+	public static int covenantBiteCooldownSeconds = 15;
+	/** Seconds after death before Vengeful Spirit rises. */
+	public static int vengefulSpiritReviveDelaySeconds = 15;
+	/** Seconds Vengeful Spirit has to kill their killer. */
+	public static int vengefulSpiritRevengeSeconds = 30;
 	/** Whether the player who died last round starts the next round with one breakable shield. */
 	public static boolean lastDeathShieldEnabled = false;
 	/** Whether guardian angel can be assigned to killer, neutral, or Mafia players. */
@@ -321,8 +415,12 @@ public final class GexpressConfig {
 	public static int levelRoadmapDisplayLevels = 25;
 	/** Optional rows like "5=750" overriding the generated XP needed for a specific level. */
 	public static List<String> levelXpOverrides = new ArrayList<>();
-	/** Optional rows like "5|Gold Skin|Unlocks the Gold revolver skin." shown in the roadmap. */
+	/** Optional rows like "5|Gold Skin|Unlocks the Gold revolver skin.|cmd;;cmd" shown in the roadmap. */
 	public static List<String> levelRewardRoadmap = new ArrayList<>();
+	/** Optional rows like "10|Experienced|#F2C94C|50" used as earned level badges. */
+	public static List<String> levelTags = new ArrayList<>();
+	/** Optional rows like "harpy|G'Express Case|100|gun:gold:70;;knife:trusted:30" used by the skins case menu. */
+	public static List<String> skinCaseRows = defaultSkinCaseRows();
 
 	public static final int C4_PRICE_MIN = 0;
 	public static final int C4_PRICE_MAX = 9999;
@@ -334,6 +432,8 @@ public final class GexpressConfig {
 	public static final int WRONG_WIRE_MAX = 100;
 	public static final int GRENADE_PRICE_MIN = 0;
 	public static final int GRENADE_PRICE_MAX = 9999;
+	public static final int SHOP_PRICE_MIN = 0;
+	public static final int SHOP_PRICE_MAX = 9999;
 	public static final int LEVEL_XP_AMOUNT_MIN = 0;
 	public static final int LEVEL_XP_AMOUNT_MAX = 10000;
 	public static final int LEVEL_XP_REQUIRED_MIN = 1;
@@ -418,6 +518,10 @@ public final class GexpressConfig {
 	public static final int TRACKER_RANGE_MAX = 96;
 	public static final int TRACKER_COOLDOWN_SECONDS_MIN = 0;
 	public static final int TRACKER_COOLDOWN_SECONDS_MAX = 600;
+	public static final int SEER_COMPARE_COOLDOWN_SECONDS_MIN = 0;
+	public static final int SEER_COMPARE_COOLDOWN_SECONDS_MAX = 600;
+	public static final int SEER_COMPARE_RANGE_MIN = 1;
+	public static final int SEER_COMPARE_RANGE_MAX = 16;
 	public static final int ALTRUIST_RANGE_MIN = 1;
 	public static final int ALTRUIST_RANGE_MAX = 16;
 	public static final int BOUNTY_HUNTER_INTERVAL_SECONDS_MIN = 10;
@@ -466,6 +570,30 @@ public final class GexpressConfig {
 	public static final int JANITOR_REVOLVER_COOLDOWN_AFTER_CLEAN_SECONDS_MAX = 900;
 	public static final int JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MIN = 0;
 	public static final int JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MAX = 900;
+	public static final int PICKPOCKET_HOLD_SECONDS_MIN = 1;
+	public static final int PICKPOCKET_HOLD_SECONDS_MAX = 30;
+	public static final int PICKPOCKET_COINS_PER_SECOND_MIN = 1;
+	public static final int PICKPOCKET_COINS_PER_SECOND_MAX = 250;
+	public static final int PICKPOCKET_RANGE_MIN = 1;
+	public static final int PICKPOCKET_RANGE_MAX = 16;
+	public static final int COPYCAT_COOLDOWN_SECONDS_MIN = 0;
+	public static final int COPYCAT_COOLDOWN_SECONDS_MAX = 900;
+	public static final int COPYCAT_DURATION_SECONDS_MIN = 10;
+	public static final int COPYCAT_DURATION_SECONDS_MAX = 600;
+	public static final int COPYCAT_RANGE_MIN = 1;
+	public static final int COPYCAT_RANGE_MAX = 64;
+	public static final int CUPID_REQUIRED_ALIVE_PAIRS_MIN = 1;
+	public static final int CUPID_REQUIRED_ALIVE_PAIRS_MAX = 10;
+	public static final int CUPID_COOLDOWN_SECONDS_MIN = 0;
+	public static final int CUPID_COOLDOWN_SECONDS_MAX = 600;
+	public static final int CUPID_RANGE_MIN = 1;
+	public static final int CUPID_RANGE_MAX = 16;
+	public static final int COVENANT_BITE_COOLDOWN_SECONDS_MIN = 0;
+	public static final int COVENANT_BITE_COOLDOWN_SECONDS_MAX = 600;
+	public static final int VENGEFUL_SPIRIT_REVIVE_DELAY_SECONDS_MIN = 0;
+	public static final int VENGEFUL_SPIRIT_REVIVE_DELAY_SECONDS_MAX = 120;
+	public static final int VENGEFUL_SPIRIT_REVENGE_SECONDS_MIN = 1;
+	public static final int VENGEFUL_SPIRIT_REVENGE_SECONDS_MAX = 300;
 	public static final int MAX_KILLER_AMOUNT_MIN = 1;
 	public static final int MAX_KILLER_AMOUNT_MAX = 64;
 	public static final int MAX_VIGILANTE_AMOUNT_MIN = 0;
@@ -519,6 +647,58 @@ public final class GexpressConfig {
 
 	public static int getGrenadePrice() {
 		return Math.max(GRENADE_PRICE_MIN, Math.min(GRENADE_PRICE_MAX, grenadePrice));
+	}
+
+	private static int clampShopPrice(int price) {
+		return Math.max(SHOP_PRICE_MIN, Math.min(SHOP_PRICE_MAX, price));
+	}
+
+	public static int getBombSpecialistFirecrackerPrice() {
+		return clampShopPrice(bombSpecialistFirecrackerPrice);
+	}
+
+	public static int getBombSpecialistLockpickPrice() {
+		return clampShopPrice(bombSpecialistLockpickPrice);
+	}
+
+	public static int getBombSpecialistCrowbarPrice() {
+		return clampShopPrice(bombSpecialistCrowbarPrice);
+	}
+
+	public static int getMafiosoKnifePrice() {
+		return clampShopPrice(mafiosoKnifePrice);
+	}
+
+	public static int getMafiosoRevolverPrice() {
+		return clampShopPrice(mafiosoRevolverPrice);
+	}
+
+	public static int getJanitorPoisonVialPrice() {
+		return clampShopPrice(janitorPoisonVialPrice);
+	}
+
+	public static int getJanitorScorpionPrice() {
+		return clampShopPrice(janitorScorpionPrice);
+	}
+
+	public static int getBurglarCrowbarPrice() {
+		return clampShopPrice(burglarCrowbarPrice);
+	}
+
+	public static int getBurglarLockpickPrice() {
+		return clampShopPrice(burglarLockpickPrice);
+	}
+
+	public static int getMutedNotePrice() {
+		return Math.max(GRENADE_PRICE_MIN, Math.min(GRENADE_PRICE_MAX, mutedNotePrice));
+	}
+
+	public static int getGoldFoodPlatterPrice() {
+		return Math.max(GRENADE_PRICE_MIN, Math.min(GRENADE_PRICE_MAX, goldFoodPlatterPrice));
+	}
+
+	public static int getGoldDrinkTrayPrice() {
+		return Math.max(GRENADE_PRICE_MIN, Math.min(GRENADE_PRICE_MAX, goldDrinkTrayPrice));
 	}
 
 	public static List<String> getGrenadeLineOfSightPassThroughBlockStrings() {
@@ -613,6 +793,38 @@ public final class GexpressConfig {
 		levelRewardRoadmap = decodeStringList(raw);
 	}
 
+	public static List<String> getLevelTagStrings() {
+		return normalizeStringList(levelTags);
+	}
+
+	public static void setLevelTagStrings(List<String> values) {
+		levelTags = normalizeStringList(values);
+	}
+
+	public static String getLevelTagsSyncString() {
+		return encodeStringList(getLevelTagStrings());
+	}
+
+	public static void setLevelTagsSyncString(String raw) {
+		levelTags = decodeStringList(raw);
+	}
+
+	public static List<String> getSkinCaseRows() {
+		return normalizeStringList(skinCaseRows);
+	}
+
+	public static void setSkinCaseRows(List<String> values) {
+		skinCaseRows = normalizeStringList(values);
+	}
+
+	public static String getSkinCaseRowsSyncString() {
+		return encodeStringList(getSkinCaseRows());
+	}
+
+	public static void setSkinCaseRowsSyncString(String raw) {
+		skinCaseRows = decodeStringList(raw);
+	}
+
 	public static int getXpNeededForLevel(int level) {
 		int safeLevel = Math.max(1, level);
 		Integer override = xpOverrideForLevel(safeLevel);
@@ -636,6 +848,45 @@ public final class GexpressConfig {
 			if (entry.level() == safeLevel) return entry;
 		}
 		return new LevelRoadmapEntry(safeLevel, "", "", "");
+	}
+
+	public static List<LevelTagEntry> getLevelTagEntries() {
+		List<LevelTagEntry> entries = new ArrayList<>();
+		for (String raw : getLevelTagStrings()) {
+			LevelTagEntry entry = parseLevelTagEntry(raw);
+			if (entry != null && entry.configured()) entries.add(entry);
+		}
+		entries.sort((a, b) -> {
+			int byLevel = Integer.compare(b.level(), a.level());
+			return byLevel != 0 ? byLevel : Integer.compare(b.priority(), a.priority());
+		});
+		return entries;
+	}
+
+	public static LevelTagEntry getLevelTagForLevel(int level) {
+		int safeLevel = Math.max(1, level);
+		for (LevelTagEntry entry : getLevelTagEntries()) {
+			if (safeLevel >= entry.level()) return entry;
+		}
+		return null;
+	}
+
+	public static List<SkinCaseEntry> getSkinCaseEntries() {
+		List<SkinCaseEntry> entries = new ArrayList<>();
+		for (String raw : getSkinCaseRows()) {
+			SkinCaseEntry entry = parseSkinCaseEntry(raw);
+			if (entry != null && entry.configured()) entries.add(entry);
+		}
+		return entries;
+	}
+
+	public static SkinCaseEntry getSkinCaseEntry(String id) {
+		if (id == null || id.isBlank()) return null;
+		String target = id.strip();
+		for (SkinCaseEntry entry : getSkinCaseEntries()) {
+			if (entry.id().equalsIgnoreCase(target)) return entry;
+		}
+		return null;
 	}
 
 	public static int getPassiveIncomeKiller() {
@@ -861,6 +1112,15 @@ public final class GexpressConfig {
 			Math.min(TRACKER_COOLDOWN_SECONDS_MAX, trackerCooldownSeconds));
 	}
 
+	public static int getSeerCompareCooldownSeconds() {
+		return Math.max(SEER_COMPARE_COOLDOWN_SECONDS_MIN,
+			Math.min(SEER_COMPARE_COOLDOWN_SECONDS_MAX, seerCompareCooldownSeconds));
+	}
+
+	public static int getSeerCompareRange() {
+		return Math.max(SEER_COMPARE_RANGE_MIN, Math.min(SEER_COMPARE_RANGE_MAX, seerCompareRange));
+	}
+
 	public static int getAltruistRange() {
 		return Math.max(ALTRUIST_RANGE_MIN, Math.min(ALTRUIST_RANGE_MAX, altruistRange));
 	}
@@ -1005,6 +1265,79 @@ public final class GexpressConfig {
 	public static int getJanitorCleanCooldownAfterKillSeconds() {
 		return Math.max(JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MIN,
 			Math.min(JANITOR_CLEAN_COOLDOWN_AFTER_KILL_SECONDS_MAX, janitorCleanCooldownAfterKillSeconds));
+	}
+
+	public static int getPickpocketMaxHoldSeconds() {
+		return Math.max(PICKPOCKET_HOLD_SECONDS_MIN,
+			Math.min(PICKPOCKET_HOLD_SECONDS_MAX, pickpocketMaxHoldSeconds));
+	}
+
+	public static int getPickpocketCoinsPerSecond() {
+		return Math.max(PICKPOCKET_COINS_PER_SECOND_MIN,
+			Math.min(PICKPOCKET_COINS_PER_SECOND_MAX, pickpocketCoinsPerSecond));
+	}
+
+	public static int getPickpocketRange() {
+		return Math.max(PICKPOCKET_RANGE_MIN, Math.min(PICKPOCKET_RANGE_MAX, pickpocketRange));
+	}
+
+	public static int getCopycatCopyCooldownSeconds() {
+		return Math.max(COPYCAT_COOLDOWN_SECONDS_MIN,
+			Math.min(COPYCAT_COOLDOWN_SECONDS_MAX, copycatCopyCooldownSeconds));
+	}
+
+	public static int getCopycatCopyDurationSeconds() {
+		return Math.max(COPYCAT_DURATION_SECONDS_MIN,
+			Math.min(COPYCAT_DURATION_SECONDS_MAX, copycatCopyDurationSeconds));
+	}
+
+	public static int getCopycatCopyRange() {
+		return Math.max(COPYCAT_RANGE_MIN, Math.min(COPYCAT_RANGE_MAX, copycatCopyRange));
+	}
+
+	public static int getCupidRequiredAlivePairs() {
+		return Math.max(CUPID_REQUIRED_ALIVE_PAIRS_MIN,
+			Math.min(CUPID_REQUIRED_ALIVE_PAIRS_MAX, cupidRequiredAlivePairs));
+	}
+
+	public static int getCupidPairCooldownSeconds() {
+		return Math.max(CUPID_COOLDOWN_SECONDS_MIN,
+			Math.min(CUPID_COOLDOWN_SECONDS_MAX, cupidPairCooldownSeconds));
+	}
+
+	public static int getCupidRange() {
+		return Math.max(CUPID_RANGE_MIN, Math.min(CUPID_RANGE_MAX, cupidRange));
+	}
+
+	public static boolean shouldShowLoverHud() {
+		return loversShowPartnerHud;
+	}
+
+	public static boolean canLoversPairAcrossSides() {
+		return loversAllowMixedSidePairs;
+	}
+
+	public static int getCovenantBiteCooldownSeconds() {
+		return Math.max(COVENANT_BITE_COOLDOWN_SECONDS_MIN,
+			Math.min(COVENANT_BITE_COOLDOWN_SECONDS_MAX, covenantBiteCooldownSeconds));
+	}
+
+	public static int getVengefulSpiritReviveDelaySeconds() {
+		return Math.max(VENGEFUL_SPIRIT_REVIVE_DELAY_SECONDS_MIN,
+			Math.min(VENGEFUL_SPIRIT_REVIVE_DELAY_SECONDS_MAX, vengefulSpiritReviveDelaySeconds));
+	}
+
+	public static int getVengefulSpiritRevengeSeconds() {
+		return Math.max(VENGEFUL_SPIRIT_REVENGE_SECONDS_MIN,
+			Math.min(VENGEFUL_SPIRIT_REVENGE_SECONDS_MAX, vengefulSpiritRevengeSeconds));
+	}
+
+	public static String getBugReportDiscordEndpoint() {
+		return bugReportDiscordEndpoint == null ? "" : bugReportDiscordEndpoint.trim();
+	}
+
+	public static String getBugReportDiscordSecret() {
+		return bugReportDiscordSecret == null ? "" : bugReportDiscordSecret.trim();
 	}
 
 	public static boolean isLastDeathShieldEnabled() {
@@ -1275,6 +1608,20 @@ public final class GexpressConfig {
 			c4FirstBeepSeconds = snap.c4FirstBeepSeconds;
 			wrongWirePercent = snap.wrongWirePercent;
 			grenadePrice = snap.grenadePrice;
+			bombSpecialistFirecrackerPrice = snap.bombSpecialistFirecrackerPrice;
+			bombSpecialistLockpickPrice = snap.bombSpecialistLockpickPrice;
+			bombSpecialistCrowbarPrice = snap.bombSpecialistCrowbarPrice;
+			mafiosoKnifePrice = snap.mafiosoKnifePrice;
+			mafiosoRevolverPrice = snap.mafiosoRevolverPrice;
+			janitorPoisonVialPrice = snap.janitorPoisonVialPrice;
+			janitorScorpionPrice = snap.janitorScorpionPrice;
+			burglarCrowbarPrice = snap.burglarCrowbarPrice;
+			burglarLockpickPrice = snap.burglarLockpickPrice;
+			mutedNotePrice = snap.mutedNotePrice;
+			bugReportDiscordEndpoint = sanitizeString(snap.bugReportDiscordEndpoint);
+			bugReportDiscordSecret = sanitizeString(snap.bugReportDiscordSecret);
+			goldFoodPlatterPrice = snap.goldFoodPlatterPrice;
+			goldDrinkTrayPrice = snap.goldDrinkTrayPrice;
 			grenadeLineOfSightPassThroughBlocks = normalizeStringList(
 				snap.grenadeLineOfSightPassThroughBlocks);
 			passiveIncomeKiller = snap.passiveIncomeKiller;
@@ -1324,6 +1671,8 @@ public final class GexpressConfig {
 			trackerMaxTargets = snap.trackerMaxTargets;
 			trackerRange = snap.trackerRange;
 			trackerCooldownSeconds = snap.trackerCooldownSeconds;
+			seerCompareCooldownSeconds = snap.seerCompareCooldownSeconds;
+			seerCompareRange = snap.seerCompareRange;
 			altruistRange = snap.altruistRange;
 			bountyHunterBountyIntervalSeconds = snap.bountyHunterBountyIntervalSeconds;
 			bountyHunterRewardGold = snap.bountyHunterRewardGold;
@@ -1355,6 +1704,20 @@ public final class GexpressConfig {
 			janitorCleanCooldownSeconds = snap.janitorCleanCooldownSeconds;
 			janitorRevolverCooldownAfterCleanSeconds = snap.janitorRevolverCooldownAfterCleanSeconds;
 			janitorCleanCooldownAfterKillSeconds = snap.janitorCleanCooldownAfterKillSeconds;
+			pickpocketMaxHoldSeconds = snap.pickpocketMaxHoldSeconds;
+			pickpocketCoinsPerSecond = snap.pickpocketCoinsPerSecond;
+			pickpocketRange = snap.pickpocketRange;
+			copycatCopyCooldownSeconds = snap.copycatCopyCooldownSeconds;
+			copycatCopyDurationSeconds = snap.copycatCopyDurationSeconds;
+			copycatCopyRange = snap.copycatCopyRange;
+			cupidRequiredAlivePairs = snap.cupidRequiredAlivePairs;
+			cupidPairCooldownSeconds = snap.cupidPairCooldownSeconds;
+			cupidRange = snap.cupidRange;
+			loversShowPartnerHud = snap.loversShowPartnerHud;
+			loversAllowMixedSidePairs = snap.loversAllowMixedSidePairs;
+			covenantBiteCooldownSeconds = snap.covenantBiteCooldownSeconds;
+			vengefulSpiritReviveDelaySeconds = snap.vengefulSpiritReviveDelaySeconds;
+			vengefulSpiritRevengeSeconds = snap.vengefulSpiritRevengeSeconds;
 			lastDeathShieldEnabled = snap.lastDeathShieldEnabled;
 			guardianAngelAllowNonInnocents = snap.guardianAngelAllowNonInnocents;
 			bodyguardProtectOnlyCivilians = snap.bodyguardProtectOnlyCivilians;
@@ -1404,6 +1767,8 @@ public final class GexpressConfig {
 			levelRoadmapDisplayLevels = snap.levelRoadmapDisplayLevels;
 			levelXpOverrides = normalizeStringList(snap.levelXpOverrides);
 			levelRewardRoadmap = normalizeStringList(snap.levelRewardRoadmap);
+			levelTags = normalizeStringList(snap.levelTags);
+			skinCaseRows = normalizeStringList(snap.skinCaseRows);
 			clampInPlace();
 		} catch (IOException | JsonSyntaxException e) {
 			MapSelect.LOGGER.warn("Failed to load gexpress.json; keeping defaults.", e);
@@ -1420,6 +1785,20 @@ public final class GexpressConfig {
 			snap.c4FirstBeepSeconds = c4FirstBeepSeconds;
 			snap.wrongWirePercent = wrongWirePercent;
 			snap.grenadePrice = grenadePrice;
+			snap.bombSpecialistFirecrackerPrice = bombSpecialistFirecrackerPrice;
+			snap.bombSpecialistLockpickPrice = bombSpecialistLockpickPrice;
+			snap.bombSpecialistCrowbarPrice = bombSpecialistCrowbarPrice;
+			snap.mafiosoKnifePrice = mafiosoKnifePrice;
+			snap.mafiosoRevolverPrice = mafiosoRevolverPrice;
+			snap.janitorPoisonVialPrice = janitorPoisonVialPrice;
+			snap.janitorScorpionPrice = janitorScorpionPrice;
+			snap.burglarCrowbarPrice = burglarCrowbarPrice;
+			snap.burglarLockpickPrice = burglarLockpickPrice;
+			snap.mutedNotePrice = mutedNotePrice;
+			snap.bugReportDiscordEndpoint = bugReportDiscordEndpoint;
+			snap.bugReportDiscordSecret = bugReportDiscordSecret;
+			snap.goldFoodPlatterPrice = goldFoodPlatterPrice;
+			snap.goldDrinkTrayPrice = goldDrinkTrayPrice;
 			snap.grenadeLineOfSightPassThroughBlocks = getGrenadeLineOfSightPassThroughBlockStrings();
 			snap.passiveIncomeKiller = passiveIncomeKiller;
 			snap.passiveIncomeCivilian = passiveIncomeCivilian;
@@ -1468,6 +1847,8 @@ public final class GexpressConfig {
 			snap.trackerMaxTargets = trackerMaxTargets;
 			snap.trackerRange = trackerRange;
 			snap.trackerCooldownSeconds = trackerCooldownSeconds;
+			snap.seerCompareCooldownSeconds = seerCompareCooldownSeconds;
+			snap.seerCompareRange = seerCompareRange;
 			snap.altruistRange = altruistRange;
 			snap.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
 			snap.bountyHunterRewardGold = bountyHunterRewardGold;
@@ -1498,6 +1879,20 @@ public final class GexpressConfig {
 			snap.janitorCleanCooldownSeconds = janitorCleanCooldownSeconds;
 			snap.janitorRevolverCooldownAfterCleanSeconds = janitorRevolverCooldownAfterCleanSeconds;
 			snap.janitorCleanCooldownAfterKillSeconds = janitorCleanCooldownAfterKillSeconds;
+			snap.pickpocketMaxHoldSeconds = pickpocketMaxHoldSeconds;
+			snap.pickpocketCoinsPerSecond = pickpocketCoinsPerSecond;
+			snap.pickpocketRange = pickpocketRange;
+			snap.copycatCopyCooldownSeconds = copycatCopyCooldownSeconds;
+			snap.copycatCopyDurationSeconds = copycatCopyDurationSeconds;
+			snap.copycatCopyRange = copycatCopyRange;
+			snap.cupidRequiredAlivePairs = cupidRequiredAlivePairs;
+			snap.cupidPairCooldownSeconds = cupidPairCooldownSeconds;
+			snap.cupidRange = cupidRange;
+			snap.loversShowPartnerHud = loversShowPartnerHud;
+			snap.loversAllowMixedSidePairs = loversAllowMixedSidePairs;
+			snap.covenantBiteCooldownSeconds = covenantBiteCooldownSeconds;
+			snap.vengefulSpiritReviveDelaySeconds = vengefulSpiritReviveDelaySeconds;
+			snap.vengefulSpiritRevengeSeconds = vengefulSpiritRevengeSeconds;
 			snap.lastDeathShieldEnabled = lastDeathShieldEnabled;
 			snap.guardianAngelAllowNonInnocents = guardianAngelAllowNonInnocents;
 			snap.bodyguardProtectOnlyCivilians = bodyguardProtectOnlyCivilians;
@@ -1547,6 +1942,8 @@ public final class GexpressConfig {
 			snap.levelRoadmapDisplayLevels = levelRoadmapDisplayLevels;
 			snap.levelXpOverrides = getLevelXpOverrideStrings();
 			snap.levelRewardRoadmap = getLevelRewardRoadmapStrings();
+			snap.levelTags = getLevelTagStrings();
+			snap.skinCaseRows = getSkinCaseRows();
 			writeAtomically(CONFIG_PATH, GSON.toJson(snap));
 		} catch (IOException e) {
 			MapSelect.LOGGER.warn("Failed to save gexpress.json.", e);
@@ -1554,7 +1951,11 @@ public final class GexpressConfig {
 	}
 
 	public static void apply(int c4Price, int c4FuseSeconds, int c4FirstBeepSeconds, int wrongWirePercent,
-			int grenadePrice, int passiveIncomeKiller, int passiveIncomeCivilian, int passiveIncomeNeutral,
+			int grenadePrice, int bombSpecialistFirecrackerPrice, int bombSpecialistLockpickPrice,
+			int bombSpecialistCrowbarPrice, int mafiosoKnifePrice, int mafiosoRevolverPrice,
+			int janitorPoisonVialPrice, int janitorScorpionPrice, int burglarCrowbarPrice,
+			int burglarLockpickPrice,
+			int passiveIncomeKiller, int passiveIncomeCivilian, int passiveIncomeNeutral,
 			int passiveIncomeVigilante, int passiveIncomeMafia,
 			int medicShieldCooldownSeconds, boolean medicShieldKnifeBreaks,
 			int silentShadowDurationSeconds, int silentShadowCooldownSeconds,
@@ -1585,6 +1986,8 @@ public final class GexpressConfig {
 			int mafiaRecruitRange, int mafiaReplacementCooldownSeconds,
 			int mafiaRevolverKillCooldownSeconds, int janitorCleanRange, int janitorCleanCooldownSeconds,
 			int janitorRevolverCooldownAfterCleanSeconds, int janitorCleanCooldownAfterKillSeconds,
+			int pickpocketMaxHoldSeconds, int pickpocketCoinsPerSecond, int pickpocketRange,
+			int copycatCopyCooldownSeconds, int copycatCopyDurationSeconds, int copycatCopyRange,
 			boolean useCustomRoleCounts,
 			int maxKillerAmount, int maxVigilanteAmount, int maxNeutralAmount, int maxModifiersPerPlayer,
 			int playersPerKiller, int playersPerVigilante, int playersPerNeutral,
@@ -1598,12 +2001,26 @@ public final class GexpressConfig {
 			float shortSightedFogRange,
 			int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
 			int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
-			float silentShadowAlpha, String specialRoleOccurrence) {
+			float silentShadowAlpha, String specialRoleOccurrence,
+			int seerCompareCooldownSeconds, int seerCompareRange,
+			int cupidRequiredAlivePairs, int cupidPairCooldownSeconds, int cupidRange,
+			boolean loversShowPartnerHud, boolean loversAllowMixedSidePairs,
+			int covenantBiteCooldownSeconds,
+			int vengefulSpiritReviveDelaySeconds, int vengefulSpiritRevengeSeconds) {
 		GexpressConfig.c4Price = c4Price;
 		GexpressConfig.c4FuseSeconds = c4FuseSeconds;
 		GexpressConfig.c4FirstBeepSeconds = c4FirstBeepSeconds;
 		GexpressConfig.wrongWirePercent = wrongWirePercent;
 		GexpressConfig.grenadePrice = grenadePrice;
+		GexpressConfig.bombSpecialistFirecrackerPrice = bombSpecialistFirecrackerPrice;
+		GexpressConfig.bombSpecialistLockpickPrice = bombSpecialistLockpickPrice;
+		GexpressConfig.bombSpecialistCrowbarPrice = bombSpecialistCrowbarPrice;
+		GexpressConfig.mafiosoKnifePrice = mafiosoKnifePrice;
+		GexpressConfig.mafiosoRevolverPrice = mafiosoRevolverPrice;
+		GexpressConfig.janitorPoisonVialPrice = janitorPoisonVialPrice;
+		GexpressConfig.janitorScorpionPrice = janitorScorpionPrice;
+		GexpressConfig.burglarCrowbarPrice = burglarCrowbarPrice;
+		GexpressConfig.burglarLockpickPrice = burglarLockpickPrice;
 		GexpressConfig.passiveIncomeKiller = passiveIncomeKiller;
 		GexpressConfig.passiveIncomeCivilian = passiveIncomeCivilian;
 		GexpressConfig.passiveIncomeNeutral = passiveIncomeNeutral;
@@ -1645,6 +2062,8 @@ public final class GexpressConfig {
 		GexpressConfig.trackerMaxTargets = trackerMaxTargets;
 		GexpressConfig.trackerRange = trackerRange;
 		GexpressConfig.trackerCooldownSeconds = trackerCooldownSeconds;
+		GexpressConfig.seerCompareCooldownSeconds = seerCompareCooldownSeconds;
+		GexpressConfig.seerCompareRange = seerCompareRange;
 		GexpressConfig.altruistRange = altruistRange;
 		GexpressConfig.skincrawlerBodyMaxAgeSeconds = skincrawlerBodyMaxAgeSeconds;
 		GexpressConfig.skincrawlerCooldownSeconds = skincrawlerCooldownSeconds;
@@ -1674,6 +2093,20 @@ public final class GexpressConfig {
 		GexpressConfig.janitorCleanCooldownSeconds = janitorCleanCooldownSeconds;
 		GexpressConfig.janitorRevolverCooldownAfterCleanSeconds = janitorRevolverCooldownAfterCleanSeconds;
 		GexpressConfig.janitorCleanCooldownAfterKillSeconds = janitorCleanCooldownAfterKillSeconds;
+		GexpressConfig.pickpocketMaxHoldSeconds = pickpocketMaxHoldSeconds;
+		GexpressConfig.pickpocketCoinsPerSecond = pickpocketCoinsPerSecond;
+		GexpressConfig.pickpocketRange = pickpocketRange;
+		GexpressConfig.copycatCopyCooldownSeconds = copycatCopyCooldownSeconds;
+		GexpressConfig.copycatCopyDurationSeconds = copycatCopyDurationSeconds;
+		GexpressConfig.copycatCopyRange = copycatCopyRange;
+		GexpressConfig.cupidRequiredAlivePairs = cupidRequiredAlivePairs;
+		GexpressConfig.cupidPairCooldownSeconds = cupidPairCooldownSeconds;
+		GexpressConfig.cupidRange = cupidRange;
+		GexpressConfig.loversShowPartnerHud = loversShowPartnerHud;
+		GexpressConfig.loversAllowMixedSidePairs = loversAllowMixedSidePairs;
+		GexpressConfig.covenantBiteCooldownSeconds = covenantBiteCooldownSeconds;
+		GexpressConfig.vengefulSpiritReviveDelaySeconds = vengefulSpiritReviveDelaySeconds;
+		GexpressConfig.vengefulSpiritRevengeSeconds = vengefulSpiritRevengeSeconds;
 		GexpressConfig.lastDeathShieldEnabled = lastDeathShieldEnabled;
 		GexpressConfig.guardianAngelAllowNonInnocents = guardianAngelAllowNonInnocents;
 		GexpressConfig.useCustomRoleCounts = useCustomRoleCounts;
@@ -1726,7 +2159,8 @@ public final class GexpressConfig {
 	public static void applyDevTuning(int levelRoundXp, int levelWinXp, int levelNeutralWinBonusXp,
 			int levelKillXp, int levelCivilianTaskXp, int levelBaseXp, int levelXpIncrease,
 			int levelRoadmapDisplayLevels, String levelXpOverrides, String levelRewardRoadmap,
-			String grenadeLineOfSightPassThroughBlocks) {
+			String levelTags, String grenadeLineOfSightPassThroughBlocks,
+			int goldFoodPlatterPrice, int goldDrinkTrayPrice, String skinCaseRows, int mutedNotePrice) {
 		GexpressConfig.levelRoundXp = levelRoundXp;
 		GexpressConfig.levelWinXp = levelWinXp;
 		GexpressConfig.levelNeutralWinBonusXp = levelNeutralWinBonusXp;
@@ -1737,7 +2171,12 @@ public final class GexpressConfig {
 		GexpressConfig.levelRoadmapDisplayLevels = levelRoadmapDisplayLevels;
 		GexpressConfig.setLevelXpOverridesSyncString(levelXpOverrides);
 		GexpressConfig.setLevelRewardRoadmapSyncString(levelRewardRoadmap);
+		GexpressConfig.setLevelTagsSyncString(levelTags);
 		GexpressConfig.setGrenadeLineOfSightPassThroughBlocksSyncString(grenadeLineOfSightPassThroughBlocks);
+		GexpressConfig.goldFoodPlatterPrice = goldFoodPlatterPrice;
+		GexpressConfig.goldDrinkTrayPrice = goldDrinkTrayPrice;
+		GexpressConfig.setSkinCaseRowsSyncString(skinCaseRows);
+		GexpressConfig.mutedNotePrice = mutedNotePrice;
 		clampInPlace();
 	}
 
@@ -1747,6 +2186,18 @@ public final class GexpressConfig {
 		c4FirstBeepSeconds = getC4FirstBeepSeconds();
 		wrongWirePercent = getWrongWirePercent();
 		grenadePrice = getGrenadePrice();
+		bombSpecialistFirecrackerPrice = getBombSpecialistFirecrackerPrice();
+		bombSpecialistLockpickPrice = getBombSpecialistLockpickPrice();
+		bombSpecialistCrowbarPrice = getBombSpecialistCrowbarPrice();
+		mafiosoKnifePrice = getMafiosoKnifePrice();
+		mafiosoRevolverPrice = getMafiosoRevolverPrice();
+		janitorPoisonVialPrice = getJanitorPoisonVialPrice();
+		janitorScorpionPrice = getJanitorScorpionPrice();
+		burglarCrowbarPrice = getBurglarCrowbarPrice();
+		burglarLockpickPrice = getBurglarLockpickPrice();
+		mutedNotePrice = getMutedNotePrice();
+		goldFoodPlatterPrice = getGoldFoodPlatterPrice();
+		goldDrinkTrayPrice = getGoldDrinkTrayPrice();
 		grenadeLineOfSightPassThroughBlocks = getGrenadeLineOfSightPassThroughBlockStrings();
 		passiveIncomeKiller = getPassiveIncomeKiller();
 		passiveIncomeCivilian = getPassiveIncomeCivilian();
@@ -1791,6 +2242,8 @@ public final class GexpressConfig {
 		trackerMaxTargets = getTrackerMaxTargets();
 		trackerRange = getTrackerRange();
 		trackerCooldownSeconds = getTrackerCooldownSeconds();
+		seerCompareCooldownSeconds = getSeerCompareCooldownSeconds();
+		seerCompareRange = getSeerCompareRange();
 		altruistRange = getAltruistRange();
 		bountyHunterBountyIntervalSeconds = getBountyHunterBountyIntervalSeconds();
 		bountyHunterRewardGold = getBountyHunterRewardGold();
@@ -1821,6 +2274,20 @@ public final class GexpressConfig {
 		janitorCleanCooldownSeconds = getJanitorCleanCooldownSeconds();
 		janitorRevolverCooldownAfterCleanSeconds = getJanitorRevolverCooldownAfterCleanSeconds();
 		janitorCleanCooldownAfterKillSeconds = getJanitorCleanCooldownAfterKillSeconds();
+		pickpocketMaxHoldSeconds = getPickpocketMaxHoldSeconds();
+		pickpocketCoinsPerSecond = getPickpocketCoinsPerSecond();
+		pickpocketRange = getPickpocketRange();
+		copycatCopyCooldownSeconds = getCopycatCopyCooldownSeconds();
+		copycatCopyDurationSeconds = getCopycatCopyDurationSeconds();
+		copycatCopyRange = getCopycatCopyRange();
+		cupidRequiredAlivePairs = getCupidRequiredAlivePairs();
+		cupidPairCooldownSeconds = getCupidPairCooldownSeconds();
+		cupidRange = getCupidRange();
+		covenantBiteCooldownSeconds = getCovenantBiteCooldownSeconds();
+		vengefulSpiritReviveDelaySeconds = getVengefulSpiritReviveDelaySeconds();
+		vengefulSpiritRevengeSeconds = getVengefulSpiritRevengeSeconds();
+		bugReportDiscordEndpoint = getBugReportDiscordEndpoint();
+		bugReportDiscordSecret = getBugReportDiscordSecret();
 		maxKillerAmount = getMaxKillerAmount();
 		maxVigilanteAmount = getMaxVigilanteAmount();
 		maxNeutralAmount = getMaxNeutralAmount();
@@ -1863,6 +2330,8 @@ public final class GexpressConfig {
 		levelRoadmapDisplayLevels = getLevelRoadmapDisplayLevels();
 		levelXpOverrides = getLevelXpOverrideStrings();
 		levelRewardRoadmap = getLevelRewardRoadmapStrings();
+		levelTags = getLevelTagStrings();
+		skinCaseRows = getSkinCaseRows();
 	}
 
 	private static C4PlacementPreset currentC4PlacementPreset() {
@@ -1916,6 +2385,12 @@ public final class GexpressConfig {
 		));
 	}
 
+	private static List<String> defaultSkinCaseRows() {
+		return new ArrayList<>(List.of(
+			"gexpress|G'Express Case|100|gun:gold:60;;gun:jem:25;;knife:trusted:10;;knife:host:5"
+		));
+	}
+
 	private static List<String> normalizeStringList(List<String> values) {
 		List<String> out = new ArrayList<>();
 		if (values == null) return out;
@@ -1924,6 +2399,10 @@ public final class GexpressConfig {
 			if (!cleaned.isEmpty()) out.add(cleaned);
 		}
 		return out;
+	}
+
+	private static String sanitizeString(String value) {
+		return value == null ? "" : value.trim();
 	}
 
 	private static String encodeStringList(List<String> values) {
@@ -2019,6 +2498,94 @@ public final class GexpressConfig {
 		return new LevelRoadmapEntry(level, title, description, command);
 	}
 
+	private static LevelTagEntry parseLevelTagEntry(String raw) {
+		if (raw == null || raw.isBlank()) return null;
+		String[] parts = raw.split("\\|", 4);
+		if (parts.length < 2) return null;
+		Integer level = parsePositiveInt(parts[0]);
+		if (level == null) return null;
+		String displayName = parts[1].strip();
+		if (displayName.isEmpty()) return null;
+		int color = parts.length >= 3 ? parseColor(parts[2], 0xF2C94C) : 0xF2C94C;
+		int priority = parts.length >= 4 ? parseBoundedInt(parts[3], 50, 0, 200) : 50;
+		return new LevelTagEntry(level, displayName, color, priority);
+	}
+
+	private static SkinCaseEntry parseSkinCaseEntry(String raw) {
+		if (raw == null || raw.isBlank()) return null;
+		String[] parts = raw.split("\\|", 4);
+		if (parts.length < 4) return null;
+		String id = normalizeCaseId(parts[0]);
+		String displayName = parts[1].strip();
+		int price = parseBoundedInt(parts[2], 100, 0, GRENADE_PRICE_MAX);
+		List<SkinCaseReward> rewards = parseSkinCaseRewards(parts[3]);
+		if (id.isEmpty() || displayName.isEmpty() || rewards.isEmpty()) return null;
+		return new SkinCaseEntry(id, displayName, price, rewards);
+	}
+
+	private static List<SkinCaseReward> parseSkinCaseRewards(String raw) {
+		List<SkinCaseReward> rewards = new ArrayList<>();
+		if (raw == null || raw.isBlank()) return rewards;
+		for (String part : raw.split("\\s*;;\\s*")) {
+			String[] pieces = part.split("[:=,]", 3);
+			if (pieces.length < 3) continue;
+			WeaponSkinType type = WeaponSkinType.byId(pieces[0].strip());
+			WeaponSkin skin = WeaponSkin.byId(pieces[1].strip());
+			int weight = parseBoundedInt(pieces[2], 0, 0, 100000);
+			SkinCaseReward reward = new SkinCaseReward(type, skin == null ? null : skin.logical(type), weight);
+			if (reward.configured()) rewards.add(reward);
+		}
+		return rewards;
+	}
+
+	private static String normalizeCaseId(String raw) {
+		if (raw == null) return "";
+		return raw.strip().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_\\-]", "_");
+	}
+
+	private static List<String> splitRewardParts(String raw) {
+		List<String> parts = new ArrayList<>();
+		if (raw == null || raw.isBlank()) return parts;
+		for (String part : raw.split("\\s*;;\\s*")) {
+			String cleaned = part == null ? "" : part.strip();
+			if (!cleaned.isEmpty()) parts.add(cleaned);
+		}
+		return parts;
+	}
+
+	private static List<String> splitRewardCommands(String raw) {
+		List<String> commands = new ArrayList<>();
+		if (raw == null || raw.isBlank()) return commands;
+		for (String command : raw.split("\\s*;;\\s*")) {
+			String cleaned = command == null ? "" : command.strip();
+			if (!cleaned.isEmpty()) commands.add(cleaned);
+		}
+		return commands;
+	}
+
+	private static int parseColor(String raw, int fallback) {
+		if (raw == null) return fallback;
+		String cleaned = raw.strip();
+		if (cleaned.startsWith("#")) cleaned = cleaned.substring(1);
+		if (cleaned.startsWith("0x") || cleaned.startsWith("0X")) cleaned = cleaned.substring(2);
+		if (cleaned.length() != 6) return fallback;
+		try {
+			return Integer.parseInt(cleaned, 16) & 0xFFFFFF;
+		} catch (NumberFormatException ignored) {
+			return fallback;
+		}
+	}
+
+	private static int parseBoundedInt(String raw, int fallback, int min, int max) {
+		if (raw == null) return fallback;
+		try {
+			int value = Integer.parseInt(raw.strip());
+			return Math.max(min, Math.min(max, value));
+		} catch (NumberFormatException ignored) {
+			return fallback;
+		}
+	}
+
 	private static Integer parsePositiveInt(String raw) {
 		if (raw == null) return null;
 		try {
@@ -2054,6 +2621,20 @@ public final class GexpressConfig {
 		int c4FirstBeepSeconds = 3;
 		int wrongWirePercent = 20;
 		int grenadePrice = 150;
+		int bombSpecialistFirecrackerPrice = 10;
+		int bombSpecialistLockpickPrice = 50;
+		int bombSpecialistCrowbarPrice = 25;
+		int mafiosoKnifePrice = 200;
+		int mafiosoRevolverPrice = 350;
+		int janitorPoisonVialPrice = 100;
+		int janitorScorpionPrice = 125;
+		int burglarCrowbarPrice = 25;
+		int burglarLockpickPrice = 50;
+		int mutedNotePrice = 10;
+		String bugReportDiscordEndpoint = "";
+		String bugReportDiscordSecret = "";
+		int goldFoodPlatterPrice = 25;
+		int goldDrinkTrayPrice = 25;
 		List<String> grenadeLineOfSightPassThroughBlocks = defaultGrenadePassThroughBlocks();
 		int passiveIncomeKiller = 5;
 		int passiveIncomeCivilian = 0;
@@ -2102,6 +2683,8 @@ public final class GexpressConfig {
 		int trackerMaxTargets = 3;
 		int trackerRange = 24;
 		int trackerCooldownSeconds = 10;
+		int seerCompareCooldownSeconds = 45;
+		int seerCompareRange = 4;
 		int altruistRange = 4;
 		int bountyHunterBountyIntervalSeconds = 60;
 		int bountyHunterRewardGold = 200;
@@ -2132,6 +2715,20 @@ public final class GexpressConfig {
 		int janitorCleanCooldownSeconds = 20;
 		int janitorRevolverCooldownAfterCleanSeconds = 45;
 		int janitorCleanCooldownAfterKillSeconds = 45;
+		int pickpocketMaxHoldSeconds = 6;
+		int pickpocketCoinsPerSecond = 12;
+		int pickpocketRange = 4;
+		int copycatCopyCooldownSeconds = 45;
+		int copycatCopyDurationSeconds = 120;
+		int copycatCopyRange = 16;
+		int cupidRequiredAlivePairs = 3;
+		int cupidPairCooldownSeconds = 20;
+		int cupidRange = 4;
+		boolean loversShowPartnerHud = true;
+		boolean loversAllowMixedSidePairs = false;
+		int covenantBiteCooldownSeconds = 15;
+		int vengefulSpiritReviveDelaySeconds = 15;
+		int vengefulSpiritRevengeSeconds = 30;
 		boolean lastDeathShieldEnabled = false;
 		boolean guardianAngelAllowNonInnocents = false;
 		boolean bodyguardProtectOnlyCivilians = true;
@@ -2181,5 +2778,7 @@ public final class GexpressConfig {
 		int levelRoadmapDisplayLevels = 25;
 		List<String> levelXpOverrides = new ArrayList<>();
 		List<String> levelRewardRoadmap = new ArrayList<>();
+		List<String> levelTags = new ArrayList<>();
+		List<String> skinCaseRows = defaultSkinCaseRows();
 	}
 }

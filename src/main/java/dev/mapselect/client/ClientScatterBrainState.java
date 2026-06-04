@@ -38,7 +38,7 @@ public final class ClientScatterBrainState {
 		try {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			Role role = game == null ? null : game.getRole(client.player);
-			return role != null && MapSelectRoles.SCATTER_BRAIN_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.SCATTER_BRAIN_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

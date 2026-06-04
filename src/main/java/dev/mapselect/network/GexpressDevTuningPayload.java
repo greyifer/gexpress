@@ -18,15 +18,22 @@ public record GexpressDevTuningPayload(
 		int levelRoadmapDisplayLevels,
 		String levelXpOverrides,
 		String levelRewardRoadmap,
-		String grenadeLineOfSightPassThroughBlocks) implements CustomPayload {
+		String levelTags,
+		String grenadeLineOfSightPassThroughBlocks,
+		int goldFoodPlatterPrice,
+		int goldDrinkTrayPrice,
+		String skinCaseRows,
+		int mutedNotePrice) implements CustomPayload {
 	public static final CustomPayload.Id<GexpressDevTuningPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "dev_tuning"));
 
 	public GexpressDevTuningPayload {
 		levelXpOverrides = levelXpOverrides == null ? "" : levelXpOverrides;
 		levelRewardRoadmap = levelRewardRoadmap == null ? "" : levelRewardRoadmap;
+		levelTags = levelTags == null ? "" : levelTags;
 		grenadeLineOfSightPassThroughBlocks = grenadeLineOfSightPassThroughBlocks == null
 			? "" : grenadeLineOfSightPassThroughBlocks;
+		skinCaseRows = skinCaseRows == null ? "" : skinCaseRows;
 	}
 
 	public static final PacketCodec<PacketByteBuf, GexpressDevTuningPayload> CODEC = PacketCodec.of(
@@ -45,7 +52,12 @@ public record GexpressDevTuningPayload(
 		buf.writeInt(payload.levelRoadmapDisplayLevels());
 		buf.writeString(payload.levelXpOverrides());
 		buf.writeString(payload.levelRewardRoadmap());
+		buf.writeString(payload.levelTags());
 		buf.writeString(payload.grenadeLineOfSightPassThroughBlocks());
+		buf.writeInt(payload.goldFoodPlatterPrice());
+		buf.writeInt(payload.goldDrinkTrayPrice());
+		buf.writeString(payload.skinCaseRows());
+		buf.writeInt(payload.mutedNotePrice());
 	}
 
 	private static GexpressDevTuningPayload decode(PacketByteBuf buf) {
@@ -60,7 +72,12 @@ public record GexpressDevTuningPayload(
 			buf.readInt(),
 			buf.readString(),
 			buf.readString(),
-			buf.readString()
+			buf.readString(),
+			buf.readString(),
+			buf.readInt(),
+			buf.readInt(),
+			buf.readableBytes() > 0 ? buf.readString() : "",
+			buf.readableBytes() > 0 ? buf.readInt() : 10
 		);
 	}
 

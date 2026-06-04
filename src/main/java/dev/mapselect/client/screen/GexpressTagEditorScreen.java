@@ -1,5 +1,6 @@
 package dev.mapselect.client.screen;
 
+import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.permissions.GexpressPermissions;
@@ -28,7 +29,10 @@ public final class GexpressTagEditorScreen extends Screen {
 	private TextFieldWidget colorField;
 	private TextFieldWidget priorityField;
 	private ButtonWidget deleteButton;
+	private ButtonWidget playerTagsButton;
+	private ButtonWidget levelTagsButton;
 	private final Set<String> enabledPermissions = new LinkedHashSet<>();
+	private Mode mode = Mode.PLAYER_TAGS;
 	private String selectedId = "";
 	private boolean selectedBuiltin;
 	private float hue = 0.58F;
@@ -57,6 +61,15 @@ public final class GexpressTagEditorScreen extends Screen {
 		colorField.setText("#D36BFF");
 		priorityField.setText("50");
 
+		playerTagsButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.player_tags"),
+				button -> setMode(Mode.PLAYER_TAGS))
+			.dimensions(18, 28, 92, 20)
+			.build());
+		levelTagsButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.level_tags"),
+				button -> setMode(Mode.LEVEL_TAGS))
+			.dimensions(114, 28, 92, 20)
+			.build());
+
 		int buttonY = Math.min(height - 58, formY + 292);
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.save"), button -> save())
 			.dimensions(formX, buttonY, 72, 20)
@@ -71,6 +84,7 @@ public final class GexpressTagEditorScreen extends Screen {
 		addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> close())
 			.dimensions(width / 2 - 45, height - 28, 90, 20)
 			.build());
+		updateModeWidgets();
 	}
 
 	@Override
@@ -78,11 +92,17 @@ public final class GexpressTagEditorScreen extends Screen {
 		context.fill(0, 0, width, height, 0xAA11151B);
 		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 16, 0xFFFFFFFF);
 		context.drawCenteredTextWithShadow(textRenderer,
-			Text.translatable("gui.gexpress.tag_editor.subtitle").formatted(Formatting.GRAY),
+			Text.translatable(mode == Mode.LEVEL_TAGS
+				? "gui.gexpress.tag_editor.level_subtitle"
+				: "gui.gexpress.tag_editor.subtitle").formatted(Formatting.GRAY),
 			width / 2, 29, 0xFF9BA3AE);
 		drawTagList(context, mouseX, mouseY);
 		drawLabels(context);
-		drawPermissions(context, mouseX, mouseY);
+		if (mode == Mode.PLAYER_TAGS) {
+			drawPermissions(context, mouseX, mouseY);
+		} else {
+			drawLevelTagHelp(context);
+		}
 		drawColorPicker(context, mouseX, mouseY);
 		super.render(context, mouseX, mouseY, delta);
 	}
@@ -94,7 +114,9 @@ public final class GexpressTagEditorScreen extends Screen {
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (button == 0) {
-			if (clickTagList(mouseX, mouseY) || clickPermission(mouseX, mouseY) || clickColor(mouseX, mouseY)) {
+			if (clickTagList(mouseX, mouseY)
+					|| (mode == Mode.PLAYER_TAGS && clickPermission(mouseX, mouseY))
+					|| clickColor(mouseX, mouseY)) {
 				return true;
 			}
 		}
@@ -125,7 +147,9 @@ public final class GexpressTagEditorScreen extends Screen {
 	private void drawTagList(DrawContext context, int mouseX, int mouseY) {
 		int x = 18;
 		int y = 52;
-		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.tags"), x, y - 14,
+		context.drawTextWithShadow(textRenderer, Text.translatable(mode == Mode.LEVEL_TAGS
+				? "gui.gexpress.tag_editor.level_tags"
+				: "gui.gexpress.tag_editor.tags"), x, y - 14,
 			0xFFFFFFFF);
 		int row = 0;
 		for (EditableTag tag : visibleTags()) {
@@ -134,9 +158,12 @@ public final class GexpressTagEditorScreen extends Screen {
 			boolean hovered = mouseX >= x && mouseX < x + 142 && mouseY >= ry && mouseY < ry + 18;
 			context.fill(x, ry, x + 142, ry + 18, selected ? 0xAA2D3542 : hovered ? 0x77313A48 : 0x55212833);
 			context.fill(x, ry + 16, x + 142, ry + 18, 0xFF000000 | tag.color());
-			context.drawTextWithShadow(textRenderer, Text.literal(tag.displayName()), x + 5, ry + 5, 0xFFFFFFFF);
+			String label = mode == Mode.LEVEL_TAGS ? "Level " + tag.id() + " - " + tag.displayName() : tag.displayName();
+			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(label, 122)),
+				x + 5, ry + 5, 0xFFFFFFFF);
 			if (tag.builtin()) {
-				context.drawTextWithShadow(textRenderer, Text.literal("*"), x + 132, ry + 5, 0xFF9BA3AE);
+				context.drawTextWithShadow(textRenderer, Text.literal(mode == Mode.LEVEL_TAGS ? "L" : "*"),
+					x + 132, ry + 5, 0xFF9BA3AE);
 			}
 			row++;
 		}
@@ -160,10 +187,27 @@ public final class GexpressTagEditorScreen extends Screen {
 	private void drawLabels(DrawContext context) {
 		int labelX = 190;
 		int y = 43;
-		context.drawTextWithShadow(textRenderer, Text.literal("Id"), labelX, y, 0xFFB9C2CE);
+		context.drawTextWithShadow(textRenderer, Text.literal(mode == Mode.LEVEL_TAGS ? "Level" : "Id"),
+			labelX, y, 0xFFB9C2CE);
 		context.drawTextWithShadow(textRenderer, Text.literal("Name"), labelX, y + 28, 0xFFB9C2CE);
 		context.drawTextWithShadow(textRenderer, Text.literal("Color"), labelX, y + 56, 0xFFB9C2CE);
 		context.drawTextWithShadow(textRenderer, Text.literal("Priority"), labelX, y + 84, 0xFFB9C2CE);
+	}
+
+	private void drawLevelTagHelp(DrawContext context) {
+		int x = 190;
+		int y = 174;
+		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.level_tag_rules"),
+			x, y - 14, 0xFFFFFFFF);
+		List<Text> lines = List.of(
+			Text.translatable("gui.gexpress.tag_editor.level_tag_rule_1"),
+			Text.translatable("gui.gexpress.tag_editor.level_tag_rule_2"),
+			Text.translatable("gui.gexpress.tag_editor.level_tag_rule_3")
+		);
+		for (int i = 0; i < lines.size(); i++) {
+			context.drawTextWithShadow(textRenderer, lines.get(i).copy().formatted(Formatting.GRAY),
+				x, y + i * 13, 0xFF9BA3AE);
+		}
 	}
 
 	private void drawPermissions(DrawContext context, int mouseX, int mouseY) {
@@ -277,8 +321,8 @@ public final class GexpressTagEditorScreen extends Screen {
 	private void load(EditableTag tag) {
 		selectedId = tag.id();
 		selectedBuiltin = tag.builtin();
-		idField.setEditable(!selectedBuiltin);
-		nameField.setEditable(!selectedBuiltin);
+		idField.setEditable(mode == Mode.LEVEL_TAGS || !selectedBuiltin);
+		nameField.setEditable(mode == Mode.LEVEL_TAGS || !selectedBuiltin);
 		idField.setText(tag.id());
 		nameField.setText(tag.displayName());
 		colorField.setText(String.format(Locale.ROOT, "#%06X", tag.color()));
@@ -289,7 +333,9 @@ public final class GexpressTagEditorScreen extends Screen {
 			if (key != null) enabledPermissions.add(key);
 		}
 		if (deleteButton != null) {
-			deleteButton.setMessage(Text.translatable(selectedBuiltin
+			deleteButton.setMessage(Text.translatable(mode == Mode.LEVEL_TAGS
+				? "gui.gexpress.tag_editor.delete"
+				: selectedBuiltin
 				? "gui.gexpress.tag_editor.reset"
 				: "gui.gexpress.tag_editor.delete"));
 		}
@@ -303,16 +349,20 @@ public final class GexpressTagEditorScreen extends Screen {
 		nameField.setEditable(true);
 		idField.setText("");
 		nameField.setText("");
-		colorField.setText("#D36BFF");
+		colorField.setText(mode == Mode.LEVEL_TAGS ? "#F2C94C" : "#D36BFF");
 		priorityField.setText("50");
 		enabledPermissions.clear();
 		if (deleteButton != null) {
 			deleteButton.setMessage(Text.translatable("gui.gexpress.tag_editor.delete"));
 		}
-		syncHsvFromColor(0xD36BFF);
+		syncHsvFromColor(mode == Mode.LEVEL_TAGS ? 0xF2C94C : 0xD36BFF);
 	}
 
 	private void save() {
+		if (mode == Mode.LEVEL_TAGS) {
+			saveLevelTag();
+			return;
+		}
 		String id = PlayerTagComponent.normalizeCustomId(idField.getText());
 		if (id == null) return;
 		String color = normalizeHex(colorField.getText());
@@ -340,6 +390,10 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private void delete() {
+		if (mode == Mode.LEVEL_TAGS) {
+			deleteLevelTag();
+			return;
+		}
 		String id = PlayerTagComponent.normalizeCustomId(idField.getText());
 		if (id == null) return;
 		if (selectedBuiltin) {
@@ -372,6 +426,9 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private List<EditableTag> visibleTags() {
+		if (mode == Mode.LEVEL_TAGS) {
+			return visibleLevelTags();
+		}
 		PlayerTagComponent component = component();
 		List<EditableTag> out = new ArrayList<>();
 		for (PlayerTag tag : PlayerTag.values()) out.add(EditableTag.from(tag, component));
@@ -383,6 +440,97 @@ public final class GexpressTagEditorScreen extends Screen {
 		out.sort(Comparator.comparingInt(EditableTag::priority).reversed()
 			.thenComparing(EditableTag::displayName, String.CASE_INSENSITIVE_ORDER));
 		return out;
+	}
+
+	private List<EditableTag> visibleLevelTags() {
+		List<EditableTag> out = new ArrayList<>();
+		for (GexpressConfig.LevelTagEntry tag : GexpressConfig.getLevelTagEntries()) {
+			out.add(new EditableTag(Integer.toString(tag.level()), tag.displayName(), tag.color(),
+				tag.priority(), true, Set.of()));
+		}
+		out.sort(Comparator.comparingInt((EditableTag tag) -> parseLevel(tag.id())).reversed()
+			.thenComparing(EditableTag::displayName, String.CASE_INSENSITIVE_ORDER));
+		return out;
+	}
+
+	private void saveLevelTag() {
+		int level = parseLevel(idField.getText());
+		if (level <= 0) return;
+		String name = nameField.getText().isBlank() ? "Level " + level : nameField.getText().trim();
+		String color = normalizeHex(colorField.getText());
+		int priority = parsePriority();
+		List<String> rows = new ArrayList<>(GexpressConfig.getLevelTagStrings());
+		rows.removeIf(row -> {
+			GexpressConfig.LevelTagEntry existing = parseLevelTag(row);
+			return existing != null && existing.level() == level;
+		});
+		rows.add(level + "|" + name.replace("|", "") + "|#" + color + "|" + priority);
+		GexpressConfig.setLevelTagStrings(rows);
+		GexpressOptionsScreen.pushGexpressConfigToServer();
+		selectedId = Integer.toString(level);
+	}
+
+	private void deleteLevelTag() {
+		int level = parseLevel(idField.getText());
+		if (level <= 0) return;
+		List<String> rows = new ArrayList<>(GexpressConfig.getLevelTagStrings());
+		rows.removeIf(row -> {
+			GexpressConfig.LevelTagEntry existing = parseLevelTag(row);
+			return existing != null && existing.level() == level;
+		});
+		GexpressConfig.setLevelTagStrings(rows);
+		GexpressOptionsScreen.pushGexpressConfigToServer();
+		clearForNew();
+	}
+
+	private GexpressConfig.LevelTagEntry parseLevelTag(String row) {
+		if (row == null || row.isBlank()) return null;
+		String[] parts = row.split("\\|", 4);
+		if (parts.length < 2) return null;
+		int level = parseLevel(parts[0]);
+		if (level <= 0) return null;
+		String name = parts[1].strip();
+		if (name.isEmpty()) return null;
+		int color = parts.length >= 3 ? parseColor(parts[2], 0xF2C94C) : 0xF2C94C;
+		int priority = parts.length >= 4 ? parseBoundedInt(parts[3], 50, 0, 200) : 50;
+		return new GexpressConfig.LevelTagEntry(level, name, color, priority);
+	}
+
+	private int parseLevel(String raw) {
+		try {
+			return Math.max(0, Math.min(999, Integer.parseInt(raw == null ? "" : raw.trim())));
+		} catch (NumberFormatException ignored) {
+			return 0;
+		}
+	}
+
+	private int parseColor(String raw, int fallback) {
+		String value = normalizeHex(raw);
+		try {
+			return Integer.parseInt(value, 16) & 0xFFFFFF;
+		} catch (NumberFormatException ignored) {
+			return fallback;
+		}
+	}
+
+	private int parseBoundedInt(String raw, int fallback, int min, int max) {
+		try {
+			return Math.max(min, Math.min(max, Integer.parseInt(raw == null ? "" : raw.trim())));
+		} catch (NumberFormatException ignored) {
+			return fallback;
+		}
+	}
+
+	private void setMode(Mode next) {
+		if (mode == next) return;
+		mode = next;
+		clearForNew();
+		updateModeWidgets();
+	}
+
+	private void updateModeWidgets() {
+		if (playerTagsButton != null) playerTagsButton.active = mode != Mode.PLAYER_TAGS;
+		if (levelTagsButton != null) levelTagsButton.active = mode != Mode.LEVEL_TAGS;
 	}
 
 	private void syncHsvFromColor(int color) {
@@ -431,5 +579,10 @@ public final class GexpressTagEditorScreen extends Screen {
 			return new EditableTag(tag.id(), tag.displayName(), tag.color(), tag.priority(), false,
 				Set.copyOf(tag.permissions()));
 		}
+	}
+
+	private enum Mode {
+		PLAYER_TAGS,
+		LEVEL_TAGS
 	}
 }

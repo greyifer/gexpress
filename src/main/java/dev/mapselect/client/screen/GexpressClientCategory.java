@@ -1,6 +1,7 @@
 package dev.mapselect.client.screen;
 
 import cat.rezelyn.watheextended.client.screen.config.ClientCategory;
+import dev.isxander.yacl3.api.ButtonOption;
 import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
@@ -8,6 +9,7 @@ import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import dev.mapselect.config.GexpressConfig;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
@@ -25,9 +27,25 @@ public final class GexpressClientCategory {
 		for (OptionGroup group : base.groups()) {
 			category.group(group);
 		}
+		category.group(tutorialGroup());
 		category.group(weaponSkinsGroup());
 		category.group(abilityHudGroup());
 		return category.build();
+	}
+
+	private static OptionGroup tutorialGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.client.tutorial"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.client.tutorial.tooltip")))
+			.collapsed(false)
+			.option(ButtonOption.createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.client.view_tutorial"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.client.view_tutorial.tooltip")))
+				.text(Text.translatable("gui.gexpress.config.option.client.view_tutorial.open"))
+				.action((screen, option) -> MinecraftClient.getInstance()
+					.setScreen(new GexpressTutorialScreen(screen, false)))
+				.build())
+			.build();
 	}
 
 	private static OptionGroup weaponSkinsGroup() {

@@ -1,23 +1,43 @@
 package dev.mapselect.client.screen;
 
 import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
+import com.google.common.collect.ImmutableList;
 import dev.isxander.yacl3.api.ButtonOption;
 import dev.isxander.yacl3.api.ConfigCategory;
+import dev.isxander.yacl3.api.CustomTabProvider;
 import dev.isxander.yacl3.api.ListOption;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
+import dev.isxander.yacl3.gui.YACLScreen;
+import dev.isxander.yacl3.gui.tab.TabExt;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.client.gui.tab.Tab;
+import net.minecraft.client.gui.tooltip.Tooltip;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.registry.Registries;
+import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.IntConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -26,25 +46,423 @@ public final class GexpressDevCategory {
 	private GexpressDevCategory() {}
 
 	public static ConfigCategory build(Screen parent) {
-		return ConfigCategory.createBuilder()
-			.name(Text.translatable("gui.gexpress.config.category.dev"))
-			.tooltip(Text.translatable("gui.gexpress.config.category.dev.tooltip"))
-			.group(xpTuningGroup())
-			.group(levelXpOverridesOption())
-			.group(levelRewardRoadmapOption())
-			.group(grenadePassThroughBlocksOption())
-			.group(c4BackModelGroup())
-			.group(spyBugModelGroup())
-			.group(modelPlacementEditorGroup())
-			.group(modelDefaultsExportGroup())
-			.group(c4PlacementPresetsOption())
-			.group(roleDescriptionsGroup())
-			.group(shortSightedGroup())
-			.group(medicShieldVisualsGroup())
-			.group(silentShadowVisualsGroup())
-			.group(tagEditorGroup())
-			.group(endScreenLayoutGroup())
-			.build();
+		return new DevCategory();
+	}
+
+	private static final class DevCategory implements ConfigCategory, CustomTabProvider {
+		private final Text name = Text.translatable("gui.gexpress.config.category.dev");
+		private final Text tooltip = Text.translatable("gui.gexpress.config.category.dev.tooltip");
+
+		@Override
+		public @NotNull Text name() {
+			return name;
+		}
+
+		@Override
+		public @NotNull ImmutableList<OptionGroup> groups() {
+			return ImmutableList.of();
+		}
+
+		@Override
+		public @NotNull Text tooltip() {
+			return tooltip;
+		}
+
+		@Override
+		public Tab createTab(YACLScreen screen, ScreenRect tabArea) {
+			return new DevTab(screen, tabArea, tooltip);
+		}
+	}
+
+	private static final class DevTab implements TabExt {
+		private final DevPanelWidget panel;
+		private final ButtonWidget doneButton;
+		private final Tooltip tooltip;
+
+		private DevTab(YACLScreen screen, ScreenRect tabArea, Text tooltipText) {
+			this.panel = new DevPanelWidget(tabArea.getLeft(), tabArea.getTop(), tabArea.width(), tabArea.height(), screen);
+			this.doneButton = ButtonWidget.builder(ScreenTexts.DONE, button -> screen.finishOrSave())
+				.size(Math.max(90, screen.width / 6), 20)
+				.build();
+			this.tooltip = Tooltip.of(tooltipText);
+			refreshGrid(tabArea);
+		}
+
+		@Override
+		public Text getTitle() {
+			return Text.translatable("gui.gexpress.config.category.dev");
+		}
+
+		@Override
+		public void forEachChild(Consumer<ClickableWidget> consumer) {
+			consumer.accept(panel);
+			consumer.accept(doneButton);
+		}
+
+		@Override
+		public void refreshGrid(ScreenRect tabArea) {
+			panel.setDimensionsAndPosition(tabArea.width(), tabArea.height() - 30, tabArea.getLeft(), tabArea.getTop());
+			doneButton.setDimensionsAndPosition(Math.max(90, tabArea.width() / 5), 20,
+				tabArea.getLeft() + tabArea.width() - Math.max(90, tabArea.width() / 5) - 12,
+				tabArea.getBottom() - 24);
+		}
+
+		@Override
+		public @Nullable Tooltip getTooltip() {
+			return tooltip;
+		}
+	}
+
+	private static final class DevPanelWidget extends ClickableWidget {
+		private static final int BUTTON_W = 64;
+		private static final int SMALL_BUTTON_W = 24;
+		private static final int ROW_H = 24;
+		private static final int CARD_GAP = 10;
+		private final List<DevAction> actions = new ArrayList<>();
+		private final Screen parent;
+		private int scroll;
+		private int maxScroll;
+
+		private DevPanelWidget(int x, int y, int width, int height, Screen parent) {
+			super(x, y, width, height, Text.translatable("gui.gexpress.config.category.dev"));
+			this.parent = parent;
+		}
+
+		@Override
+		protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+			MinecraftClient client = MinecraftClient.getInstance();
+			if (client == null || client.textRenderer == null) return;
+			actions.clear();
+			TextRenderer tr = client.textRenderer;
+			int x = getX() + 14;
+			int w = width - 28;
+			int contentTop = getY() + 8;
+			int contentBottom = getY() + height - 8;
+			int y = contentTop - scroll;
+			context.enableScissor(getX(), contentTop, getX() + width, contentBottom);
+			y = drawToolsCard(context, tr, x, y, w, mouseX, mouseY) + CARD_GAP;
+			if (w >= 760) {
+				int leftW = (w - CARD_GAP) / 2;
+				int rightW = w - leftW - CARD_GAP;
+				int leftX = x;
+				int rightX = x + leftW + CARD_GAP;
+				int leftY = y;
+				int rightY = y;
+				leftY = drawXpCard(context, tr, leftX, leftY, leftW, mouseX, mouseY) + CARD_GAP;
+				leftY = drawEconomyCard(context, tr, leftX, leftY, leftW, mouseX, mouseY) + CARD_GAP;
+				leftY = drawVisualsCard(context, tr, leftX, leftY, leftW, mouseX, mouseY) + CARD_GAP;
+				rightY = drawLevelRewardsCard(context, tr, rightX, rightY, rightW, mouseX, mouseY) + CARD_GAP;
+				rightY = drawTagsCard(context, tr, rightX, rightY, rightW, mouseX, mouseY) + CARD_GAP;
+				rightY = drawMapToolsCard(context, tr, rightX, rightY, rightW, mouseX, mouseY) + CARD_GAP;
+				y = Math.max(leftY, rightY);
+			} else {
+				y = drawXpCard(context, tr, x, y, w, mouseX, mouseY) + CARD_GAP;
+				y = drawEconomyCard(context, tr, x, y, w, mouseX, mouseY) + CARD_GAP;
+				y = drawLevelRewardsCard(context, tr, x, y, w, mouseX, mouseY) + CARD_GAP;
+				y = drawTagsCard(context, tr, x, y, w, mouseX, mouseY) + CARD_GAP;
+				y = drawMapToolsCard(context, tr, x, y, w, mouseX, mouseY) + CARD_GAP;
+				y = drawVisualsCard(context, tr, x, y, w, mouseX, mouseY) + CARD_GAP;
+			}
+			context.disableScissor();
+			int contentHeight = y + scroll - contentTop;
+			maxScroll = Math.max(0, contentHeight - (contentBottom - contentTop));
+			scroll = Math.max(0, Math.min(scroll, maxScroll));
+			if (maxScroll > 0) {
+				int trackX = getX() + width - 7;
+				int trackH = contentBottom - contentTop;
+				int thumbH = Math.max(24, trackH * trackH / Math.max(trackH, contentHeight));
+				int thumbY = contentTop + Math.round((trackH - thumbH) * (scroll / (float) maxScroll));
+				context.fill(trackX, contentTop, trackX + 2, contentBottom, 0x553F4A55);
+				context.fill(trackX - 1, thumbY, trackX + 3, thumbY + thumbH, 0xBBD9E3EE);
+			}
+		}
+
+		private int drawToolsCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
+			ToolTile[] tiles = {
+				new ToolTile("Model Placement", "Preview and position C4 or spy models.", 0xFF6FD7FF,
+					() -> MinecraftClient.getInstance().setScreen(new GexpressModelPlacementScreen(parent))),
+				new ToolTile("Tags & Permissions", "Edit tags, owner access, and level tags.", 0xFFF2C94C,
+					() -> MinecraftClient.getInstance().setScreen(new GexpressTagEditorScreen(parent))),
+				new ToolTile("Level Rewards", "Build claimable XP Roadmap rewards.", 0xFF7CC9A2,
+					() -> MinecraftClient.getInstance().setScreen(new GexpressLevelRewardEditorScreen(parent))),
+				new ToolTile("Case Editor", "Tune G'Express case prices and weighted skin drops.", 0xFFE0B65A,
+					() -> MinecraftClient.getInstance().setScreen(new GexpressCaseEditorScreen(parent))),
+				new ToolTile("Tutorial Editor", "Edit first-run tutorial pages.", 0xFF9AE66E,
+					() -> MinecraftClient.getInstance().setScreen(new GexpressTutorialEditorScreen(parent))),
+				new ToolTile("Copy Model Defaults", "Copy current model values for code defaults.", 0xFFB8A7FF,
+					GexpressDevCategory::copyModelDefaultsToClipboard)
+			};
+			int columns = w >= 1120 ? 5 : w >= 760 ? 3 : 2;
+			int tileGap = 8;
+			int tileW = Math.max(112, (w - 24 - tileGap * (columns - 1)) / columns);
+			int tileH = 50;
+			int rows = (tiles.length + columns - 1) / columns;
+			int h = 42 + rows * tileH + Math.max(0, rows - 1) * tileGap + 12;
+			drawCard(context, tr, "Dev Workspace", "Fast access to the editors and live tuning tools.", x, y, w, h);
+			int tileY = y + 38;
+			for (int i = 0; i < tiles.length; i++) {
+				int col = i % columns;
+				int row = i / columns;
+				int tileX = x + 12 + col * (tileW + tileGap);
+				int currentTileW = col == columns - 1 ? x + w - 12 - tileX : tileW;
+				drawToolTile(context, tr, tiles[i], tileX, tileY + row * (tileH + tileGap), currentTileW, tileH,
+					mouseX, mouseY);
+			}
+			return y + h;
+		}
+
+		private void drawToolTile(DrawContext context, TextRenderer tr, ToolTile tile, int x, int y, int w, int h,
+				int mouseX, int mouseY) {
+			boolean hovered = contains(mouseX, mouseY, x, y, w, h);
+			context.fill(x, y, x + w, y + h, hovered ? 0xBB263746 : 0x99202A36);
+			context.drawBorder(x, y, w, h, hovered ? 0xFFE6F2FF : 0x887C8CA0);
+			context.fill(x, y, x + 3, y + h, tile.accent());
+			context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(tile.title(), w - 16)).formatted(Formatting.BOLD),
+				x + 10, y + 9, 0xFFFFFFFF);
+			context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(tile.subtitle(), w - 16)).formatted(Formatting.GRAY),
+				x + 10, y + 25, 0xFFB6C1CC);
+			actions.add(new DevAction(x, y, w, h, tile.action()));
+		}
+
+		private int drawXpCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
+			int h = 228;
+			drawCard(context, tr, "XP Tuning", "Round XP, win bonuses, and level curve.", x, y, w, h);
+			int rowY = y + 34;
+			rowY = numberRow(context, tr, "Round Played", GexpressConfig.getLevelRoundXp(), x + 12, rowY, w - 24,
+				1, 10, v -> GexpressConfig.levelRoundXp = v, GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX, mouseX, mouseY);
+			rowY = numberRow(context, tr, "Winning Side", GexpressConfig.getLevelWinXp(), x + 12, rowY, w - 24,
+				1, 10, v -> GexpressConfig.levelWinXp = v, GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX, mouseX, mouseY);
+			rowY = numberRow(context, tr, "Neutral Win Bonus", GexpressConfig.getLevelNeutralWinBonusXp(), x + 12, rowY, w - 24,
+				1, 10, v -> GexpressConfig.levelNeutralWinBonusXp = v, GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX, mouseX, mouseY);
+			rowY = numberRow(context, tr, "Kill", GexpressConfig.getLevelKillXp(), x + 12, rowY, w - 24,
+				1, 10, v -> GexpressConfig.levelKillXp = v, GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX, mouseX, mouseY);
+			rowY = numberRow(context, tr, "Civilian Task", GexpressConfig.getLevelCivilianTaskXp(), x + 12, rowY, w - 24,
+				1, 10, v -> GexpressConfig.levelCivilianTaskXp = v, GexpressConfig.LEVEL_XP_AMOUNT_MIN, GexpressConfig.LEVEL_XP_AMOUNT_MAX, mouseX, mouseY);
+			rowY = numberRow(context, tr, "Base Level XP", GexpressConfig.getLevelBaseXp(), x + 12, rowY, w - 24,
+				25, 100, v -> GexpressConfig.levelBaseXp = v, GexpressConfig.LEVEL_XP_REQUIRED_MIN, GexpressConfig.LEVEL_XP_REQUIRED_MAX, mouseX, mouseY);
+			numberRow(context, tr, "XP Increase", GexpressConfig.getLevelXpIncrease(), x + 12, rowY, w - 24,
+				25, 100, v -> GexpressConfig.levelXpIncrease = v, 0, GexpressConfig.LEVEL_XP_REQUIRED_MAX, mouseX, mouseY);
+			return y + h;
+		}
+
+		private int drawEconomyCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
+			int h = 132;
+			drawCard(context, tr, "Economy", "Prices used by paid interactables and shop-style tools.", x, y, w, h);
+			int rowY = y + 34;
+			rowY = numberRow(context, tr, "Golden Food Platter", GexpressConfig.getGoldFoodPlatterPrice(), x + 12, rowY, w - 24,
+				5, 25, v -> GexpressConfig.goldFoodPlatterPrice = v, GexpressConfig.GRENADE_PRICE_MIN, GexpressConfig.GRENADE_PRICE_MAX, mouseX, mouseY);
+			rowY = numberRow(context, tr, "Golden Drink Tray", GexpressConfig.getGoldDrinkTrayPrice(), x + 12, rowY, w - 24,
+				5, 25, v -> GexpressConfig.goldDrinkTrayPrice = v, GexpressConfig.GRENADE_PRICE_MIN, GexpressConfig.GRENADE_PRICE_MAX, mouseX, mouseY);
+			numberRow(context, tr, "Muted Note", GexpressConfig.getMutedNotePrice(), x + 12, rowY, w - 24,
+				1, 10, v -> GexpressConfig.mutedNotePrice = v, GexpressConfig.GRENADE_PRICE_MIN, GexpressConfig.GRENADE_PRICE_MAX, mouseX, mouseY);
+			return y + h;
+		}
+
+		private int drawLevelRewardsCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
+			int h = 154;
+			drawCard(context, tr, "Level Rewards", "Configured XP Roadmap rewards.", x, y, w, h);
+			drawButton(context, tr, "Edit Rewards", x + w - 106, y + 10, 92, mouseX, mouseY,
+				() -> MinecraftClient.getInstance().setScreen(new GexpressLevelRewardEditorScreen(parent)));
+			List<GexpressConfig.LevelRoadmapEntry> rewards = new ArrayList<>(GexpressConfig.getLevelRoadmapEntries());
+			rewards.sort((a, b) -> Integer.compare(a.level(), b.level()));
+			int rowY = y + 38;
+			if (rewards.isEmpty()) {
+				context.drawTextWithShadow(tr, Text.literal("No rewards configured yet.").formatted(Formatting.GRAY),
+					x + 14, rowY, 0xFF9EACB9);
+			} else {
+				for (int i = 0; i < Math.min(4, rewards.size()); i++) {
+					GexpressConfig.LevelRoadmapEntry reward = rewards.get(i);
+					String title = reward.rewardTitles().isEmpty() ? reward.title() : String.join(" + ", reward.rewardTitles());
+					context.fill(x + 12, rowY, x + w - 12, rowY + 19, 0x33242E38);
+					context.drawTextWithShadow(tr, Text.literal("LvL " + reward.level()).formatted(Formatting.GOLD),
+						x + 20, rowY + 5, 0xFFFFD57A);
+					context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(title, w - 160)),
+						x + 78, rowY + 5, 0xFFFFFFFF);
+					String commands = reward.commands().size() + " command" + (reward.commands().size() == 1 ? "" : "s");
+					context.drawTextWithShadow(tr, Text.literal(commands).formatted(Formatting.GRAY),
+						x + w - 20 - tr.getWidth(commands), rowY + 5, 0xFF9EACB9);
+					rowY += 22;
+				}
+				if (rewards.size() > 4) {
+					context.drawTextWithShadow(tr, Text.literal("+" + (rewards.size() - 4) + " more").formatted(Formatting.GRAY),
+						x + 20, rowY + 4, 0xFF9EACB9);
+				}
+			}
+			return y + h;
+		}
+
+		private int drawTagsCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
+			int h = 134;
+			drawCard(context, tr, "Tags", "Player permissions and level-tag rules are summarized here.", x, y, w, h);
+			drawButton(context, tr, "Edit Tags", x + w - 88, y + 10, 74, mouseX, mouseY,
+				() -> MinecraftClient.getInstance().setScreen(new GexpressTagEditorScreen(parent)));
+			List<GexpressConfig.LevelTagEntry> levelTags = GexpressConfig.getLevelTagEntries();
+			int rowY = y + 38;
+			context.drawTextWithShadow(tr, Text.literal("Level tags").formatted(Formatting.GRAY),
+				x + 18, rowY, 0xFF9EACB9);
+			rowY += 14;
+			if (levelTags.isEmpty()) {
+				context.drawTextWithShadow(tr, Text.literal("No level tags configured.").formatted(Formatting.DARK_GRAY),
+					x + 18, rowY, 0xFF777777);
+			} else {
+				int drawX = x + 18;
+				for (int i = 0; i < Math.min(5, levelTags.size()); i++) {
+					GexpressConfig.LevelTagEntry tag = levelTags.get(i);
+					String label = "LvL " + tag.level() + " " + tag.displayName();
+					int tw = Math.min(112, tr.getWidth(label) + 12);
+					context.fill(drawX, rowY, drawX + tw, rowY + 18, 0x66000000 | (tag.color() & 0xFFFFFF));
+					context.drawBorder(drawX, rowY, tw, 18, 0xAAFFFFFF);
+					context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(label, tw - 8)),
+						drawX + 5, rowY + 5, 0xFFFFFFFF);
+					drawX += tw + 6;
+					if (drawX > x + w - 120) break;
+				}
+			}
+			context.drawTextWithShadow(tr,
+				Text.literal(GexpressPermissions.permissionKeys().size() + " permission flags available").formatted(Formatting.GRAY),
+				x + 18, y + h - 24, 0xFF9EACB9);
+			return y + h;
+		}
+
+		private int drawMapToolsCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
+			int h = 86;
+			drawCard(context, tr, "Grenade Trace Blocks", "Use the block you are looking at as a pass-through block for grenade wall checks.", x, y, w, h);
+			int buttonX = x + 12;
+			int buttonY = y + 40;
+			drawButton(context, tr, "Add Looked Block", buttonX, buttonY, 126, mouseX, mouseY,
+				() -> addLookedBlockToGrenadePassThrough(MinecraftClient.getInstance()));
+			drawButton(context, tr, "Clear List", buttonX + 134, buttonY, 82, mouseX, mouseY,
+				() -> {
+					GexpressConfig.setGrenadeLineOfSightPassThroughBlockStrings(List.of());
+					GexpressOptionsScreen.pushGexpressConfigToServer();
+				});
+			String count = GexpressConfig.getGrenadeLineOfSightPassThroughBlockStrings().size() + " configured";
+			context.drawTextWithShadow(tr, Text.literal(count).formatted(Formatting.GRAY), x + w - 18 - tr.getWidth(count),
+				buttonY + 5, 0xFF9EACB9);
+			return y + h;
+		}
+
+		private int drawVisualsCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
+			int h = 166;
+			drawCard(context, tr, "Visuals", "Fine tuning for overlays and screen effects.", x, y, w, h);
+			int rowY = y + 34;
+			rowY = numberRow(context, tr, "Short Sight Range", Math.round(GexpressConfig.getShortSightedEntityRange()), x + 12, rowY, w - 24,
+				1, 5, v -> GexpressConfig.shortSightedFogRange = v, Math.round(GexpressConfig.SHORT_SIGHTED_ENTITY_RANGE_MIN),
+				Math.round(GexpressConfig.SHORT_SIGHTED_ENTITY_RANGE_MAX), mouseX, mouseY);
+			rowY = numberRow(context, tr, "Medic Block Flash", GexpressConfig.getMedicShieldBlockFlashAlpha(), x + 12, rowY, w - 24,
+				2, 10, v -> GexpressConfig.medicShieldBlockFlashAlpha = v, GexpressConfig.MEDIC_SHIELD_FLASH_ALPHA_MIN,
+				GexpressConfig.MEDIC_SHIELD_FLASH_ALPHA_MAX, mouseX, mouseY);
+			rowY = numberRow(context, tr, "Medic Break Flash", GexpressConfig.getMedicShieldBreakFlashAlpha(), x + 12, rowY, w - 24,
+				2, 10, v -> GexpressConfig.medicShieldBreakFlashAlpha = v, GexpressConfig.MEDIC_SHIELD_FLASH_ALPHA_MIN,
+				GexpressConfig.MEDIC_SHIELD_FLASH_ALPHA_MAX, mouseX, mouseY);
+			numberRow(context, tr, "Silent Shadow %", Math.round(GexpressConfig.getSilentShadowAlpha() * 100.0F), x + 12, rowY, w - 24,
+				1, 5, v -> GexpressConfig.silentShadowAlpha = v / 100.0F, Math.round(GexpressConfig.SILENT_SHADOW_ALPHA_MIN * 100.0F),
+				Math.round(GexpressConfig.SILENT_SHADOW_ALPHA_MAX * 100.0F), mouseX, mouseY);
+			return y + h;
+		}
+
+		private void drawCard(DrawContext context, TextRenderer tr, String title, String subtitle, int x, int y, int w, int h) {
+			context.fill(x, y, x + w, y + h, 0x77202630);
+			context.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0x66303A46);
+			context.drawBorder(x, y, w, h, 0xAA718499);
+			context.fill(x, y, x + 4, y + h, 0xFF7CC9A2);
+			context.drawTextWithShadow(tr, Text.literal(title).formatted(Formatting.BOLD), x + 14, y + 10, 0xFFFFFFFF);
+			context.drawTextWithShadow(tr, Text.literal(subtitle).formatted(Formatting.GRAY), x + 14, y + 22, 0xFF9EACB9);
+		}
+
+		private int numberRow(DrawContext context, TextRenderer tr, String label, int value, int x, int y, int w,
+				int step, int bigStep, IntConsumer setter, int min, int max, int mouseX, int mouseY) {
+			context.fill(x, y, x + w, y + ROW_H - 3, 0x33242E38);
+			context.drawTextWithShadow(tr, Text.literal(label), x + 8, y + 6, 0xFFE8EEF5);
+			String valueText = Integer.toString(value);
+			int valueX = x + w - BUTTON_W - SMALL_BUTTON_W * 2 - 24;
+			context.drawTextWithShadow(tr, Text.literal(valueText).formatted(Formatting.AQUA),
+				valueX + BUTTON_W - tr.getWidth(valueText), y + 6, 0xFF7CE9F2);
+			drawSmallButton(context, tr, "-", x + w - SMALL_BUTTON_W * 2 - 8, y + 2, mouseX, mouseY,
+				() -> applyInt(setter, value - (hasShift() ? bigStep : step), min, max));
+			drawSmallButton(context, tr, "+", x + w - SMALL_BUTTON_W - 4, y + 2, mouseX, mouseY,
+				() -> applyInt(setter, value + (hasShift() ? bigStep : step), min, max));
+			return y + ROW_H;
+		}
+
+		private void drawSmallButton(DrawContext context, TextRenderer tr, String label, int x, int y, int mouseX,
+				int mouseY, Runnable action) {
+			drawButton(context, tr, label, x, y, SMALL_BUTTON_W, mouseX, mouseY, action);
+		}
+
+		private void drawButton(DrawContext context, TextRenderer tr, String label, int x, int y, int w, int mouseX,
+				int mouseY, Runnable action) {
+			int h = 18;
+			boolean hovered = contains(mouseX, mouseY, x, y, w, h);
+			context.fill(x, y, x + w, y + h, hovered ? 0xAA3A4A5B : 0x77303A45);
+			context.drawBorder(x, y, w, h, hovered ? 0xFFE8F2FF : 0xAA8795A5);
+			String trimmed = tr.trimToWidth(label, w - 8);
+			context.drawCenteredTextWithShadow(tr, Text.literal(trimmed), x + w / 2, y + 5, 0xFFFFFFFF);
+			actions.add(new DevAction(x, y, w, h, action));
+		}
+
+		private void applyInt(IntConsumer setter, int value, int min, int max) {
+			setter.accept(Math.max(min, Math.min(max, value)));
+			GexpressOptionsScreen.pushGexpressConfigToServer();
+		}
+
+		@Override
+		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+			if (button == 0) {
+				for (DevAction action : actions) {
+					if (!action.contains(mouseX, mouseY)) continue;
+					action.action().run();
+					return true;
+				}
+			}
+			return super.mouseClicked(mouseX, mouseY, button);
+		}
+
+		@Override
+		public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+			if (maxScroll <= 0 || mouseX < getX() || mouseX >= getX() + width || mouseY < getY() || mouseY >= getY() + height) {
+				return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+			}
+			scroll = Math.max(0, Math.min(maxScroll, scroll - (int) Math.round(verticalAmount * 24.0D)));
+			return true;
+		}
+
+		@Override
+		protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+		}
+
+		private static boolean contains(double mouseX, double mouseY, int x, int y, int w, int h) {
+			return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+		}
+
+		private static boolean hasShift() {
+			return Screen.hasShiftDown();
+		}
+
+		private record DevAction(int x, int y, int w, int h, Runnable action) {
+			private boolean contains(double mouseX, double mouseY) {
+				return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+			}
+		}
+
+		private record ToolTile(String title, String subtitle, int accent, Runnable action) {
+		}
+	}
+
+	private static void addLookedBlockToGrenadePassThrough(MinecraftClient client) {
+		if (client == null || client.world == null || !(client.crosshairTarget instanceof BlockHitResult hit)
+				|| hit.getType() != HitResult.Type.BLOCK) {
+			return;
+		}
+		String id = Registries.BLOCK.getId(client.world.getBlockState(hit.getBlockPos()).getBlock()).toString();
+		List<String> rows = new ArrayList<>(GexpressConfig.getGrenadeLineOfSightPassThroughBlockStrings());
+		if (!rows.contains(id)) rows.add(id);
+		GexpressConfig.setGrenadeLineOfSightPassThroughBlockStrings(rows);
+		GexpressOptionsScreen.pushGexpressConfigToServer();
+		if (client.player != null) {
+			client.player.sendMessage(Text.literal("Added " + id + " to grenade pass-through blocks.")
+				.formatted(Formatting.GREEN), true);
+		}
 	}
 
 	private static OptionGroup xpTuningGroup() {
@@ -84,10 +502,19 @@ public final class GexpressDevCategory {
 			GexpressConfig::setLevelXpOverrideStrings, () -> "5=750");
 	}
 
-	private static ListOption<String> levelRewardRoadmapOption() {
-		return stringListOption("level_reward_roadmap", GexpressConfig::getLevelRewardRoadmapStrings,
-			GexpressConfig::setLevelRewardRoadmapStrings,
-			() -> "5|Gold Skin|Unlocks or notes the reward for reaching level 5.|g skin grant {player} revolver gold");
+	private static OptionGroup levelRewardEditorGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.dev.level_rewards"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.level_rewards.tooltip")))
+			.collapsed(false)
+			.option(ButtonOption.createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.dev.level_reward_editor"))
+				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.level_reward_editor.tooltip")))
+				.text(Text.translatable("gui.gexpress.config.option.dev.level_reward_editor.open"))
+				.action((screen, option) -> MinecraftClient.getInstance()
+					.setScreen(new GexpressLevelRewardEditorScreen(screen)))
+				.build())
+			.build();
 	}
 
 	private static ListOption<String> grenadePassThroughBlocksOption() {
@@ -332,21 +759,6 @@ public final class GexpressDevCategory {
 			.option(floatOption("silent_shadow_alpha", 0.45F, GexpressConfig::getSilentShadowAlpha,
 				v -> GexpressConfig.silentShadowAlpha = v,
 				GexpressConfig.SILENT_SHADOW_ALPHA_MIN, GexpressConfig.SILENT_SHADOW_ALPHA_MAX))
-			.build();
-	}
-
-	private static OptionGroup endScreenLayoutGroup() {
-		return OptionGroup.createBuilder()
-			.name(Text.translatable("gui.gexpress.config.group.dev.end_screen_layout"))
-			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.dev.end_screen_layout.tooltip")))
-			.collapsed(false)
-			.option(ButtonOption.createBuilder()
-				.name(Text.translatable("gui.gexpress.config.option.dev.end_screen_layout"))
-				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.dev.end_screen_layout.tooltip")))
-				.text(Text.translatable("gui.gexpress.config.option.dev.end_screen_layout.open"))
-				.action((screen, option) -> MinecraftClient.getInstance()
-					.setScreen(new GexpressEndScreenLayoutScreen(screen)))
-				.build())
 			.build();
 	}
 

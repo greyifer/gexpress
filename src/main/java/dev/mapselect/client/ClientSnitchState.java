@@ -91,13 +91,9 @@ public final class ClientSnitchState {
 		infoAlpha = MathHelper.lerp(0.25F, infoAlpha, revealReady && !infoLines.isEmpty() ? 1.0F : 0.0F);
 	}
 
-	public static void renderMoodOverlay(DrawContext context, TextRenderer renderer) {
-		renderHudOverlay(context, renderer);
-	}
-
 	private static void renderHudOverlay(DrawContext context, TextRenderer renderer) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.options == null || client.options.hudHidden) return;
+		if (ClientHudVisibility.shouldHide(client)) return;
 		if (renderer == null) return;
 
 		if (progressAlpha > 0.02F && shouldShowProgress(client) && watheTaskVisibleTicks <= 0) {

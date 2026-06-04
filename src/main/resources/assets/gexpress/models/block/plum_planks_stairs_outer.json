@@ -1,0 +1,9 @@
+﻿{
+  "parent": "minecraft:block/outer_stairs",
+  "textures": {
+    "bottom": "gexpress:block/plum_planks",
+    "side": "gexpress:block/plum_planks",
+    "top": "gexpress:block/plum_planks"
+  }
+}
+

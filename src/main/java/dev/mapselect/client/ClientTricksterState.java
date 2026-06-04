@@ -110,7 +110,7 @@ public final class ClientTricksterState {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			if (game == null) return false;
 			Role role = game.getRole(client.player);
-			return role != null && MapSelectRoles.TRICKSTER_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.TRICKSTER_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

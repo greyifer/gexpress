@@ -5,7 +5,6 @@ import dev.mapselect.registry.MapSelectBlockEntities;
 import dev.mapselect.registry.MapSelectSounds;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockEntityProvider;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockWithEntity;
 import net.minecraft.block.BlockState;
@@ -15,7 +14,7 @@ import net.minecraft.block.entity.BlockEntityTicker;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.DirectionProperty;
 import net.minecraft.state.property.Properties;
@@ -28,13 +27,21 @@ import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 
-public class GreyiferPlushBlock extends BlockWithEntity implements BlockEntityProvider {
+import java.util.function.Supplier;
+
+public class GreyiferPlushBlock extends BlockWithEntity {
 	private static final MapCodec<GreyiferPlushBlock> CODEC = createCodec(GreyiferPlushBlock::new);
 	public static final DirectionProperty FACING = Properties.HORIZONTAL_FACING;
 	private static final VoxelShape SHAPE = BlockWithEntity.createCuboidShape(2.0, 0.0, 2.0, 14.0, 15.0, 14.0);
+	private final Supplier<SoundEvent> useSound;
 
 	public GreyiferPlushBlock(AbstractBlock.Settings settings) {
+		this(settings, () -> MapSelectSounds.GREYIFER_PLUSH_HONK);
+	}
+
+	public GreyiferPlushBlock(AbstractBlock.Settings settings, Supplier<SoundEvent> useSound) {
 		super(settings);
+		this.useSound = useSound;
 		this.setDefaultState(this.stateManager.getDefaultState().with(FACING, net.minecraft.util.math.Direction.NORTH));
 	}
 
@@ -73,9 +80,10 @@ public class GreyiferPlushBlock extends BlockWithEntity implements BlockEntityPr
 
 	@Override
 	protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-		if (!world.isClient) {
-			float pitch = 0.8F + world.getRandom().nextFloat() * 0.4F;
-			world.playSound(null, pos, MapSelectSounds.GREYIFER_PLUSH_HONK, SoundCategory.BLOCKS, 1.0F, pitch);
+		float pitch = 0.8F + world.getRandom().nextFloat() * 0.4F;
+		if (world.isClient) {
+			player.playSound(useSound.get(), 1.0F, pitch);
+		} else {
 			if (world.getBlockEntity(pos) instanceof GreyiferPlushBlockEntity plush) {
 				plush.squish(1);
 			}

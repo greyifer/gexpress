@@ -1,0 +1,9 @@
+﻿{
+  "parent": "minecraft:block/slab",
+  "textures": {
+    "bottom": "gexpress:block/plum_herringbone",
+    "side": "gexpress:block/plum_herringbone",
+    "top": "gexpress:block/plum_herringbone"
+  }
+}
+

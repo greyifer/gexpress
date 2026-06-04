@@ -14,7 +14,8 @@ import de.maxhenkel.voicechat.api.events.StaticSoundPacketEvent;
 import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
 import dev.mapselect.modifier.ModifierUtils;
 import dev.mapselect.registry.MapSelectModifiers;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.altruist.AltruistManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -62,12 +63,16 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 			event.cancel();
 			return;
 		}
+		if (AltruistManager.isRevivedMuted(senderId)) {
+			event.cancel();
+			return;
+		}
 		if (nativePlayer instanceof ServerPlayerEntity player
 				&& ModifierUtils.has(player, MapSelectModifiers.MUTED_ID)) {
 			event.cancel();
 			return;
 		}
-		Set<UUID> bellyReceivers = VultureManager.bellyVoiceReceivers(senderId);
+		Set<UUID> bellyReceivers = PelicanManager.bellyVoiceReceivers(senderId);
 		if (!bellyReceivers.isEmpty()) {
 			StaticSoundPacket packet = event.getPacket().staticSoundPacketBuilder()
 				.channelId(senderId)
@@ -77,7 +82,7 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 				VoicechatConnection connection = event.getVoicechat().getConnectionOf(receiverId);
 				if (connection != null) event.getVoicechat().sendStaticSoundPacketTo(connection, packet);
 			}
-			if (VultureManager.isStashed(senderId)) {
+			if (PelicanManager.isStashed(senderId)) {
 				event.cancel();
 			}
 		}
@@ -89,7 +94,7 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		if (sender == null || receiver == null) return;
 		UUID senderId = sender.getPlayer().getUuid();
 		UUID receiverId = receiver.getPlayer().getUuid();
-		if (VultureManager.shouldCancelVoice(senderId, receiverId)) {
+		if (PelicanManager.shouldCancelVoice(senderId, receiverId)) {
 			event.cancel();
 		}
 	}

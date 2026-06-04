@@ -11,7 +11,7 @@ import dev.mapselect.network.GuardianAngelShieldStatePayload;
 import dev.mapselect.network.GuardianAngelShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -64,7 +64,7 @@ public final class GuardianAngelManager {
 		List<ServerPlayerEntity> candidates = new ArrayList<>();
 		for (ServerPlayerEntity player : serverWorld.getPlayers()) {
 			if (!game.getRoles().containsKey(player.getUuid())
-					|| VultureManager.isStashed(player)
+					|| PelicanManager.isStashed(player)
 					|| !GameFunctions.isPlayerAliveAndSurvival(player)) {
 				continue;
 			}

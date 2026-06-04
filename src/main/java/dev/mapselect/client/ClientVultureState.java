@@ -114,8 +114,8 @@ public final class ClientVultureState {
 
 	private static void renderHud(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.player == null) return;
-		if (progressAlpha > 0.02F && client.textRenderer != null && !client.options.hudHidden
+		if (ClientHudVisibility.shouldHide(client) || client.player == null) return;
+		if (progressAlpha > 0.02F && client.textRenderer != null
 				&& ClientRoleRevealState.canShowRoleHud(client)) {
 			int alpha = Math.max(0, Math.min(255, (int) (progressAlpha * 255.0F)));
 			Text text = Text.literal("Pelican " + Math.min(eaten, required) + "/" + required);
@@ -183,7 +183,7 @@ public final class ClientVultureState {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
 			if (game == null) return false;
 			Role role = game.getRole(client.player);
-			return role != null && MapSelectRoles.VULTURE_ID.equals(role.identifier());
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.VULTURE_ID);
 		} catch (Throwable ignored) {
 			return false;
 		}

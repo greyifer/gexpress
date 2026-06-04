@@ -1,14 +1,17 @@
 package dev.mapselect.command.admin;
 
 import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.item.DevWeaponSkinStamper;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.skin.PlayerSkinComponent;
+import dev.mapselect.skin.SkinCaseManager;
 import dev.mapselect.skin.WeaponSkin;
 import dev.mapselect.skin.WeaponSkinType;
 import net.minecraft.command.CommandSource;
@@ -31,6 +34,36 @@ public final class SkinCommand {
 	private SkinCommand() {}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
+		LiteralArgumentBuilder<ServerCommandSource> caseGive = CommandManager.literal("give")
+			.requires(GexpressPermissions::canUseAdminCommands);
+		caseGive.then(CommandManager.argument("case", StringArgumentType.word())
+			.suggests(SkinCommand::suggestCases)
+			.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
+				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+					.executes(ctx -> runCaseGrant(ctx, true)))));
+
+		LiteralArgumentBuilder<ServerCommandSource> caseRemove = CommandManager.literal("remove")
+			.requires(GexpressPermissions::canUseAdminCommands);
+		caseRemove.then(CommandManager.argument("case", StringArgumentType.word())
+			.suggests(SkinCommand::suggestCases)
+			.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
+				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+					.executes(ctx -> runCaseGrant(ctx, false)))));
+
+		LiteralArgumentBuilder<ServerCommandSource> caseTree = CommandManager.literal("case")
+			.then(CommandManager.literal("open")
+				.then(CommandManager.argument("case", StringArgumentType.word())
+					.suggests(SkinCommand::suggestCases)
+					.executes(SkinCommand::runOpenCase)))
+			.then(CommandManager.literal("buy")
+				.then(CommandManager.argument("case", StringArgumentType.word())
+					.suggests(SkinCommand::suggestCases)
+					.executes(SkinCommand::runBuyCase)))
+			.then(CommandManager.literal("list")
+				.executes(SkinCommand::runCaseList))
+			.then(caseGive)
+			.then(caseRemove);
+
 		return CommandManager.literal("skins")
 			.then(CommandManager.literal("equip")
 				.then(CommandManager.argument("type", StringArgumentType.word())
@@ -55,7 +88,31 @@ public final class SkinCommand {
 					.then(CommandManager.argument("skin", StringArgumentType.word())
 						.suggests(SkinCommand::suggestGrantableSkins)
 						.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
-							.executes(ctx -> runGrant(ctx, false))))));
+							.executes(ctx -> runGrant(ctx, false))))))
+			.then(caseTree);
+	}
+
+	public static LiteralArgumentBuilder<ServerCommandSource> buildPublicTree() {
+		return CommandManager.literal("skins")
+			.then(CommandManager.literal("equip")
+				.then(CommandManager.argument("type", StringArgumentType.word())
+					.suggests(SkinCommand::suggestTypes)
+					.then(CommandManager.argument("skin", StringArgumentType.word())
+						.suggests(SkinCommand::suggestSkins)
+						.executes(SkinCommand::runEquip))))
+			.then(CommandManager.literal("list")
+				.executes(SkinCommand::runList))
+			.then(CommandManager.literal("case")
+				.then(CommandManager.literal("open")
+					.then(CommandManager.argument("case", StringArgumentType.word())
+						.suggests(SkinCommand::suggestCases)
+						.executes(SkinCommand::runOpenCase)))
+				.then(CommandManager.literal("buy")
+					.then(CommandManager.argument("case", StringArgumentType.word())
+						.suggests(SkinCommand::suggestCases)
+						.executes(SkinCommand::runBuyCase)))
+				.then(CommandManager.literal("list")
+					.executes(SkinCommand::runCaseList)));
 	}
 
 	private static CompletableFuture<Suggestions> suggestTypes(CommandContext<ServerCommandSource> ctx,
@@ -71,6 +128,13 @@ public final class SkinCommand {
 	private static CompletableFuture<Suggestions> suggestGrantableSkins(CommandContext<ServerCommandSource> ctx,
 			SuggestionsBuilder builder) {
 		return CommandSource.suggestMatching(skinsForType(ctx, false), builder);
+	}
+
+	private static CompletableFuture<Suggestions> suggestCases(CommandContext<ServerCommandSource> ctx,
+			SuggestionsBuilder builder) {
+		return CommandSource.suggestMatching(
+			GexpressConfig.getSkinCaseEntries().stream().map(GexpressConfig.SkinCaseEntry::id).toList(),
+			builder);
 	}
 
 	private static int runEquip(CommandContext<ServerCommandSource> ctx)
@@ -131,6 +195,55 @@ public final class SkinCommand {
 		String knife = component.unlocked(player.getUuid(), WeaponSkinType.KNIFE).stream().map(WeaponSkin::displayName).toList().toString();
 		String gun = component.unlocked(player.getUuid(), WeaponSkinType.GUN).stream().map(WeaponSkin::displayName).toList().toString();
 		player.sendMessage(Text.literal("Knife skins: " + knife + " | Gun skins: " + gun).formatted(Formatting.GRAY), false);
+		return 1;
+	}
+
+	private static int runOpenCase(CommandContext<ServerCommandSource> ctx)
+			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+		ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+		return SkinCaseManager.open(player, StringArgumentType.getString(ctx, "case")) ? 1 : 0;
+	}
+
+	private static int runBuyCase(CommandContext<ServerCommandSource> ctx)
+			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+		ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+		return SkinCaseManager.buy(player, StringArgumentType.getString(ctx, "case")) ? 1 : 0;
+	}
+
+	private static int runCaseGrant(CommandContext<ServerCommandSource> ctx, boolean give)
+			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+		String caseId = StringArgumentType.getString(ctx, "case");
+		int amount = IntegerArgumentType.getInteger(ctx, "amount");
+		GexpressConfig.SkinCaseEntry skinCase = GexpressConfig.getSkinCaseEntry(caseId);
+		if (skinCase == null) {
+			ctx.getSource().sendError(Text.literal("Unknown case: " + caseId));
+			return 0;
+		}
+		PlayerSkinComponent component = PlayerSkinComponent.KEY.get(ctx.getSource().getWorld());
+		Collection<GameProfile> profiles = GameProfileArgumentType.getProfileArgument(ctx, "players");
+		int changed = 0;
+		for (GameProfile profile : profiles) {
+			boolean ok = give
+				? component.giveCase(profile.getId(), skinCase.id(), amount)
+				: component.removeCase(profile.getId(), skinCase.id(), amount);
+			if (ok) changed++;
+		}
+		int finalChanged = changed;
+		ctx.getSource().sendFeedback(() -> Text.literal((give ? "Gave " : "Removed ")
+			+ amount + " " + skinCase.displayName() + " case(s) for " + finalChanged + " player(s).")
+			.formatted(Formatting.GREEN), true);
+		return changed;
+	}
+
+	private static int runCaseList(CommandContext<ServerCommandSource> ctx)
+			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+		ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+		PlayerSkinComponent component = PlayerSkinComponent.KEY.get(player.getServerWorld());
+		String cases = component.caseCounts(player.getUuid()).entrySet().stream()
+			.map(entry -> entry.getKey() + " x" + entry.getValue())
+			.toList()
+			.toString();
+		player.sendMessage(Text.literal("Cases: " + cases).formatted(Formatting.GRAY), false);
 		return 1;
 	}
 

@@ -12,7 +12,7 @@ import dev.mapselect.network.ScatterBrainUsePayload;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.registry.MapSelectRoles;
-import dev.mapselect.role.vulture.VultureManager;
+import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.weather.MapWeatherComponent;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -64,12 +64,13 @@ public final class ScatterBrainManager {
 
 	private static void tryScatter(ServerPlayerEntity scatterBrain) {
 		if (scatterBrain == null || !(scatterBrain.getWorld() instanceof ServerWorld world)) return;
-		if (VultureManager.isStashed(scatterBrain) || !isScatterBrain(scatterBrain)
+		if (PelicanManager.isStashed(scatterBrain) || !isScatterBrain(scatterBrain)
 				|| !canUseHere(world, scatterBrain) || !isPlayable(scatterBrain, scatterBrain)) {
 			return;
 		}
-		long remaining = cooldownRemaining(scatterBrain);
-		if (remaining > 0L) {
+		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(scatterBrain);
+		long remaining = creativeBypass ? 0L : cooldownRemaining(scatterBrain);
+		if (!creativeBypass && remaining > 0L) {
 			AbilityCooldownSync.send(scatterBrain, AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, remaining,
 				(long) GexpressConfig.getScatterBrainCooldownSeconds() * 20L, false);
 			scatterBrain.sendMessage(Text.literal("Scatter ready in " + secondsCeil(remaining) + "s."), true);
@@ -77,7 +78,7 @@ public final class ScatterBrainManager {
 		}
 
 		List<ServerPlayerEntity> players = world.getPlayers(player ->
-			!VultureManager.isStashed(player) && isPlayable(player, scatterBrain));
+			!PelicanManager.isStashed(player) && isPlayable(player, scatterBrain));
 		if (players.isEmpty()) {
 			scatterBrain.sendMessage(Text.literal("Scatter needs living players."), true);
 			return;
@@ -107,8 +108,12 @@ public final class ScatterBrainManager {
 		}
 
 		long cooldown = (long) GexpressConfig.getScatterBrainCooldownSeconds() * 20L;
-		cooldownUntil.put(scatterBrain.getUuid(), world.getTime() + cooldown);
-		AbilityCooldownSync.send(scatterBrain, AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, cooldown, cooldown, false);
+		if (creativeBypass) {
+			AbilityCooldownSync.clear(scatterBrain, AbilityCooldownPayload.SCATTER_BRAIN_SCATTER);
+		} else {
+			cooldownUntil.put(scatterBrain.getUuid(), world.getTime() + cooldown);
+			AbilityCooldownSync.send(scatterBrain, AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, cooldown, cooldown, false);
+		}
 		scatterBrain.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.0F, 0.7F);
 		scatterBrain.sendMessage(Text.literal("Scatter Brain."), true);
 	}
@@ -294,7 +299,8 @@ public final class ScatterBrainManager {
 	private static boolean isScatterBrain(PlayerEntity player) {
 		GameWorldComponent game = player == null ? null : GameWorldComponent.KEY.getNullable(player.getWorld());
 		Role role = game == null ? null : game.getRole(player);
-		return role != null && MapSelectRoles.SCATTER_BRAIN_ID.equals(role.identifier());
+		return role != null && (MapSelectRoles.SCATTER_BRAIN_ID.equals(role.identifier())
+			|| dev.mapselect.role.copycat.CopycatManager.isCopyingRole(player, MapSelectRoles.SCATTER_BRAIN_ID));
 	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {

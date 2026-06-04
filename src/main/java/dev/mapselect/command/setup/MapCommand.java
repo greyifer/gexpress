@@ -202,7 +202,11 @@ public class MapCommand {
 							.suggests(suggestFromPreset(p -> Integer.toString(MapPreset.normalizeRoomCount(p.roomCount))))
 							.executes(ctx -> runEditRoomCount(ctx,
 								StringArgumentType.getString(ctx, "name"),
-								IntegerArgumentType.getInteger(ctx, "count")))))))
+								IntegerArgumentType.getInteger(ctx, "count")))))
+					.then(couchSleepEditLiteral("couchsleep"))
+					.then(couchSleepEditLiteral("couchsleeping"))
+					.then(staticMapEditLiteral("static"))
+					.then(staticMapEditLiteral("staticmap"))))
 			.then(CommandManager.literal("list")
 				.requires(OP_OR_HOST)
 				.executes(MapCommand::runList))
@@ -251,6 +255,24 @@ public class MapCommand {
 		return CommandManager.argument(name, IntegerArgumentType.integer())
 			.suggests(suggestFromPreset(extractor))
 			.executes(exec);
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> couchSleepEditLiteral(String name) {
+		return CommandManager.literal(name)
+			.then(CommandManager.argument("enabled", BoolArgumentType.bool())
+				.suggests(suggestFromPreset(p -> Boolean.toString(p.isCouchSleepingEnabled())))
+				.executes(ctx -> runEditCouchSleep(ctx,
+					StringArgumentType.getString(ctx, "name"),
+					BoolArgumentType.getBool(ctx, "enabled"))));
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> staticMapEditLiteral(String name) {
+		return CommandManager.literal(name)
+			.then(CommandManager.argument("enabled", BoolArgumentType.bool())
+				.suggests(suggestFromPreset(p -> Boolean.toString(p.isStaticMapEnabled())))
+				.executes(ctx -> runEditStaticMap(ctx,
+					StringArgumentType.getString(ctx, "name"),
+					BoolArgumentType.getBool(ctx, "enabled"))));
 	}
 
 	private static RequiredArgumentBuilder<ServerCommandSource, Double> doubleArg(
@@ -556,6 +578,7 @@ public class MapCommand {
 			preset.resetTemplateArea = ta;
 		}
 		preset.roomCount = MapPreset.normalizeRoomCount(neighbor.roomCount);
+		preset.couchSleepingEnabled = neighbor.isCouchSleepingEnabled();
 		preset.weather = neighbor.weather == null ? WeatherType.NONE : neighbor.weather;
 		preset.fogColor = neighbor.fogColor;
 		return preset;
@@ -683,6 +706,8 @@ public class MapCommand {
 			sendFogLine(src, "Fog Color", preset.fogColor);
 			sendDefaultTrainLine(src, "Default Train", preset.defaultTrainPreset);
 			sendRoomCountLine(src, "Room Key Count", preset.roomCount);
+			sendBooleanLine(src, "Couch Sleeping", preset.isCouchSleepingEnabled());
+			sendBooleanLine(src, "Static Map Reset", preset.isStaticMapEnabled());
 			sendOffsetLine(src, "Ready Train Corner", preset.lobbyTrainCorner);
 			sendRandomSpawnsLine(src, "Random Spawn Positions", preset.randomSpawnPositions);
 			return 1;
@@ -766,6 +791,11 @@ public class MapCommand {
 	private static void sendRoomCountLine(ServerCommandSource src, String label, int roomCount) {
 		int count = MapPreset.normalizeRoomCount(roomCount);
 		Text value = Text.literal(Integer.toString(count)).formatted(Formatting.WHITE);
+		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+	}
+
+	private static void sendBooleanLine(ServerCommandSource src, String label, boolean enabled) {
+		Text value = Text.literal(enabled ? "enabled" : "disabled").formatted(enabled ? Formatting.GREEN : Formatting.RED);
 		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
@@ -1006,6 +1036,39 @@ public class MapCommand {
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit room key count: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runEditCouchSleep(CommandContext<ServerCommandSource> ctx, String name, boolean enabled) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			MapPreset preset = loadOrError(src, name);
+			if (preset == null) return 0;
+			preset.couchSleepingEnabled = enabled;
+			saveAndBroadcast(src, name, preset);
+			String state = enabled ? "enabled" : "disabled";
+			src.sendFeedback(() -> Text.literal("Couch sleeping for '" + name + "' is now " + state + ".").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to edit couch sleeping: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runEditStaticMap(CommandContext<ServerCommandSource> ctx, String name, boolean enabled) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			MapPreset preset = loadOrError(src, name);
+			if (preset == null) return 0;
+			preset.staticMapEnabled = enabled;
+			saveAndBroadcast(src, name, preset);
+			String state = enabled ? "enabled" : "disabled";
+			src.sendFeedback(() -> Text.literal("Static map reset for '" + name + "' is now " + state + ".")
+				.formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to edit static map reset: " + e.getMessage()));
 			return 0;
 		}
 	}

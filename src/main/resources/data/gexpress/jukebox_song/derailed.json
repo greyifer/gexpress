@@ -1,0 +1,8 @@
+{
+	"comparator_output": 12,
+	"description": {
+		"translate": "jukebox_song.gexpress.derailed"
+	},
+	"length_in_seconds": 122.115,
+	"sound_event": "gexpress:music_disc.derailed"
+}

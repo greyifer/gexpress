@@ -8,6 +8,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.command.admin.TagCommand;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.currency.GcoinComponent;
 import dev.mapselect.network.ClaimLevelRewardPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -21,6 +22,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Vec2f;
 import net.minecraft.world.World;
 
 import java.util.HashMap;
@@ -31,6 +33,7 @@ import java.util.UUID;
 
 public final class LevelManager {
 	private static final int KILL_XP_DEDUP_TICKS = 20;
+	private static final int WIN_GCOIN_REWARD = 10;
 	private static final Map<UUID, RecentKillAward> recentKillXpAwards = new HashMap<>();
 
 	private LevelManager() {}
@@ -78,23 +81,36 @@ public final class LevelManager {
 	}
 
 	private static boolean runRewardCommand(ServerPlayerEntity player, GexpressConfig.LevelRoadmapEntry reward, int level) {
-		String command = reward.command();
-		if (command == null || command.isBlank()) return true;
-		String parsed = command.strip();
-		while (parsed.startsWith("/")) parsed = parsed.substring(1).stripLeading();
-		parsed = parsed
-			.replace("{player}", player.getGameProfile().getName())
-			.replace("{uuid}", player.getUuidAsString())
-			.replace("{level}", Integer.toString(level));
-		if (parsed.isBlank()) return true;
-		try {
-			ServerCommandSource source = player.getCommandSource().withLevel(4).withSilent();
-			player.getServer().getCommandManager().executeWithPrefix(source, parsed);
-			return true;
-		} catch (Throwable t) {
-			player.sendMessage(Text.literal("Reward command failed.").formatted(Formatting.RED), true);
-			return false;
+		for (String command : reward.commands()) {
+			if (command == null || command.isBlank()) continue;
+			String parsed = command.strip();
+			while (parsed.startsWith("/")) parsed = parsed.substring(1).stripLeading();
+			parsed = parsed
+				.replace("{player}", player.getGameProfile().getName())
+				.replace("%player%", player.getGameProfile().getName())
+				.replace("<player>", player.getGameProfile().getName())
+				.replace("{uuid}", player.getUuidAsString())
+				.replace("%uuid%", player.getUuidAsString())
+				.replace("{level}", Integer.toString(level))
+				.replace("%level%", Integer.toString(level));
+			if (parsed.isBlank()) continue;
+			try {
+				ServerCommandSource source = player.getServer().getCommandSource()
+					.withWorld(player.getServerWorld())
+					.withPosition(player.getPos())
+					.withRotation(new Vec2f(player.getPitch(), player.getYaw()))
+					.withEntity(player)
+					.withLevel(4)
+					.withSilent();
+				player.getServer().getCommandManager().executeWithPrefix(source, parsed);
+			} catch (Throwable t) {
+				dev.mapselect.MapSelect.LOGGER.warn("Level {} reward command failed for {}: {}",
+					level, player.getGameProfile().getName(), parsed, t);
+				player.sendMessage(Text.literal("Reward command failed.").formatted(Formatting.RED), true);
+				return false;
+			}
 		}
+		return true;
 	}
 
 	public static void grantCivilianTaskXp(ServerPlayerEntity player) {
@@ -112,6 +128,7 @@ public final class LevelManager {
 		GameRoundEndComponent roundEnd = GameRoundEndComponent.KEY.getNullable(world);
 		if (roundEnd == null || roundEnd.getWinStatus() == GameFunctions.WinStatus.NONE) return;
 		LevelComponent levels = LevelComponent.KEY.get(world);
+		GcoinComponent gcoins = GcoinComponent.KEY.get(world);
 		Set<UUID> awarded = new LinkedHashSet<>();
 		for (GameRoundEndComponent.RoundEndData entry : roundEnd.getPlayers()) {
 			if (entry == null || entry.player() == null || !awarded.add(entry.player().getId())) continue;
@@ -122,6 +139,9 @@ public final class LevelManager {
 				amount += GexpressConfig.getLevelNeutralWinBonusXp();
 			}
 			levels.addXp(entry.player().getId(), amount);
+			if (won) {
+				gcoins.add(entry.player().getId(), WIN_GCOIN_REWARD);
+			}
 		}
 		if (!awarded.isEmpty()) {
 			LevelComponent.KEY.sync(world);

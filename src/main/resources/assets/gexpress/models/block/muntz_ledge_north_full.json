@@ -1,0 +1,41 @@
+﻿{
+    "parent":  "block/block",
+    "textures":  {
+                     "particle":  "gexpress:block/muntz_ledge",
+                     "ledge":  "gexpress:block/muntz_ledge"
+                 },
+    "elements":  [
+                     {
+                         "from":  [
+                                      0,
+                                      0,
+                                      0
+                                  ],
+                         "to":  [
+                                    16,
+                                    2,
+                                    2
+                                ],
+                         "faces":  {
+                                       "down":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "up":  {
+                                                  "texture":  "#ledge"
+                                              },
+                                       "north":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "south":  {
+                                                     "texture":  "#ledge"
+                                                 },
+                                       "west":  {
+                                                    "texture":  "#ledge"
+                                                },
+                                       "east":  {
+                                                    "texture":  "#ledge"
+                                                }
+                                   }
+                     }
+                 ]
+}

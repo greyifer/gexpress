@@ -4,6 +4,7 @@ import dev.mapselect.host.HostComponent;
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.host.TrustedComponent;
+import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.level.LevelComponent;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
@@ -164,9 +165,15 @@ public final class GexpressPermissions {
 			if (!out.getString().isEmpty()) out.append(Text.literal(" "));
 			out.append(tagBadge(tag));
 		}
+		GexpressConfig.LevelTagEntry levelTag = GexpressConfig.getLevelTagForLevel(LevelComponent.level(player));
+		if (levelTag != null) {
+			if (!out.getString().isEmpty()) out.append(Text.literal(" "));
+			out.append(Text.literal(levelTag.displayName())
+				.setStyle(Style.EMPTY.withColor(TextColor.fromRgb(levelTag.color()))));
+		}
 		if (!out.getString().isEmpty()) out.append(Text.literal(" "));
 		out.append(Text.literal(player.getGameProfile().getName()));
-		out.append(Text.literal(" [Lv " + LevelComponent.level(player) + "]").formatted(Formatting.GRAY));
+		out.append(Text.literal(" [LvL " + LevelComponent.level(player) + "]").formatted(Formatting.GRAY));
 		return out;
 	}
 

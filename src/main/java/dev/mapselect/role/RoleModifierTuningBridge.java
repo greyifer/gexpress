@@ -1,23 +1,28 @@
 package dev.mapselect.role;
 
+import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.WatheRoles;
 import dev.mapselect.MapSelect;
+import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
+import dev.mapselect.registry.MapSelectRoles;
 import net.minecraft.util.Identifier;
 import org.agmas.harpymodloader.Harpymodloader;
+import org.agmas.harpymodloader.modifiers.HMLModifiers;
+import org.agmas.harpymodloader.modifiers.Modifier;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class RoleModifierTuningBridge {
-	private static final Random RANDOM = new Random();
 	private static final Set<Identifier> rememberedRoleMax = new HashSet<>();
-	private static final Set<Identifier> rememberedModifierMax = new HashSet<>();
 	private static final Set<Identifier> originalRoleMaxPresent = new HashSet<>();
-	private static final Set<Identifier> originalModifierMaxPresent = new HashSet<>();
 	private static final Map<Identifier, Integer> originalRoleMax = new HashMap<>();
+	private static final Set<Identifier> rememberedModifierMax = new HashSet<>();
+	private static final Set<Identifier> originalModifierMaxPresent = new HashSet<>();
 	private static final Map<Identifier, Integer> originalModifierMax = new HashMap<>();
 
 	private RoleModifierTuningBridge() {}
@@ -25,6 +30,7 @@ public final class RoleModifierTuningBridge {
 	public static void applyConfiguredMaxima() {
 		try {
 			restoreManagedMaxima();
+			applyDefaultMaxima();
 			applyExplicitMaxima();
 		} catch (Throwable t) {
 			MapSelect.LOGGER.debug("Failed to apply role/modifier tuning maxima: {}", t.toString());
@@ -32,58 +38,106 @@ public final class RoleModifierTuningBridge {
 	}
 
 	public static void prepareForGame() {
+		prepareForGame(-1);
+	}
+
+	public static void prepareForGame(int playerCount) {
 		try {
 			RoleModifierTuningConfig.load();
 			restoreManagedMaxima();
+			applyDefaultMaxima();
 			applyExplicitMaxima();
-			rollChances();
+			applyRoleChanceGates();
+			applySpecialRoleGates(playerCount);
 		} catch (Throwable t) {
-			MapSelect.LOGGER.warn("Failed to prepare role/modifier chance tuning.", t);
+			MapSelect.LOGGER.warn("Failed to prepare role count tuning.", t);
+		}
+	}
+
+	private static void applyDefaultMaxima() {
+		for (Role role : WatheRoles.ROLES) {
+			if (!isModdedAssignableRole(role)) continue;
+			putRoleMax(role.identifier(), isStupidExpressPairRole(role.identifier())
+				? fixedPairRoleMax(RoleModifierTuningConfig.DEFAULT_MAX)
+				: RoleModifierTuningConfig.DEFAULT_MAX);
+		}
+		for (Modifier modifier : HMLModifiers.MODIFIERS) {
+			if (modifier == null || modifier.identifier() == null) continue;
+			putModifierMax(modifier.identifier(), isStupidExpressPairModifier(modifier.identifier())
+				? fixedPairModifierRolls(RoleModifierTuningConfig.DEFAULT_MAX)
+				: RoleModifierTuningConfig.DEFAULT_MAX);
 		}
 	}
 
 	private static void applyExplicitMaxima() {
 		for (Map.Entry<String, Integer> entry : RoleModifierTuningConfig.roleMaxEntries().entrySet()) {
 			Identifier id = parse(entry.getKey());
-			if (id != null) putRoleMax(id, entry.getValue());
+			if (id != null) putRoleMax(id, isStupidExpressPairRole(id)
+				? fixedPairRoleMax(entry.getValue())
+				: entry.getValue());
 		}
 		for (Map.Entry<String, Integer> entry : RoleModifierTuningConfig.modifierMaxEntries().entrySet()) {
 			Identifier id = parse(entry.getKey());
-			if (id != null) putModifierMax(id, isFixedPairLovers(id) ? Math.min(2, entry.getValue()) : entry.getValue());
+			if (id != null) putModifierMax(id, isStupidExpressPairModifier(id)
+				? fixedPairModifierRolls(entry.getValue())
+				: entry.getValue());
 		}
 	}
 
-	private static void rollChances() {
+	private static void applyRoleChanceGates() {
 		for (Map.Entry<String, Integer> entry : RoleModifierTuningConfig.roleChanceEntries().entrySet()) {
 			Identifier id = parse(entry.getKey());
-			if (id != null && !passes(entry.getValue())) {
-				putRoleMax(id, 0);
-			}
+			if (id != null && !passes(entry.getValue())) putRoleMax(id, 0);
 		}
 		for (Map.Entry<String, Integer> entry : RoleModifierTuningConfig.modifierChanceEntries().entrySet()) {
 			Identifier id = parse(entry.getKey());
-			if (id != null && !passes(entry.getValue())) {
-				putModifierMax(id, 0);
-			}
+			if (id != null && !passes(entry.getValue())) putModifierMax(id, 0);
 		}
 	}
 
-	private static boolean passes(int chance) {
-		int clamped = Math.max(RoleModifierTuningConfig.CHANCE_MIN,
-			Math.min(RoleModifierTuningConfig.CHANCE_MAX, chance));
-		return clamped >= RoleModifierTuningConfig.CHANCE_MAX || RANDOM.nextInt(100) < clamped;
-	}
-
 	private static void putRoleMax(Identifier id, int max) {
+		if (id == null) return;
 		rememberRoleMax(id);
 		Harpymodloader.ROLE_MAX.put(id, Math.max(RoleModifierTuningConfig.MAX_MIN,
 			Math.min(RoleModifierTuningConfig.MAX_MAX, max)));
 	}
 
 	private static void putModifierMax(Identifier id, int max) {
+		if (id == null) return;
 		rememberModifierMax(id);
 		Harpymodloader.MODIFIER_MAX.put(id, Math.max(RoleModifierTuningConfig.MAX_MIN,
 			Math.min(RoleModifierTuningConfig.MAX_MAX, max)));
+	}
+
+	private static void applySpecialRoleGates(int playerCount) {
+		boolean belowMinimum = playerCount >= 0 && playerCount < GexpressConfig.getMafiaMinimumPlayers();
+		GexpressConfig.SpecialRoleOccurrence occurrence = GexpressConfig.getSpecialRoleOccurrence();
+
+		if (belowMinimum || !occurrence.mafiaEnabled()) {
+			disableRoles(MapSelectRoles.GODFATHER_ID, MapSelectRoles.MAFIOSO_ID, MapSelectRoles.JANITOR_ID,
+				MapSelectRoles.PICKPOCKET_ID, MapSelectRoles.BURGLAR_ID);
+		} else {
+			disableRoles(MapSelectRoles.MAFIOSO_ID, MapSelectRoles.JANITOR_ID, MapSelectRoles.PICKPOCKET_ID,
+				MapSelectRoles.BURGLAR_ID);
+		}
+
+		if (belowMinimum || !occurrence.covenantEnabled()) {
+			disableRoles(MapSelectRoles.DRACULA_ID, MapSelectRoles.VAMPIRE_ID);
+		} else {
+			disableRoles(MapSelectRoles.VAMPIRE_ID);
+		}
+	}
+
+	private static boolean isModdedAssignableRole(Role role) {
+		return role != null
+			&& role.identifier() != null
+			&& !Harpymodloader.VANNILA_ROLES.contains(role)
+			&& !Harpymodloader.NON_MURDER_ROLES.contains(role)
+			&& !"vulture".equals(role.identifier().getPath());
+	}
+
+	private static void disableRoles(Identifier... ids) {
+		for (Identifier id : ids) putRoleMax(id, 0);
 	}
 
 	private static void restoreManagedMaxima() {
@@ -124,9 +178,33 @@ public final class RoleModifierTuningBridge {
 		return Identifier.tryParse(raw);
 	}
 
-	private static boolean isFixedPairLovers(Identifier id) {
+	private static boolean passes(int chance) {
+		int clamped = Math.max(RoleModifierTuningConfig.CHANCE_MIN,
+			Math.min(RoleModifierTuningConfig.CHANCE_MAX, chance));
+		return clamped >= RoleModifierTuningConfig.CHANCE_MAX
+			|| (clamped > 0 && ThreadLocalRandom.current().nextInt(100) < clamped);
+	}
+
+	public static boolean isStupidExpressPairRole(Identifier id) {
 		if (id == null) return false;
-		return id.getNamespace().toLowerCase(java.util.Locale.ROOT).contains("stupid")
-			&& id.getPath().toLowerCase(java.util.Locale.ROOT).contains("lover");
+		return hasStupidExpressNamespace(id) && id.getPath().toLowerCase(java.util.Locale.ROOT).contains("initiate");
+	}
+
+	public static boolean isStupidExpressPairModifier(Identifier id) {
+		if (id == null) return false;
+		String path = id.getPath().toLowerCase(java.util.Locale.ROOT);
+		return hasStupidExpressNamespace(id) && (path.contains("lover") || path.contains("initiate"));
+	}
+
+	private static boolean hasStupidExpressNamespace(Identifier id) {
+		return id != null && id.getNamespace().toLowerCase(java.util.Locale.ROOT).contains("stupid");
+	}
+
+	private static int fixedPairRoleMax(int configured) {
+		return configured <= 0 ? 0 : 2;
+	}
+
+	private static int fixedPairModifierRolls(int configured) {
+		return configured <= 0 ? 0 : 1;
 	}
 }

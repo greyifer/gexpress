@@ -27,7 +27,8 @@ public final class ClientTimeMasterRewindState {
 
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client == null || client.world == null || activeUntilTick <= client.world.getTime()) return;
+		if (ClientHudVisibility.shouldHide(client) || client.world == null
+				|| activeUntilTick <= client.world.getTime()) return;
 		long remaining = activeUntilTick - client.world.getTime();
 		float phase = Math.min(1.0F, Math.max(0.0F, remaining / (float) Math.max(1, activeDurationTicks)));
 		int alpha = 42 + Math.round(54.0F * phase);

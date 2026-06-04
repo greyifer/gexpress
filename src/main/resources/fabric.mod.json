@@ -33,6 +33,7 @@
 			"gexpress:player_tags",
 			"gexpress:player_skins",
 			"gexpress:levels",
+			"gexpress:gcoins",
 			"gexpress:c4_back",
 			"gexpress:spy_bug",
 			"gexpress:medic_shield",
@@ -50,6 +51,7 @@
 		"wathe": ">=1.3.2-1.21.1",
 		"watheextended": ">=3.4.132",
 		"harpymodloader": ">=1.2.4-h1.3",
+		"geckolib": ">=4.7.3",
 		"yet_another_config_lib_v3": ">=3.8.0+1.21.1-fabric",
 		"cardinal-components-base": "*",
 		"cardinal-components-world": "*"

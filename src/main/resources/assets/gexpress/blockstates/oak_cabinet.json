@@ -1,0 +1,8 @@
+﻿{
+  "variants": {
+    "facing=north": { "model": "gexpress:block/oak_cabinet" },
+    "facing=east": { "model": "gexpress:block/oak_cabinet", "y": 90 },
+    "facing=south": { "model": "gexpress:block/oak_cabinet", "y": 180 },
+    "facing=west": { "model": "gexpress:block/oak_cabinet", "y": 270 }
+  }
+}

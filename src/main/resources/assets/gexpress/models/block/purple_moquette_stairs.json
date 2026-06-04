@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/stairs",
+  "textures": {
+    "bottom": "watheextended:block/purple_moquette",
+    "side": "watheextended:block/purple_moquette",
+    "top": "watheextended:block/purple_moquette"
+  }
+}

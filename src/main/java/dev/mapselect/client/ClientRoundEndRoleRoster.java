@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class ClientRoundEndRoleRoster {
 	private static final Map<UUID, String> ROLE_IDS = new ConcurrentHashMap<>();
+	private static final Map<UUID, Integer> LEVELS = new ConcurrentHashMap<>();
 
 	private ClientRoundEndRoleRoster() {}
 
@@ -21,6 +22,8 @@ public final class ClientRoundEndRoleRoster {
 			context.client().execute(() -> {
 				ROLE_IDS.clear();
 				ROLE_IDS.putAll(payload.roleIds());
+				LEVELS.clear();
+				LEVELS.putAll(payload.levels());
 			}));
 	}
 
@@ -43,6 +46,14 @@ public final class ClientRoundEndRoleRoster {
 			}
 		}
 		return fallback;
+	}
+
+	public static int level(UUID playerId) {
+		return Math.max(1, playerId == null ? 1 : LEVELS.getOrDefault(playerId, 1));
+	}
+
+	public static Map<UUID, String> roleIds() {
+		return Map.copyOf(ROLE_IDS);
 	}
 
 	private static String titleCase(String raw) {
