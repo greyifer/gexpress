@@ -3,8 +3,8 @@ package dev.mapselect.client.preset;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.mapselect.MapSelect;
-import dev.mapselect.network.GexpressTrainPresetsSavePayload;
-import dev.mapselect.network.GexpressTrainPresetsSyncPayload;
+import dev.mapselect.network.preset.GexpressTrainPresetsSavePayload;
+import dev.mapselect.network.preset.GexpressTrainPresetsSyncPayload;
 import dev.mapselect.preset.train.TrainPreset;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 

@@ -13,13 +13,14 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import dev.mapselect.command.setup.TrainCommand;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.level.LevelComponent;
-import dev.mapselect.network.GexpressConfigSyncHandler;
-import dev.mapselect.network.GexpressPresetsSyncHandler;
+import dev.mapselect.network.config.GexpressConfigSyncHandler;
+import dev.mapselect.network.preset.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
+import dev.mapselect.role.painter.PainterManager;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.command.argument.GameProfileArgumentType;
 import net.minecraft.server.command.CommandManager;
@@ -57,9 +58,8 @@ public final class DevCommand {
 		SuggestionProvider<ServerCommandSource> trainNames = TrainCommand::suggestTrainNames;
 
 		return root
-			.requires(DEV)
 			.then(levelCommandTree())
-			.then(CommandManager.literal("c4back")
+			.then(adminDevLiteral("c4back")
 				.then(CommandManager.literal("offset")
 					.then(floatSetting("x", GexpressConfig.C4_BACK_OFFSET_MIN, GexpressConfig.C4_BACK_OFFSET_MAX,
 						v -> GexpressConfig.c4BackOffsetX = v, GexpressConfig::getC4BackOffsetX))
@@ -78,7 +78,7 @@ public final class DevCommand {
 					v -> GexpressConfig.c4BackSlant = v, GexpressConfig::getC4BackSlant))
 				.then(floatSetting("scale", GexpressConfig.C4_BACK_SCALE_MIN, GexpressConfig.C4_BACK_SCALE_MAX,
 					v -> GexpressConfig.c4BackScale = v, GexpressConfig::getC4BackScale)))
-			.then(CommandManager.literal("c4preset")
+			.then(adminDevLiteral("c4preset")
 				.then(CommandManager.literal("add")
 					.executes(ctx -> runC4PresetAdd(ctx, GexpressConfig.getCurrentC4PlacementPresetString()))
 					.then(CommandManager.argument("values", StringArgumentType.greedyString())
@@ -88,7 +88,7 @@ public final class DevCommand {
 					.then(CommandManager.argument("index", IntegerArgumentType.integer(1))
 						.executes(ctx -> runC4PresetRemove(ctx, IntegerArgumentType.getInteger(ctx, "index")))))
 				.then(CommandManager.literal("clear").executes(DevCommand::runC4PresetClear)))
-			.then(CommandManager.literal("roledesc")
+			.then(adminDevLiteral("roledesc")
 				.then(CommandManager.argument("role", StringArgumentType.word())
 					.suggests(rolePaths)
 					.then(CommandManager.literal("set")
@@ -98,7 +98,7 @@ public final class DevCommand {
 								StringArgumentType.getString(ctx, "description")))))
 					.then(CommandManager.literal("clear")
 						.executes(ctx -> runRoleDescSet(ctx, StringArgumentType.getString(ctx, "role"), "")))))
-			.then(CommandManager.literal("shortsighted")
+			.then(adminDevLiteral("shortsighted")
 				.then(CommandManager.literal("range")
 					.then(CommandManager.argument("value", FloatArgumentType.floatArg(
 							GexpressConfig.SHORT_SIGHTED_ENTITY_RANGE_MIN,
@@ -107,7 +107,7 @@ public final class DevCommand {
 							FloatArgumentType.getFloat(ctx, "value"),
 							v -> GexpressConfig.shortSightedFogRange = v,
 							GexpressConfig::getShortSightedEntityRange)))))
-			.then(CommandManager.literal("medicshield")
+			.then(adminDevLiteral("medicshield")
 				.then(intSetting("blockFlashTicks", GexpressConfig.MEDIC_SHIELD_FLASH_TICKS_MIN,
 					GexpressConfig.MEDIC_SHIELD_FLASH_TICKS_MAX,
 					v -> GexpressConfig.medicShieldBlockFlashTicks = v,
@@ -124,7 +124,7 @@ public final class DevCommand {
 					GexpressConfig.MEDIC_SHIELD_FLASH_ALPHA_MAX,
 					v -> GexpressConfig.medicShieldBreakFlashAlpha = v,
 					GexpressConfig::getMedicShieldBreakFlashAlpha)))
-			.then(CommandManager.literal("silentshadow")
+			.then(adminDevLiteral("silentshadow")
 				.then(CommandManager.literal("alpha")
 					.then(CommandManager.argument("value", FloatArgumentType.floatArg(
 							GexpressConfig.SILENT_SHADOW_ALPHA_MIN,
@@ -133,7 +133,16 @@ public final class DevCommand {
 							FloatArgumentType.getFloat(ctx, "value"),
 							v -> GexpressConfig.silentShadowAlpha = v,
 							GexpressConfig::getSilentShadowAlpha)))))
-			.then(CommandManager.literal("traincart")
+			.then(adminDevLiteral("painterdoor")
+				.then(CommandManager.literal("toggle")
+					.executes(ctx -> runPainterDoorToggle(ctx, null)))
+				.then(CommandManager.literal("disable")
+					.executes(ctx -> runPainterDoorToggle(ctx, true)))
+				.then(CommandManager.literal("enable")
+					.executes(ctx -> runPainterDoorToggle(ctx, false)))
+				.then(CommandManager.literal("clear")
+					.executes(DevCommand::runPainterDoorClear)))
+			.then(adminDevLiteral("traincart")
 				.then(CommandManager.argument("preset", StringArgumentType.word())
 					.suggests(trainNames)
 					.then(CommandManager.literal("list")
@@ -155,23 +164,28 @@ public final class DevCommand {
 
 	private static LiteralArgumentBuilder<ServerCommandSource> levelCommandTree() {
 		return CommandManager.literal("level")
+			.requires(DevCommand::canUseLevelBranch)
 			.then(CommandManager.literal("xp")
+				.requires(source -> canUseLevelCommand(source, "xp"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.then(CommandManager.argument("amount", IntegerArgumentType.integer(0))
 						.executes(ctx -> runLevelXp(ctx,
 							GameProfileArgumentType.getProfileArgument(ctx, "players"),
 							IntegerArgumentType.getInteger(ctx, "amount"))))))
 			.then(CommandManager.literal("level")
+				.requires(source -> canUseLevelCommand(source, "level"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.then(CommandManager.argument("level", IntegerArgumentType.integer(1))
 						.executes(ctx -> runLevelSet(ctx,
 							GameProfileArgumentType.getProfileArgument(ctx, "players"),
 							IntegerArgumentType.getInteger(ctx, "level"))))))
 			.then(CommandManager.literal("reset")
+				.requires(source -> canUseLevelCommand(source, "reset"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.executes(ctx -> runLevelReset(ctx,
 						GameProfileArgumentType.getProfileArgument(ctx, "players")))))
 			.then(CommandManager.literal("rewards")
+				.requires(source -> canUseLevelCommand(source, "rewards"))
 				.then(CommandManager.literal("reset")
 					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 						.executes(ctx -> runLevelRewardResetAll(ctx,
@@ -180,6 +194,57 @@ public final class DevCommand {
 							.executes(ctx -> runLevelRewardResetLevel(ctx,
 								GameProfileArgumentType.getProfileArgument(ctx, "players"),
 								IntegerArgumentType.getInteger(ctx, "level")))))));
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> adminDevLiteral(String name) {
+		return CommandManager.literal(name)
+			.requires(source -> DEV.test(source)
+				|| GexpressPermissions.canUseCommandBranch(source, "admin", name)
+				|| GexpressPermissions.canUseCommandBranch(source, "admin", "dev", name));
+	}
+
+	private static boolean canUseLevelBranch(ServerCommandSource source) {
+		return GexpressPermissions.canManageProgression(source)
+			|| GexpressPermissions.canUseCommandBranch(source, "admin", "level")
+			|| GexpressPermissions.canUseCommandBranch(source, "admin", "dev", "level");
+	}
+
+	private static boolean canUseLevelCommand(ServerCommandSource source, String subcommand) {
+		return GexpressPermissions.canManageProgression(source)
+			|| GexpressPermissions.canUseCommandPath(source, "admin", "level", subcommand)
+			|| GexpressPermissions.canUseCommandPath(source, "admin", "dev", "level", subcommand);
+	}
+
+	private static int runPainterDoorToggle(CommandContext<ServerCommandSource> ctx, Boolean disabled)
+			throws CommandSyntaxException {
+		ServerCommandSource source = ctx.getSource();
+		ServerPlayerEntity player = source.getPlayerOrThrow();
+		PainterManager.DoorwayToggleResult result = PainterManager.setLookedDoorwayDisabled(player, disabled);
+		return sendPainterDoorToggleFeedback(source, result);
+	}
+
+	private static int sendPainterDoorToggleFeedback(ServerCommandSource source,
+			PainterManager.DoorwayToggleResult result) {
+		if (!result.found()) {
+			source.sendError(Text.literal("Choose a door to toggle Painter doorway destination access."));
+			return 0;
+		}
+		source.sendFeedback(() -> Text.literal((result.disabled() ? "Disabled" : "Enabled")
+				+ " Painter doorway destination at " + formatBlockPos(result.lowerPos()) + ".")
+			.formatted(result.disabled() ? Formatting.YELLOW : Formatting.GREEN), true);
+		return 1;
+	}
+
+	private static int runPainterDoorClear(CommandContext<ServerCommandSource> ctx) {
+		int count = PainterManager.clearDisabledDoorways(ctx.getSource().getWorld());
+		ctx.getSource().sendFeedback(() -> Text.literal("Cleared " + count + " disabled Painter doorway"
+				+ (count == 1 ? "." : "s."))
+			.formatted(Formatting.GREEN), true);
+		return count;
+	}
+
+	private static String formatBlockPos(BlockPos pos) {
+		return pos == null ? "unknown" : pos.getX() + " " + pos.getY() + " " + pos.getZ();
 	}
 
 	private static int runLevelXp(CommandContext<ServerCommandSource> ctx, Collection<GameProfile> profiles,

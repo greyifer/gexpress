@@ -47,6 +47,12 @@
 		],
 		"subtitle": "subtitles.gexpress.mafia"
 	},
+	"cupid": {
+		"sounds": [
+			"gexpress:cupid"
+		],
+		"subtitle": "subtitles.gexpress.cupid"
+	},
 	"music_disc.derailed": {
 		"sounds": [
 			{

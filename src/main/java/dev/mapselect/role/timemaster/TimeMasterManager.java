@@ -18,10 +18,11 @@ import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.level.LevelComponent;
-import dev.mapselect.network.TimeMasterFreezeStatePayload;
-import dev.mapselect.network.TimeMasterFreezeUsePayload;
-import dev.mapselect.network.TimeMasterRewindPayload;
-import dev.mapselect.network.TimeMasterUsePayload;
+import dev.mapselect.modifier.LoversManager;
+import dev.mapselect.network.role.timemaster.TimeMasterFreezeStatePayload;
+import dev.mapselect.network.role.timemaster.TimeMasterFreezeUsePayload;
+import dev.mapselect.network.role.timemaster.TimeMasterRewindPayload;
+import dev.mapselect.network.role.timemaster.TimeMasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.bombspecialist.C4Detonation;
@@ -149,15 +150,15 @@ public final class TimeMasterManager {
 		}
 
 		TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(world);
-		boolean hasTimelineUser = false;
+		boolean hasTimelineOwner = false;
 		if (comp != null) {
 			for (ServerPlayerEntity player : world.getPlayers()) {
 				if (!isTimeMaster(player)) continue;
 				comp.ensurePlayer(player.getUuid());
-				if (isPlayable(player, player)) hasTimelineUser = true;
+				hasTimelineOwner = true;
 			}
 		}
-		if (!hasTimelineUser) {
+		if (!hasTimelineOwner) {
 			clearTimeline(worldKey);
 			return;
 		}
@@ -881,6 +882,7 @@ public final class TimeMasterManager {
 			C4Detonation.TimeState c4Detonation,
 			BodyguardManager.TimeState bodyguard,
 			CovenantManager.TimeState covenant,
+			LoversManager.TimeState lovers,
 			NbtCompound gameWorld, NbtCompound gameTime, NbtCompound timeMaster,
 			NbtCompound c4Back, NbtCompound spyBug, NbtCompound medicShield,
 			NbtCompound silentShadow, NbtCompound warlock, NbtCompound voiceMute,
@@ -924,6 +926,7 @@ public final class TimeMasterManager {
 				C4Detonation.snapshotForTimeRewind(),
 				BodyguardManager.snapshotForTimeRewind(),
 				CovenantManager.snapshotForTimeRewind(),
+				LoversManager.snapshotForTimeRewind(),
 				writeComponent(GameWorldComponent.KEY.getNullable(world), lookup),
 				writeComponent(GameTimeComponent.KEY.getNullable(world), lookup),
 				writeComponent(TimeMasterComponent.KEY.getNullable(world), lookup),
@@ -1021,6 +1024,7 @@ public final class TimeMasterManager {
 			GuardianAngelManager.restoreForTimeRewind(world, guardianAngel);
 			BodyguardManager.restoreForTimeRewind(world, bodyguard);
 			CovenantManager.restoreForTimeRewind(world, covenant);
+			LoversManager.restoreForTimeRewind(world, lovers);
 
 			GameWorldComponent.KEY.sync(world);
 			GameTimeComponent.KEY.sync(world);
@@ -1065,27 +1069,6 @@ public final class TimeMasterManager {
 			}
 		}
 
-		private void applyVisualFrame(ServerWorld world) {
-			MinecraftServer server = world.getServer();
-			RegistryWrapper.WrapperLookup lookup = world.getRegistryManager();
-			for (Map.Entry<BlockPos, BlockSnapshot> entry : blocks.entrySet()) {
-				entry.getValue().restore(world, entry.getKey(), lookup);
-			}
-			for (PlayerSnapshot snapshot : players.values()) {
-				ServerPlayerEntity player = server.getPlayerManager().getPlayer(snapshot.playerId());
-				if (player != null && player.getWorld() == world) {
-					snapshot.applyVisualFrame(player);
-				}
-			}
-			for (ItemEntity item : world.getEntitiesByType(EntityType.ITEM, entity -> true)) {
-				ItemEntitySnapshot snapshot = items.get(item.getUuid());
-				if (snapshot != null) snapshot.applyVisualFrame(item);
-			}
-			for (PlayerBodyEntity body : world.getEntitiesByType(WatheEntities.PLAYER_BODY, entity -> true)) {
-				BodyEntitySnapshot snapshot = bodies.get(body.getUuid());
-				if (snapshot != null) snapshot.applyVisualFrame(body);
-			}
-		}
 	}
 
 	private record BlockSnapshot(BlockState state, NbtCompound blockEntityNbt) {
@@ -1219,18 +1202,6 @@ public final class TimeMasterManager {
 			TimeMasterManager.restoreVehicle(player, vehicleId, vehicleNbt);
 		}
 
-		private void applyVisualFrame(ServerPlayerEntity player) {
-			if (vehicleId == null || vehicleNbt == null || TimeMasterManager.restoreVehicle(player, vehicleId, vehicleNbt) == null) {
-				player.stopRiding();
-				player.teleport(player.getServerWorld(), x, y, z, yaw, pitch);
-			} else {
-				player.setYaw(yaw);
-				player.setPitch(pitch);
-			}
-			player.setVelocity(Vec3d.ZERO);
-			player.velocityModified = true;
-		}
-
 	}
 
 	private record ItemEntitySnapshot(UUID entityId, NbtCompound tag, ItemStack stack,
@@ -1259,11 +1230,6 @@ public final class TimeMasterManager {
 			world.spawnEntity(item);
 		}
 
-		private void applyVisualFrame(ItemEntity item) {
-			item.refreshPositionAndAngles(x, y, z, yaw, pitch);
-			item.setVelocity(Vec3d.ZERO);
-			item.velocityModified = true;
-		}
 	}
 
 	private record BodyEntitySnapshot(UUID entityId, UUID playerId, NbtCompound tag,
@@ -1293,11 +1259,6 @@ public final class TimeMasterManager {
 			world.spawnEntity(body);
 		}
 
-		private void applyVisualFrame(PlayerBodyEntity body) {
-			body.refreshPositionAndAngles(x, y, z, yaw, pitch);
-			body.setVelocity(Vec3d.ZERO);
-			body.velocityModified = true;
-		}
 	}
 
 	private record ItemCooldownSnapshot(Map<Item, Integer> remainingTicks) {

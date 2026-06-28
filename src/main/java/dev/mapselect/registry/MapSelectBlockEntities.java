@@ -3,6 +3,7 @@ package dev.mapselect.registry;
 import dev.mapselect.MapSelect;
 import dev.mapselect.block.CoinBarrierBlockEntity;
 import dev.mapselect.block.FusedOrnamentBlockEntity;
+import dev.mapselect.block.FloatingTextBlockEntity;
 import dev.mapselect.block.GoldBeveragePlateBlockEntity;
 import dev.mapselect.block.GreyiferPlushBlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
@@ -17,6 +18,7 @@ public final class MapSelectBlockEntities {
 	public static BlockEntityType<GoldBeveragePlateBlockEntity> GOLD_BEVERAGE_PLATE;
 	public static BlockEntityType<FusedOrnamentBlockEntity> FUSED_ORNAMENT;
 	public static BlockEntityType<CoinBarrierBlockEntity> COIN_BARRIER;
+	public static BlockEntityType<FloatingTextBlockEntity> FLOATING_TEXT;
 
 	public static void register() {
 		GREYIFER_PLUSH = Registry.register(
@@ -51,6 +53,12 @@ public final class MapSelectBlockEntities {
 			Identifier.of(MapSelect.MOD_ID, "coin_barrier"),
 			BlockEntityType.Builder.create(CoinBarrierBlockEntity::new,
 				MapSelectBlocks.COIN_BARRIER).build(null)
+		);
+		FLOATING_TEXT = Registry.register(
+			Registries.BLOCK_ENTITY_TYPE,
+			Identifier.of(MapSelect.MOD_ID, "floating_text"),
+			BlockEntityType.Builder.create(FloatingTextBlockEntity::new,
+				MapSelectBlocks.FLOATING_TEXT).build(null)
 		);
 	}
 }

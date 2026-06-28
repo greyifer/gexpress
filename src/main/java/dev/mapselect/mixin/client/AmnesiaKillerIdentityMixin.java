@@ -1,7 +1,7 @@
 package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.cca.GameWorldComponent;
-import dev.mapselect.client.ClientAmnesiaState;
+import dev.mapselect.client.role.amnesia.ClientAmnesiaState;
 import net.minecraft.entity.player.PlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

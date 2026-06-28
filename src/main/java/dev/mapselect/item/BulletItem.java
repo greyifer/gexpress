@@ -1,5 +1,6 @@
 package dev.mapselect.item;
 
+import dev.mapselect.game.GexpressAbilityGuards;
 import dev.mapselect.role.mafia.MafiaManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
@@ -17,6 +18,7 @@ public class BulletItem extends Item {
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
 		ItemStack stack = user.getStackInHand(hand);
+		if (GexpressAbilityGuards.shouldBlockItemAbility(user)) return TypedActionResult.fail(stack);
 		if (world.isClient) return TypedActionResult.success(stack);
 		if (user instanceof ServerPlayerEntity serverPlayer && MafiaManager.tryLoadBullet(serverPlayer, stack)) {
 			return TypedActionResult.consume(stack);

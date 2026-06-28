@@ -3,10 +3,11 @@ package dev.mapselect.mixin.client;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.client.WatheClient;
-import dev.mapselect.client.ClientAmnesiaState;
-import dev.mapselect.client.ClientInstinctEnergy;
-import dev.mapselect.client.ClientSpectatorRoleRevealDelay;
-import dev.mapselect.client.ClientVultureState;
+import dev.mapselect.client.game.ClientLastStandState;
+import dev.mapselect.client.role.amnesia.ClientAmnesiaState;
+import dev.mapselect.client.role.mafia.ClientMafiaState;
+import dev.mapselect.client.game.ClientSpectatorRoleRevealDelay;
+import dev.mapselect.client.role.pelican.ClientVultureState;
 import dev.mapselect.role.copycat.CopycatManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
@@ -33,6 +34,10 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 			cir.setReturnValue(false);
 			return;
 		}
+		if (ClientLastStandState.isLocalLastStandDuel()) {
+			cir.setReturnValue(false);
+			return;
+		}
 		if (client != null && CopycatManager.isBorrowingAbility(client.player)) {
 			cir.setReturnValue(false);
 		}
@@ -42,7 +47,6 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 	private static void gexpress$disableInstinctForLicensedVillain(CallbackInfoReturnable<Boolean> cir) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.player == null || client.world == null) {
-			cir.setReturnValue(ClientInstinctEnergy.filter(cir.getReturnValue()));
 			return;
 		}
 		if (CopycatManager.isBorrowingAbility(client.player)) {
@@ -57,7 +61,8 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 				enabled = false;
 			}
 		}
-		cir.setReturnValue(ClientInstinctEnergy.filter(enabled));
+		if (!enabled && ClientMafiaState.shouldUseFamilyInstinct()) enabled = true;
+		cir.setReturnValue(enabled);
 	}
 
 	@Inject(method = "getInstinctHighlight", at = @At("HEAD"), cancellable = true)
@@ -67,8 +72,18 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 			cir.setReturnValue(-1);
 			return;
 		}
+		if (ClientLastStandState.isLocalLastStandDuel()) {
+			cir.setReturnValue(-1);
+			return;
+		}
 		if (client != null && CopycatManager.isBorrowingAbility(client.player)) {
 			cir.setReturnValue(-1);
+			return;
+		}
+		if (ClientMafiaState.shouldUseFamilyInstinct()) {
+			cir.setReturnValue(target instanceof PlayerEntity player && ClientMafiaState.shouldGlow(player.getUuid())
+				? ClientMafiaState.glowColor()
+				: -1);
 			return;
 		}
 		if (target instanceof PlayerEntity player) {
@@ -76,6 +91,11 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 				cir.setReturnValue(ClientSpectatorRoleRevealDelay.shouldUseInstinctReveal(client)
 					? ClientSpectatorRoleRevealDelay.glowColor()
 					: -1);
+				return;
+			}
+			Integer spectatorRoleColor = ClientSpectatorRoleRevealDelay.revealedRoleColor(client, player);
+			if (spectatorRoleColor != null) {
+				cir.setReturnValue(spectatorRoleColor);
 				return;
 			}
 			if (ClientAmnesiaState.shouldHideKillerIdentity(player)) {

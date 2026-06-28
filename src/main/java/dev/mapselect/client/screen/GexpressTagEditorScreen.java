@@ -22,12 +22,19 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class GexpressTagEditorScreen extends Screen {
-	private static final List<String> PERMISSIONS = GexpressPermissions.permissionKeys();
+	private static final List<GexpressPermissions.PermissionEntry> PERMISSIONS = GexpressPermissions.permissionEntries();
+	private static final List<String> PERMISSION_KEYS = GexpressPermissions.permissionKeys();
+	private static final List<PermissionRow> PERMISSION_ROWS = buildPermissionRows();
+	private static final int TAG_ROW_HEIGHT = 22;
+	private static final int PERMISSION_ROW_HEIGHT = 31;
+	private static final int PERMISSION_HEADER_HEIGHT = 17;
+	private static final int SELECTED_PERMISSION_ROW_HEIGHT = 22;
 	private final Screen parent;
 	private TextFieldWidget idField;
 	private TextFieldWidget nameField;
 	private TextFieldWidget colorField;
 	private TextFieldWidget priorityField;
+	private TextFieldWidget permissionSearchField;
 	private ButtonWidget deleteButton;
 	private ButtonWidget playerTagsButton;
 	private ButtonWidget levelTagsButton;
@@ -40,26 +47,46 @@ public final class GexpressTagEditorScreen extends Screen {
 	private float value = 0.92F;
 	private boolean draggingColor;
 	private boolean draggingHue;
+	private int tagListScroll;
+	private int permissionScroll;
+	private int addedPermissionScroll;
 
 	public GexpressTagEditorScreen(Screen parent) {
 		super(Text.translatable("gui.gexpress.tag_editor.title"));
 		this.parent = parent;
 	}
 
+	private static List<PermissionRow> buildPermissionRows() {
+		List<PermissionRow> rows = new ArrayList<>();
+		String currentGroup = null;
+		for (GexpressPermissions.PermissionEntry permission : PERMISSIONS) {
+			if (!permission.group().equals(currentGroup)) {
+				currentGroup = permission.group();
+				rows.add(new PermissionRow(currentGroup, null));
+			}
+			rows.add(new PermissionRow(currentGroup, permission));
+		}
+		return List.copyOf(rows);
+	}
+
 	@Override
 	protected void init() {
-		int formX = 190;
+		int formX = formX();
 		int formY = 54;
-		idField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY, 128, 18,
+		int fieldWidth = Math.min(240, Math.max(128, contentWidth()));
+		idField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY, fieldWidth, 18,
 			Text.translatable("gui.gexpress.tag_editor.id")));
-		nameField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY + 28, 128, 18,
+		nameField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY + 28, fieldWidth, 18,
 			Text.translatable("gui.gexpress.tag_editor.name")));
-		colorField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY + 56, 128, 18,
+		colorField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY + 56, fieldWidth, 18,
 			Text.translatable("gui.gexpress.tag_editor.color")));
-		priorityField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY + 84, 128, 18,
+		priorityField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY + 84, fieldWidth, 18,
 			Text.translatable("gui.gexpress.tag_editor.priority")));
 		colorField.setText("#D36BFF");
 		priorityField.setText("50");
+		permissionSearchField = addDrawableChild(new TextFieldWidget(textRenderer, formX, permissionTop(),
+			contentWidth(), 18, Text.literal("Search commands and permissions")));
+		permissionSearchField.setMaxLength(96);
 
 		playerTagsButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.player_tags"),
 				button -> setMode(Mode.PLAYER_TAGS))
@@ -70,7 +97,7 @@ public final class GexpressTagEditorScreen extends Screen {
 			.dimensions(114, 28, 92, 20)
 			.build());
 
-		int buttonY = Math.min(height - 58, formY + 292);
+		int buttonY = Math.max(formY + 292, height - 58);
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.save"), button -> save())
 			.dimensions(formX, buttonY, 72, 20)
 			.build());
@@ -144,38 +171,68 @@ public final class GexpressTagEditorScreen extends Screen {
 		MinecraftClient.getInstance().setScreen(parent);
 	}
 
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (mouseX >= 18 && mouseX < 18 + listWidth() && mouseY >= tagListTop() && mouseY < tagListBottom()) {
+			tagListScroll = scrollBy(tagListScroll, verticalAmount, maxTagListScroll());
+			return true;
+		}
+		if (mode == Mode.PLAYER_TAGS && mouseX >= formX() && mouseX < formX() + contentWidth()
+				&& mouseY >= selectedPermissionTop() && mouseY < selectedPermissionBottom()) {
+			addedPermissionScroll = scrollBy(addedPermissionScroll, verticalAmount, maxAddedPermissionScroll());
+			return true;
+		}
+		if (mode == Mode.PLAYER_TAGS && mouseX >= formX() && mouseX < formX() + contentWidth()
+				&& mouseY >= permissionResultTop() && mouseY < permissionBottom()) {
+			permissionScroll = scrollBy(permissionScroll, verticalAmount, maxPermissionScroll());
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+	}
+
 	private void drawTagList(DrawContext context, int mouseX, int mouseY) {
 		int x = 18;
-		int y = 52;
+		int y = tagListTop();
+		int listWidth = listWidth();
+		List<EditableTag> tags = visibleTags();
+		tagListScroll = MathHelper.clamp(tagListScroll, 0, maxTagListScroll(tags.size()));
 		context.drawTextWithShadow(textRenderer, Text.translatable(mode == Mode.LEVEL_TAGS
 				? "gui.gexpress.tag_editor.level_tags"
 				: "gui.gexpress.tag_editor.tags"), x, y - 14,
 			0xFFFFFFFF);
+		context.enableScissor(x, y, x + listWidth, tagListBottom());
 		int row = 0;
-		for (EditableTag tag : visibleTags()) {
-			int ry = y + row * 22;
+		for (EditableTag tag : tags) {
+			int ry = y + row * TAG_ROW_HEIGHT - tagListScroll;
+			if (ry + 18 <= y || ry >= tagListBottom()) {
+				row++;
+				continue;
+			}
 			boolean selected = tag.id().equals(selectedId);
-			boolean hovered = mouseX >= x && mouseX < x + 142 && mouseY >= ry && mouseY < ry + 18;
-			context.fill(x, ry, x + 142, ry + 18, selected ? 0xAA2D3542 : hovered ? 0x77313A48 : 0x55212833);
-			context.fill(x, ry + 16, x + 142, ry + 18, 0xFF000000 | tag.color());
+			boolean hovered = mouseX >= x && mouseX < x + listWidth && mouseY >= ry && mouseY < ry + 18;
+			context.fill(x, ry, x + listWidth, ry + 18, selected ? 0xAA2D3542 : hovered ? 0x77313A48 : 0x55212833);
+			context.fill(x, ry + 16, x + listWidth, ry + 18, 0xFF000000 | tag.color());
 			String label = mode == Mode.LEVEL_TAGS ? "Level " + tag.id() + " - " + tag.displayName() : tag.displayName();
-			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(label, 122)),
+			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(label, listWidth - 20)),
 				x + 5, ry + 5, 0xFFFFFFFF);
 			if (tag.builtin()) {
 				context.drawTextWithShadow(textRenderer, Text.literal(mode == Mode.LEVEL_TAGS ? "L" : "*"),
-					x + 132, ry + 5, 0xFF9BA3AE);
+					x + listWidth - 10, ry + 5, 0xFF9BA3AE);
 			}
 			row++;
 		}
+		context.disableScissor();
+		drawScrollbar(context, x + listWidth + 3, y, tagListBottom(), tagListScroll, maxTagListScroll(tags.size()));
 	}
 
 	private boolean clickTagList(double mouseX, double mouseY) {
 		int x = 18;
-		int y = 52;
+		int y = tagListTop();
+		if (mouseX < x || mouseX >= x + listWidth() || mouseY < y || mouseY >= tagListBottom()) return false;
 		int row = 0;
 		for (EditableTag tag : visibleTags()) {
-			int ry = y + row * 22;
-			if (mouseX >= x && mouseX < x + 142 && mouseY >= ry && mouseY < ry + 18) {
+			int ry = y + row * TAG_ROW_HEIGHT - tagListScroll;
+			if (mouseX >= x && mouseX < x + listWidth() && mouseY >= ry && mouseY < ry + 18) {
 				load(tag);
 				return true;
 			}
@@ -185,7 +242,7 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private void drawLabels(DrawContext context) {
-		int labelX = 190;
+		int labelX = formX();
 		int y = 43;
 		context.drawTextWithShadow(textRenderer, Text.literal(mode == Mode.LEVEL_TAGS ? "Level" : "Id"),
 			labelX, y, 0xFFB9C2CE);
@@ -195,7 +252,7 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private void drawLevelTagHelp(DrawContext context) {
-		int x = 190;
+		int x = formX();
 		int y = 174;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.level_tag_rules"),
 			x, y - 14, 0xFFFFFFFF);
@@ -211,47 +268,156 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private void drawPermissions(DrawContext context, int mouseX, int mouseY) {
-		int x = 190;
-		int y = 174;
+		int x = formX();
+		int y = permissionTop();
+		int bottom = permissionBottom();
+		int selectedTop = selectedPermissionTop();
+		int selectedBottom = selectedPermissionBottom();
+		int resultTop = permissionResultTop();
+		List<GexpressPermissions.PermissionEntry> selected = enabledPermissionEntries();
+		List<GexpressPermissions.PermissionEntry> candidates = permissionCandidates();
+		addedPermissionScroll = MathHelper.clamp(addedPermissionScroll, 0, maxAddedPermissionScroll(selected.size()));
+		permissionScroll = MathHelper.clamp(permissionScroll, 0, maxPermissionScroll());
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.permissions"), x, y - 14,
 			0xFFFFFFFF);
-		for (int i = 0; i < PERMISSIONS.size(); i++) {
-			int bx = x + (i % 2) * 172;
-			int by = y + (i / 2) * 28;
-			String permission = PERMISSIONS.get(i);
-			boolean selected = enabledPermissions.contains(permission);
-			boolean hovered = mouseX >= bx && mouseX < bx + 164 && mouseY >= by && mouseY < by + 24;
-			context.fill(bx, by, bx + 164, by + 24, selected ? 0xAA2E6F57 : hovered ? 0x77313A48 : 0x55212833);
-			context.drawBorder(bx, by, 164, 24, selected ? 0xAA6BE3A7 : 0x443C4A58);
-			context.drawTextWithShadow(textRenderer, Text.literal(permission), bx + 5, by + 3,
-				selected ? 0xFFB8FFD7 : 0xFFFFFFFF);
-			String description = GexpressPermissions.permissionDescription(permission);
-			if (description != null) {
-				context.drawTextWithShadow(textRenderer,
-					Text.literal(textRenderer.trimToWidth(description, 154)).formatted(Formatting.GRAY),
-					bx + 5, by + 14, 0xFF9BA3AE);
-			}
+		context.drawTextWithShadow(textRenderer,
+			Text.literal("Added commands and access").formatted(Formatting.GRAY), x, selectedTop - 12,
+			0xFF9BA3AE);
+		context.enableScissor(x, selectedTop, x + contentWidth(), selectedBottom);
+		if (selected.isEmpty()) {
+			context.drawTextWithShadow(textRenderer,
+				Text.literal("Nothing added yet.").formatted(Formatting.DARK_GRAY), x + 6, selectedTop + 6,
+				0xFF777777);
 		}
+		for (int i = 0; i < selected.size(); i++) {
+			GexpressPermissions.PermissionEntry entry = selected.get(i);
+			int rowY = selectedTop + i * SELECTED_PERMISSION_ROW_HEIGHT - addedPermissionScroll;
+			if (rowY + 18 <= selectedTop || rowY >= selectedBottom) continue;
+			boolean hovered = mouseX >= x && mouseX < x + contentWidth() && mouseY >= rowY && mouseY < rowY + 18;
+			context.fill(x, rowY, x + contentWidth(), rowY + 18, hovered ? 0xAA69403A : 0xAA2E6F57);
+			context.drawBorder(x, rowY, contentWidth(), 18, hovered ? 0xFFFFA078 : 0xAA6BE3A7);
+			String label = entry.label() + "  -  " + entry.key();
+			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(label, contentWidth() - 28)),
+				x + 6, rowY + 5, 0xFFFFFFFF);
+			context.drawTextWithShadow(textRenderer, Text.literal("x"), x + contentWidth() - 13, rowY + 5,
+				0xFFFFB3A0);
+		}
+		context.disableScissor();
+		drawScrollbar(context, x + contentWidth() + 3, selectedTop, selectedBottom, addedPermissionScroll,
+			maxAddedPermissionScroll(selected.size()));
+
+		context.drawTextWithShadow(textRenderer,
+			Text.literal("Search results").formatted(Formatting.GRAY), x, resultTop - 12, 0xFF9BA3AE);
+		context.enableScissor(x, resultTop, x + contentWidth(), bottom);
+		if (candidates.isEmpty()) {
+			context.drawTextWithShadow(textRenderer,
+				Text.literal(permissionSearchField == null || permissionSearchField.getText().isBlank()
+					? "All permissions are already added."
+					: "No matching permissions.")
+					.formatted(Formatting.DARK_GRAY),
+				x + 6, resultTop + 6, 0xFF777777);
+		}
+		for (int i = 0; i < candidates.size(); i++) {
+			GexpressPermissions.PermissionEntry entry = candidates.get(i);
+			int rowY = resultTop + i * PERMISSION_ROW_HEIGHT - permissionScroll;
+			if (rowY + PERMISSION_ROW_HEIGHT - 4 <= resultTop || rowY >= bottom) continue;
+			boolean hovered = mouseX >= x && mouseX < x + contentWidth()
+				&& mouseY >= rowY && mouseY < rowY + PERMISSION_ROW_HEIGHT - 4;
+			context.fill(x, rowY, x + contentWidth(), rowY + PERMISSION_ROW_HEIGHT - 4,
+				hovered ? 0x77313A48 : 0x55212833);
+			context.drawBorder(x, rowY, contentWidth(), PERMISSION_ROW_HEIGHT - 4,
+				hovered ? 0xAA8795A5 : 0x443C4A58);
+			drawPermissionEntry(context, entry, x, rowY, contentWidth(), 0xFFFFFFFF);
+		}
+		context.disableScissor();
+		drawScrollbar(context, x + contentWidth() + 3, resultTop, bottom, permissionScroll,
+			maxPermissionScroll(candidates.size()));
 	}
 
 	private boolean clickPermission(double mouseX, double mouseY) {
-		int x = 190;
-		int y = 174;
-		for (int i = 0; i < PERMISSIONS.size(); i++) {
-			int bx = x + (i % 2) * 172;
-			int by = y + (i / 2) * 28;
-			if (mouseX < bx || mouseX >= bx + 164 || mouseY < by || mouseY >= by + 24) continue;
-			String permission = PERMISSIONS.get(i);
-			if (!enabledPermissions.remove(permission)) enabledPermissions.add(permission);
-			return true;
+		int x = formX();
+		if (mouseX < x || mouseX >= x + contentWidth()) return false;
+		if (mouseY >= selectedPermissionTop() && mouseY < selectedPermissionBottom()) {
+			int index = ((int) mouseY - selectedPermissionTop() + addedPermissionScroll)
+				/ SELECTED_PERMISSION_ROW_HEIGHT;
+			List<GexpressPermissions.PermissionEntry> selected = enabledPermissionEntries();
+			if (index >= 0 && index < selected.size()) {
+				enabledPermissions.remove(selected.get(index).key());
+				addedPermissionScroll = MathHelper.clamp(addedPermissionScroll, 0, maxAddedPermissionScroll());
+				return true;
+			}
+		}
+		if (mouseY >= permissionResultTop() && mouseY < permissionBottom()) {
+			int index = ((int) mouseY - permissionResultTop() + permissionScroll) / PERMISSION_ROW_HEIGHT;
+			List<GexpressPermissions.PermissionEntry> candidates = permissionCandidates();
+			if (index >= 0 && index < candidates.size()) {
+				enabledPermissions.add(candidates.get(index).key());
+				permissionScroll = MathHelper.clamp(permissionScroll, 0, maxPermissionScroll());
+				return true;
+			}
 		}
 		return false;
 	}
 
+	private void drawPermissionEntry(DrawContext context, GexpressPermissions.PermissionEntry entry, int x, int y,
+			int width, int labelColor) {
+		String key = entry.key();
+		int keyWidth = Math.min(textRenderer.getWidth(key), Math.max(68, width / 3));
+		context.drawTextWithShadow(textRenderer,
+			Text.literal(textRenderer.trimToWidth(entry.label(), width - keyWidth - 22)).formatted(Formatting.BOLD),
+			x + 6, y + 4, labelColor);
+		context.drawTextWithShadow(textRenderer,
+			Text.literal(textRenderer.trimToWidth(key, keyWidth)).formatted(Formatting.DARK_GRAY),
+			x + width - keyWidth - 6, y + 4, 0xFF7E8994);
+		context.drawTextWithShadow(textRenderer,
+			Text.literal(textRenderer.trimToWidth(entry.description(), width - 12)).formatted(Formatting.GRAY),
+			x + 6, y + 17, 0xFF9BA3AE);
+	}
+
+	private List<GexpressPermissions.PermissionEntry> enabledPermissionEntries() {
+		List<GexpressPermissions.PermissionEntry> out = new ArrayList<>();
+		for (String key : enabledPermissions) {
+			GexpressPermissions.PermissionEntry entry = permissionEntry(key);
+			if (entry != null) out.add(entry);
+		}
+		return out;
+	}
+
+	private List<GexpressPermissions.PermissionEntry> permissionCandidates() {
+		String query = permissionSearchField == null ? "" : permissionSearchField.getText().trim();
+		List<GexpressPermissions.PermissionEntry> out = new ArrayList<>();
+		for (GexpressPermissions.PermissionEntry entry : PERMISSIONS) {
+			if (enabledPermissions.contains(entry.key())) continue;
+			if (!permissionMatches(entry, query)) continue;
+			out.add(entry);
+		}
+		return out;
+	}
+
+	private boolean permissionMatches(GexpressPermissions.PermissionEntry entry, String rawQuery) {
+		if (entry == null) return false;
+		String query = rawQuery == null ? "" : rawQuery.toLowerCase(Locale.ROOT).trim();
+		if (query.isEmpty()) return true;
+		String slashless = query.startsWith("/") ? query.substring(1) : query;
+		return entry.key().toLowerCase(Locale.ROOT).contains(query)
+			|| entry.label().toLowerCase(Locale.ROOT).contains(query)
+			|| entry.group().toLowerCase(Locale.ROOT).contains(query)
+			|| entry.description().toLowerCase(Locale.ROOT).contains(query)
+			|| entry.label().toLowerCase(Locale.ROOT).replace("/", "").contains(slashless);
+	}
+
+	private GexpressPermissions.PermissionEntry permissionEntry(String key) {
+		if (key == null) return null;
+		for (GexpressPermissions.PermissionEntry entry : PERMISSIONS) {
+			if (key.equals(entry.key())) return entry;
+		}
+		return null;
+	}
+
 	private void drawColorPicker(DrawContext context, int mouseX, int mouseY) {
-		int x = Math.max(370, width - 300);
+		int x = pickerX();
 		int y = 54;
-		int w = 260;
+		int w = pickerWidth();
 		int h = 110;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.color_picker"), x, y - 14,
 			0xFFFFFFFF);
@@ -285,9 +451,9 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private boolean clickColor(double mouseX, double mouseY) {
-		int x = Math.max(370, width - 300);
+		int x = pickerX();
 		int y = 54;
-		int w = 260;
+		int w = pickerWidth();
 		int h = 110;
 		if (mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h) {
 			draggingColor = true;
@@ -304,9 +470,9 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private void updateColor(double mouseX, double mouseY, boolean hueOnly) {
-		int x = Math.max(370, width - 300);
+		int x = pickerX();
 		int y = 54;
-		int w = 260;
+		int w = pickerWidth();
 		int h = 110;
 		if (hueOnly) {
 			hue = Math.max(0.0F, Math.min(1.0F, (float) ((mouseX - x) / Math.max(1.0D, w - 1.0D))));
@@ -332,6 +498,8 @@ public final class GexpressTagEditorScreen extends Screen {
 			String key = GexpressPermissions.canonicalPermission(permission);
 			if (key != null) enabledPermissions.add(key);
 		}
+		permissionScroll = 0;
+		addedPermissionScroll = 0;
 		if (deleteButton != null) {
 			deleteButton.setMessage(Text.translatable(mode == Mode.LEVEL_TAGS
 				? "gui.gexpress.tag_editor.delete"
@@ -352,6 +520,9 @@ public final class GexpressTagEditorScreen extends Screen {
 		colorField.setText(mode == Mode.LEVEL_TAGS ? "#F2C94C" : "#D36BFF");
 		priorityField.setText("50");
 		enabledPermissions.clear();
+		permissionScroll = 0;
+		addedPermissionScroll = 0;
+		if (permissionSearchField != null) permissionSearchField.setText("");
 		if (deleteButton != null) {
 			deleteButton.setMessage(Text.translatable("gui.gexpress.tag_editor.delete"));
 		}
@@ -370,7 +541,7 @@ public final class GexpressTagEditorScreen extends Screen {
 		if (selectedBuiltin) {
 			send("g admin tag settings color " + id + " " + color);
 			send("g admin tag settings priority " + id + " " + priority);
-			for (String permission : PERMISSIONS) {
+			for (String permission : PERMISSION_KEYS) {
 				send("g admin tag settings permission " + id + " " + permission + " "
 					+ enabledPermissions.contains(permission));
 			}
@@ -382,7 +553,7 @@ public final class GexpressTagEditorScreen extends Screen {
 		send("g admin tag custom name " + id + " " + name);
 		send("g admin tag custom color " + id + " " + color);
 		send("g admin tag custom priority " + id + " " + priority);
-		for (String permission : PERMISSIONS) {
+		for (String permission : PERMISSION_KEYS) {
 			send("g admin tag custom permission " + id + " " + permission + " "
 				+ enabledPermissions.contains(permission));
 		}
@@ -521,9 +692,102 @@ public final class GexpressTagEditorScreen extends Screen {
 		}
 	}
 
+	private int listWidth() {
+		return MathHelper.clamp(width / 5, 142, 190);
+	}
+
+	private int formX() {
+		return 18 + listWidth() + 24;
+	}
+
+	private int pickerWidth() {
+		return MathHelper.clamp(width / 4, 180, 260);
+	}
+
+	private int pickerX() {
+		return width - pickerWidth() - 18;
+	}
+
+	private int contentWidth() {
+		return Math.max(96, pickerX() - formX() - 16);
+	}
+
+	private int permissionColumns() {
+		return contentWidth() >= 320 ? 2 : 1;
+	}
+
+	private int tagListTop() {
+		return 52;
+	}
+
+	private int tagListBottom() {
+		return Math.max(tagListTop() + 24, height - 44);
+	}
+
+	private int permissionTop() {
+		return 174;
+	}
+
+	private int selectedPermissionTop() {
+		return permissionTop() + 42;
+	}
+
+	private int selectedPermissionBottom() {
+		return Math.min(permissionTop() + 124, Math.max(selectedPermissionTop() + 24, permissionBottom() - 104));
+	}
+
+	private int permissionResultTop() {
+		return selectedPermissionBottom() + 24;
+	}
+
+	private int permissionBottom() {
+		return Math.max(permissionTop() + 24, height - 70);
+	}
+
+	private int maxTagListScroll() {
+		return maxTagListScroll(visibleTags().size());
+	}
+
+	private int maxTagListScroll(int size) {
+		return Math.max(0, size * TAG_ROW_HEIGHT - (tagListBottom() - tagListTop()));
+	}
+
+	private int maxPermissionScroll() {
+		return maxPermissionScroll(permissionCandidates().size());
+	}
+
+	private int maxPermissionScroll(int size) {
+		return Math.max(0, size * PERMISSION_ROW_HEIGHT - (permissionBottom() - permissionResultTop()));
+	}
+
+	private int maxAddedPermissionScroll() {
+		return maxAddedPermissionScroll(enabledPermissionEntries().size());
+	}
+
+	private int maxAddedPermissionScroll(int size) {
+		return Math.max(0, size * SELECTED_PERMISSION_ROW_HEIGHT
+			- (selectedPermissionBottom() - selectedPermissionTop()));
+	}
+
+	private int scrollBy(int current, double verticalAmount, int max) {
+		return MathHelper.clamp(current - (int) Math.signum(verticalAmount) * TAG_ROW_HEIGHT, 0, max);
+	}
+
+	private void drawScrollbar(DrawContext context, int x, int top, int bottom, int scroll, int maxScroll) {
+		if (maxScroll <= 0 || bottom <= top) return;
+		int trackH = bottom - top;
+		int thumbH = Math.max(18, trackH * trackH / Math.max(trackH, trackH + maxScroll));
+		int thumbY = top + (trackH - thumbH) * scroll / maxScroll;
+		context.fill(x, top, x + 2, bottom, 0x553C4A58);
+		context.fill(x, thumbY, x + 2, thumbY + thumbH, 0xFFBFA35A);
+	}
+
 	private void setMode(Mode next) {
 		if (mode == next) return;
 		mode = next;
+		tagListScroll = 0;
+		permissionScroll = 0;
+		addedPermissionScroll = 0;
 		clearForNew();
 		updateModeWidgets();
 	}
@@ -531,6 +795,10 @@ public final class GexpressTagEditorScreen extends Screen {
 	private void updateModeWidgets() {
 		if (playerTagsButton != null) playerTagsButton.active = mode != Mode.PLAYER_TAGS;
 		if (levelTagsButton != null) levelTagsButton.active = mode != Mode.LEVEL_TAGS;
+		if (permissionSearchField != null) {
+			permissionSearchField.visible = mode == Mode.PLAYER_TAGS;
+			permissionSearchField.active = mode == Mode.PLAYER_TAGS;
+		}
 	}
 
 	private void syncHsvFromColor(int color) {
@@ -578,6 +846,16 @@ public final class GexpressTagEditorScreen extends Screen {
 		private static EditableTag from(PlayerTagComponent.CustomTag tag) {
 			return new EditableTag(tag.id(), tag.displayName(), tag.color(), tag.priority(), false,
 				Set.copyOf(tag.permissions()));
+		}
+	}
+
+	private record PermissionRow(String group, GexpressPermissions.PermissionEntry permission) {
+		private boolean isHeader() {
+			return permission == null;
+		}
+
+		private int height() {
+			return isHeader() ? PERMISSION_HEADER_HEIGHT : PERMISSION_ROW_HEIGHT;
 		}
 	}
 

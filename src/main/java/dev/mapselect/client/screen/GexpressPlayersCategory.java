@@ -42,13 +42,23 @@ import java.util.function.Consumer;
 public final class GexpressPlayersCategory {
 	private GexpressPlayersCategory() {}
 
-	public static ConfigCategory build(Screen parent) {
-		return new PlayersCategory();
+	public static ConfigCategory build(Screen parent, boolean canEditTags, boolean canManageProgression,
+			boolean canManageEconomy) {
+		return new PlayersCategory(canEditTags, canManageProgression, canManageEconomy);
 	}
 
 	private static final class PlayersCategory implements ConfigCategory, CustomTabProvider {
 		private final Text name = Text.translatable("gui.gexpress.config.category.players");
 		private final Text tooltip = Text.translatable("gui.gexpress.config.category.players.tooltip");
+		private final boolean canEditTags;
+		private final boolean canManageProgression;
+		private final boolean canManageEconomy;
+
+		private PlayersCategory(boolean canEditTags, boolean canManageProgression, boolean canManageEconomy) {
+			this.canEditTags = canEditTags;
+			this.canManageProgression = canManageProgression;
+			this.canManageEconomy = canManageEconomy;
+		}
 
 		@Override
 		public @NotNull Text name() {
@@ -67,7 +77,7 @@ public final class GexpressPlayersCategory {
 
 		@Override
 		public Tab createTab(YACLScreen screen, ScreenRect tabArea) {
-			return new PlayersTab(screen, tabArea, tooltip);
+			return new PlayersTab(screen, tabArea, tooltip, canEditTags, canManageProgression, canManageEconomy);
 		}
 	}
 
@@ -76,8 +86,10 @@ public final class GexpressPlayersCategory {
 		private final ButtonWidget doneButton;
 		private final Tooltip tooltip;
 
-		private PlayersTab(YACLScreen screen, ScreenRect tabArea, Text tooltipText) {
-			this.panel = new PlayersPanelWidget(tabArea.getLeft(), tabArea.getTop(), tabArea.width(), tabArea.height());
+		private PlayersTab(YACLScreen screen, ScreenRect tabArea, Text tooltipText, boolean canEditTags,
+				boolean canManageProgression, boolean canManageEconomy) {
+			this.panel = new PlayersPanelWidget(tabArea.getLeft(), tabArea.getTop(), tabArea.width(), tabArea.height(),
+				canEditTags, canManageProgression, canManageEconomy);
 			this.doneButton = ButtonWidget.builder(ScreenTexts.DONE, button -> screen.finishOrSave())
 				.size(Math.max(90, screen.width / 6), 20)
 				.build();
@@ -119,6 +131,7 @@ public final class GexpressPlayersCategory {
 		private static final int CHANGE_BUTTON_WIDTH = 92;
 		private static final int LEVEL_EDITOR_HEIGHT = 58;
 		private static final int GCOIN_EDITOR_HEIGHT = 80;
+		private static final int ECONOMY_EDITOR_HEIGHT = 38;
 		private static final int LEVEL_FIELD_WIDTH = 62;
 		private static final int LEVEL_APPLY_WIDTH = 38;
 		private static final PlayerTag[] BUILTIN_TAGS = {
@@ -134,12 +147,19 @@ public final class GexpressPlayersCategory {
 		private final List<LevelFieldBox> levelFields = new ArrayList<>();
 		private final List<LevelApplyButton> levelApplyButtons = new ArrayList<>();
 		private final Map<UUID, LevelDraft> levelDrafts = new HashMap<>();
+		private final boolean canEditTags;
+		private final boolean canManageProgression;
+		private final boolean canManageEconomy;
 		private FocusedLevelField focusedLevelField;
 		private UUID expandedPlayer;
 		private int scroll;
 
-		private PlayersPanelWidget(int x, int y, int width, int height) {
+		private PlayersPanelWidget(int x, int y, int width, int height, boolean canEditTags,
+				boolean canManageProgression, boolean canManageEconomy) {
 			super(x, y, width, height, Text.translatable("gui.gexpress.config.category.players"));
+			this.canEditTags = canEditTags;
+			this.canManageProgression = canManageProgression;
+			this.canManageEconomy = canManageEconomy;
 		}
 
 		@Override
@@ -206,14 +226,19 @@ public final class GexpressPlayersCategory {
 				return;
 			}
 
+			if (!canEditAny()) return;
 			drawChangeButton(context, client, id, x + rowWidth - CHANGE_BUTTON_WIDTH - 6, y + 10, mouseX, mouseY);
 			if (expanded) {
 				int detailX = x + 38;
 				int detailWidth = rowWidth - 44;
 				int editorHeight = editorHeight(client);
-				drawLevelEditor(context, client, id, name, detailX, y + ROW_HEIGHT - 2, detailWidth, mouseX, mouseY);
-				drawTagDropdown(context, client, id, name, tags, detailX, y + ROW_HEIGHT + editorHeight - 4,
-					detailWidth, mouseX, mouseY);
+				if (editorHeight > 0) {
+					drawLevelEditor(context, client, id, name, detailX, y + ROW_HEIGHT - 2, detailWidth, mouseX, mouseY);
+				}
+				if (canEditTags) {
+					drawTagDropdown(context, client, id, name, tags, detailX, y + ROW_HEIGHT + editorHeight - 4,
+						detailWidth, mouseX, mouseY);
+				}
 			}
 		}
 
@@ -246,40 +271,42 @@ public final class GexpressPlayersCategory {
 
 		private void drawLevelEditor(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
 				int x, int y, int editorWidth, int mouseX, int mouseY) {
+			if (!canManageProgression && !canManageEconomy) return;
 			LevelSnapshot snapshot = levelSnapshot(client, playerId);
 			LevelDraft draft = levelDraft(playerId, snapshot);
 			boolean showGcoin = showGcoin(client);
 			int editorHeight = editorHeight(client);
 			context.fill(x, y + 4, x + editorWidth, y + editorHeight - 8, 0x33212A35);
 			context.drawBorder(x, y + 4, editorWidth, editorHeight - 12, 0x55758AA0);
-			context.drawTextWithShadow(client.textRenderer, Text.literal("Level"), x + 8, y + 12, 0xFFB8C3CC);
-			context.drawTextWithShadow(client.textRenderer, Text.literal("XP"), x + 8, y + 33, 0xFFB8C3CC);
-			if (showGcoin) {
-				context.drawTextWithShadow(client.textRenderer, Text.literal("G'Coin"), x + 8, y + 54, 0xFFFFD56E);
-			}
 
 			int fieldX = x + 64;
-			int levelY = y + 8;
-			int xpY = y + 29;
-			int gcoinY = y + 50;
-			drawLevelField(context, client, playerId, playerName, LevelFieldKind.LEVEL, draft.levelText,
-				fieldX, levelY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
-			drawLevelApply(context, client, playerId, playerName, LevelFieldKind.LEVEL,
-				fieldX + LEVEL_FIELD_WIDTH + 5, levelY, mouseX, mouseY);
+			int rowY = y + 8;
+			if (canManageProgression) {
+				context.drawTextWithShadow(client.textRenderer, Text.literal("Level"), x + 8, rowY + 4, 0xFFB8C3CC);
+				drawLevelField(context, client, playerId, playerName, LevelFieldKind.LEVEL, draft.levelText,
+					fieldX, rowY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
+				drawLevelApply(context, client, playerId, playerName, LevelFieldKind.LEVEL,
+					fieldX + LEVEL_FIELD_WIDTH + 5, rowY, mouseX, mouseY);
+				rowY += 21;
 
-			drawLevelField(context, client, playerId, playerName, LevelFieldKind.XP, draft.xpText,
-				fieldX, xpY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
-			context.drawTextWithShadow(client.textRenderer, Text.literal("/ " + snapshot.neededXp()),
-				fieldX + LEVEL_FIELD_WIDTH + 7, xpY + 5, 0xFF8FA1B2);
-			drawLevelApply(context, client, playerId, playerName, LevelFieldKind.XP,
-				fieldX + LEVEL_FIELD_WIDTH + 52, xpY, mouseX, mouseY);
+				context.drawTextWithShadow(client.textRenderer, Text.literal("XP"), x + 8, rowY + 4, 0xFFB8C3CC);
+				drawLevelField(context, client, playerId, playerName, LevelFieldKind.XP, draft.xpText,
+					fieldX, rowY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
+				context.drawTextWithShadow(client.textRenderer, Text.literal("/ " + snapshot.neededXp()),
+					fieldX + LEVEL_FIELD_WIDTH + 7, rowY + 5, 0xFF8FA1B2);
+				drawLevelApply(context, client, playerId, playerName, LevelFieldKind.XP,
+					fieldX + LEVEL_FIELD_WIDTH + 52, rowY, mouseX, mouseY);
+				rowY += 21;
+			}
 			if (showGcoin) {
+				context.drawTextWithShadow(client.textRenderer, Text.literal("G'Coin"), x + 8, rowY + 4, 0xFFFFD56E);
 				drawLevelField(context, client, playerId, playerName, LevelFieldKind.GCOIN, draft.gcoinText,
-					fieldX, gcoinY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
+					fieldX, rowY, LEVEL_FIELD_WIDTH, mouseX, mouseY);
 				drawLevelApply(context, client, playerId, playerName, LevelFieldKind.GCOIN,
-					fieldX + LEVEL_FIELD_WIDTH + 5, gcoinY, mouseX, mouseY);
+					fieldX + LEVEL_FIELD_WIDTH + 5, rowY, mouseX, mouseY);
 			}
 
+			if (!canManageProgression) return;
 			int barX = Math.min(x + editorWidth - 114, fieldX + LEVEL_FIELD_WIDTH + 96);
 			int barY = y + 16;
 			int barW = Math.max(52, x + editorWidth - barX - 10);
@@ -321,6 +348,7 @@ public final class GexpressPlayersCategory {
 
 		private void drawTagDropdown(DrawContext context, MinecraftClient client, UUID playerId, String playerName,
 				List<GexpressPermissions.TagInfo> current, int x, int y, int dropdownWidth, int mouseX, int mouseY) {
+			if (!canEditTags) return;
 			List<TagOption> options = editableTags(client);
 			int columns = dropdownColumns(dropdownWidth);
 			int bx = x;
@@ -466,15 +494,19 @@ public final class GexpressPlayersCategory {
 					|| !entry.getProfile().getId().equals(expandedPlayer)) {
 				return ROW_HEIGHT;
 			}
-			int optionCount = editableTags(client).size();
+			if (!canEditAny()) return ROW_HEIGHT;
+			int optionCount = canEditTags ? editableTags(client).size() : 0;
 			int columns = dropdownColumns(rowWidth - 44);
-			int rows = (optionCount + columns - 1) / columns;
-			return ROW_HEIGHT + editorHeight(client) + 8 + rows * TAG_BUTTON_HEIGHT
+			int rows = optionCount <= 0 ? 0 : (optionCount + columns - 1) / columns;
+			return ROW_HEIGHT + editorHeight(client) + (rows > 0 ? 8 : 0) + rows * TAG_BUTTON_HEIGHT
 				+ Math.max(0, rows - 1) * TAG_BUTTON_GAP;
 		}
 
 		private int editorHeight(MinecraftClient client) {
-			return showGcoin(client) ? GCOIN_EDITOR_HEIGHT : LEVEL_EDITOR_HEIGHT;
+			if (canManageProgression && showGcoin(client)) return GCOIN_EDITOR_HEIGHT;
+			if (canManageProgression) return LEVEL_EDITOR_HEIGHT;
+			if (showGcoin(client)) return ECONOMY_EDITOR_HEIGHT;
+			return 0;
 		}
 
 		private int dropdownColumns(int dropdownWidth) {
@@ -501,7 +533,7 @@ public final class GexpressPlayersCategory {
 
 		private void sendTagCommand(String playerName, TagOption tag, boolean selected) {
 			MinecraftClient client = MinecraftClient.getInstance();
-			if (client == null || client.player == null || client.player.networkHandler == null
+			if (!canEditTags || client == null || client.player == null || client.player.networkHandler == null
 					|| tag == null || PlayerTag.DEV.id().equals(tag.id())
 					|| PlayerTag.PASSENGER.id().equals(tag.id())) return;
 			String action = selected ? "remove" : "add";
@@ -516,8 +548,10 @@ public final class GexpressPlayersCategory {
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.player == null || client.player.networkHandler == null) return;
 			if (kind == LevelFieldKind.GCOIN) {
+				if (!canManageEconomy) return;
 				client.player.networkHandler.sendChatCommand("g admin gcoin set " + playerName + " " + value);
 			} else {
+				if (!canManageProgression) return;
 				String subcommand = kind == LevelFieldKind.XP ? "xp" : "level";
 				client.player.networkHandler.sendChatCommand("g admin level " + subcommand + " " + playerName + " " + value);
 			}
@@ -556,7 +590,11 @@ public final class GexpressPlayersCategory {
 		}
 
 		private boolean showGcoin(MinecraftClient client) {
-			return client != null && client.world != null;
+			return canManageEconomy && client != null && client.world != null;
+		}
+
+		private boolean canEditAny() {
+			return canEditTags || canManageProgression || canManageEconomy;
 		}
 
 		private int gcoinBalance(MinecraftClient client, UUID playerId) {

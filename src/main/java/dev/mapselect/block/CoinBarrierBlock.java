@@ -1,25 +1,22 @@
 package dev.mapselect.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.doctor4t.wathe.cca.GameWorldComponent;
-import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.mapselect.registry.MapSelectBlocks;
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.BlockWithEntity;
-import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.world.BlockView;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.util.shape.VoxelShape;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -29,6 +26,7 @@ import java.util.Set;
 
 public class CoinBarrierBlock extends BlockWithEntity {
 	private static final MapCodec<CoinBarrierBlock> CODEC = createCodec(CoinBarrierBlock::new);
+	private static final VoxelShape COLLISION = createCuboidShape(0, 0, 0, 16, 32, 16);
 	public static final int PRICE_PER_BLOCK = 25;
 	public static final int MAX_CONNECTED_BLOCKS = 2048;
 
@@ -48,11 +46,20 @@ public class CoinBarrierBlock extends BlockWithEntity {
 
 	@Override
 	protected BlockRenderType getRenderType(BlockState state) {
-		return BlockRenderType.MODEL;
+		return BlockRenderType.INVISIBLE;
+	}
+
+	@Override
+	protected VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
+		return COLLISION;
 	}
 
 	@Override
 	protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
+		if (player.getMainHandStack().isOf(MapSelectBlocks.COIN_BARRIER_ITEM)
+				|| player.getOffHandStack().isOf(MapSelectBlocks.COIN_BARRIER_ITEM)) {
+			return ActionResult.PASS;
+		}
 		if (player.shouldCancelInteraction() && player.getMainHandStack().isEmpty()) {
 			if (!world.isClient && player instanceof ServerPlayerEntity serverPlayer) {
 				CoinBarrierManager.openEditor(serverPlayer, pos);
@@ -60,32 +67,9 @@ public class CoinBarrierBlock extends BlockWithEntity {
 			return ActionResult.SUCCESS;
 		}
 		if (world.isClient) return ActionResult.SUCCESS;
-		Cluster cluster = scan(world, pos);
-		if (cluster.positions().isEmpty()) return ActionResult.PASS;
-		int price = cluster.price();
-		if (!player.isCreative()) {
-			GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
-			if (game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) {
-				player.sendMessage(Text.literal("Coin barriers can only be bought during a round.")
-					.formatted(Formatting.RED), true);
-				return ActionResult.SUCCESS;
-			}
-			PlayerShopComponent shop = PlayerShopComponent.KEY.get(player);
-			if (shop.balance < price) {
-				player.sendMessage(Text.literal("You need " + price + " coins.")
-					.formatted(Formatting.RED), true);
-				return ActionResult.SUCCESS;
-			}
-			shop.setBalance(shop.balance - price);
-			PlayerShopComponent.KEY.sync(player);
-		}
-		for (BlockPos blockPos : cluster.positions()) {
-			world.setBlockState(blockPos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
-		}
-		String label = cluster.title().isBlank() ? "Barrier" : cluster.title();
-		player.sendMessage(Text.literal(label + " removed for " + price + " coins.")
-			.formatted(Formatting.GOLD), true);
-		return ActionResult.SUCCESS;
+		return player instanceof ServerPlayerEntity serverPlayer && CoinBarrierManager.openPurchase(serverPlayer, pos)
+			? ActionResult.SUCCESS
+			: ActionResult.PASS;
 	}
 
 	public static Cluster scan(World world, BlockPos origin) {

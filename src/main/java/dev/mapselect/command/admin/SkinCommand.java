@@ -29,13 +29,12 @@ import java.util.concurrent.CompletableFuture;
 
 public final class SkinCommand {
 	private static final List<String> TYPES = Arrays.stream(WeaponSkinType.values()).map(WeaponSkinType::id).toList();
-	private static final List<String> SKINS = Arrays.stream(WeaponSkin.values()).map(WeaponSkin::id).toList();
 
 	private SkinCommand() {}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		LiteralArgumentBuilder<ServerCommandSource> caseGive = CommandManager.literal("give")
-			.requires(GexpressPermissions::canUseAdminCommands);
+			.requires(source -> canUseAdminSkinCommand(source, "case", "give"));
 		caseGive.then(CommandManager.argument("case", StringArgumentType.word())
 			.suggests(SkinCommand::suggestCases)
 			.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
@@ -43,7 +42,7 @@ public final class SkinCommand {
 					.executes(ctx -> runCaseGrant(ctx, true)))));
 
 		LiteralArgumentBuilder<ServerCommandSource> caseRemove = CommandManager.literal("remove")
-			.requires(GexpressPermissions::canUseAdminCommands);
+			.requires(source -> canUseAdminSkinCommand(source, "case", "remove"));
 		caseRemove.then(CommandManager.argument("case", StringArgumentType.word())
 			.suggests(SkinCommand::suggestCases)
 			.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
@@ -65,6 +64,7 @@ public final class SkinCommand {
 			.then(caseRemove);
 
 		return CommandManager.literal("skins")
+			.requires(SkinCommand::canUseAdminSkinBranch)
 			.then(CommandManager.literal("equip")
 				.then(CommandManager.argument("type", StringArgumentType.word())
 					.suggests(SkinCommand::suggestTypes)
@@ -74,7 +74,7 @@ public final class SkinCommand {
 			.then(CommandManager.literal("list")
 				.executes(SkinCommand::runList))
 			.then(CommandManager.literal("give")
-				.requires(GexpressPermissions::canUseAdminCommands)
+				.requires(source -> canUseAdminSkinCommand(source, "give"))
 				.then(CommandManager.argument("type", StringArgumentType.word())
 					.suggests(SkinCommand::suggestTypes)
 					.then(CommandManager.argument("skin", StringArgumentType.word())
@@ -82,7 +82,7 @@ public final class SkinCommand {
 						.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 							.executes(ctx -> runGrant(ctx, true))))))
 			.then(CommandManager.literal("remove")
-				.requires(GexpressPermissions::canUseAdminCommands)
+				.requires(source -> canUseAdminSkinCommand(source, "remove"))
 				.then(CommandManager.argument("type", StringArgumentType.word())
 					.suggests(SkinCommand::suggestTypes)
 					.then(CommandManager.argument("skin", StringArgumentType.word())
@@ -90,6 +90,20 @@ public final class SkinCommand {
 						.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 							.executes(ctx -> runGrant(ctx, false))))))
 			.then(caseTree);
+	}
+
+	private static boolean canUseAdminSkinBranch(ServerCommandSource source) {
+		return GexpressPermissions.canManageSkins(source)
+			|| GexpressPermissions.canUseCommandBranch(source, "admin", "skins");
+	}
+
+	private static boolean canUseAdminSkinCommand(ServerCommandSource source, String... subcommand) {
+		String[] path = new String[(subcommand == null ? 0 : subcommand.length) + 2];
+		path[0] = "admin";
+		path[1] = "skins";
+		if (subcommand != null) System.arraycopy(subcommand, 0, path, 2, subcommand.length);
+		return GexpressPermissions.canManageSkins(source)
+			|| GexpressPermissions.canUseCommandPath(source, path);
 	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildPublicTree() {
@@ -143,7 +157,7 @@ public final class SkinCommand {
 		WeaponSkinType type = type(ctx);
 		WeaponSkin skin = skin(ctx);
 		if (type == null || skin == null) {
-			ctx.getSource().sendError(Text.literal("Use type knife/gun and skin " + String.join(", ", SKINS) + "."));
+			ctx.getSource().sendError(Text.literal("Use type knife/gun and skin " + String.join(", ", skinIds()) + "."));
 			return 0;
 		}
 		if (!skin.supports(type)) {
@@ -257,7 +271,7 @@ public final class SkinCommand {
 
 	private static List<String> skinsForType(CommandContext<ServerCommandSource> ctx, boolean includeDefault) {
 		WeaponSkinType type = type(ctx);
-		if (type == null) return includeDefault ? SKINS : SKINS.stream().filter(id -> !"default".equals(id)).toList();
+		if (type == null) return includeDefault ? skinIds() : skinIds().stream().filter(id -> !"default".equals(id)).toList();
 		return Arrays.stream(WeaponSkin.values())
 			.filter(skin -> includeDefault || skin != WeaponSkin.DEFAULT)
 			.map(skin -> skin.logical(type))
@@ -265,5 +279,9 @@ public final class SkinCommand {
 			.filter(skin -> skin.visibleInPicker(type))
 			.map(WeaponSkin::id)
 			.toList();
+	}
+
+	private static List<String> skinIds() {
+		return Arrays.stream(WeaponSkin.values()).map(WeaponSkin::id).toList();
 	}
 }

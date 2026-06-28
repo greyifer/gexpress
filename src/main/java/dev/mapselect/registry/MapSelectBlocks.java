@@ -3,6 +3,7 @@ package dev.mapselect.registry;
 import dev.mapselect.MapSelect;
 import dev.mapselect.block.CabinetBlock;
 import dev.mapselect.block.CoinBarrierBlock;
+import dev.mapselect.block.FloatingTextBlock;
 import dev.mapselect.block.FusedOrnamentBlock;
 import dev.mapselect.block.GexpressStairsBlock;
 import dev.mapselect.block.GoldDrinkTrayBlock;
@@ -13,6 +14,8 @@ import dev.mapselect.block.PebbleBlock;
 import dev.mapselect.block.SandLayerBlock;
 import dev.doctor4t.wathe.block.PanelBlock;
 import dev.mapselect.item.FusedLedgeItem;
+import dev.mapselect.item.FusedOrnamentItem;
+import dev.mapselect.item.RedRibbonItem;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
@@ -132,8 +135,15 @@ public final class MapSelectBlocks {
 	public static final Block COIN_BARRIER = new CoinBarrierBlock(AbstractBlock.Settings.create()
 		.mapColor(MapColor.BLACK)
 		.strength(3.0f, 1200.0f)
-		.sounds(BlockSoundGroup.DEEPSLATE)
+		.sounds(BlockSoundGroup.WOOL)
+		.nonOpaque()
 		.pistonBehavior(PistonBehavior.BLOCK));
+
+	public static final Block FLOATING_TEXT = new FloatingTextBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.CLEAR)
+		.strength(1.0f)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
 
 	public static final Block OLIVE_PLANKS = new Block(AbstractBlock.Settings.copy(Blocks.OAK_PLANKS)
 		.mapColor(MapColor.DARK_GREEN)
@@ -236,7 +246,8 @@ public final class MapSelectBlocks {
 	public static final BlockItem FAKE_SUSPICIOUS_SAND_ITEM = new BlockItem(FAKE_SUSPICIOUS_SAND, new Item.Settings());
 	public static final BlockItem FAKE_SUSPICIOUS_GRAVEL_ITEM = new BlockItem(FAKE_SUSPICIOUS_GRAVEL, new Item.Settings());
 	public static final BlockItem PEBBLE_BLOCK_ITEM = new BlockItem(PEBBLE_BLOCK, new Item.Settings());
-	public static final BlockItem COIN_BARRIER_ITEM = new BlockItem(COIN_BARRIER, new Item.Settings());
+	public static final Item COIN_BARRIER_ITEM = new RedRibbonItem(new Item.Settings().maxCount(1));
+	public static final BlockItem FLOATING_TEXT_ITEM = new BlockItem(FLOATING_TEXT, new Item.Settings());
 	public static final BlockItem OLIVE_PLANKS_ITEM = new BlockItem(OLIVE_PLANKS, new Item.Settings());
 	public static final BlockItem OLIVE_PLANKS_STAIRS_ITEM = new BlockItem(OLIVE_PLANKS_STAIRS, new Item.Settings());
 	public static final BlockItem OLIVE_PLANKS_SLAB_ITEM = new BlockItem(OLIVE_PLANKS_SLAB, new Item.Settings());
@@ -304,17 +315,6 @@ public final class MapSelectBlocks {
 	public static final BlockItem OAK_CABINET_ITEM = new BlockItem(OAK_CABINET, new Item.Settings());
 	public static final BlockItem SPRUCE_CABINET_ITEM = new BlockItem(SPRUCE_CABINET, new Item.Settings());
 
-	private static final BlockItem[] CABINET_ITEMS = {
-		ACACIA_CABINET_ITEM,
-		BIRCH_CABINET_ITEM,
-		CHERRY_CABINET_ITEM,
-		DARK_OAK_CABINET_ITEM,
-		JUNGLE_CABINET_ITEM,
-		MANGROVE_CABINET_ITEM,
-		OAK_CABINET_ITEM,
-		SPRUCE_CABINET_ITEM
-	};
-
 	private static final MoquetteFamily[] MOQUETTE_FAMILIES = {
 		moquetteFamily("red_moquette", Blocks.RED_WOOL),
 		moquetteFamily("brown_moquette", Blocks.BROWN_WOOL),
@@ -330,7 +330,8 @@ public final class MapSelectBlocks {
 		FAKE_SUSPICIOUS_SAND_ITEM,
 		FAKE_SUSPICIOUS_GRAVEL_ITEM,
 		PEBBLE_BLOCK_ITEM,
-		COIN_BARRIER_ITEM
+		COIN_BARRIER_ITEM,
+		FLOATING_TEXT_ITEM
 	};
 
 	private static final Item[] BUILDING_BLOCK_ITEMS = {
@@ -424,6 +425,7 @@ public final class MapSelectBlocks {
 		Identifier fakeSuspiciousGravelId = Identifier.of(MapSelect.MOD_ID, "fake_suspicious_gravel");
 		Identifier pebbleBlockId = Identifier.of(MapSelect.MOD_ID, "pebble_block");
 		Identifier coinBarrierId = Identifier.of(MapSelect.MOD_ID, "coin_barrier");
+		Identifier floatingTextId = Identifier.of(MapSelect.MOD_ID, "floating_text");
 		Identifier olivePlanksId = Identifier.of(MapSelect.MOD_ID, "olive_planks");
 		Identifier olivePlanksStairsId = Identifier.of(MapSelect.MOD_ID, "olive_planks_stairs");
 		Identifier olivePlanksSlabId = Identifier.of(MapSelect.MOD_ID, "olive_planks_slab");
@@ -498,6 +500,7 @@ public final class MapSelectBlocks {
 		Registry.register(Registries.BLOCK, fakeSuspiciousGravelId, FAKE_SUSPICIOUS_GRAVEL);
 		Registry.register(Registries.BLOCK, pebbleBlockId, PEBBLE_BLOCK);
 		Registry.register(Registries.BLOCK, coinBarrierId, COIN_BARRIER);
+		Registry.register(Registries.BLOCK, floatingTextId, FLOATING_TEXT);
 		Registry.register(Registries.BLOCK, olivePlanksId, OLIVE_PLANKS);
 		Registry.register(Registries.BLOCK, olivePlanksStairsId, OLIVE_PLANKS_STAIRS);
 		Registry.register(Registries.BLOCK, olivePlanksSlabId, OLIVE_PLANKS_SLAB);
@@ -566,6 +569,7 @@ public final class MapSelectBlocks {
 		Registry.register(Registries.ITEM, fakeSuspiciousGravelId, FAKE_SUSPICIOUS_GRAVEL_ITEM);
 		Registry.register(Registries.ITEM, pebbleBlockId, PEBBLE_BLOCK_ITEM);
 		Registry.register(Registries.ITEM, coinBarrierId, COIN_BARRIER_ITEM);
+		Registry.register(Registries.ITEM, floatingTextId, FLOATING_TEXT_ITEM);
 		Registry.register(Registries.ITEM, olivePlanksId, OLIVE_PLANKS_ITEM);
 		Registry.register(Registries.ITEM, olivePlanksStairsId, OLIVE_PLANKS_STAIRS_ITEM);
 		Registry.register(Registries.ITEM, olivePlanksSlabId, OLIVE_PLANKS_SLAB_ITEM);
@@ -761,7 +765,7 @@ public final class MapSelectBlocks {
 	}
 
 	private static Item ornamentBlockItem(Identifier ornamentId) {
-		return new BlockItem(Registries.BLOCK.get(ornamentId), new Item.Settings().maxCount(64));
+		return new FusedOrnamentItem(new Item.Settings().maxCount(64), ornamentId);
 	}
 
 	private record MoquetteFamily(

@@ -50,6 +50,12 @@ repositories {
 	}
 }
 
+configurations {
+	vendoredImmersivePortals {
+		transitive = false
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
@@ -62,6 +68,10 @@ dependencies {
 	modCompileOnly "dev.isxander:yet-another-config-lib:${project.yacl_version}"
 	modImplementation "software.bernie.geckolib:geckolib-fabric-1.21.1:${project.geckolib_version}"
 	compileOnly "de.maxhenkel.voicechat:voicechat-api:${project.voicechat_api_version}"
+	modCompileOnly "maven.modrinth:sodium:${project.sodium_version}"
+	modCompileOnly "maven.modrinth:iris:${project.iris_version}"
+	modCompileOnly "maven.modrinth:immersiveportals:${project.immersive_portals_version}"
+	vendoredImmersivePortals "maven.modrinth:immersiveportals:${project.immersive_portals_version}"
 
 	modCompileOnly "org.ladysnake.cardinal-components-api:cardinal-components-base:${project.cca_version}"
 	modCompileOnly "org.ladysnake.cardinal-components-api:cardinal-components-world:${project.cca_version}"
@@ -92,10 +102,100 @@ test {
 	useJUnitPlatform()
 }
 
+def licenseArchiveName = project.archives_base_name
+
 jar {
 	from("LICENSE") {
-		rename { "${it}_${project.archives_base_name}" }
+		rename { "${it}_${licenseArchiveName}" }
 	}
+	from("THIRD_PARTY_NOTICES.md") {
+		into "META-INF"
+		rename { "THIRD_PARTY_NOTICES_Gexpress.md" }
+	}
+	from("licenses") {
+		into "META-INF/licenses"
+	}
+}
+
+tasks.register('vendorImmersivePortalsIntoRemappedJar') {
+	dependsOn remapJar
+	inputs.files(configurations.vendoredImmersivePortals)
+	outputs.upToDateWhen { false }
+
+	doLast {
+		def immersivePortalsJar = configurations.vendoredImmersivePortals.singleFile
+		def jarFile = remapJar.archiveFile.get().asFile
+		def tempDir = temporaryDir
+		delete tempDir
+		mkdir tempDir
+		copy {
+			from zipTree(jarFile)
+			include 'fabric.mod.json'
+			into tempDir
+		}
+		def fabricModJsonFile = file("${tempDir}/fabric.mod.json")
+		def fabricModJson = new groovy.json.JsonSlurper().parse(fabricModJsonFile)
+		fabricModJson.provides = ((fabricModJson.provides ?: []) + [
+				'iportal',
+				'imm_ptl_core',
+				'immersive_portals_core'
+		]).unique()
+		fabricModJson.entrypoints.main = ((fabricModJson.entrypoints.main ?: []) + [
+				'qouteall.imm_ptl.peripheral.platform_specific.PeripheralModEntry',
+				'qouteall.imm_ptl.core.platform_specific.IPModEntry',
+				'qouteall.q_misc_util.MiscUtilModEntry'
+		]).unique()
+		fabricModJson.entrypoints.client = ((fabricModJson.entrypoints.client ?: []) + [
+				'qouteall.imm_ptl.peripheral.platform_specific.PeripheralModEntryClient',
+				'qouteall.imm_ptl.core.platform_specific.IPModEntryClient',
+				'qouteall.q_misc_util.MiscUtilModEntryClient'
+		]).unique()
+		fabricModJson.entrypoints.server = ((fabricModJson.entrypoints.server ?: []) + [
+				'qouteall.imm_ptl.core.platform_specific.IPModEntryDedicatedServer'
+		]).unique()
+		fabricModJson.mixins = ((fabricModJson.mixins ?: []) + [
+				'imm_ptl_peripheral.mixins.json',
+				'imm_ptl.mixins.json',
+				'imm_ptl_fabric.mixins.json',
+				'imm_ptl_compat.mixins.json',
+				'q_misc_util.mixins.json'
+		]).unique()
+		fabricModJson.accessWidener = 'imm_ptl.accesswidener'
+		fabricModJson.jars = [
+				[file: 'META-INF/jars/DimLib-v1.1.0-mc1.21.1.jar']
+		]
+		fabricModJson.custom = fabricModJson.custom ?: [:]
+		fabricModJson.custom['fabric-renderer-indigo:force_compatibility'] = true
+		fabricModJson.custom['lithium:options'] = [
+				'mixin.world.player_chunk_tick'       : false,
+				'mixin.world.combined_heightmap_update': false
+		]
+		fabricModJson.custom['dashloader:disableoption'] = ['CACHE_SHADER']
+		fabricModJsonFile.text = groovy.json.JsonOutput.prettyPrint(
+				groovy.json.JsonOutput.toJson(fabricModJson)
+		)
+		ant.zip(destfile: remapJar.archiveFile.get().asFile, update: true, duplicate: 'preserve') {
+			zipfileset(src: immersivePortalsJar) {
+				exclude(name: 'fabric.mod.json')
+				exclude(name: 'META-INF/MANIFEST.MF')
+				exclude(name: 'META-INF/*.SF')
+				exclude(name: 'META-INF/*.DSA')
+				exclude(name: 'META-INF/*.RSA')
+				exclude(name: 'META-INF/jars/cloth-config-fabric-*.jar')
+			}
+			zipfileset(dir: tempDir) {
+				include(name: 'fabric.mod.json')
+			}
+		}
+	}
+}
+
+tasks.named('assemble') {
+	dependsOn tasks.named('vendorImmersivePortalsIntoRemappedJar')
+}
+
+tasks.named('build') {
+	dependsOn tasks.named('vendorImmersivePortalsIntoRemappedJar')
 }
 
 def modrinthMods = file(System.getenv('APPDATA') ?: "${System.getProperty('user.home')}/AppData/Roaming")
@@ -104,7 +204,7 @@ def modrinthMods = file(System.getenv('APPDATA') ?: "${System.getProperty('user.
 		.toFile()
 
 tasks.register('copyToModrinth', Copy) {
-	dependsOn remapJar
+	dependsOn tasks.named('vendorImmersivePortalsIntoRemappedJar')
 	from remapJar.archiveFile
 	into modrinthMods
 	doFirst {

@@ -24,8 +24,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -58,6 +60,7 @@ public abstract class HmlRoleCountTuningMixin {
 	private void gexpress$clearCivilianRolePlayers(int killerCount, ServerWorld world, GameWorldComponent game,
 			List<ServerPlayerEntity> players, CallbackInfo ci) {
 		gexpress$ensureSpecialFamilyStarters(world, game, players);
+		gexpress$ensureStupidExpressPairRoles(world, game, players);
 		GEXPRESS_PLAYER_COUNT.remove();
 	}
 
@@ -162,6 +165,31 @@ public abstract class HmlRoleCountTuningMixin {
 			if (player != null && game.isRole(player, role)) return true;
 		}
 		return false;
+	}
+
+	@Unique
+	private static void gexpress$ensureStupidExpressPairRoles(ServerWorld world, GameWorldComponent game,
+			List<ServerPlayerEntity> players) {
+		if (world == null || game == null || players == null || players.size() < 2) return;
+		Map<Role, List<ServerPlayerEntity>> membersByRole = new HashMap<>();
+		for (ServerPlayerEntity player : players) {
+			if (player == null) continue;
+			Role role = game.getRole(player);
+			if (role != null && RoleModifierTuningBridge.isStupidExpressPairRole(role.identifier())) {
+				membersByRole.computeIfAbsent(role, ignored -> new ArrayList<>()).add(player);
+			}
+		}
+
+		boolean changed = false;
+		for (Map.Entry<Role, List<ServerPlayerEntity>> entry : membersByRole.entrySet()) {
+			if (entry.getValue().size() != 1) continue;
+			Set<ServerPlayerEntity> reserved = new HashSet<>(entry.getValue());
+			ServerPlayerEntity candidate = gexpress$specialStarterCandidate(game, players, reserved);
+			if (candidate == null) continue;
+			gexpress$assignSpecialStarter(game, candidate, entry.getKey());
+			changed = true;
+		}
+		if (changed) game.sync();
 	}
 
 	@Unique

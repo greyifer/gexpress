@@ -7,6 +7,7 @@ import dev.mapselect.item.C4Item;
 import dev.mapselect.item.CreativeSectionItem;
 import dev.mapselect.item.GexpressCaseItem;
 import dev.mapselect.item.PliersItem;
+import dev.mapselect.item.TutorialWeaponItem;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.block.jukebox.JukeboxSong;
@@ -29,6 +30,10 @@ public final class MapSelectItems {
 	public static final PliersItem PLIERS = new PliersItem(new Item.Settings().maxCount(1));
 	public static final BulletItem BULLET = new BulletItem(new Item.Settings().maxCount(3));
 	public static final Item SPY_BUG = new Item(new Item.Settings().maxCount(1));
+	public static final TutorialWeaponItem TUTORIAL_REVOLVER = new TutorialWeaponItem(
+		TutorialWeaponItem.Kind.REVOLVER, new Item.Settings().maxCount(1));
+	public static final TutorialWeaponItem TUTORIAL_KNIFE = new TutorialWeaponItem(
+		TutorialWeaponItem.Kind.KNIFE, new Item.Settings().maxCount(1));
 	public static final GexpressCaseItem GEXPRESS_CASE = new GexpressCaseItem(new Item.Settings().maxCount(64));
 	public static final Item CREATIVE_DECORATION_BLOCKS_HEADER = new CreativeSectionItem(new Item.Settings().maxCount(1));
 	public static final Item CREATIVE_ENVIRONMENTAL_BLOCKS_HEADER = new CreativeSectionItem(new Item.Settings().maxCount(1));
@@ -49,6 +54,8 @@ public final class MapSelectItems {
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "pliers"), PLIERS);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "bullet"), BULLET);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "spy_bug"), SPY_BUG);
+		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "tutorial_revolver"), TUTORIAL_REVOLVER);
+		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "tutorial_knife"), TUTORIAL_KNIFE);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "gexpress_case"), GEXPRESS_CASE);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "music_disc_derailed"), MUSIC_DISC_DERAILED);
 		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "music_disc_aeristheme"), MUSIC_DISC_AERISTHEME);

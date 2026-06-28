@@ -1,6 +1,6 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.ClientSpectatorRoleRevealDelay;
+import dev.mapselect.client.game.ClientSpectatorRoleRevealDelay;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;

@@ -43,6 +43,8 @@ public final class DefaultMapPresets {
 		preset.fogColor = null;
 		preset.defaultTrainPreset = "snow";
 		preset.roomCount = 7;
+		preset.terrainMode = MapPreset.TerrainMode.MOVING;
+		preset.playAreaMode = MapPreset.PlayAreaMode.TRAIN;
 		preset.freshAirAreas = new ArrayList<>();
 		preset.freshAirArea = null;
 		preset.normalize();

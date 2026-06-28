@@ -3,6 +3,7 @@ package dev.mapselect.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.mapselect.command.admin.DevCommand;
+import dev.mapselect.command.admin.DiagnosticsCommand;
 import dev.mapselect.command.admin.ForceCommand;
 import dev.mapselect.command.admin.GcoinCommand;
 import dev.mapselect.command.admin.HostCommand;
@@ -39,6 +40,8 @@ public final class GexpressCommand {
 				.then(TrainCommand.buildTree())
 				.then(RtpCommand.buildTree()))
 			.then(TestCommand.buildTree())
+			.then(ServerAccessCommand.openTree())
+			.then(ServerAccessCommand.closeTree())
 			.then(CommandManager.literal("roles")
 				.then(TuningCommand.buildRoleTree())
 				.then(PelicanCommand.buildTree()))
@@ -50,6 +53,8 @@ public final class GexpressCommand {
 				.then(HostCommand.buildTree())
 				.then(TrustedCommand.buildTree())
 				.then(TagCommand.buildTree())
+				.then(DiagnosticsCommand.buildTree())
+				.then(DiagnosticsCommand.buildDebugTree())
 				.then(SkinCommand.buildTree())
 				.then(GcoinCommand.buildTree())
 				.then(VoiceCommand.buildTree())

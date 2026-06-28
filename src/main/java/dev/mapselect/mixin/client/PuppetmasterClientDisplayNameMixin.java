@@ -1,8 +1,8 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.ClientPuppetmasterState;
-import dev.mapselect.client.ClientSkincrawlerState;
-import dev.mapselect.client.ClientTricksterState;
+import dev.mapselect.client.role.puppetmaster.ClientPuppetmasterState;
+import dev.mapselect.client.role.skincrawler.ClientSkincrawlerState;
+import dev.mapselect.client.role.harlequin.ClientTricksterState;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;

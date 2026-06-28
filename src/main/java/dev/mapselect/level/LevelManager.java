@@ -10,7 +10,7 @@ import dev.mapselect.command.admin.TagCommand;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.currency.GcoinComponent;
 import dev.mapselect.game.RoundParticipantTracker;
-import dev.mapselect.network.ClaimLevelRewardPayload;
+import dev.mapselect.network.progression.ClaimLevelRewardPayload;
 import dev.mapselect.role.RoleTeams;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -209,11 +209,6 @@ public final class LevelManager {
 	private static boolean isCivilianSide(GameWorldComponent game, PlayerEntity player) {
 		Role role = game == null || player == null ? null : game.getRole(player);
 		return role != null && role.isInnocent() && !game.canUseKillerFeatures(player);
-	}
-
-	private static boolean isNeutralSide(GameWorldComponent game, PlayerEntity player) {
-		Role role = game == null || player == null ? null : game.getRole(player);
-		return role != null && !role.canUseKiller() && !role.isInnocent();
 	}
 
 	private static boolean isNeutralSide(GameWorldComponent game, UUID playerId) {

@@ -5,7 +5,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.client.gui.RoleAnnouncementTexts;
 import dev.doctor4t.wathe.client.gui.RoundTextRenderer;
 import dev.doctor4t.wathe.game.GameFunctions;
-import dev.mapselect.client.ClientNeutralWinState;
+import dev.mapselect.client.game.ClientNeutralWinState;
 import dev.mapselect.registry.MapSelectRoles;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.font.TextRenderer;

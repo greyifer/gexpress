@@ -12,8 +12,8 @@ import dev.doctor4t.wathe.index.WatheDataComponentTypes;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.BodyguardFeedPayload;
-import dev.mapselect.network.BodyguardStatePayload;
+import dev.mapselect.network.role.bodyguard.BodyguardFeedPayload;
+import dev.mapselect.network.role.bodyguard.BodyguardStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
@@ -45,6 +45,7 @@ public final class BodyguardManager {
 	private static final double PROTECTION_RANGE_SQUARED = 25.0D;
 	private static final String BODYGUARD_REVOLVER_KEY = "gexpress_bodyguard_revolver";
 	private static final Map<UUID, UUID> targetByBodyguard = new ConcurrentHashMap<>();
+	private static final Map<UUID, Boolean> failedBodyguards = new ConcurrentHashMap<>();
 	private static final Map<String, Long> nextLineTick = new ConcurrentHashMap<>();
 	private static final Map<UUID, MoodRestore> pendingMoodRestores = new ConcurrentHashMap<>();
 	private static int tickGate;
@@ -84,6 +85,11 @@ public final class BodyguardManager {
 		for (ServerPlayerEntity bodyguard : world.getPlayers()) {
 			if (!isBodyguard(bodyguard) || PelicanManager.isStashed(bodyguard)
 					|| !isPlayable(bodyguard, bodyguard)) {
+				removeIssuedRevolver(bodyguard);
+				sendClear(bodyguard);
+				continue;
+			}
+			if (failedBodyguards.containsKey(bodyguard.getUuid())) {
 				removeIssuedRevolver(bodyguard);
 				sendClear(bodyguard);
 				continue;
@@ -267,6 +273,7 @@ public final class BodyguardManager {
 			if (!target.getUuid().equals(entry.getValue())) continue;
 			ServerPlayerEntity bodyguard = world.getServer().getPlayerManager().getPlayer(entry.getKey());
 			targetByBodyguard.remove(entry.getKey());
+			failedBodyguards.put(entry.getKey(), true);
 			if (bodyguard == null || bodyguard.getWorld() != world) continue;
 			removeIssuedRevolver(bodyguard);
 			sendClear(bodyguard);
@@ -316,18 +323,23 @@ public final class BodyguardManager {
 			}
 		}
 		targetByBodyguard.clear();
+		failedBodyguards.clear();
 		nextLineTick.clear();
 		pendingMoodRestores.clear();
 		tickGate = 0;
 	}
 
 	public static TimeState snapshotForTimeRewind() {
-		return new TimeState(Map.copyOf(targetByBodyguard));
+		return new TimeState(Map.copyOf(targetByBodyguard), Map.copyOf(failedBodyguards));
 	}
 
 	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
 		targetByBodyguard.clear();
-		if (state != null) targetByBodyguard.putAll(state.targetByBodyguard());
+		failedBodyguards.clear();
+		if (state != null) {
+			targetByBodyguard.putAll(state.targetByBodyguard());
+			failedBodyguards.putAll(state.failedBodyguards());
+		}
 		if (world == null) return;
 		for (ServerPlayerEntity bodyguard : world.getPlayers()) {
 			UUID targetId = targetByBodyguard.get(bodyguard.getUuid());
@@ -337,7 +349,7 @@ public final class BodyguardManager {
 		}
 	}
 
-	public record TimeState(Map<UUID, UUID> targetByBodyguard) {}
+	public record TimeState(Map<UUID, UUID> targetByBodyguard, Map<UUID, Boolean> failedBodyguards) {}
 
 	private static boolean isBodyguard(PlayerEntity player) {
 		if (player == null || player.getWorld() == null) return false;

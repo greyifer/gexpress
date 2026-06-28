@@ -37,12 +37,12 @@ public final class GexpressRoleShop {
 	private GexpressRoleShop() {}
 
 	public static List<ShopEntry> resolve(PlayerEntity player) {
-		if (CopycatManager.isBorrowingAbility(player)) return List.of();
+		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player) ? mutedNotesList() : List.of();
 		Role role = roleOf(player);
 		boolean muted = isMuted(player);
 		if (role == null) return muted ? mutedNotesList() : GameConstants.SHOP_ENTRIES;
 		Identifier id = role.identifier();
-		if (muted && isExternalOverlayShopRole(id)) return List.of();
+		if (muted && isExternalRole(id)) return List.of();
 		List<ShopEntry> entries;
 		if (BOMB_SPECIALIST_ID.equals(id)) entries = bombSpecialistList();
 		else if (GODFATHER_ID.equals(id)) entries = godfatherList();
@@ -63,7 +63,7 @@ public final class GexpressRoleShop {
 	}
 
 	public static boolean canUseKillerEconomy(PlayerEntity player) {
-		if (CopycatManager.isBorrowingAbility(player)) return false;
+		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player);
 		if (isMuted(player) && !usesExternalMutedNoteWidget(player)) return true;
 		return canUseKillerEconomy(roleOf(player));
 	}
@@ -74,7 +74,7 @@ public final class GexpressRoleShop {
 	}
 
 	public static boolean showsMoneyHud(PlayerEntity player) {
-		if (CopycatManager.isBorrowingAbility(player)) return false;
+		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player);
 		if (isMuted(player)) return true;
 		Role role = roleOf(player);
 		if (role == null) return false;
@@ -89,7 +89,7 @@ public final class GexpressRoleShop {
 
 	public static boolean usesExternalMutedNoteWidget(PlayerEntity player) {
 		Role role = roleOf(player);
-		return isMuted(player) && role != null && isExternalOverlayShopRole(role.identifier());
+		return isMuted(player) && role != null && isExternalRole(role.identifier());
 	}
 
 	public static int externalOverlayShopSize(PlayerEntity player) {
@@ -120,15 +120,8 @@ public final class GexpressRoleShop {
 			|| BURGLAR_ID.equals(id);
 	}
 
-	private static boolean isExternalOverlayShopRole(Identifier id) {
-		if (id == null) return false;
-		if ("noellesroles".equals(id.getNamespace())) {
-			return switch (id.getPath()) {
-				case "trapper", "bartender", "noisemaker", "jester", "mimic", "executioner" -> true;
-				default -> false;
-			};
-		}
-		return "starexpress".equals(id.getNamespace()) && "muzzler".equals(id.getPath());
+	private static boolean isExternalRole(Identifier id) {
+		return id != null && !MapSelect.MOD_ID.equals(id.getNamespace()) && !"wathe".equals(id.getNamespace());
 	}
 
 	public static List<ShopEntry> bombSpecialistList() {

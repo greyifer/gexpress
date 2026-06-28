@@ -39,23 +39,27 @@ public class TagCommand {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("tag")
-			.requires(GexpressPermissions::canEditTags)
+			.requires(TagCommand::canUseTagBranch)
 			.then(CommandManager.literal("set")
+				.requires(source -> canUseTagCommand(source, "set"))
 				.then(CommandManager.argument("tag", StringArgumentType.word())
 					.suggests(TagCommand::suggestTags)
 					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 						.executes(TagCommand::runSet))))
 			.then(CommandManager.literal("add")
+				.requires(source -> canUseTagCommand(source, "add"))
 				.then(CommandManager.argument("tag", StringArgumentType.word())
 					.suggests(TagCommand::suggestTags)
 					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 						.executes(ctx -> runToggle(ctx, true)))))
 			.then(CommandManager.literal("remove")
+				.requires(source -> canUseTagCommand(source, "remove"))
 				.then(CommandManager.argument("tag", StringArgumentType.word())
 					.suggests(TagCommand::suggestTags)
 					.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 						.executes(ctx -> runToggle(ctx, false)))))
 			.then(CommandManager.literal("custom")
+				.requires(source -> canUseTagCommand(source, "custom"))
 				.then(CommandManager.literal("create")
 					.then(CommandManager.argument("id", StringArgumentType.word())
 						.then(CommandManager.argument("display", StringArgumentType.word())
@@ -89,6 +93,7 @@ public class TagCommand {
 							.then(CommandManager.argument("enabled", BoolArgumentType.bool())
 								.executes(TagCommand::runCustomPermission))))))
 			.then(CommandManager.literal("settings")
+				.requires(source -> canUseTagCommand(source, "settings"))
 				.then(CommandManager.literal("color")
 					.then(CommandManager.argument("id", StringArgumentType.word())
 						.suggests(TagCommand::suggestAllTagDefinitions)
@@ -111,9 +116,21 @@ public class TagCommand {
 						.suggests(TagCommand::suggestBuiltinTags)
 						.executes(TagCommand::runTagReset))))
 			.then(CommandManager.literal("list")
+				.requires(source -> canUseTagCommand(source, "list"))
 				.executes(TagCommand::runList))
 			.then(CommandManager.literal("permissions")
+				.requires(source -> canUseTagCommand(source, "permissions"))
 				.executes(TagCommand::runPermissions));
+	}
+
+	private static boolean canUseTagBranch(ServerCommandSource source) {
+		return GexpressPermissions.canEditTags(source)
+			|| GexpressPermissions.canUseCommandBranch(source, "admin", "tag");
+	}
+
+	private static boolean canUseTagCommand(ServerCommandSource source, String subcommand) {
+		return GexpressPermissions.canEditTags(source)
+			|| GexpressPermissions.canUseCommandPath(source, "admin", "tag", subcommand);
 	}
 
 	private static CompletableFuture<Suggestions> suggestTags(CommandContext<ServerCommandSource> ctx,

@@ -25,11 +25,11 @@ import java.util.function.Predicate;
 public final class StartCommand {
 	private StartCommand() {}
 
-	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseHostCommands;
+	private static final Predicate<ServerCommandSource> CAN_START_GAMES = GexpressPermissions::canStartGames;
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("start")
-			.requires(OP_OR_HOST)
+			.requires(CAN_START_GAMES)
 			.then(mode("modded", () -> Harpymodloader.MODDED_GAMEMODE))
 			.then(mode("amnesia", () -> GexpressGameModes.AMNESIA))
 			.then(mode("takeover", () -> GexpressGameModes.TAKEOVER))

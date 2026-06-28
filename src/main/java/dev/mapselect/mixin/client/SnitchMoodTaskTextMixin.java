@@ -1,7 +1,7 @@
 package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.cca.PlayerMoodComponent;
-import dev.mapselect.client.ClientSnitchState;
+import dev.mapselect.client.role.snitch.ClientSnitchState;
 import net.minecraft.text.Text;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;

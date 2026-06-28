@@ -5,7 +5,7 @@ import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.game.RoundParticipantTracker;
 import dev.mapselect.level.LevelComponent;
-import dev.mapselect.network.RoundEndRoleRosterPayload;
+import dev.mapselect.network.game.RoundEndRoleRosterPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;

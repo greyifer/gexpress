@@ -8,11 +8,11 @@ import dev.isxander.yacl3.api.OptionGroup;
 import dev.isxander.yacl3.gui.YACLScreen;
 import dev.isxander.yacl3.gui.tab.TabExt;
 import dev.mapselect.MapSelect;
-import dev.mapselect.client.DevWeaponModels;
+import dev.mapselect.client.render.DevWeaponModels;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.currency.GcoinComponent;
 import dev.mapselect.item.GexpressCaseItem;
-import dev.mapselect.network.SkinCaseResultPayload;
+import dev.mapselect.network.progression.SkinCaseResultPayload;
 import dev.mapselect.skin.PlayerSkinComponent;
 import dev.mapselect.skin.WeaponSkin;
 import dev.mapselect.skin.WeaponSkinType;
@@ -440,11 +440,6 @@ public final class GexpressSkinsCategory {
 				x + w / 2, y + h - 15, 0xFFB8C3CC);
 		}
 
-		private String rewardChanceText(GexpressConfig.SkinCaseReward reward, int totalWeight) {
-			if (reward == null || totalWeight <= 0) return "0.0%";
-			return chanceText(reward.weight(), totalWeight);
-		}
-
 		private String chanceText(int weight, int totalWeight) {
 			if (totalWeight <= 0) return "0.0%";
 			int tenths = Math.max(0, weight) * 1000 / totalWeight;
@@ -598,7 +593,8 @@ public final class GexpressSkinsCategory {
 				.map(skin -> skin.logical(type))
 				.distinct()
 				.filter(skin -> skin.visibleInPicker(type))
-				.sorted(Comparator.comparingInt(Enum::ordinal))
+				.sorted(Comparator.comparing((WeaponSkin skin) -> skin != WeaponSkin.DEFAULT)
+					.thenComparing(WeaponSkin::displayName, String.CASE_INSENSITIVE_ORDER))
 				.toList();
 		}
 
@@ -755,7 +751,6 @@ public final class GexpressSkinsCategory {
 				openingRevealSoundPlayed = true;
 				playCaseSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 0.7F, 1.18F);
 			}
-			int color = reward.color();
 			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(reward.skin().displayName()),
 				centerX, titleY + 28, 0xFFFFFFFF);
 			context.drawCenteredTextWithShadow(client.textRenderer,

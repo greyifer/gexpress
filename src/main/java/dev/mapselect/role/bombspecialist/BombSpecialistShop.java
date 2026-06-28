@@ -11,10 +11,12 @@ import java.util.List;
 public final class BombSpecialistShop {
 	private BombSpecialistShop() {}
 
+	@Deprecated
 	public static List<ShopEntry> resolve(PlayerEntity player) {
 		return GexpressRoleShop.resolve(player);
 	}
 
+	@Deprecated
 	public static List<ShopEntry> customList() {
 		return GexpressRoleShop.bombSpecialistList();
 	}

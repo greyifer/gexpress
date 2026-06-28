@@ -1,6 +1,6 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.ClientPuppetmasterState;
+import dev.mapselect.client.role.puppetmaster.ClientPuppetmasterState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.InGameHud;
 import net.minecraft.entity.player.PlayerEntity;

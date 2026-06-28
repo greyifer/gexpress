@@ -2,8 +2,11 @@ package dev.mapselect.mixin.client;
 
 import cat.rezelyn.watheextended.client.screen.guidebook.GuidebookEntry;
 import cat.rezelyn.watheextended.client.screen.guidebook.GuidebookEntryBuilder;
+import cat.rezelyn.watheextended.client.screen.guidebook.GuidebookIcons;
 import dev.mapselect.MapSelect;
+import dev.mapselect.client.text.GexpressRoleTexts;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,6 +30,7 @@ public abstract class GuidebookModGroupingMixin {
 	@Unique private static final int GEXPRESS$COVENANT_COLOR = 0x8B0F1F;
 	@Unique private static final String GEXPRESS$MAFIA_ICON = "\uE500";
 	@Unique private static final String GEXPRESS$COVENANT_ICON = "\uE501";
+	@Unique private static final String GEXPRESS$PAINTER_ID = MapSelect.MOD_ID + ":painter";
 	@Unique private static final Set<String> GEXPRESS$MAFIA_ROLES = Set.of(
 		"godfather", "mafioso", "janitor", "pickpocket", "burglar"
 	);
@@ -57,6 +61,7 @@ public abstract class GuidebookModGroupingMixin {
 		boolean hasHeader = false;
 
 		for (GuidebookEntry entry : entries) {
+			entry = gexpress$styleSpecialRole(entry);
 			if (entry != null && entry.isHeader()) {
 				gexpress$appendRoleSection(grouped, sectionEntries, mafiaEntries, covenantEntries);
 				sectionEntries.clear();
@@ -72,6 +77,17 @@ public abstract class GuidebookModGroupingMixin {
 		gexpress$appendSpecialRoleSection(grouped, "Covenant Roles", GEXPRESS$COVENANT_ICON, GEXPRESS$COVENANT_COLOR,
 			covenantEntries);
 		return grouped;
+	}
+
+	@Unique
+	private static GuidebookEntry gexpress$styleSpecialRole(GuidebookEntry entry) {
+		if (entry == null || !GEXPRESS$PAINTER_ID.equals(entry.id())) return entry;
+		MutableText row = GuidebookIcons.icon(entry.active() ? "enabled" : "disabled").copy()
+			.append(Text.literal(" "))
+			.append(GexpressRoleTexts.painterName(entry.displayTitle()));
+		MutableText title = GexpressRoleTexts.painterName(entry.displayTitle());
+		return new GuidebookEntry(row, entry.color(), entry.isHeader(), entry.id(), entry.descriptionKey(), title,
+			entry.active(), entry.killerSided());
 	}
 
 	@Unique

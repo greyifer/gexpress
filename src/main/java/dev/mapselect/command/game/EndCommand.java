@@ -13,7 +13,9 @@ import java.util.function.Predicate;
 public final class EndCommand {
 	private EndCommand() {}
 
-	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseHostCommands;
+	private static final Predicate<ServerCommandSource> OP_OR_HOST = source ->
+		GexpressPermissions.canUseHostCommands(source)
+			|| GexpressPermissions.canUseCommandPath(source, "game", "end");
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("end")

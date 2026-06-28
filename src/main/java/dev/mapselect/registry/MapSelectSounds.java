@@ -25,6 +25,8 @@ public final class MapSelectSounds {
 	public static final SoundEvent JEVIL_LAUGH = SoundEvent.of(JEVIL_LAUGH_ID);
 	public static final Identifier MAFIA_ID = Identifier.of(MapSelect.MOD_ID, "mafia");
 	public static final SoundEvent MAFIA = SoundEvent.of(MAFIA_ID);
+	public static final Identifier CUPID_ID = Identifier.of(MapSelect.MOD_ID, "cupid");
+	public static final SoundEvent CUPID = SoundEvent.of(CUPID_ID);
 	public static final Identifier MUSIC_DISC_DERAILED_ID = Identifier.of(MapSelect.MOD_ID, "music_disc.derailed");
 	public static final SoundEvent MUSIC_DISC_DERAILED = SoundEvent.of(MUSIC_DISC_DERAILED_ID);
 	public static final Identifier MUSIC_DISC_AERISTHEME_ID = Identifier.of(MapSelect.MOD_ID, "music_disc.aeristheme");
@@ -41,6 +43,7 @@ public final class MapSelectSounds {
 		Registry.register(Registries.SOUND_EVENT, PIZZA_PLUSH_HONK_ID, PIZZA_PLUSH_HONK);
 		Registry.register(Registries.SOUND_EVENT, JEVIL_LAUGH_ID, JEVIL_LAUGH);
 		Registry.register(Registries.SOUND_EVENT, MAFIA_ID, MAFIA);
+		Registry.register(Registries.SOUND_EVENT, CUPID_ID, CUPID);
 		Registry.register(Registries.SOUND_EVENT, MUSIC_DISC_DERAILED_ID, MUSIC_DISC_DERAILED);
 		Registry.register(Registries.SOUND_EVENT, MUSIC_DISC_AERISTHEME_ID, MUSIC_DISC_AERISTHEME);
 		Registry.register(Registries.SOUND_EVENT, AERISTHEME_LOOP_ID, AERISTHEME_LOOP);

@@ -3,6 +3,7 @@ package dev.mapselect.role;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.painter.PainterManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
 
@@ -59,12 +60,12 @@ public final class RoleTeams {
 
 	private static Role role(GameWorldComponent game, PlayerEntity player) {
 		if (game == null || player == null) return null;
-		return game.getRole(player);
+		return PainterManager.investigationRole(game, player);
 	}
 
 	private static Role role(GameWorldComponent game, UUID playerId) {
 		if (game == null || playerId == null) return null;
-		return game.getRole(playerId);
+		return PainterManager.investigationRole(game, playerId);
 	}
 
 	private static boolean isMafia(Identifier id) {

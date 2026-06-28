@@ -1,6 +1,7 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.ClientSilentShadowState;
+import dev.mapselect.client.role.silent.ClientSilentShadowState;
+import dev.mapselect.client.role.painter.ClientPainterState;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.EntityRenderer;
@@ -60,6 +61,9 @@ public abstract class SilentShadowRendererMixin<T extends LivingEntity> {
 		LivingEntity entity = GEXPRESS_RENDERING_ENTITY.get();
 		if (entity instanceof PlayerEntity && ClientSilentShadowState.isShadowed(entity)) {
 			return ClientSilentShadowState.shadowColor();
+		}
+		if (entity instanceof net.minecraft.client.network.AbstractClientPlayerEntity player) {
+			return ClientPainterState.playerColor(player, originalColor);
 		}
 		return originalColor;
 	}

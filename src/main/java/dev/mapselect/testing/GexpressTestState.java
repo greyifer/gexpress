@@ -27,7 +27,7 @@ public final class GexpressTestState {
 	}
 
 	public static boolean hasCreativeAbilityBypass(PlayerEntity player) {
-		return isRoleTester(player) && player.isCreative();
+		return player != null && player.isCreative();
 	}
 
 	public static boolean hasRoleTesters() {

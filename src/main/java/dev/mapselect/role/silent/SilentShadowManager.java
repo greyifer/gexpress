@@ -5,8 +5,9 @@ import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
-import dev.mapselect.network.ShadowMarchUsePayload;
+import dev.mapselect.network.role.silent.ShadowMarchUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.ExternalRoleCompat;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -39,6 +40,7 @@ public final class SilentShadowManager {
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (!(victim instanceof ServerPlayerEntity player)) return true;
+		if (ExternalRoleCompat.isVoodooDeath(reason)) return true;
 		SilentShadowComponent comp = SilentShadowComponent.KEY.getNullable(player.getWorld());
 		if (comp == null || !comp.isActive(player.getUuid())) return true;
 		player.sendMessage(Text.literal("Shadow March protected you."), true);

@@ -8,19 +8,21 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.AbilityCooldownPayload;
-import dev.mapselect.network.AbilityCooldownSync;
-import dev.mapselect.network.PuppetmasterHotbarPayload;
-import dev.mapselect.network.PuppetmasterInputPayload;
-import dev.mapselect.network.PuppetmasterSelectPayload;
-import dev.mapselect.network.PuppetmasterStatePayload;
-import dev.mapselect.network.PuppetmasterTargetsPayload;
-import dev.mapselect.network.PuppetmasterUsePayload;
+import dev.mapselect.network.ability.AbilityCooldownPayload;
+import dev.mapselect.network.ability.AbilityCooldownSync;
+import dev.mapselect.network.role.puppetmaster.PuppetmasterHotbarPayload;
+import dev.mapselect.network.role.puppetmaster.PuppetmasterInputPayload;
+import dev.mapselect.network.role.puppetmaster.PuppetmasterSelectPayload;
+import dev.mapselect.network.role.puppetmaster.PuppetmasterStatePayload;
+import dev.mapselect.network.role.puppetmaster.PuppetmasterTargetsPayload;
+import dev.mapselect.network.role.puppetmaster.PuppetmasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilitySounds;
+import dev.mapselect.role.ExternalRoleCompat;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
+import dev.doctor4t.wathe.index.WatheItems;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -29,6 +31,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.s2c.play.SetCameraEntityS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -36,6 +39,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
@@ -87,7 +91,7 @@ public final class PuppetmasterManager {
 			}
 			return true;
 		});
-		ServerTickEvents.START_WORLD_TICK.register(PuppetmasterManager::tick);
+		ServerTickEvents.END_WORLD_TICK.register(PuppetmasterManager::tick);
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 			server.execute(() -> endForDisconnectedPlayer(handler.player, server)));
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
@@ -168,8 +172,8 @@ public final class PuppetmasterManager {
 
 		int durationTicks = GexpressConfig.getPuppetmasterControlDurationSeconds() * 20;
 		ControlSession session = new ControlSession(puppetmaster, target,
-			puppetmaster.getWorld().getTime(),
 			puppetmaster.getWorld().getTime() + durationTicks);
+		grantTemporaryKnife(target, session);
 		sessionsByController.put(puppetmaster.getUuid(), session);
 		controllerByTarget.put(target.getUuid(), puppetmaster.getUuid());
 		applyModifierSwap(puppetmaster.getServerWorld(), puppetmaster, target, session);
@@ -179,8 +183,11 @@ public final class PuppetmasterManager {
 		target.setSneaking(false);
 		target.setSprinting(false);
 		target.setVelocity(Vec3d.ZERO);
+		puppetmaster.setInvisible(false);
+		target.setInvisible(session.targetWasInvisible);
 		puppetmaster.playerScreenHandler.syncState();
 		target.playerScreenHandler.syncState();
+		syncPuppetHotbar(puppetmaster, target);
 
 		puppetmaster.networkHandler.sendPacket(new SetCameraEntityS2CPacket(target));
 		AbilitySounds.playTo(List.of(puppetmaster, target),
@@ -205,7 +212,6 @@ public final class PuppetmasterManager {
 			MathHelper.clamp(payload.pitch(), -90.0F, 90.0F),
 			MathHelper.clamp(payload.selectedSlot(), 0, 8)
 		);
-		session.lastInputTick = puppetmaster.getWorld().getTime();
 	}
 
 	private static float clampInput(float value) {
@@ -231,6 +237,7 @@ public final class PuppetmasterManager {
 			}
 			freezeController(controller, session);
 			driveTarget(target, session);
+			syncPuppetHotbar(controller, target);
 		}
 		for (UUID controllerId : stale) endControl(controllerId, world.getServer(), true);
 	}
@@ -258,6 +265,7 @@ public final class PuppetmasterManager {
 		target.setBodyYaw(yaw);
 		target.setSneaking(input.sneaking());
 		target.setSprinting(input.sprinting() && input.forward() > 0.5F && !input.sneaking());
+		target.getInventory().selectedSlot = input.selectedSlot();
 
 		float sideways = input.sideways();
 		float forward = input.forward();
@@ -269,7 +277,7 @@ public final class PuppetmasterManager {
 		double yawRad = yaw * (Math.PI / 180.0D);
 		double sin = Math.sin(yawRad);
 		double cos = Math.cos(yawRad);
-		double speed = input.sneaking() ? 0.08D : input.sprinting() ? 0.22D : 0.15D;
+		double speed = input.sneaking() ? 0.10D : input.sprinting() ? 0.30D : 0.20D;
 		double velocityX = (sideways * cos - forward * sin) * speed;
 		double velocityZ = (forward * cos + sideways * sin) * speed;
 		double velocityY = target.getVelocity().y;
@@ -278,6 +286,10 @@ public final class PuppetmasterManager {
 		}
 		target.setVelocity(velocityX, velocityY, velocityZ);
 		target.velocityModified = true;
+		if (input.using() && !session.wasUsing) {
+			useSelectedItem(target);
+		}
+		session.wasUsing = input.using();
 	}
 
 	private static boolean isControlledTargetValid(ServerPlayerEntity target, ServerPlayerEntity controller) {
@@ -369,6 +381,10 @@ public final class PuppetmasterManager {
 	private static boolean allowWatheDeath(PlayerEntity victim, PlayerEntity killer, net.minecraft.util.Identifier reason) {
 		if (!(victim instanceof ServerPlayerEntity player)) return true;
 		ControlSession controllerSession = sessionsByController.get(player.getUuid());
+		if (ExternalRoleCompat.isVoodooDeath(reason)) {
+			if (controllerSession != null) endControl(controllerSession.controllerId, player.getServer(), true);
+			return true;
+		}
 		if (controllerSession != null) {
 			killControlledTargetForControllerHit(player, controllerSession, killer, reason);
 			return false;
@@ -425,8 +441,9 @@ public final class PuppetmasterManager {
 		PuppetmasterStatePayload clear = PuppetmasterStatePayload.clear();
 		broadcastState(server, clear);
 		if (controller != null && target != null && controller.getWorld() instanceof ServerWorld controllerWorld
-				&& target.getWorld() instanceof ServerWorld targetWorld) {
+				&& target.getWorld() instanceof ServerWorld) {
 			restoreModifierSwap(controllerWorld, controller, target, session);
+			removeTemporaryKnife(target, session);
 			target.changeGameMode(session.targetGameMode);
 			if (controller.squaredDistanceTo(session.controllerHomeX, session.controllerHomeY, session.controllerHomeZ) > 0.25D) {
 				controller.teleport(controllerWorld, session.controllerHomeX, session.controllerHomeY, session.controllerHomeZ,
@@ -455,6 +472,7 @@ public final class PuppetmasterManager {
 			controller.sendMessage(Text.literal("Released puppet."), true);
 		}
 		if (target != null) {
+			removeTemporaryKnife(target, session);
 			target.changeGameMode(session.targetGameMode);
 			target.setInvisible(session.targetWasInvisible);
 			target.stopUsingItem();
@@ -549,6 +567,52 @@ public final class PuppetmasterManager {
 		if (puppetmaster == null || target == null || puppetmaster.getWorld() != target.getWorld()) return false;
 		double range = GexpressConfig.getPuppetmasterControlRange();
 		return puppetmaster.squaredDistanceTo(target) <= range * range;
+	}
+
+	private static void grantTemporaryKnife(ServerPlayerEntity target, ControlSession session) {
+		if (target == null || session == null || target.getInventory().count(WatheItems.KNIFE) > 0) return;
+		int slot = firstEmptyHotbarSlot(target);
+		if (slot < 0) return;
+		target.getInventory().setStack(slot, WatheItems.KNIFE.getDefaultStack());
+		target.getInventory().selectedSlot = slot;
+		session.temporaryKnifeSlot = slot;
+		session.input = new PuppetInput(0.0F, 0.0F, false, false, false, false,
+			session.targetStartYaw, session.targetStartPitch, slot);
+	}
+
+	private static int firstEmptyHotbarSlot(ServerPlayerEntity player) {
+		for (int slot = 0; slot < 9; slot++) {
+			if (player.getInventory().getStack(slot).isEmpty()) return slot;
+		}
+		return -1;
+	}
+
+	private static void removeTemporaryKnife(ServerPlayerEntity target, ControlSession session) {
+		if (target == null || session == null || session.temporaryKnifeSlot < 0) return;
+		ItemStack stack = target.getInventory().getStack(session.temporaryKnifeSlot);
+		if (stack.isOf(WatheItems.KNIFE)) {
+			target.getInventory().setStack(session.temporaryKnifeSlot, ItemStack.EMPTY);
+			target.playerScreenHandler.syncState();
+		}
+		session.temporaryKnifeSlot = -1;
+	}
+
+	private static void syncPuppetHotbar(ServerPlayerEntity controller, ServerPlayerEntity target) {
+		if (controller == null || target == null || !ServerPlayNetworking.canSend(controller, PuppetmasterHotbarPayload.ID)) {
+			return;
+		}
+		List<ItemStack> hotbar = new ArrayList<>(9);
+		for (int slot = 0; slot < 9; slot++) {
+			hotbar.add(target.getInventory().getStack(slot).copy());
+		}
+		ServerPlayNetworking.send(controller, new PuppetmasterHotbarPayload(hotbar,
+			MathHelper.clamp(target.getInventory().selectedSlot, 0, 8)));
+	}
+
+	private static void useSelectedItem(ServerPlayerEntity target) {
+		ItemStack stack = target.getStackInHand(Hand.MAIN_HAND);
+		if (stack.isEmpty()) return;
+		target.interactionManager.interactItem(target, target.getWorld(), stack, Hand.MAIN_HAND);
 	}
 
 	private static ArrayList<Modifier> copyModifiers(World world, UUID playerId) {
@@ -646,9 +710,6 @@ public final class PuppetmasterManager {
 		private final double controllerHomeZ;
 		private final float controllerHomeYaw;
 		private final float controllerHomePitch;
-		private final double targetStartX;
-		private final double targetStartY;
-		private final double targetStartZ;
 		private final float targetStartYaw;
 		private final float targetStartPitch;
 		private final ArrayList<Modifier> controllerModifiers;
@@ -658,10 +719,11 @@ public final class PuppetmasterManager {
 		private final boolean controllerWasInvisible;
 		private final boolean targetWasInvisible;
 		private final GameMode targetGameMode;
+		private int temporaryKnifeSlot = -1;
+		private boolean wasUsing;
 		private PuppetInput input = new PuppetInput(0.0F, 0.0F, false, false, false, false, 0.0F, 0.0F, 0);
-		private long lastInputTick;
 
-		private ControlSession(ServerPlayerEntity controller, ServerPlayerEntity target, long now, long endTick) {
+		private ControlSession(ServerPlayerEntity controller, ServerPlayerEntity target, long endTick) {
 			this.controllerId = controller.getUuid();
 			this.targetId = target.getUuid();
 			this.endTick = endTick;
@@ -670,9 +732,6 @@ public final class PuppetmasterManager {
 			this.controllerHomeZ = controller.getZ();
 			this.controllerHomeYaw = controller.getYaw();
 			this.controllerHomePitch = controller.getPitch();
-			this.targetStartX = target.getX();
-			this.targetStartY = target.getY();
-			this.targetStartZ = target.getZ();
 			this.targetStartYaw = target.getYaw();
 			this.targetStartPitch = target.getPitch();
 			this.controllerModifiers = copyModifiers(controller.getWorld(), controller.getUuid());
@@ -684,7 +743,6 @@ public final class PuppetmasterManager {
 			this.targetGameMode = target.interactionManager.getGameMode();
 			this.input = new PuppetInput(0.0F, 0.0F, false, false, false, false,
 				target.getYaw(), target.getPitch(), this.targetSelectedSlot);
-			this.lastInputTick = now;
 		}
 	}
 

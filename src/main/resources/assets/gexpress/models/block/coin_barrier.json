@@ -1,6 +1,5 @@
 {
-	"parent": "minecraft:block/cube_all",
 	"textures": {
-		"all": "gexpress:block/coin_barrier"
+		"particle": "gexpress:misc/red_ribbon_strip"
 	}
 }

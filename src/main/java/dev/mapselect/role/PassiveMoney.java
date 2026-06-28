@@ -9,6 +9,8 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.registry.MapSelectModifiers;
+import dev.mapselect.modifier.ModifierUtils;
 import dev.mapselect.role.mafia.MafiaManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -51,6 +53,9 @@ public final class PassiveMoney {
 	}
 
 	private static int amountFor(GameWorldComponent game, ServerPlayerEntity player) {
+		if (ModifierUtils.has(player, MapSelectModifiers.MUTED_ID)) {
+			return Math.max(1, GexpressConfig.getPassiveIncomeNeutral());
+		}
 		if (MafiaManager.isMafiaRole(player)) return GexpressConfig.getPassiveIncomeMafia();
 		Role role = game.getRole(player);
 		if (role == null) return 0;

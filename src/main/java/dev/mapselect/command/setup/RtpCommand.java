@@ -7,7 +7,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import dev.mapselect.MapSelect;
-import dev.mapselect.network.GexpressPresetsSyncHandler;
+import dev.mapselect.network.preset.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
@@ -27,12 +27,28 @@ import java.util.function.Predicate;
 
 public class RtpCommand {
 
-	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseSetupCommands;
+	private static final Predicate<ServerCommandSource> OP = source ->
+		GexpressPermissions.canUseRtpCommands(source)
+			|| GexpressPermissions.canUseCommandBranch(source, "setup", "rtp");
+
+	private static Predicate<ServerCommandSource> rtpCommand(String... subcommand) {
+		return source -> GexpressPermissions.canUseRtpCommands(source)
+			|| GexpressPermissions.canUseCommandPath(source, rtpPath(subcommand));
+	}
+
+	private static String[] rtpPath(String... subcommand) {
+		String[] path = new String[(subcommand == null ? 0 : subcommand.length) + 2];
+		path[0] = "setup";
+		path[1] = "rtp";
+		if (subcommand != null) System.arraycopy(subcommand, 0, path, 2, subcommand.length);
+		return path;
+	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("rtp")
 			.requires(OP)
 			.then(CommandManager.literal("add")
+				.requires(rtpCommand("add"))
 				.executes(RtpCommand::runAddHere)
 				.then(CommandManager.argument("x", DoubleArgumentType.doubleArg())
 					.then(CommandManager.argument("y", DoubleArgumentType.doubleArg())
@@ -42,17 +58,23 @@ public class RtpCommand {
 								DoubleArgumentType.getDouble(ctx, "y"),
 								DoubleArgumentType.getDouble(ctx, "z")))))))
 			.then(CommandManager.literal("remove")
+				.requires(rtpCommand("remove"))
 				.then(CommandManager.argument("id", IntegerArgumentType.integer(0))
 					.executes(ctx -> runRemove(ctx, IntegerArgumentType.getInteger(ctx, "id")))))
 			.then(CommandManager.literal("removenearest")
+				.requires(rtpCommand("remove"))
 				.executes(RtpCommand::runRemoveNearest))
 			.then(CommandManager.literal("list")
+				.requires(rtpCommand("list"))
 				.executes(RtpCommand::runList))
 			.then(CommandManager.literal("clear")
+				.requires(rtpCommand("clear"))
 				.executes(RtpCommand::runClear))
 			.then(CommandManager.literal("enable")
+				.requires(rtpCommand("enable"))
 				.executes(ctx -> runSetEnabled(ctx, true)))
 			.then(CommandManager.literal("disable")
+				.requires(rtpCommand("disable"))
 				.executes(ctx -> runSetEnabled(ctx, false)));
 	}
 

@@ -10,6 +10,7 @@ import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 
 public class CoinBarrierBlockEntity extends BlockEntity {
 	public static final int DEFAULT_PRICE = -1;
@@ -18,6 +19,9 @@ public class CoinBarrierBlockEntity extends BlockEntity {
 
 	private int price = DEFAULT_PRICE;
 	private String title = "";
+	private Vec3d ribbonStart;
+	private Vec3d ribbonEnd;
+	private boolean fixedRibbonAnchors;
 
 	public CoinBarrierBlockEntity(BlockPos pos, BlockState state) {
 		super(MapSelectBlockEntities.COIN_BARRIER, pos, state);
@@ -33,6 +37,25 @@ public class CoinBarrierBlockEntity extends BlockEntity {
 
 	public int priceOrDefault(int defaultPrice) {
 		return price >= 0 ? price : defaultPrice;
+	}
+
+	public boolean hasRibbonSpan() {
+		return fixedRibbonAnchors && ribbonStart != null && ribbonEnd != null;
+	}
+
+	public Vec3d ribbonStart() {
+		return ribbonStart;
+	}
+
+	public Vec3d ribbonEnd() {
+		return ribbonEnd;
+	}
+
+	public void setRibbonSpan(Vec3d start, Vec3d end) {
+		ribbonStart = start;
+		ribbonEnd = end;
+		fixedRibbonAnchors = start != null && end != null;
+		sync();
 	}
 
 	public void setMetadata(int price, String title) {
@@ -63,6 +86,15 @@ public class CoinBarrierBlockEntity extends BlockEntity {
 		super.writeNbt(nbt, registryLookup);
 		nbt.putInt("Price", price);
 		if (!title.isBlank()) nbt.putString("Title", title);
+		if (hasRibbonSpan()) {
+			nbt.putDouble("RibbonStartX", ribbonStart.x);
+			nbt.putDouble("RibbonStartY", ribbonStart.y);
+			nbt.putDouble("RibbonStartZ", ribbonStart.z);
+			nbt.putDouble("RibbonEndX", ribbonEnd.x);
+			nbt.putDouble("RibbonEndY", ribbonEnd.y);
+			nbt.putDouble("RibbonEndZ", ribbonEnd.z);
+			nbt.putBoolean("FixedRibbonAnchors", true);
+		}
 	}
 
 	@Override
@@ -75,6 +107,16 @@ public class CoinBarrierBlockEntity extends BlockEntity {
 			price = DEFAULT_PRICE;
 		}
 		title = nbt.contains("Title") ? sanitizeTitle(nbt.getString("Title")) : "";
+		fixedRibbonAnchors = nbt.getBoolean("FixedRibbonAnchors");
+		if (fixedRibbonAnchors && nbt.contains("RibbonStartX") && nbt.contains("RibbonStartY") && nbt.contains("RibbonStartZ")
+				&& nbt.contains("RibbonEndX") && nbt.contains("RibbonEndY") && nbt.contains("RibbonEndZ")) {
+			ribbonStart = new Vec3d(nbt.getDouble("RibbonStartX"), nbt.getDouble("RibbonStartY"), nbt.getDouble("RibbonStartZ"));
+			ribbonEnd = new Vec3d(nbt.getDouble("RibbonEndX"), nbt.getDouble("RibbonEndY"), nbt.getDouble("RibbonEndZ"));
+		} else {
+			ribbonStart = null;
+			ribbonEnd = null;
+			fixedRibbonAnchors = false;
+		}
 	}
 
 	@Override

@@ -8,11 +8,11 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.AbilityCooldownPayload;
-import dev.mapselect.network.AbilityCooldownSync;
-import dev.mapselect.network.TricksterDancingCartsPayload;
-import dev.mapselect.network.TricksterSkinSwapPayload;
-import dev.mapselect.network.TricksterUsePayload;
+import dev.mapselect.network.ability.AbilityCooldownPayload;
+import dev.mapselect.network.ability.AbilityCooldownSync;
+import dev.mapselect.network.role.harlequin.TricksterDancingCartsPayload;
+import dev.mapselect.network.role.harlequin.TricksterSkinSwapPayload;
+import dev.mapselect.network.role.harlequin.TricksterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.registry.MapSelectSounds;
 import dev.mapselect.role.pelican.PelicanManager;
@@ -24,6 +24,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
@@ -140,6 +141,7 @@ public final class HarlequinManager {
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			ServerPlayNetworking.send(player, payload);
 		}
+		refreshPlayerListNames(world);
 
 		trickster.playSoundToPlayer(SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE,
 			SoundCategory.PLAYERS, 0.85F, 1.65F);
@@ -234,6 +236,18 @@ public final class HarlequinManager {
 		TricksterSkinSwapPayload clear = new TricksterSkinSwapPayload(Map.of(), Map.of(), 0);
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			ServerPlayNetworking.send(player, clear);
+		}
+		refreshPlayerListNames(world);
+	}
+
+	private static void refreshPlayerListNames(ServerWorld world) {
+		if (world == null) return;
+		for (ServerPlayerEntity subject : world.getServer().getPlayerManager().getPlayerList()) {
+			PlayerListS2CPacket packet = new PlayerListS2CPacket(
+				PlayerListS2CPacket.Action.UPDATE_DISPLAY_NAME, subject);
+			for (ServerPlayerEntity viewer : world.getServer().getPlayerManager().getPlayerList()) {
+				viewer.networkHandler.sendPacket(packet);
+			}
 		}
 	}
 

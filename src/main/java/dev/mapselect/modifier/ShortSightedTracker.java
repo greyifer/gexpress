@@ -2,7 +2,7 @@ package dev.mapselect.modifier;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.ShortSightedSyncPayload;
+import dev.mapselect.network.modifier.ShortSightedSyncPayload;
 import dev.mapselect.registry.MapSelectModifiers;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -42,7 +42,7 @@ import java.util.UUID;
  * mixed client/server {@code ModInitializer} entrypoint calls this on both JVMs, so the
  * payload type is available for decoding on the client and encoding on the server without
  * a separate call in {@code ClientModInitializer}. Mirrors the pattern in
- * {@link dev.mapselect.network.GexpressConfigSyncHandler}.
+ * {@link dev.mapselect.network.config.GexpressConfigSyncHandler}.
  */
 public final class ShortSightedTracker {
 	private ShortSightedTracker() {}

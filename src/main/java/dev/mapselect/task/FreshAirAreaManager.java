@@ -2,7 +2,7 @@ package dev.mapselect.task;
 
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
-import dev.mapselect.network.FreshAirAmbienceStatePayload;
+import dev.mapselect.network.game.FreshAirAmbienceStatePayload;
 import dev.mapselect.weather.MapWeatherComponent;
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;

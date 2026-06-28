@@ -14,8 +14,8 @@ import de.maxhenkel.voicechat.api.events.StaticSoundPacketEvent;
 import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
 import dev.mapselect.modifier.ModifierUtils;
 import dev.mapselect.registry.MapSelectModifiers;
-import dev.mapselect.role.altruist.AltruistManager;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.twins.TwinsManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -63,14 +63,23 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 			event.cancel();
 			return;
 		}
-		if (AltruistManager.isRevivedMuted(senderId)) {
-			event.cancel();
-			return;
-		}
 		if (nativePlayer instanceof ServerPlayerEntity player
 				&& ModifierUtils.has(player, MapSelectModifiers.MUTED_ID)) {
 			event.cancel();
 			return;
+		}
+		if (nativePlayer instanceof ServerPlayerEntity player) {
+			Set<UUID> twinReceivers = TwinsManager.voiceReceiversNear(world, senderId, player.getPos());
+			if (!twinReceivers.isEmpty()) {
+				StaticSoundPacket packet = event.getPacket().staticSoundPacketBuilder()
+					.channelId(senderId)
+					.opusEncodedData(event.getPacket().getOpusEncodedData())
+					.build();
+				for (UUID receiverId : twinReceivers) {
+					VoicechatConnection connection = event.getVoicechat().getConnectionOf(receiverId);
+					if (connection != null) event.getVoicechat().sendStaticSoundPacketTo(connection, packet);
+				}
+			}
 		}
 		Set<UUID> bellyReceivers = PelicanManager.bellyVoiceReceivers(senderId);
 		if (!bellyReceivers.isEmpty()) {
@@ -139,7 +148,7 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		if (lookedUpClientPitchForMethod) return clientPitchForMethod;
 		lookedUpClientPitchForMethod = true;
 		try {
-			Class<?> bridge = Class.forName("dev.mapselect.client.ClientVoicePitchBridge");
+			Class<?> bridge = Class.forName("dev.mapselect.client.game.ClientVoicePitchBridge");
 			clientPitchForMethod = bridge.getMethod("pitchFor", UUID.class);
 		} catch (Throwable ignored) {
 			clientPitchForMethod = null;

@@ -14,6 +14,7 @@ public final class MapSelectRoles {
 	public static final Identifier MEDIC_ID = Identifier.of(MapSelect.MOD_ID, "medic");
 	public static final Identifier SNITCH_ID = Identifier.of(MapSelect.MOD_ID, "snitch");
 	public static final Identifier SEER_ID = Identifier.of(MapSelect.MOD_ID, "seer");
+	public static final Identifier TWINS_ID = Identifier.of(MapSelect.MOD_ID, "twins");
 	public static final Identifier CUPID_ID = Identifier.of(MapSelect.MOD_ID, "cupid");
 	public static final Identifier VENGEFUL_SPIRIT_ID = Identifier.of(MapSelect.MOD_ID, "vengeful_spirit");
 	public static final Identifier SNIFFER_ID = Identifier.of(MapSelect.MOD_ID, "sniffer");
@@ -25,6 +26,7 @@ public final class MapSelectRoles {
 	public static final Identifier PUPPETMASTER_ID = Identifier.of(MapSelect.MOD_ID, "puppetmaster");
 	public static final Identifier BOUNTY_HUNTER_ID = Identifier.of(MapSelect.MOD_ID, "bounty_hunter");
 	public static final Identifier SKINCRAWLER_ID = Identifier.of(MapSelect.MOD_ID, "skincrawler");
+	public static final Identifier PAINTER_ID = Identifier.of(MapSelect.MOD_ID, "painter");
 	public static final Identifier VULTURE_ID = Identifier.of(MapSelect.MOD_ID, "pelican");
 	public static final Identifier SCATTER_BRAIN_ID = Identifier.of(MapSelect.MOD_ID, "scatter_brain");
 	public static final Identifier TRACKER_ID = Identifier.of(MapSelect.MOD_ID, "tracker");
@@ -44,6 +46,7 @@ public final class MapSelectRoles {
 	public static Role MEDIC;
 	public static Role SNITCH;
 	public static Role SEER;
+	public static Role TWINS;
 	public static Role CUPID;
 	public static Role VENGEFUL_SPIRIT;
 	public static Role SNIFFER;
@@ -55,6 +58,7 @@ public final class MapSelectRoles {
 	public static Role PUPPETMASTER;
 	public static Role BOUNTY_HUNTER;
 	public static Role SKINCRAWLER;
+	public static Role PAINTER;
 	public static Role VULTURE;
 	public static Role SCATTER_BRAIN;
 	public static Role TRACKER;
@@ -107,6 +111,16 @@ public final class MapSelectRoles {
 		SEER = WatheRoles.registerRole(new Role(
 			SEER_ID,
 			0xD94B66, // red flash warning role
+			true,
+			false,
+			Role.MoodType.REAL,
+			CIVILIAN_STAMINA,
+			false
+		));
+
+		TWINS = WatheRoles.registerRole(new Role(
+			TWINS_ID,
+			0x72D6FF,
 			true,
 			false,
 			Role.MoodType.REAL,
@@ -217,6 +231,16 @@ public final class MapSelectRoles {
 		SKINCRAWLER = WatheRoles.registerRole(new Role(
 			SKINCRAWLER_ID,
 			0x4D161D,
+			false,
+			true,
+			Role.MoodType.FAKE,
+			-1,
+			true
+		));
+
+		PAINTER = WatheRoles.registerRole(new Role(
+			PAINTER_ID,
+			0xC65BFF,
 			false,
 			true,
 			Role.MoodType.FAKE,

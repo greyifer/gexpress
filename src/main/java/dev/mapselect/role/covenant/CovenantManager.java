@@ -9,11 +9,12 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.AbilityCooldownPayload;
-import dev.mapselect.network.AbilityCooldownSync;
-import dev.mapselect.network.CovenantBatPayload;
-import dev.mapselect.network.CovenantBitePayload;
-import dev.mapselect.network.CovenantStatePayload;
+import dev.mapselect.network.ability.AbilityCooldownPayload;
+import dev.mapselect.network.ability.AbilityCooldownSync;
+import dev.mapselect.network.role.covenant.CovenantBatMovementPayload;
+import dev.mapselect.network.role.covenant.CovenantBatPayload;
+import dev.mapselect.network.role.covenant.CovenantBitePayload;
+import dev.mapselect.network.role.covenant.CovenantStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
@@ -55,6 +56,7 @@ public final class CovenantManager {
 	private static final Map<UUID, Integer> bloodByPlayer = new HashMap<>();
 	private static final Map<UUID, Integer> batTicksByPlayer = new HashMap<>();
 	private static final Map<UUID, BatState> batStates = new HashMap<>();
+	private static final Map<UUID, BatInput> batInputs = new HashMap<>();
 	private static final Map<UUID, Long> biteCooldownUntil = new HashMap<>();
 	private static int syncTicker;
 
@@ -63,11 +65,14 @@ public final class CovenantManager {
 	public static void register() {
 		PayloadTypeRegistry.playC2S().register(CovenantBitePayload.ID, CovenantBitePayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(CovenantBatPayload.ID, CovenantBatPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(CovenantBatMovementPayload.ID, CovenantBatMovementPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(CovenantStatePayload.ID, CovenantStatePayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(CovenantBitePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryBite(context.player())));
 		ServerPlayNetworking.registerGlobalReceiver(CovenantBatPayload.ID,
 			(payload, context) -> context.server().execute(() -> toggleBat(context.player())));
+		ServerPlayNetworking.registerGlobalReceiver(CovenantBatMovementPayload.ID,
+			(payload, context) -> context.server().execute(() -> updateBatInput(context.player(), payload)));
 		ServerTickEvents.END_WORLD_TICK.register(CovenantManager::tick);
 		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRound(world));
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearRound(world));
@@ -245,6 +250,7 @@ public final class CovenantManager {
 				player.getAbilities().flying = true;
 				player.sendAbilitiesUpdate();
 			}
+			applyBatMovement(player);
 			updateBatEntity(player, state);
 			player.fallDistance = 0.0F;
 			if (player.isOnGround() && player.getVelocity().y < 0.08D) {
@@ -258,19 +264,7 @@ public final class CovenantManager {
 	}
 
 	private static void startBat(ServerPlayerEntity player) {
-		BatEntity bat = EntityType.BAT.create(player.getWorld());
-		UUID batEntityId = null;
-		if (bat != null) {
-			bat.refreshPositionAndAngles(player.getX(), player.getY() + 0.4D, player.getZ(),
-				player.getYaw(), player.getPitch());
-			bat.setRoosting(false);
-			bat.setNoGravity(true);
-			bat.setAiDisabled(true);
-			bat.setInvulnerable(true);
-			bat.setSilent(true);
-			player.getServerWorld().spawnEntity(bat);
-			batEntityId = bat.getUuid();
-		}
+		UUID batEntityId = spawnBatEntity(player);
 		BatState state = new BatState(player.getAbilities().allowFlying, player.getAbilities().flying,
 			player.isInvisible(), batEntityId);
 		batStates.put(player.getUuid(), state);
@@ -286,6 +280,7 @@ public final class CovenantManager {
 	private static void endBat(ServerPlayerEntity player) {
 		if (player == null) return;
 		BatState state = batStates.remove(player.getUuid());
+		batInputs.remove(player.getUuid());
 		if (state == null) return;
 		discardBatEntity(player, state);
 		player.setInvisible(state.invisible());
@@ -313,14 +308,68 @@ public final class CovenantManager {
 	}
 
 	private static void updateBatEntity(ServerPlayerEntity player, BatState state) {
-		if (player == null || state == null || state.batEntityId() == null) return;
-		Entity entity = player.getServerWorld().getEntity(state.batEntityId());
-		if (entity == null) return;
+		if (player == null || state == null) return;
+		Entity entity = state.batEntityId() == null ? null : player.getServerWorld().getEntity(state.batEntityId());
+		if (!(entity instanceof BatEntity)) {
+			UUID batEntityId = spawnBatEntity(player);
+			if (batEntityId == null) return;
+			state = new BatState(state.allowFlying(), state.flying(), state.invisible(), batEntityId);
+			batStates.put(player.getUuid(), state);
+			entity = player.getServerWorld().getEntity(batEntityId);
+			if (entity == null) return;
+		}
 		entity.refreshPositionAndAngles(player.getX(), player.getY() + 0.4D, player.getZ(),
 			player.getYaw(), player.getPitch());
 		entity.setVelocity(player.getVelocity());
 		entity.setNoGravity(true);
 		if (entity instanceof BatEntity bat) bat.setRoosting(false);
+	}
+
+	private static UUID spawnBatEntity(ServerPlayerEntity player) {
+		if (player == null) return null;
+		BatEntity bat = EntityType.BAT.create(player.getWorld());
+		if (bat == null) return null;
+		bat.refreshPositionAndAngles(player.getX(), player.getY() + 0.4D, player.getZ(),
+			player.getYaw(), player.getPitch());
+		bat.setRoosting(false);
+		bat.setNoGravity(true);
+		bat.setAiDisabled(true);
+		bat.setInvulnerable(true);
+		bat.setSilent(true);
+		bat.setPersistent();
+		return player.getServerWorld().spawnEntity(bat) ? bat.getUuid() : null;
+	}
+
+	private static void updateBatInput(ServerPlayerEntity player, CovenantBatMovementPayload payload) {
+		if (player == null || payload == null || !batStates.containsKey(player.getUuid()) || !isDracula(player)) return;
+		batInputs.put(player.getUuid(), new BatInput(payload.sideways(), payload.forward(), payload.ascending(),
+			payload.descending(), payload.sprinting(), player.getServerWorld().getTime()));
+	}
+
+	private static void applyBatMovement(ServerPlayerEntity player) {
+		BatInput input = batInputs.get(player.getUuid());
+		if (input == null) return;
+		if (player.getServerWorld().getTime() - input.updatedAt() > 5L) {
+			player.setVelocity(0.0D, 0.0D, 0.0D);
+			player.velocityModified = true;
+			return;
+		}
+		float sideways = input.sideways();
+		float forward = input.forward();
+		float magnitude = (float) Math.sqrt(sideways * sideways + forward * forward);
+		if (magnitude > 1.0F) {
+			sideways /= magnitude;
+			forward /= magnitude;
+		}
+		double yaw = Math.toRadians(player.getYaw());
+		double sin = Math.sin(yaw);
+		double cos = Math.cos(yaw);
+		double speed = input.sprinting() && forward > 0.0F ? 0.38D : 0.27D;
+		double velocityX = (sideways * cos - forward * sin) * speed;
+		double velocityZ = (forward * cos + sideways * sin) * speed;
+		double velocityY = input.ascending() == input.descending() ? 0.0D : input.ascending() ? 0.27D : -0.27D;
+		player.setVelocity(velocityX, velocityY, velocityZ);
+		player.velocityModified = true;
 	}
 
 	private static void discardBatEntity(ServerPlayerEntity player, BatState state) {
@@ -403,6 +452,7 @@ public final class CovenantManager {
 		if (restoreBat) endBat(player);
 		bloodByPlayer.remove(player.getUuid());
 		batTicksByPlayer.remove(player.getUuid());
+		batInputs.remove(player.getUuid());
 		biteCooldownUntil.remove(player.getUuid());
 	}
 
@@ -422,6 +472,7 @@ public final class CovenantManager {
 		bloodByPlayer.clear();
 		batTicksByPlayer.clear();
 		batStates.clear();
+		batInputs.clear();
 		biteCooldownUntil.clear();
 		syncTicker = 0;
 	}
@@ -463,4 +514,6 @@ public final class CovenantManager {
 	}
 
 	private record BatState(boolean allowFlying, boolean flying, boolean invisible, UUID batEntityId) {}
+	private record BatInput(float sideways, float forward, boolean ascending, boolean descending,
+	                        boolean sprinting, long updatedAt) {}
 }

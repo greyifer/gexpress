@@ -5,6 +5,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.mafia.MafiaManager;
+import dev.mapselect.modifier.LoversManager;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -27,10 +28,20 @@ public abstract class GameRoundEndWinnerMixin {
 		if (getWinStatus() != GameFunctions.WinStatus.LOOSE_END) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		if (game == null || uuid == null || game.getLooseEndWinner() == null) return;
+		if (LoversManager.isIndependentLover(game.getLooseEndWinner())) {
+			cir.setReturnValue(LoversManager.didIndependentPairWin(uuid, game.getLooseEndWinner()));
+			return;
+		}
 		if (uuid.equals(game.getLooseEndWinner())
 				|| MafiaManager.isSameFamily(uuid, game.getLooseEndWinner())) {
 			cir.setReturnValue(true);
 		}
+	}
+
+	@Inject(method = "didWin", at = @At("HEAD"), cancellable = true)
+	private void gexpress$independentLoversDoNotShareTeamWins(UUID uuid, CallbackInfoReturnable<Boolean> cir) {
+		if (uuid == null || getWinStatus() == GameFunctions.WinStatus.LOOSE_END) return;
+		if (LoversManager.isIndependentLover(uuid)) cir.setReturnValue(false);
 	}
 
 	@Inject(method = "didWin", at = @At("HEAD"), cancellable = true)

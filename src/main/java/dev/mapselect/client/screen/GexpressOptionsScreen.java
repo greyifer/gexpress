@@ -8,10 +8,10 @@ import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
-import dev.mapselect.network.GexpressConfigSyncPayload;
-import dev.mapselect.network.GexpressDevTuningPayload;
-import dev.mapselect.network.GexpressTaskConfigPayload;
-import dev.mapselect.network.PuppetmasterConfigPayload;
+import dev.mapselect.network.config.GexpressConfigSyncPayload;
+import dev.mapselect.network.config.GexpressDevTuningPayload;
+import dev.mapselect.network.config.GexpressTaskConfigPayload;
+import dev.mapselect.network.config.PuppetmasterConfigPayload;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -76,9 +76,12 @@ public final class GexpressOptionsScreen {
 	}
 
 	private static Screen buildScreen(Screen parent) {
-		boolean isOp = canEditOptions();
-		boolean canEditGame = isOp;
-		boolean canEditSetup = canEditSetupOptions();
+		boolean canEditGame = canEditGameTab();
+		boolean canViewGame = canViewGameTab();
+		boolean canViewPlayers = canViewPlayersTab();
+		boolean canViewMaps = canViewMapsTab();
+		boolean canViewTrainCarts = canViewTrainCartsTab();
+		boolean canViewDev = canViewDevTab();
 		BiConsumer<String, Screen> stage = GexpressOptionsScreen::stage;
 
 		YetAnotherConfigLib.Builder builder = YetAnotherConfigLib.createBuilder()
@@ -88,7 +91,7 @@ public final class GexpressOptionsScreen {
 		mapsTabIndex = -1;
 		trainCartsTabIndex = -1;
 		int idx = 0;
-		builder.category(GexpressClientCategory.build(parent, isOp, stage));
+		builder.category(GexpressClientCategory.build(parent, canEditGame, stage));
 		idx++;
 		builder.category(GexpressSkinsCategory.build(parent));
 		idx++;
@@ -97,17 +100,17 @@ public final class GexpressOptionsScreen {
 		builder.category(GexpressBugReportsCategory.build(parent));
 		idx++;
 
-		if (canUseDevTab()) {
+		if (canViewDev) {
 			builder.category(GexpressDevCategory.build(parent));
 			idx++;
 		}
 
-		if (canEditGame) {
-			builder.category(GexpressPlayersCategory.build(parent));
+		if (canViewPlayers) {
+			builder.category(GexpressPlayersCategory.build(parent, canEditTags(), canManageProgression(), canManageEconomy()));
 			idx++;
 		}
 
-		if (isDevPlayer() || canEditSetup) {
+		if (canViewTrainCarts) {
 			ConfigCategory trainCarts = (selectedTrainCartMap == null)
 				? GexpressTrainCartsScreen.buildListCategory(parent)
 				: GexpressTrainCartsScreen.buildDetailCategory(parent, selectedTrainCartMap);
@@ -116,12 +119,12 @@ public final class GexpressOptionsScreen {
 			idx++;
 		}
 
-		if (canEditGame) {
+		if (canViewGame) {
 			builder.category(GexpressGameCategory.build(parent, stage));
 			idx++;
 		}
 
-		if (canEditSetup) {
+		if (canViewMaps) {
 			ConfigCategory maps = (selectedMapPreset == null)
 				? GexpressMapScreen.buildListCategory(parent)
 				: GexpressMapDetailScreen.buildDetailCategory(parent, selectedMapPreset);
@@ -227,156 +230,180 @@ public final class GexpressOptionsScreen {
 
 	private static void pushMapPresetsToServer() {
 		if (GexpressMapPresetsCategory.pendingEdits.isEmpty()) return;
+		if (!canEditMapsTab()) {
+			GexpressMapPresetsCategory.pendingEdits.clear();
+			return;
+		}
 		ClientPresetCache.savePending(GexpressMapPresetsCategory.pendingEdits);
 		GexpressMapPresetsCategory.pendingEdits.clear();
 	}
 
 	private static void pushTrainPresetsToServer() {
 		if (GexpressTrainCartsScreen.pendingEdits.isEmpty()) return;
+		if (!canEditTrainCartsTab()) {
+			GexpressTrainCartsScreen.pendingEdits.clear();
+			return;
+		}
 		ClientTrainPresetCache.savePending(GexpressTrainCartsScreen.pendingEdits);
 		GexpressTrainCartsScreen.pendingEdits.clear();
 	}
 
 	static void pushGexpressConfigToServer() {
-		if (!ClientPlayNetworking.canSend(GexpressConfigSyncPayload.ID)) return;
-		ClientPlayNetworking.send(new GexpressConfigSyncPayload(
-			GexpressConfig.getC4Price(),
-			GexpressConfig.getC4FuseSeconds(),
-			GexpressConfig.getC4FirstBeepSeconds(),
-			GexpressConfig.getWrongWirePercent(),
-			GexpressConfig.getGrenadePrice(),
-			GexpressConfig.getBombSpecialistFirecrackerPrice(),
-			GexpressConfig.getBombSpecialistLockpickPrice(),
-			GexpressConfig.getBombSpecialistCrowbarPrice(),
-			GexpressConfig.getMafiosoKnifePrice(),
-			GexpressConfig.getMafiosoRevolverPrice(),
-			GexpressConfig.getJanitorPoisonVialPrice(),
-			GexpressConfig.getJanitorScorpionPrice(),
-			GexpressConfig.getBurglarCrowbarPrice(),
-			GexpressConfig.getBurglarLockpickPrice(),
-			GexpressConfig.getPassiveIncomeKiller(),
-			GexpressConfig.getPassiveIncomeCivilian(),
-			GexpressConfig.getPassiveIncomeNeutral(),
-			GexpressConfig.getPassiveIncomeVigilante(),
-			GexpressConfig.getPassiveIncomeMafia(),
-			GexpressConfig.getMedicShieldCooldownSeconds(),
-			GexpressConfig.doesMedicShieldKnifeBreaks(),
-			GexpressConfig.getSilentShadowDurationSeconds(),
-			GexpressConfig.getSilentShadowCooldownSeconds(),
-			GexpressConfig.getWarlockMarkCooldownSeconds(),
-			GexpressConfig.getWarlockKillCooldownSeconds(),
-			GexpressConfig.getJuggernautInitialCooldownSeconds(),
-			GexpressConfig.getJuggernautCooldownReductionSeconds(),
-			GexpressConfig.getJuggernautMinimumCooldownSeconds(),
-			GexpressConfig.getJuggernautShieldRechargeSeconds(),
-			GexpressConfig.getTricksterSwapDurationSeconds(),
-			GexpressConfig.getTricksterMasqueradeCooldownSeconds(),
-			GexpressConfig.getTricksterDancingCartsCooldownSeconds(),
-			GexpressConfig.getTricksterDancingCartsMaxUses(),
-			GexpressConfig.getPuppetmasterControlDurationSeconds(),
-			GexpressConfig.getPuppetmasterControlCooldownSeconds(),
-			GexpressConfig.isPuppetmasterRandomTarget(),
-			GexpressConfig.getPuppetmasterControlRange(),
-			GexpressConfig.getPuppetmasterMaxUses(),
-			GexpressConfig.getPelicanEatCooldownSeconds(),
-			GexpressConfig.getPelicanEatPercentage(),
-			GexpressConfig.getHungryFoodLimit(),
-			GexpressConfig.getThirstyDrinkLimit(),
-			GexpressConfig.getSnitchTasksRequired(),
-			GexpressConfig.getSnitchWarningTasksRemaining(),
-			GexpressConfig.getTimeMasterRewindSeconds(),
-			GexpressConfig.getTimeMasterCooldownSeconds(),
-			GexpressConfig.getTimeMasterMaxUses(),
-			GexpressConfig.getTimeMasterFreezeDurationSeconds(),
-			GexpressConfig.getTimeMasterFreezeCooldownSeconds(),
-			GexpressConfig.getTimeMasterFreezeMaxUses(),
-			GexpressConfig.getTimeMasterFreezeRange(),
-			GexpressConfig.getScatterBrainCooldownSeconds(),
-			GexpressConfig.getTrackerMaxTargets(),
-			GexpressConfig.getTrackerRange(),
-			GexpressConfig.getTrackerCooldownSeconds(),
-			GexpressConfig.getAltruistRange(),
-			GexpressConfig.getSkincrawlerBodyMaxAgeSeconds(),
-			GexpressConfig.getSkincrawlerCooldownSeconds(),
-			GexpressConfig.getSkincrawlerStunSeconds(),
-			GexpressConfig.getSkincrawlerRange(),
-			GexpressConfig.getSpyBugCost(),
-			GexpressConfig.getSpyBugDurationSeconds(),
-			GexpressConfig.getSpyBugRange(),
-			GexpressConfig.getSqueakerPitchPercent(),
-			GexpressConfig.getMasqueradePitchMinPercent(),
-			GexpressConfig.getMasqueradePitchMaxPercent(),
-			GexpressConfig.isLastDeathShieldEnabled(),
-			GexpressConfig.canGuardianAngelPickNonInnocents(),
-			GexpressConfig.getBountyHunterBountyIntervalSeconds(),
-			GexpressConfig.getBountyHunterRewardGold(),
-			GexpressConfig.getBountyHunterFailCooldownSeconds(),
-			GexpressConfig.getGodfatherBulletPrice(),
-			GexpressConfig.getGodfatherStartingBullets(),
-			GexpressConfig.getGodfatherMaxLoadedBullets(),
-			GexpressConfig.getMafiaStartingGold(),
-			GexpressConfig.getMafiaMinimumPlayers(),
-			GexpressConfig.getGodfatherStartingGold(),
-			GexpressConfig.getMafiosoStartingGold(),
-			GexpressConfig.getJanitorStartingGold(),
-			GexpressConfig.getMafiaRecruitRange(),
-			GexpressConfig.getMafiaReplacementCooldownSeconds(),
-			GexpressConfig.getMafiaRevolverKillCooldownSeconds(),
-			GexpressConfig.getJanitorCleanRange(),
-			GexpressConfig.getJanitorCleanCooldownSeconds(),
-			GexpressConfig.getJanitorRevolverCooldownAfterCleanSeconds(),
-			GexpressConfig.getJanitorCleanCooldownAfterKillSeconds(),
-			GexpressConfig.getPickpocketMaxHoldSeconds(),
-			GexpressConfig.getPickpocketCoinsPerSecond(),
-			GexpressConfig.getPickpocketRange(),
-			GexpressConfig.getCopycatCopyCooldownSeconds(),
-			GexpressConfig.getCopycatCopyDurationSeconds(),
-			GexpressConfig.getCopycatCopyRange(),
-			GexpressConfig.useCustomRoleCounts(),
-			GexpressConfig.getMaxKillerAmount(),
-			GexpressConfig.getMaxVigilanteAmount(),
-			GexpressConfig.getMaxNeutralAmount(),
-			GexpressConfig.getMaxModifiersPerPlayer(),
-			GexpressConfig.getPlayersPerKiller(),
-			GexpressConfig.getPlayersPerVigilante(),
-			GexpressConfig.getPlayersPerNeutral(),
-			GexpressConfig.getC4BackOffsetX(),
-			GexpressConfig.getC4BackOffsetY(),
-			GexpressConfig.getC4BackOffsetZ(),
-			GexpressConfig.getC4BackRotationX(),
-			GexpressConfig.getC4BackRotationY(),
-			GexpressConfig.getC4BackRotationZ(),
-			GexpressConfig.getC4BackSlant(),
-			GexpressConfig.getC4BackScale(),
-			GexpressConfig.getSpyBugOffsetX(),
-			GexpressConfig.getSpyBugOffsetY(),
-			GexpressConfig.getSpyBugOffsetZ(),
-			GexpressConfig.getSpyBugRotationX(),
-			GexpressConfig.getSpyBugRotationY(),
-			GexpressConfig.getSpyBugRotationZ(),
-			GexpressConfig.getSpyBugSlant(),
-			GexpressConfig.getSpyBugScale(),
-			GexpressConfig.getC4PlacementPresetsSyncString(),
-			GexpressConfig.getRoleDescriptionOverridesSyncString(),
-			GexpressConfig.getShortSightedEntityRange(),
-			GexpressConfig.getMedicShieldBlockFlashTicks(),
-			GexpressConfig.getMedicShieldBreakFlashTicks(),
-			GexpressConfig.getMedicShieldBlockFlashAlpha(),
-			GexpressConfig.getMedicShieldBreakFlashAlpha(),
-			GexpressConfig.getSilentShadowAlpha(),
-			GexpressConfig.getSpecialRoleOccurrenceId(),
-			GexpressConfig.getSeerCompareCooldownSeconds(),
-			GexpressConfig.getSeerCompareRange(),
-			GexpressConfig.getCupidRequiredAlivePairs(),
-			GexpressConfig.getCupidPairCooldownSeconds(),
-			GexpressConfig.getCupidRange(),
-			GexpressConfig.shouldShowLoverHud(),
-			GexpressConfig.canLoversPairAcrossSides(),
-			GexpressConfig.getCovenantBiteCooldownSeconds(),
-			GexpressConfig.getVengefulSpiritReviveDelaySeconds(),
-			GexpressConfig.getVengefulSpiritRevengeSeconds()
-		));
-		if (ClientPlayNetworking.canSend(GexpressTaskConfigPayload.ID)) {
+		boolean canEditGame = canEditGameTab();
+		boolean canEditDev = canEditDevTab();
+		if (canEditGame && ClientPlayNetworking.canSend(GexpressConfigSyncPayload.ID)) {
+			ClientPlayNetworking.send(new GexpressConfigSyncPayload(
+				GexpressConfig.getC4Price(),
+				GexpressConfig.getC4FuseSeconds(),
+				GexpressConfig.getC4FirstBeepSeconds(),
+				GexpressConfig.getWrongWirePercent(),
+				GexpressConfig.getGrenadePrice(),
+				GexpressConfig.getBombSpecialistFirecrackerPrice(),
+				GexpressConfig.getBombSpecialistLockpickPrice(),
+				GexpressConfig.getBombSpecialistCrowbarPrice(),
+				GexpressConfig.getMafiosoKnifePrice(),
+				GexpressConfig.getMafiosoRevolverPrice(),
+				GexpressConfig.getJanitorPoisonVialPrice(),
+				GexpressConfig.getJanitorScorpionPrice(),
+				GexpressConfig.getBurglarCrowbarPrice(),
+				GexpressConfig.getBurglarLockpickPrice(),
+				GexpressConfig.getPassiveIncomeKiller(),
+				GexpressConfig.getPassiveIncomeCivilian(),
+				GexpressConfig.getPassiveIncomeNeutral(),
+				GexpressConfig.getPassiveIncomeVigilante(),
+				GexpressConfig.getPassiveIncomeMafia(),
+				GexpressConfig.getMedicShieldCooldownSeconds(),
+				GexpressConfig.doesMedicShieldKnifeBreaks(),
+				GexpressConfig.getSilentShadowDurationSeconds(),
+				GexpressConfig.getSilentShadowCooldownSeconds(),
+				GexpressConfig.getWarlockMarkCooldownSeconds(),
+				GexpressConfig.getWarlockKillCooldownSeconds(),
+				GexpressConfig.getJuggernautInitialCooldownSeconds(),
+				GexpressConfig.getJuggernautCooldownReductionSeconds(),
+				GexpressConfig.getJuggernautMinimumCooldownSeconds(),
+				GexpressConfig.getJuggernautShieldRechargeSeconds(),
+				GexpressConfig.getTricksterSwapDurationSeconds(),
+				GexpressConfig.getTricksterMasqueradeCooldownSeconds(),
+				GexpressConfig.getTricksterDancingCartsCooldownSeconds(),
+				GexpressConfig.getTricksterDancingCartsMaxUses(),
+				GexpressConfig.getPuppetmasterControlDurationSeconds(),
+				GexpressConfig.getPuppetmasterControlCooldownSeconds(),
+				GexpressConfig.isPuppetmasterRandomTarget(),
+				GexpressConfig.getPuppetmasterControlRange(),
+				GexpressConfig.getPuppetmasterMaxUses(),
+				GexpressConfig.getPelicanEatCooldownSeconds(),
+				GexpressConfig.getPelicanEatPercentage(),
+				GexpressConfig.getHungryFoodLimit(),
+				GexpressConfig.getThirstyDrinkLimit(),
+				GexpressConfig.getSnitchTasksRequired(),
+				GexpressConfig.getSnitchWarningTasksRemaining(),
+				GexpressConfig.getTimeMasterRewindSeconds(),
+				GexpressConfig.getTimeMasterCooldownSeconds(),
+				GexpressConfig.getTimeMasterMaxUses(),
+				GexpressConfig.getTimeMasterFreezeDurationSeconds(),
+				GexpressConfig.getTimeMasterFreezeCooldownSeconds(),
+				GexpressConfig.getTimeMasterFreezeMaxUses(),
+				GexpressConfig.getTimeMasterFreezeRange(),
+				GexpressConfig.getScatterBrainCooldownSeconds(),
+				GexpressConfig.getTrackerMaxTargets(),
+				GexpressConfig.getTrackerRange(),
+				GexpressConfig.getTrackerCooldownSeconds(),
+				GexpressConfig.getAltruistRange(),
+				GexpressConfig.getSkincrawlerBodyMaxAgeSeconds(),
+				GexpressConfig.getSkincrawlerCooldownSeconds(),
+				GexpressConfig.getSkincrawlerStunSeconds(),
+				GexpressConfig.getSkincrawlerRange(),
+				GexpressConfig.getPainterPaintDurationSeconds(),
+				GexpressConfig.getPainterBodyCooldownSeconds(),
+				GexpressConfig.getPainterPlayerCooldownSeconds(),
+				GexpressConfig.getPainterDoorwayDurationSeconds(),
+				GexpressConfig.getPainterDoorwayCooldownSeconds(),
+				GexpressConfig.getPainterMaxPaintedBodies(),
+				GexpressConfig.getPainterMaxPaintedPlayers(),
+				GexpressConfig.getSpyBugCost(),
+				GexpressConfig.getSpyBugDurationSeconds(),
+				GexpressConfig.getSpyBugRange(),
+				GexpressConfig.getSqueakerPitchPercent(),
+				GexpressConfig.getMasqueradePitchMinPercent(),
+				GexpressConfig.getMasqueradePitchMaxPercent(),
+				GexpressConfig.isLastDeathShieldEnabled(),
+				GexpressConfig.canGuardianAngelPickNonInnocents(),
+				GexpressConfig.isLastStandEnabled(),
+				GexpressConfig.getItemPickupPolicyId(),
+				GexpressConfig.getBountyHunterBountyIntervalSeconds(),
+				GexpressConfig.getBountyHunterRewardGold(),
+				GexpressConfig.getBountyHunterFailCooldownSeconds(),
+				GexpressConfig.getGodfatherBulletPrice(),
+				GexpressConfig.getGodfatherStartingBullets(),
+				GexpressConfig.getGodfatherMaxLoadedBullets(),
+				GexpressConfig.getMafiaStartingGold(),
+				GexpressConfig.getMafiaMinimumPlayers(),
+				GexpressConfig.getGodfatherStartingGold(),
+				GexpressConfig.getMafiosoStartingGold(),
+				GexpressConfig.getJanitorStartingGold(),
+				GexpressConfig.getMafiaRecruitRange(),
+				GexpressConfig.getMafiaReplacementCooldownSeconds(),
+				GexpressConfig.getMafiaRevolverKillCooldownSeconds(),
+				GexpressConfig.getJanitorCleanRange(),
+				GexpressConfig.getJanitorCleanCooldownSeconds(),
+				GexpressConfig.getJanitorRevolverCooldownAfterCleanSeconds(),
+				GexpressConfig.getJanitorCleanCooldownAfterKillSeconds(),
+				GexpressConfig.getPickpocketMaxHoldSeconds(),
+				GexpressConfig.getPickpocketCoinsPerSecond(),
+				GexpressConfig.getPickpocketRange(),
+				GexpressConfig.getCopycatCopyCooldownSeconds(),
+				GexpressConfig.getCopycatCopyDurationSeconds(),
+				GexpressConfig.getCopycatCopyRange(),
+				GexpressConfig.useCustomRoleCounts(),
+				GexpressConfig.getMaxKillerAmount(),
+				GexpressConfig.getMaxVigilanteAmount(),
+				GexpressConfig.getMaxNeutralAmount(),
+				GexpressConfig.getMaxModifiersPerPlayer(),
+				GexpressConfig.getPlayersPerKiller(),
+				GexpressConfig.getPlayersPerVigilante(),
+				GexpressConfig.getPlayersPerNeutral(),
+				GexpressConfig.getC4BackOffsetX(),
+				GexpressConfig.getC4BackOffsetY(),
+				GexpressConfig.getC4BackOffsetZ(),
+				GexpressConfig.getC4BackRotationX(),
+				GexpressConfig.getC4BackRotationY(),
+				GexpressConfig.getC4BackRotationZ(),
+				GexpressConfig.getC4BackSlant(),
+				GexpressConfig.getC4BackScale(),
+				GexpressConfig.getSpyBugOffsetX(),
+				GexpressConfig.getSpyBugOffsetY(),
+				GexpressConfig.getSpyBugOffsetZ(),
+				GexpressConfig.getSpyBugRotationX(),
+				GexpressConfig.getSpyBugRotationY(),
+				GexpressConfig.getSpyBugRotationZ(),
+				GexpressConfig.getSpyBugSlant(),
+				GexpressConfig.getSpyBugScale(),
+				GexpressConfig.getC4PlacementPresetsSyncString(),
+				GexpressConfig.getRoleDescriptionOverridesSyncString(),
+				GexpressConfig.getShortSightedEntityRange(),
+				GexpressConfig.getMedicShieldBlockFlashTicks(),
+				GexpressConfig.getMedicShieldBreakFlashTicks(),
+				GexpressConfig.getMedicShieldBlockFlashAlpha(),
+				GexpressConfig.getMedicShieldBreakFlashAlpha(),
+				GexpressConfig.getSilentShadowAlpha(),
+				GexpressConfig.getSpecialRoleOccurrenceId(),
+				GexpressConfig.getSeerCompareCooldownSeconds(),
+				GexpressConfig.getSeerCompareDeathsRequired(),
+				GexpressConfig.getSeerCompareRange(),
+				GexpressConfig.getTwinsSwapCooldownSeconds(),
+				GexpressConfig.canTwinsBodyUseDifferentRole(),
+				GexpressConfig.getCupidLovePercentage(),
+				GexpressConfig.getCupidPairCooldownSeconds(),
+				GexpressConfig.getCupidRange(),
+				GexpressConfig.shouldShowLoverHud(),
+				GexpressConfig.canLoversPairAcrossSides(),
+				GexpressConfig.getCovenantBiteCooldownSeconds(),
+				GexpressConfig.getVengefulSpiritReviveDelaySeconds(),
+				GexpressConfig.getVengefulSpiritRevengeSeconds(),
+				GexpressConfig.doLoversWinIndependently()
+			));
+		}
+		if (canEditGame && ClientPlayNetworking.canSend(GexpressTaskConfigPayload.ID)) {
 			ClientPlayNetworking.send(new GexpressTaskConfigPayload(
 				GexpressConfig.isConversationTaskEnabled(),
 				GexpressConfig.getConversationTaskChancePercent(),
@@ -385,7 +412,7 @@ public final class GexpressOptionsScreen {
 				GexpressConfig.getConversationTaskVerticalToleranceBlocks()
 			));
 		}
-		if (ClientPlayNetworking.canSend(GexpressDevTuningPayload.ID)) {
+		if (canEditDev && ClientPlayNetworking.canSend(GexpressDevTuningPayload.ID)) {
 			ClientPlayNetworking.send(new GexpressDevTuningPayload(
 				GexpressConfig.getLevelRoundXp(),
 				GexpressConfig.getLevelWinXp(),
@@ -405,7 +432,7 @@ public final class GexpressOptionsScreen {
 				GexpressConfig.getMutedNotePrice()
 			));
 		}
-		if (ClientPlayNetworking.canSend(PuppetmasterConfigPayload.ID)) {
+		if (canEditGame && ClientPlayNetworking.canSend(PuppetmasterConfigPayload.ID)) {
 			ClientPlayNetworking.send(new PuppetmasterConfigPayload(GexpressConfig.canPuppetmasterKillOwnBody()));
 		}
 	}
@@ -441,25 +468,63 @@ public final class GexpressOptionsScreen {
 		}
 	}
 
-	private static boolean canEditOptions() {
+	private static boolean canViewPlayersTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
-		return mc.player != null && GexpressPermissions.canEditGameOptions(mc.player);
+		return mc.player != null && GexpressPermissions.canViewPlayersTab(mc.player);
 	}
 
-	private static boolean canEditSetupOptions() {
+	private static boolean canViewGameTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
-		return mc.player != null && GexpressPermissions.canEditSetupOptions(mc.player);
+		return mc.player != null && GexpressPermissions.canViewGameTab(mc.player);
 	}
 
-	private static boolean isDevPlayer() {
+	private static boolean canEditGameTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
-		return mc.player != null && GexpressPermissions.isDev(mc.player);
+		return mc.player != null && GexpressPermissions.canEditGameTab(mc.player);
 	}
 
-	private static boolean canUseDevTab() {
+	private static boolean canViewMapsTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
-		return mc.player != null && (mc.player.hasPermissionLevel(2)
-			|| GexpressPermissions.isDev(mc.player)
-			|| GexpressPermissions.isOwner(mc.player));
+		return mc.player != null && GexpressPermissions.canViewMapsTab(mc.player);
+	}
+
+	private static boolean canEditMapsTab() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canEditMapsTab(mc.player);
+	}
+
+	private static boolean canViewTrainCartsTab() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canViewTrainCartsTab(mc.player);
+	}
+
+	private static boolean canEditTrainCartsTab() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canEditTrainCartsTab(mc.player);
+	}
+
+	private static boolean canViewDevTab() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canViewDevTab(mc.player);
+	}
+
+	private static boolean canEditDevTab() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canEditDevTab(mc.player);
+	}
+
+	private static boolean canEditTags() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canEditTags(mc.player);
+	}
+
+	private static boolean canManageProgression() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canManageProgression(mc.player);
+	}
+
+	private static boolean canManageEconomy() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.player != null && GexpressPermissions.canManageEconomy(mc.player);
 	}
 }

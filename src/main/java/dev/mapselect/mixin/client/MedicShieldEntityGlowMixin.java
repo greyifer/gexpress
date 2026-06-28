@@ -1,15 +1,18 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.ClientMedicShieldState;
-import dev.mapselect.client.ClientMafiaState;
-import dev.mapselect.client.ClientSnitchState;
-import dev.mapselect.client.ClientJanitorState;
-import dev.mapselect.client.ClientGuardianAngelState;
-import dev.mapselect.client.ClientBodyguardState;
-import dev.mapselect.client.ClientTimeMasterFreezeState;
-import dev.mapselect.client.ClientTrackerState;
-import dev.mapselect.client.ClientAbilityTargetState;
-import dev.mapselect.client.ClientSpectatorRoleRevealDelay;
+import dev.mapselect.client.role.medic.ClientMedicShieldState;
+import dev.mapselect.client.role.mafia.ClientMafiaState;
+import dev.mapselect.client.role.snitch.ClientSnitchState;
+import dev.mapselect.client.role.mafia.ClientJanitorState;
+import dev.mapselect.client.role.guardian.ClientGuardianAngelState;
+import dev.mapselect.client.role.bodyguard.ClientBodyguardState;
+import dev.mapselect.client.role.timemaster.ClientTimeMasterFreezeState;
+import dev.mapselect.client.role.tracker.ClientTrackerState;
+import dev.mapselect.client.role.painter.ClientPainterState;
+import dev.mapselect.client.ability.ClientAbilityTargetState;
+import dev.mapselect.client.role.vengeful.ClientVengefulSpiritState;
+import dev.mapselect.client.game.ClientSpectatorRoleRevealDelay;
+import dev.doctor4t.wathe.entity.PlayerBodyEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -29,12 +32,16 @@ public abstract class MedicShieldEntityGlowMixin {
 		if (ClientMedicShieldState.shouldGlow((Entity) (Object) this)
 				|| ClientSnitchState.shouldGlow((Entity) (Object) this)
 				|| ClientJanitorState.shouldGlow((Entity) (Object) this)
+				|| ((Object) this instanceof PlayerBodyEntity paintedBody && ClientPainterState.shouldGlow(paintedBody))
+				|| ((Object) this instanceof PlayerBodyEntity targetBody && ClientAbilityTargetState.shouldGlow(targetBody))
 				|| ((Object) this instanceof AbstractClientPlayerEntity player
 					&& (ClientTimeMasterFreezeState.shouldGlow(player)
 						|| ClientMafiaState.shouldGlow(player.getUuid())
 						|| ClientGuardianAngelState.shouldGlow(player)
 						|| ClientBodyguardState.shouldGlow(player)
+						|| ClientPainterState.shouldGlow(player)
 						|| ClientTrackerState.isTracked(player.getUuid())
+						|| ClientVengefulSpiritState.shouldGlow(player)
 						|| ClientAbilityTargetState.shouldGlow(player)
 						|| ClientSpectatorRoleRevealDelay.shouldGlow(player)))) {
 			cir.setReturnValue(true);
@@ -61,6 +68,14 @@ public abstract class MedicShieldEntityGlowMixin {
 			cir.setReturnValue(ClientJanitorState.glowColor());
 			return;
 		}
+		if ((Object) this instanceof PlayerBodyEntity body && ClientPainterState.shouldGlow(body)) {
+			cir.setReturnValue(ClientPainterState.glowColor(body));
+			return;
+		}
+		if ((Object) this instanceof PlayerBodyEntity body && ClientAbilityTargetState.shouldGlow(body)) {
+			cir.setReturnValue(ClientAbilityTargetState.glowColor(body));
+			return;
+		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientTimeMasterFreezeState.shouldGlow(player)) {
 			cir.setReturnValue(ClientTimeMasterFreezeState.glowColor());
@@ -82,13 +97,23 @@ public abstract class MedicShieldEntityGlowMixin {
 			return;
 		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
+				&& ClientPainterState.shouldGlow(player)) {
+			cir.setReturnValue(ClientPainterState.glowColor(player));
+			return;
+		}
+		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientTrackerState.isTracked(player.getUuid())) {
 			cir.setReturnValue(0x3E9CFF);
 			return;
 		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
+				&& ClientVengefulSpiritState.shouldGlow(player)) {
+			cir.setReturnValue(ClientVengefulSpiritState.KILLER_GLOW_COLOR);
+			return;
+		}
+		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientAbilityTargetState.shouldGlow(player)) {
-			cir.setReturnValue(ClientAbilityTargetState.glowColor());
+			cir.setReturnValue(ClientAbilityTargetState.glowColor(player));
 			return;
 		}
 	}

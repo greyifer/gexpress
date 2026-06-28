@@ -44,6 +44,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 	private ButtonWidget newButton;
 	private ButtonWidget doneButton;
 	private ButtonWidget addRewardButton;
+	private ButtonWidget panelToggleButton;
 	private String selectedId = "";
 	private String status = "Select a case or create a new one.";
 	private int statusColor = MUTED;
@@ -52,6 +53,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 	private int skinScroll;
 	private WeaponSkinType selectedType = WeaponSkinType.GUN;
 	private WeaponSkin selectedSkin;
+	private boolean compactSkinLibrary;
 
 	public GexpressCaseEditorScreen(Screen parent) {
 		super(Text.literal("Case Editor"));
@@ -65,6 +67,10 @@ public final class GexpressCaseEditorScreen extends Screen {
 		nameField = addField(0, 0, 160, 18, 80, "Display name");
 		priceField = addField(0, 0, 64, 18, 8, "Price");
 		addRewardButton = addDrawableChild(ButtonWidget.builder(Text.literal("Add Reward"), button -> addSelectedReward()).build());
+		panelToggleButton = addDrawableChild(ButtonWidget.builder(Text.literal("Browse Skins"), button -> {
+			compactSkinLibrary = !compactSkinLibrary;
+			updatePanelButtons();
+		}).build());
 		saveButton = addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> save()).build());
 		deleteButton = addDrawableChild(ButtonWidget.builder(Text.literal("Delete"), button -> delete()).build());
 		newButton = addDrawableChild(ButtonWidget.builder(Text.literal("New"), button -> clearForm()).build());
@@ -125,11 +131,13 @@ public final class GexpressCaseEditorScreen extends Screen {
 			caseScroll = MathHelper.clamp(caseScroll - (int) Math.round(verticalAmount * 24.0D), 0, max);
 			return true;
 		}
-		if (inside(mouseX, mouseY, rewardX(), rewardY(), rewardW(), rewardH())) {
+		if ((!compactLayout() || !compactSkinLibrary)
+				&& inside(mouseX, mouseY, rewardX(), rewardY(), rewardW(), rewardH())) {
 			rewardScroll = MathHelper.clamp(rewardScroll - (int) Math.round(verticalAmount * 24.0D), 0, maxRewardScroll());
 			return true;
 		}
-		if (inside(mouseX, mouseY, skinX(), skinY(), skinW(), skinH())) {
+		if ((!compactLayout() || compactSkinLibrary)
+				&& inside(mouseX, mouseY, skinX(), skinY(), skinW(), skinH())) {
 			skinScroll = MathHelper.clamp(skinScroll - (int) Math.round(verticalAmount * 24.0D), 0, maxSkinScroll());
 			return true;
 		}
@@ -204,8 +212,8 @@ public final class GexpressCaseEditorScreen extends Screen {
 		context.drawTextWithShadow(textRenderer, Text.literal("Display Name"), nameField.getX(), nameField.getY() - 11, MUTED);
 		context.drawTextWithShadow(textRenderer, Text.literal("Price"), priceField.getX(), priceField.getY() - 11, MUTED);
 		context.drawTextWithShadow(textRenderer, Text.literal(status), x + 14, y + 84, statusColor);
-		drawRewardPanel(context, mouseX, mouseY);
-		drawSkinPanel(context, mouseX, mouseY);
+		if (!compactLayout() || !compactSkinLibrary) drawRewardPanel(context, mouseX, mouseY);
+		if (!compactLayout() || compactSkinLibrary) drawSkinPanel(context, mouseX, mouseY);
 	}
 
 	private void drawRewardPanel(DrawContext context, int mouseX, int mouseY) {
@@ -354,6 +362,8 @@ public final class GexpressCaseEditorScreen extends Screen {
 
 		addRewardButton.setDimensionsAndPosition(Math.min(112, rewardW() - 22), 20,
 			rewardX() + rewardW() - Math.min(112, rewardW() - 22) - 10, rewardY() + 8);
+		panelToggleButton.setDimensionsAndPosition(104, 20, rewardX(), rewardY() - 24);
+		updatePanelButtons();
 		updateAddButton();
 
 		int buttonY = height - 32;
@@ -373,6 +383,13 @@ public final class GexpressCaseEditorScreen extends Screen {
 		}
 		addRewardButton.active = true;
 		addRewardButton.setMessage(Text.literal("Add " + textRenderer.trimToWidth(selectedSkin.displayName(), 58)));
+	}
+
+	private void updatePanelButtons() {
+		if (panelToggleButton == null || addRewardButton == null) return;
+		panelToggleButton.visible = compactLayout();
+		panelToggleButton.setMessage(Text.literal(compactSkinLibrary ? "Show Rewards" : "Browse Skins"));
+		addRewardButton.visible = !compactLayout() || !compactSkinLibrary;
 	}
 
 	private void load(GexpressConfig.SkinCaseEntry entry) {
@@ -619,8 +636,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 
 	private int rewardH() {
 		if (splitPanels()) return Math.max(148, height - rewardY() - 90);
-		int available = Math.max(170, height - rewardY() - 102);
-		return Math.max(130, available / 2);
+		return Math.max(148, height - rewardY() - 90);
 	}
 
 	private int skinX() {
@@ -628,7 +644,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 	}
 
 	private int skinY() {
-		return splitPanels() ? rewardY() : rewardY() + rewardH() + 12;
+		return splitPanels() ? rewardY() : rewardY();
 	}
 
 	private int skinW() {
@@ -636,12 +652,15 @@ public final class GexpressCaseEditorScreen extends Screen {
 	}
 
 	private int skinH() {
-		if (splitPanels()) return rewardH();
-		return Math.max(120, listY() + listH() - skinY() - 12);
+		return rewardH();
 	}
 
 	private boolean splitPanels() {
 		return editorW() >= 760;
+	}
+
+	private boolean compactLayout() {
+		return !splitPanels();
 	}
 
 	private boolean inside(double mouseX, double mouseY, int x, int y, int w, int h) {

@@ -1,6 +1,6 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.C4ModelTransforms;
+import dev.mapselect.client.render.C4ModelTransforms;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;

@@ -1,5 +1,6 @@
 package dev.mapselect.item;
 
+import dev.mapselect.game.GexpressAbilityGuards;
 import dev.mapselect.role.bombspecialist.C4Detonation;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
@@ -17,6 +18,7 @@ public class C4DetonatorItem extends Item {
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
 		ItemStack stack = user.getStackInHand(hand);
+		if (GexpressAbilityGuards.shouldBlockItemAbility(user)) return TypedActionResult.fail(stack);
 		if (!world.isClient && user instanceof ServerPlayerEntity player) {
 			C4Detonation.triggerRemoteDetonation(player);
 		}

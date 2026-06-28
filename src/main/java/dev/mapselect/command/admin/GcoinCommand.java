@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import dev.mapselect.currency.GcoinComponent;
+import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.command.argument.GameProfileArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -18,7 +19,11 @@ public final class GcoinCommand {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("gcoin")
+			.requires(source -> GexpressPermissions.canManageEconomy(source)
+				|| GexpressPermissions.canUseCommandBranch(source, "admin", "gcoin"))
 			.then(CommandManager.literal("give")
+				.requires(source -> GexpressPermissions.canManageEconomy(source)
+					|| GexpressPermissions.canUseCommandPath(source, "admin", "gcoin", "give"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
 						.executes(ctx -> runChange(ctx,
@@ -26,6 +31,8 @@ public final class GcoinCommand {
 							IntegerArgumentType.getInteger(ctx, "amount"),
 							Change.GIVE)))))
 			.then(CommandManager.literal("remove")
+				.requires(source -> GexpressPermissions.canManageEconomy(source)
+					|| GexpressPermissions.canUseCommandPath(source, "admin", "gcoin", "remove"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
 						.executes(ctx -> runChange(ctx,
@@ -33,6 +40,8 @@ public final class GcoinCommand {
 							IntegerArgumentType.getInteger(ctx, "amount"),
 							Change.REMOVE)))))
 			.then(CommandManager.literal("set")
+				.requires(source -> GexpressPermissions.canManageEconomy(source)
+					|| GexpressPermissions.canUseCommandPath(source, "admin", "gcoin", "set"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.then(CommandManager.argument("amount", IntegerArgumentType.integer(0))
 						.executes(ctx -> runChange(ctx,

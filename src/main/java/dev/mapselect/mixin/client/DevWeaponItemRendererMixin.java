@@ -1,8 +1,8 @@
 package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.index.WatheItems;
-import dev.mapselect.client.ClientSilentShadowState;
-import dev.mapselect.client.DevWeaponModels;
+import dev.mapselect.client.role.silent.ClientSilentShadowState;
+import dev.mapselect.client.render.DevWeaponModels;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.item.ItemModels;
 import net.minecraft.client.render.item.ItemRenderer;

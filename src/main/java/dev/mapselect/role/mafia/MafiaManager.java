@@ -16,12 +16,12 @@ import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.game.GexpressGameModes;
-import dev.mapselect.network.AbilityCooldownPayload;
-import dev.mapselect.network.AbilityCooldownSync;
-import dev.mapselect.network.MafiaActionPayload;
-import dev.mapselect.network.MafiaAmmoPayload;
-import dev.mapselect.network.MafiaIntroPayload;
-import dev.mapselect.network.MafiaStatePayload;
+import dev.mapselect.network.ability.AbilityCooldownPayload;
+import dev.mapselect.network.ability.AbilityCooldownSync;
+import dev.mapselect.network.role.mafia.MafiaActionPayload;
+import dev.mapselect.network.role.mafia.MafiaAmmoPayload;
+import dev.mapselect.network.role.mafia.MafiaIntroPayload;
+import dev.mapselect.network.role.mafia.MafiaStatePayload;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
@@ -109,7 +109,7 @@ public final class MafiaManager {
 	}
 
 	private static void handleAction(ServerPlayerEntity player, int action) {
-		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
+		if (player == null || !(player.getWorld() instanceof ServerWorld)) return;
 		if (action == MafiaActionPayload.RECRUIT_MAFIOSO) {
 			tryRecruit(player, SlotType.MAFIOSO);
 		} else if (action == MafiaActionPayload.RECRUIT_JANITOR) {
@@ -901,7 +901,7 @@ public final class MafiaManager {
 	}
 
 	private static void sync(ServerPlayerEntity player) {
-		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
+		if (player == null || !(player.getWorld() instanceof ServerWorld)) return;
 		UUID godfatherId = isGodfather(player) ? player.getUuid() : godfatherByMember.get(player.getUuid());
 		sync(player, familyIds(godfatherId));
 	}

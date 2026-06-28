@@ -1,6 +1,6 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.ClientSilentShadowState;
+import dev.mapselect.client.role.silent.ClientSilentShadowState;
 import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.entity.PlayerEntityRenderer;

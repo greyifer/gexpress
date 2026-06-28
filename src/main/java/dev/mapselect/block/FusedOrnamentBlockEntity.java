@@ -1,14 +1,12 @@
 package dev.mapselect.block;
 
 import dev.doctor4t.wathe.block.property.OrnamentShape;
-import dev.doctor4t.wathe.index.WatheProperties;
 import dev.mapselect.registry.MapSelectBlockEntities;
 import dev.mapselect.registry.MapSelectBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.FacingBlock;
-import net.minecraft.block.HorizontalFacingBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
@@ -19,19 +17,15 @@ import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -46,15 +40,12 @@ public class FusedOrnamentBlockEntity extends BlockEntity {
 	private boolean hasGoldLedgeCollision;
 	private VoxelShape goldLedgeCollisionShape = VoxelShapes.empty();
 	private long renderVersion;
-	private boolean migrationAttempted;
 
 	public FusedOrnamentBlockEntity(BlockPos pos, BlockState state) {
 		super(MapSelectBlockEntities.FUSED_ORNAMENT, pos, state);
 	}
 
 	public record Decoration(Identifier ornamentId, OrnamentShape shape) {}
-
-	private record MigrationPlacement(BlockPos pos, BlockState state) {}
 
 	public BlockState getBaseState() {
 		return baseState;
@@ -131,13 +122,6 @@ public class FusedOrnamentBlockEntity extends BlockEntity {
 		return goldLedgeCollisionShape;
 	}
 
-	public static void tick(World world, BlockPos pos, BlockState state, FusedOrnamentBlockEntity entity) {
-		if (world == null || world.isClient || entity.migrationAttempted) return;
-		if ((world.getTime() + Math.floorMod(pos.asLong(), 20L)) % 20L != 0L) return;
-		entity.migrationAttempted = true;
-		entity.tryMigrateToRealBlocks(world, pos);
-	}
-
 	private Decoration firstDecoration() {
 		return decorations.values().stream().findFirst().orElse(null);
 	}
@@ -161,73 +145,6 @@ public class FusedOrnamentBlockEntity extends BlockEntity {
 		goldLedgeCollisionShape = ledges;
 		hasGoldLedgeCollision = hasLedge;
 		goldLedgeCollisionDirty = false;
-	}
-
-	private void tryMigrateToRealBlocks(World world, BlockPos pos) {
-		if (decorations.isEmpty() || baseState == null || baseState.isAir()) return;
-		List<MigrationPlacement> placements = new ArrayList<>(decorations.size());
-		for (Map.Entry<Direction, Decoration> entry : decorations.entrySet()) {
-			MigrationPlacement placement = migrationPlacement(world, pos, entry.getKey(), entry.getValue());
-			if (placement == null) return;
-			placements.add(placement);
-		}
-
-		world.setBlockState(pos, baseState, Block.NOTIFY_ALL);
-		for (MigrationPlacement placement : placements) {
-			world.setBlockState(placement.pos(), placement.state(), Block.NOTIFY_ALL);
-		}
-	}
-
-	@Nullable
-	private MigrationPlacement migrationPlacement(World world, BlockPos sourcePos, Direction side,
-			Decoration decoration) {
-		Block ornamentBlock = Registries.BLOCK.get(decoration.ornamentId());
-		if (ornamentBlock == Blocks.AIR) return null;
-		BlockPos targetPos = sourcePos.offset(side);
-		BlockState existing = world.getBlockState(targetPos);
-		BlockState placementState = actualOrnamentState(ornamentBlock, side, decoration.shape());
-
-		if (existing.isOf(ornamentBlock)) {
-			BlockState merged = mergeOrnamentState(existing, placementState, decoration.shape());
-			if (merged != null) return new MigrationPlacement(targetPos, merged);
-		}
-
-		return existing.isReplaceable()
-			? new MigrationPlacement(targetPos, placementState)
-			: null;
-	}
-
-	private static BlockState actualOrnamentState(Block block, Direction side, OrnamentShape shape) {
-		BlockState state = block.getDefaultState();
-		if (state.contains(FacingBlock.FACING)) {
-			state = state.with(FacingBlock.FACING, side);
-		}
-		if (state.contains(HorizontalFacingBlock.FACING) && side.getAxis().isHorizontal()) {
-			state = state.with(HorizontalFacingBlock.FACING, side);
-		}
-		if (state.contains(WatheProperties.ORNAMENT_SHAPE)) {
-			state = state.with(WatheProperties.ORNAMENT_SHAPE, shape);
-		}
-		return state;
-	}
-
-	@Nullable
-	private static BlockState mergeOrnamentState(BlockState existing, BlockState placement, OrnamentShape shape) {
-		if (existing.contains(FacingBlock.FACING)
-				&& placement.contains(FacingBlock.FACING)
-				&& existing.get(FacingBlock.FACING) != placement.get(FacingBlock.FACING)) {
-			return null;
-		}
-		if (existing.contains(HorizontalFacingBlock.FACING)
-				&& placement.contains(HorizontalFacingBlock.FACING)
-				&& existing.get(HorizontalFacingBlock.FACING) != placement.get(HorizontalFacingBlock.FACING)) {
-			return null;
-		}
-		if (existing.contains(WatheProperties.ORNAMENT_SHAPE)) {
-			return existing.with(WatheProperties.ORNAMENT_SHAPE,
-				existing.get(WatheProperties.ORNAMENT_SHAPE).with(shape));
-		}
-		return existing;
 	}
 
 	public void sync() {

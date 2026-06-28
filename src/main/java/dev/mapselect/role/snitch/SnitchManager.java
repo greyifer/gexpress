@@ -6,7 +6,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerMoodComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
-import dev.mapselect.network.SnitchProgressPayload;
+import dev.mapselect.network.role.snitch.SnitchProgressPayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.role.pelican.PelicanManager;

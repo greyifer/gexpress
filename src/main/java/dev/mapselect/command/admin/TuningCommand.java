@@ -43,14 +43,16 @@ public final class TuningCommand {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildRoleTree() {
 		return CommandManager.literal("tuning")
-			.requires(GexpressPermissions::canUseRoleCommands)
+			.requires(source -> GexpressPermissions.canUseRoleCommands(source)
+				|| GexpressPermissions.canUseCommandBranch(source, "roles", "tuning"))
 			.then(roleTarget())
 			.then(roleBranch());
 	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildModifierTree() {
 		return CommandManager.literal("tuning")
-			.requires(GexpressPermissions::canUseModifierCommands)
+			.requires(source -> GexpressPermissions.canUseModifierCommands(source)
+				|| GexpressPermissions.canUseCommandBranch(source, "modifiers", "tuning"))
 			.then(modifierTarget())
 			.then(modifierBranch());
 	}

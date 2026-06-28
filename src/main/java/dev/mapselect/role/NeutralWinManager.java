@@ -1,6 +1,6 @@
 package dev.mapselect.role;
 
-import dev.mapselect.network.NeutralWinPayload;
+import dev.mapselect.network.game.NeutralWinPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;

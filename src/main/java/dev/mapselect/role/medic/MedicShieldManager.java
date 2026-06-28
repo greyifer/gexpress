@@ -2,12 +2,13 @@ package dev.mapselect.role.medic;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
+import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.MedicShieldFlashPayload;
-import dev.mapselect.network.MedicShieldUsePayload;
+import dev.mapselect.network.role.medic.MedicShieldFlashPayload;
+import dev.mapselect.network.role.medic.MedicShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.AbilityTargeting;
@@ -42,6 +43,8 @@ public final class MedicShieldManager {
 		ServerPlayNetworking.registerGlobalReceiver(MedicShieldUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryShield(context.player())));
 		AllowPlayerDeath.EVENT.register(MedicShieldManager::allowDeath);
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearWorld(world));
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearWorld(world));
 		ServerTickEvents.END_WORLD_TICK.register(MedicShieldManager::tick);
 	}
 
@@ -125,6 +128,11 @@ public final class MedicShieldManager {
 		String path = reason.getPath().toLowerCase(Locale.ROOT);
 		return path.contains("knife") || path.contains("stab") || path.contains("gun")
 			|| path.contains("bullet") || path.contains("revolver");
+	}
+
+	private static void clearWorld(World world) {
+		MedicShieldComponent comp = MedicShieldComponent.KEY.getNullable(world);
+		if (comp != null) comp.clearAll();
 	}
 
 	private static void tick(ServerWorld world) {

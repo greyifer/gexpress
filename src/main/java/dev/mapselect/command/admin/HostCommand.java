@@ -18,15 +18,24 @@ public class HostCommand {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("host")
-			.requires(GexpressPermissions::canUseAdminCommands)
+			.requires(source -> GexpressPermissions.canUseAdminCommands(source)
+				|| GexpressPermissions.canUseCommandBranch(source, "admin", "host"))
 			.then(CommandManager.literal("add")
+				.requires(source -> canUseHostCommand(source, "add"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.executes(HostCommand::runAdd)))
 			.then(CommandManager.literal("remove")
+				.requires(source -> canUseHostCommand(source, "remove"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.executes(HostCommand::runRemove)))
 			.then(CommandManager.literal("list")
+				.requires(source -> canUseHostCommand(source, "list"))
 				.executes(HostCommand::runList));
+	}
+
+	private static boolean canUseHostCommand(ServerCommandSource source, String subcommand) {
+		return GexpressPermissions.canUseAdminCommands(source)
+			|| GexpressPermissions.canUseCommandPath(source, "admin", "host", subcommand);
 	}
 
 	private static HostComponent component(ServerCommandSource src) {

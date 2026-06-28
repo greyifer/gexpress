@@ -5,18 +5,14 @@ import dev.doctor4t.wathe.block.property.OrnamentShape;
 import dev.doctor4t.wathe.index.WatheProperties;
 import dev.doctor4t.wathe.mixin.AbstractBlockInvoker;
 import dev.mapselect.item.FusedOrnamentItem;
-import dev.mapselect.registry.MapSelectBlockEntities;
 import dev.mapselect.registry.MapSelectBlocks;
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockEntityProvider;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.BlockWithEntity;
 import net.minecraft.block.FacingBlock;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ai.pathing.NavigationType;
 import net.minecraft.entity.player.PlayerEntity;
@@ -30,6 +26,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.ItemActionResult;
 import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec2f;
@@ -44,7 +41,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 
-public class FusedOrnamentBlock extends BlockWithEntity implements BlockEntityProvider {
+public class FusedOrnamentBlock extends BlockWithEntity {
 	public static final EnumProperty<OrnamentShape> SHAPE = WatheProperties.ORNAMENT_SHAPE;
 
 	public FusedOrnamentBlock(Settings settings) {
@@ -62,17 +59,6 @@ public class FusedOrnamentBlock extends BlockWithEntity implements BlockEntityPr
 	@Override
 	public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
 		return new FusedOrnamentBlockEntity(pos, state);
-	}
-
-	@Nullable
-	@Override
-	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state,
-			BlockEntityType<T> type) {
-		return type == MapSelectBlockEntities.FUSED_ORNAMENT
-			? (tickerWorld, tickerPos, tickerState, tickerEntity) ->
-				FusedOrnamentBlockEntity.tick(tickerWorld, tickerPos, tickerState,
-					(FusedOrnamentBlockEntity) tickerEntity)
-			: null;
 	}
 
 	@Override
@@ -100,21 +86,35 @@ public class FusedOrnamentBlock extends BlockWithEntity implements BlockEntityPr
 	@Override
 	protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
 		if (player.shouldCancelInteraction() && player.getMainHandStack().isEmpty()) {
-			return removeOrnament(state, world, pos, player, hit);
+			return removeOrnament(state, world, pos, player, hit.getSide(), null);
 		}
 		BlockState baseState = getBaseState(world, pos);
 		if (baseState == null) return ActionResult.PASS;
 		return ((AbstractBlockInvoker) baseState.getBlock()).wathe$invokeOnUse(baseState, world, pos, player, hit);
 	}
 
-	private ActionResult removeOrnament(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
+	public static ActionResult removeOrnament(BlockState state, World world, BlockPos pos, @Nullable PlayerEntity player,
+			Direction hitSide, @Nullable Identifier preferredOrnamentId) {
 		if (!(world.getBlockEntity(pos) instanceof FusedOrnamentBlockEntity entity)) return ActionResult.PASS;
-		Direction side = hit.getSide();
+		Direction side = hitSide;
 		FusedOrnamentBlockEntity.Decoration decoration = entity.getDecoration(side);
-		if (decoration == null && entity.getDecorations().size() == 1) {
+		if (preferredOrnamentId != null && (decoration == null || !preferredOrnamentId.equals(decoration.ornamentId()))) {
+			Map.Entry<Direction, FusedOrnamentBlockEntity.Decoration> match = entity.getDecorations().entrySet().stream()
+				.filter(entry -> preferredOrnamentId.equals(entry.getValue().ornamentId()))
+				.findFirst()
+				.orElse(null);
+			if (match != null) {
+				side = match.getKey();
+				decoration = match.getValue();
+			}
+		}
+		if (decoration == null && preferredOrnamentId == null && entity.getDecorations().size() == 1) {
 			Map.Entry<Direction, FusedOrnamentBlockEntity.Decoration> first = entity.getDecorations().entrySet().iterator().next();
 			side = first.getKey();
 			decoration = first.getValue();
+		}
+		if (preferredOrnamentId != null && (decoration == null || !preferredOrnamentId.equals(decoration.ornamentId()))) {
+			return ActionResult.PASS;
 		}
 		if (decoration == null) return ActionResult.PASS;
 		if (!world.isClient) {
@@ -130,7 +130,7 @@ public class FusedOrnamentBlock extends BlockWithEntity implements BlockEntityPr
 			} else {
 				world.setBlockState(pos, baseState, Block.NOTIFY_ALL);
 			}
-			if (!player.isCreative()) {
+			if (player == null || !player.isCreative()) {
 				dropDecoration(world, pos, removed);
 			}
 		}

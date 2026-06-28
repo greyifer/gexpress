@@ -15,10 +15,10 @@ import dev.doctor4t.wathe.cca.PlayerMoodComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.mapselect.MapSelect;
 import dev.mapselect.game.GexpressGameModes;
-import dev.mapselect.network.MafiaIntroPayload;
-import dev.mapselect.network.TestOverlayPayload;
-import dev.mapselect.network.TimeMasterFreezeStatePayload;
-import dev.mapselect.network.TimeMasterRewindPayload;
+import dev.mapselect.network.role.mafia.MafiaIntroPayload;
+import dev.mapselect.network.game.TestOverlayPayload;
+import dev.mapselect.network.role.timemaster.TimeMasterFreezeStatePayload;
+import dev.mapselect.network.role.timemaster.TimeMasterRewindPayload;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.task.ConversationTask;
 import dev.mapselect.role.AbilityCooldownReducers;
@@ -198,6 +198,7 @@ public final class TestCommand {
 			.then(timedOverlayBranch("freeze", 5, TestCommand::runFreezeOverlay))
 			.then(timedOverlayBranch("mafia_intro", 5, TestCommand::runMafiaIntroOverlay))
 			.then(timedOverlayBranch("black_white", 8, TestCommand::runBlackWhiteOverlay))
+			.then(timedOverlayBranch("cupid", 8, TestCommand::runCupidOverlay))
 			.then(CommandManager.literal("clear")
 				.executes(ctx -> runClearOverlay(ctx, self(ctx)))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
@@ -522,6 +523,11 @@ public final class TestCommand {
 		return runTestOverlay(ctx, "black_white", "black-white shader", seconds, players);
 	}
 
+	private static int runCupidOverlay(CommandContext<ServerCommandSource> ctx, int seconds,
+			Collection<ServerPlayerEntity> players) {
+		return runTestOverlay(ctx, "cupid", "cupid shader", seconds, players);
+	}
+
 	private static int runClearOverlay(CommandContext<ServerCommandSource> ctx,
 			Collection<ServerPlayerEntity> players) {
 		int sent = 0;
@@ -653,7 +659,7 @@ public final class TestCommand {
 		return Math.max(1, seconds) * 20;
 	}
 
-	@SuppressWarnings({"rawtypes", "unchecked"})
+	@SuppressWarnings("rawtypes")
 	private static boolean sendPayload(ServerPlayerEntity player, CustomPayload payload) {
 		CustomPayload.Id id = payload.getId();
 		if (!ServerPlayNetworking.canSend(player, id)) return false;

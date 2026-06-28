@@ -2,7 +2,7 @@ package dev.mapselect.skin;
 
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.currency.GcoinComponent;
-import dev.mapselect.network.SkinCaseResultPayload;
+import dev.mapselect.network.progression.SkinCaseResultPayload;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;

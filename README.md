@@ -292,3 +292,17 @@ G'Express is an addon for that ecosystem, not a replacement for it.
 ## License
 
 G'Express is licensed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
+
+## Third-party code notice
+
+This project is licensed under the GNU General Public License v3.0.
+
+This project includes code derived from Immersive Portals Mod by qouteall / iPortalTeam, which is licensed under the Apache License 2.0.
+
+The original Immersive Portals Mod copyright notice is retained where applicable:
+
+Copyright 2020 qouteall
+
+Modifications to the Immersive Portals code were made by this project's contributors.
+
+This project is an unofficial modification and is not affiliated with, endorsed by, or maintained by qouteall or the iPortalTeam.

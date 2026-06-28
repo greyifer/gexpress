@@ -1,3 +1,6 @@
 {
-	"parent": "gexpress:block/coin_barrier"
+	"parent": "minecraft:item/generated",
+	"textures": {
+		"layer0": "gexpress:item/red_ribbon"
+	}
 }

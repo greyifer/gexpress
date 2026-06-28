@@ -1,7 +1,7 @@
 package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.item.RevolverItem;
-import dev.mapselect.client.ClientMafiaState;
+import dev.mapselect.client.role.mafia.ClientMafiaState;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;

@@ -2,6 +2,7 @@ package dev.mapselect.item;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.GexpressAbilityGuards;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.bombspecialist.C4Detonation;
 import net.minecraft.entity.Entity;
@@ -30,6 +31,7 @@ public class C4Item extends Item {
 	public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
 		if (!(entity instanceof PlayerEntity target)) return ActionResult.PASS;
 		if (target == user) return ActionResult.PASS;
+		if (GexpressAbilityGuards.shouldBlockItemAbility(user)) return ActionResult.FAIL;
 		if (user.getWorld().isClient) return ActionResult.SUCCESS;
 
 		return plantOnPlayer(stack, user, target);
@@ -39,6 +41,7 @@ public class C4Item extends Item {
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
 		ItemStack stack = user.getStackInHand(hand);
 		if (stack.isEmpty()) return TypedActionResult.pass(stack);
+		if (GexpressAbilityGuards.shouldBlockItemAbility(user)) return TypedActionResult.fail(stack);
 
 		PlayerEntity targetedPlayer = findTargetedPlayer(user);
 		if (targetedPlayer != null) {

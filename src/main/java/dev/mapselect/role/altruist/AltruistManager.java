@@ -8,7 +8,8 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheEntities;
 import dev.mapselect.config.GexpressConfig;
-import dev.mapselect.network.AltruistUsePayload;
+import dev.mapselect.network.role.altruist.AltruistUsePayload;
+import dev.mapselect.modifier.LoversManager;
 import dev.mapselect.modifier.ModifierUtils;
 import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.registry.MapSelectRoles;
@@ -29,13 +30,12 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class AltruistManager {
 	private static final double LOOK_RADIUS_SQUARED = 1.25D;
-	private static final Set<UUID> REVIVED_MUTED = ConcurrentHashMap.newKeySet();
 
 	private AltruistManager() {}
 
@@ -43,12 +43,6 @@ public final class AltruistManager {
 		PayloadTypeRegistry.playC2S().register(AltruistUsePayload.ID, AltruistUsePayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(AltruistUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryRevive(context.player())));
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> REVIVED_MUTED.clear());
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> REVIVED_MUTED.clear());
-	}
-
-	public static boolean isRevivedMuted(UUID playerId) {
-		return playerId != null && REVIVED_MUTED.contains(playerId);
 	}
 
 	private static void tryRevive(ServerPlayerEntity altruist) {
@@ -73,6 +67,28 @@ public final class AltruistManager {
 		Vec3d revivePos = body.getPos();
 		float yaw = body.getYaw();
 		body.discard();
+
+		List<ServerPlayerEntity> soundTargets = new ArrayList<>();
+		soundTargets.add(altruist);
+		if (revivePlayer(world, target, revivePos, yaw, Text.literal("The Altruist revived you."))) {
+			soundTargets.add(target);
+		}
+		ServerPlayerEntity linkedLover = reviveLinkedLover(world, target);
+		if (linkedLover != null) soundTargets.add(linkedLover);
+
+		AbilitySounds.playTo(soundTargets, SoundEvents.BLOCK_BEACON_ACTIVATE,
+			SoundCategory.PLAYERS, 0.9F, 1.35F);
+		if (!GexpressTestState.hasCreativeAbilityBypass(altruist)) {
+			GameFunctions.killPlayer(altruist, true, target, GameConstants.DeathReasons.GENERIC);
+			TrainVoicePlugin.addPlayer(altruist.getUuid());
+		}
+	}
+
+	private static boolean revivePlayer(ServerWorld world, ServerPlayerEntity target, Vec3d revivePos, float yaw,
+			Text message) {
+		if (world == null || target == null || revivePos == null || GameFunctions.isPlayerAliveAndSurvival(target)) {
+			return false;
+		}
 		target.changeGameMode(GameMode.ADVENTURE);
 		target.teleport(world, revivePos.x, revivePos.y, revivePos.z, yaw, 0.0F);
 		target.setHealth(target.getMaxHealth());
@@ -81,16 +97,23 @@ public final class AltruistManager {
 		target.velocityModified = true;
 		target.networkHandler.sendPacket(new SetCameraEntityS2CPacket(target));
 		TrainVoicePlugin.resetPlayer(target.getUuid());
-		ModifierUtils.addIfMissing(target, MapSelectModifiers.MUTED);
-		REVIVED_MUTED.add(target.getUuid());
-		target.sendMessage(Text.literal("The Altruist revived you."), true);
+		ModifierUtils.addEvenIfPresent(target, MapSelectModifiers.MUTED);
+		if (message != null) target.sendMessage(message, true);
+		return true;
+	}
 
-		AbilitySounds.playTo(java.util.List.of(altruist, target), SoundEvents.BLOCK_BEACON_ACTIVATE,
-			SoundCategory.PLAYERS, 0.9F, 1.35F);
-		if (!GexpressTestState.hasCreativeAbilityBypass(altruist)) {
-			GameFunctions.killPlayer(altruist, true, target, GameConstants.DeathReasons.GENERIC);
-			TrainVoicePlugin.addPlayer(altruist.getUuid());
-		}
+	private static ServerPlayerEntity reviveLinkedLover(ServerWorld world, ServerPlayerEntity revived) {
+		if (world == null || revived == null) return null;
+		UUID partnerId = LoversManager.partnerId(revived.getUuid());
+		if (partnerId == null) return null;
+		ServerPlayerEntity partner = world.getServer().getPlayerManager().getPlayer(partnerId);
+		if (partner == null || GameFunctions.isPlayerAliveAndSurvival(partner)) return null;
+		PlayerBodyEntity partnerBody = findBodyFor(world, partnerId);
+		Vec3d revivePos = partnerBody == null ? revived.getPos() : partnerBody.getPos();
+		float yaw = partnerBody == null ? revived.getYaw() : partnerBody.getYaw();
+		if (partnerBody != null) partnerBody.discard();
+		return revivePlayer(world, partner, revivePos, yaw,
+			Text.literal("The Altruist revived your lover, pulling you back too.")) ? partner : null;
 	}
 
 	private static PlayerBodyEntity findBody(ServerPlayerEntity altruist) {
@@ -109,6 +132,15 @@ public final class AltruistManager {
 			bestAlong = along;
 		}
 		return best;
+	}
+
+	private static PlayerBodyEntity findBodyFor(ServerWorld world, UUID playerId) {
+		if (world == null || playerId == null) return null;
+		for (PlayerBodyEntity body : world.getEntitiesByType(WatheEntities.PLAYER_BODY,
+				entity -> playerId.equals(entity.getPlayerUuid()))) {
+			return body;
+		}
+		return null;
 	}
 
 	private static boolean isAltruist(PlayerEntity player) {

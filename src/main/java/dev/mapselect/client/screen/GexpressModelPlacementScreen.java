@@ -1,7 +1,7 @@
 package dev.mapselect.client.screen;
 
 import com.mojang.authlib.GameProfile;
-import dev.mapselect.client.ClientModelAttachmentPreview;
+import dev.mapselect.client.render.ClientModelAttachmentPreview;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
 import net.minecraft.client.MinecraftClient;
@@ -27,13 +27,11 @@ import java.util.Locale;
 public final class GexpressModelPlacementScreen extends Screen {
 	private static final String[] LABELS = { "X", "Y", "Z", "Rot X", "Rot Y", "Rot Z", "Slant", "Scale" };
 	private static final int PANEL = 0xCC151A20;
-	private static final int PANEL_SOFT = 0x88242B34;
 	private static final int BORDER = 0x775E6D7E;
 	private static final int GOLD = 0xFFE7C66A;
 	private static final int RED = 0xFFFF5F63;
 	private static final int BLUE = 0xFF7FB6FF;
 	private static final int GREEN = 0xFF74D990;
-	private static final int PURPLE = 0xFFC77DFF;
 	private static final int TEXT = 0xFFE8EDF2;
 	private static final int MUTED = 0xFF9DA9B6;
 	private static final C4PlacementPreset SPY_DEFAULT =
@@ -43,6 +41,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 	private final List<TextFieldWidget> fields = new ArrayList<>();
 	private ClientModelAttachmentPreview.Kind kind = ClientModelAttachmentPreview.Kind.C4;
 	private ButtonWidget kindButton;
+	private ButtonWidget toolButton;
 	private ButtonWidget applyButton;
 	private ButtonWidget copyButton;
 	private ButtonWidget resetButton;
@@ -50,7 +49,8 @@ public final class GexpressModelPlacementScreen extends Screen {
 	private ButtonWidget doneButton;
 	private boolean draggingPreview;
 	private boolean panningPreview;
-	private TransformGizmo activeGizmo;
+	private TransformAxis activeGizmo;
+	private boolean rotateTool;
 	private int lastGizmoX;
 	private int lastGizmoY;
 	private int lastGizmoRadius;
@@ -75,6 +75,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 			fields.add(addDrawableChild(field));
 		}
 		kindButton = addDrawableChild(ButtonWidget.builder(kindText(), button -> toggleKind()).build());
+		toolButton = addDrawableChild(ButtonWidget.builder(toolText(), button -> toggleTool()).build());
 		applyButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.model_placement.apply"),
 			button -> applyAndSave()).build());
 		copyButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.model_placement.copy"),
@@ -106,7 +107,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if ((button == 0 || button == 1 || button == 2) && inPreview(mouseX, mouseY)) {
 			if (button == 0) {
-				TransformGizmo gizmo = hitGizmo(mouseX, mouseY);
+				TransformAxis gizmo = hitGizmo(mouseX, mouseY);
 				if (gizmo != null) {
 					activeGizmo = gizmo;
 					draggingPreview = true;
@@ -238,22 +239,21 @@ public final class GexpressModelPlacementScreen extends Screen {
 		lastGizmoX = x;
 		lastGizmoY = y;
 		lastGizmoRadius = r;
-		TransformGizmo hover = activeGizmo != null ? activeGizmo : hitGizmo(mouseX, mouseY);
+		TransformAxis hover = activeGizmo != null ? activeGizmo : hitGizmo(mouseX, mouseY);
 
-		context.fill(x - 2, y - 2, x + 3, y + 3, 0xFFFFFFFF);
-		drawLine(context, x, y, x + r, y, hover == TransformGizmo.MOVE_X ? 0xFFFFFFFF : RED, 2);
-		drawLine(context, x, y, x, y - r, hover == TransformGizmo.MOVE_Y ? 0xFFFFFFFF : GREEN, 2);
-		drawLine(context, x, y, x - r, y + r, hover == TransformGizmo.MOVE_Z ? 0xFFFFFFFF : BLUE, 2);
+		context.fill(x - 3, y - 3, x + 4, y + 4, 0xFFE8EDF2);
+		drawLine(context, x, y, x + r, y, hover == TransformAxis.X ? 0xFFFFFFFF : RED, 3);
+		drawLine(context, x, y, x, y - r, hover == TransformAxis.Y ? 0xFFFFFFFF : GREEN, 3);
+		drawLine(context, x, y, x - r, y + r, hover == TransformAxis.Z ? 0xFFFFFFFF : BLUE, 3);
 		drawArrowHead(context, x + r, y, 1, 0, RED);
 		drawArrowHead(context, x, y - r, 0, -1, GREEN);
 		drawArrowHead(context, x - r, y + r, -1, 1, BLUE);
 		context.drawTextWithShadow(textRenderer, Text.literal("X"), x + r + 7, y - 4, RED);
 		context.drawTextWithShadow(textRenderer, Text.literal("Y"), x - 4, y - r - 12, GREEN);
 		context.drawTextWithShadow(textRenderer, Text.literal("Z"), x - r - 12, y + r - 4, BLUE);
-
-		drawRing(context, x, y, r + 13, hover == TransformGizmo.ROT_X ? 0xFFFFFFFF : RED);
-		drawRing(context, x, y, r + 20, hover == TransformGizmo.ROT_Y ? 0xFFFFFFFF : GREEN);
-		drawRing(context, x, y, r + 27, hover == TransformGizmo.ROT_Z ? 0xFFFFFFFF : PURPLE);
+		context.fill(x - 34, y + r + 16, x + 35, y + r + 30, 0xAA111820);
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal(rotateTool ? "ROTATE" : "MOVE"),
+			x, y + r + 19, rotateTool ? GOLD : TEXT);
 	}
 
 	private void drawArrowHead(DrawContext context, int x, int y, int dx, int dy, int color) {
@@ -285,42 +285,28 @@ public final class GexpressModelPlacementScreen extends Screen {
 		}
 	}
 
-	private void drawRing(DrawContext context, int x, int y, int radius, int color) {
-		for (int i = 0; i < 72; i++) {
-			double angle = i * Math.PI * 2.0D / 72.0D;
-			int px = x + (int) Math.round(Math.cos(angle) * radius);
-			int py = y + (int) Math.round(Math.sin(angle) * radius * 0.58D);
-			context.fill(px - 1, py - 1, px + 2, py + 2, color);
-		}
-	}
-
-	private TransformGizmo hitGizmo(double mouseX, double mouseY) {
+	private TransformAxis hitGizmo(double mouseX, double mouseY) {
 		if (lastGizmoRadius <= 0) return null;
 		double dx = mouseX - lastGizmoX;
 		double dy = mouseY - lastGizmoY;
 		double r = lastGizmoRadius;
-		if (dx >= 0.0D && dx <= r + 10.0D && Math.abs(dy) <= 7.0D) return TransformGizmo.MOVE_X;
-		if (dy <= 0.0D && dy >= -r - 10.0D && Math.abs(dx) <= 7.0D) return TransformGizmo.MOVE_Y;
+		if (dx >= 0.0D && dx <= r + 10.0D && Math.abs(dy) <= 7.0D) return TransformAxis.X;
+		if (dy <= 0.0D && dy >= -r - 10.0D && Math.abs(dx) <= 7.0D) return TransformAxis.Y;
 		if (dx <= 0.0D && dy >= 0.0D && dx >= -r - 12.0D && dy <= r + 12.0D
 				&& Math.abs(Math.abs(dx) - Math.abs(dy)) <= 9.0D) {
-			return TransformGizmo.MOVE_Z;
+			return TransformAxis.Z;
 		}
-		double distance = Math.sqrt(dx * dx + Math.pow(dy / 0.58D, 2.0D));
-		if (Math.abs(distance - (r + 13.0D)) <= 5.0D) return TransformGizmo.ROT_X;
-		if (Math.abs(distance - (r + 20.0D)) <= 5.0D) return TransformGizmo.ROT_Y;
-		if (Math.abs(distance - (r + 27.0D)) <= 5.0D) return TransformGizmo.ROT_Z;
 		return null;
 	}
 
-	private void dragGizmo(TransformGizmo gizmo, double deltaX, double deltaY) {
-		switch (gizmo) {
-			case MOVE_X -> adjustField(0, (float) deltaX * 0.006F, -1.0F, 1.0F);
-			case MOVE_Y -> adjustField(1, (float) -deltaY * 0.006F, -1.0F, 1.0F);
-			case MOVE_Z -> adjustField(2, (float) (deltaX - deltaY) * 0.004F, -1.0F, 1.0F);
-			case ROT_X -> adjustField(3, (float) -deltaY * 0.8F, -180.0F, 180.0F);
-			case ROT_Y -> adjustField(4, (float) deltaX * 0.8F, -180.0F, 180.0F);
-			case ROT_Z -> adjustField(5, (float) deltaX * 0.8F, -180.0F, 180.0F);
-		}
+	private void dragGizmo(TransformAxis gizmo, double deltaX, double deltaY) {
+		int index = rotateTool ? 3 + gizmo.ordinal() : gizmo.ordinal();
+		float delta = switch (gizmo) {
+			case X -> (float) deltaX * (rotateTool ? 0.8F : 0.006F);
+			case Y -> (float) -deltaY * (rotateTool ? 0.8F : 0.006F);
+			case Z -> (float) (deltaX - deltaY) * (rotateTool ? 0.55F : 0.004F);
+		};
+		adjustField(index, delta, rotateTool ? -180.0F : -1.0F, rotateTool ? 180.0F : 1.0F);
 		applyLocal();
 	}
 
@@ -364,7 +350,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 			Text.literal("Camera: drag rotate, shift/right drag pan, scroll zoom."),
 			x + 12, y + h - 74, 0xFF768391);
 		context.drawTextWithShadow(textRenderer,
-			Text.literal("Gizmo: drag arrows to move, rings to rotate."),
+			Text.literal("Manipulator: choose Move or Rotate, then drag an X/Y/Z axis."),
 			x + 12, y + h - 61, 0xFF768391);
 	}
 
@@ -386,14 +372,15 @@ public final class GexpressModelPlacementScreen extends Screen {
 		int x = controlsX() + 12;
 		int y = previewY() + 54;
 		kindButton.setDimensionsAndPosition(controlsW() - 24, 20, x, y);
-		y += 34;
+		toolButton.setDimensionsAndPosition(controlsW() - 24, 20, x, y + 26);
+		y += 60;
 		int colW = (controlsW() - 34) / 2;
 		for (int i = 0; i < fields.size(); i++) {
 			int col = i % 2;
 			int row = i / 2;
 			fields.get(i).setDimensionsAndPosition(colW, 18, x + col * (colW + 10), y + row * 32);
 		}
-		int buttonY = y + 144;
+		int buttonY = y + 136;
 		int buttonW = (controlsW() - 34) / 2;
 		applyButton.setDimensionsAndPosition(buttonW, 20, x, buttonY);
 		copyButton.setDimensionsAndPosition(buttonW, 20, x + buttonW + 10, buttonY);
@@ -440,6 +427,15 @@ public final class GexpressModelPlacementScreen extends Screen {
 		if (kindButton != null) kindButton.setMessage(kindText());
 		loadFromConfig();
 		updatePreview();
+	}
+
+	private void toggleTool() {
+		rotateTool = !rotateTool;
+		if (toolButton != null) toolButton.setMessage(toolText());
+	}
+
+	private Text toolText() {
+		return Text.literal(rotateTool ? "Rotate Tool" : "Move Tool");
 	}
 
 	private Text kindText() {
@@ -574,12 +570,9 @@ public final class GexpressModelPlacementScreen extends Screen {
 		}
 	}
 
-	private enum TransformGizmo {
-		MOVE_X,
-		MOVE_Y,
-		MOVE_Z,
-		ROT_X,
-		ROT_Y,
-		ROT_Z
+	private enum TransformAxis {
+		X,
+		Y,
+		Z
 	}
 }

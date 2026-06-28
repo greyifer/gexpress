@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(value = LimitedInventoryScreen.class, remap = false)
+@Mixin(value = LimitedInventoryScreen.class, remap = false, priority = 500)
 public abstract class MutedExternalShopScreenMixin extends LimitedHandledScreen<PlayerScreenHandler> {
 	@Shadow @Final public ClientPlayerEntity player;
 
@@ -25,10 +25,13 @@ public abstract class MutedExternalShopScreenMixin extends LimitedHandledScreen<
 	@Inject(method = "init", at = @At("TAIL"), remap = false)
 	private void gexpress$addMutedNoteToExternalShop(CallbackInfo ci) {
 		if (!GexpressRoleShop.usesExternalMutedNoteWidget(this.player)) return;
-		int externalSize = GexpressRoleShop.externalOverlayShopSize(this.player);
-		if (externalSize <= 0) return;
+		int renderedSize = (int) children().stream()
+			.filter(child -> child instanceof LimitedInventoryScreen.StoreItemWidget)
+			.count();
+		int externalSize = Math.max(renderedSize, GexpressRoleShop.externalOverlayShopSize(this.player));
 		int apart = 36;
-		int x = this.width / 2 - externalSize * apart / 2 + 9 + externalSize * apart;
+		int totalSize = externalSize + 1;
+		int x = this.width / 2 - totalSize * apart / 2 + 9 + externalSize * apart;
 		int shouldBeY = (((LimitedInventoryScreen) (Object) this).height - 32) / 2;
 		int y = shouldBeY - 46;
 		addDrawableChild(new LimitedInventoryScreen.StoreItemWidget((LimitedInventoryScreen) (Object) this, x, y,

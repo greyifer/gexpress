@@ -119,6 +119,8 @@ public final class GexpressBugReportsCategory {
 		private final List<HitButton> buttons = new ArrayList<>();
 		private boolean textFocused;
 		private int issueScroll;
+		private boolean requestedReports;
+		private String reportFilter = "all";
 		private String status = "Reports are saved locally first, then sent to the configured Discord forum bot.";
 		private int statusColor = MUTED;
 
@@ -130,6 +132,10 @@ public final class GexpressBugReportsCategory {
 		protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.textRenderer == null) return;
+			if (!requestedReports) {
+				requestedReports = true;
+				BugReportStore.refreshRemoteReports(reportFilter);
+			}
 			buttons.clear();
 			TextRenderer tr = client.textRenderer;
 			int margin = 14;
@@ -151,12 +157,16 @@ public final class GexpressBugReportsCategory {
 		private void drawWriter(DrawContext context, TextRenderer tr, int x, int y, int w, int h,
 				int mouseX, int mouseY) {
 			fillPanel(context, x, y, w, h);
-			context.drawTextWithShadow(tr, Text.literal("New Report").formatted(Formatting.BOLD), x + 12, y + 10, TEXT);
-			context.drawTextWithShadow(tr, Text.literal("Discord account optional. The server forwards the report through the bot."),
-				x + 12, y + 25, MUTED);
+			context.fill(x + 1, y + 1, x + w - 1, y + 44, 0x55293642);
+			context.drawTextWithShadow(tr, Text.literal("New Bug Report").formatted(Formatting.BOLD), x + 12, y + 10, TEXT);
+			List<OrderedText> intro = tr.wrapLines(Text.literal("Sent to the configured Discord forum through the bot."), w - 24);
+			for (int i = 0; i < Math.min(2, intro.size()); i++) {
+				context.drawTextWithShadow(tr, intro.get(i), x + 12, y + 25 + i * 10, MUTED);
+			}
 
-			int rowY = y + 48;
-			int buttonW = Math.max(86, (w - 32) / 3);
+			context.drawTextWithShadow(tr, Text.literal("Category").formatted(Formatting.BOLD), x + 12, y + 54, TEXT);
+			int rowY = y + 70;
+			int buttonW = Math.max(86, (w - 32 - 8) / 3);
 			int bx = x + 12;
 			for (BugReportStore.Category category : BugReportStore.Category.values()) {
 				boolean selected = draftCategory == category;
@@ -166,12 +176,16 @@ public final class GexpressBugReportsCategory {
 			}
 
 			int fieldX = x + 12;
-			int fieldY = rowY + 36;
+			int fieldY = rowY + 46;
 			int fieldW = w - 24;
-			int fieldH = Math.max(120, h - 190);
+			context.drawTextWithShadow(tr, Text.literal("Details").formatted(Formatting.BOLD), fieldX, fieldY - 16, TEXT);
+			int fieldH = Math.max(120, h - 222);
 			context.fill(fieldX, fieldY, fieldX + fieldW, fieldY + fieldH, FIELD);
 			context.drawBorder(fieldX, fieldY, fieldW, fieldH, textFocused ? 0xFFE6C56A : BORDER);
 			drawMessage(context, tr, fieldX + 8, fieldY + 8, fieldW - 16, fieldH - 16);
+			String count = Math.min(MAX_MESSAGE_LENGTH, draftMessage.length()) + "/" + MAX_MESSAGE_LENGTH;
+			context.drawTextWithShadow(tr, Text.literal(count), fieldX + fieldW - tr.getWidth(count) - 6,
+				fieldY + fieldH - 12, 0xFF6F7D8A);
 
 			int actionY = fieldY + fieldH + 12;
 			int submitW = Math.min(150, Math.max(120, (w - 32) / 2));
@@ -180,7 +194,10 @@ public final class GexpressBugReportsCategory {
 			drawButton(context, tr, "Copy Report", x + 18 + submitW, actionY, submitW, 24, mouseX, mouseY, BLUE,
 				this::copyFallback);
 
-			context.drawTextWithShadow(tr, Text.literal(status), x + 12, actionY + 34, statusColor);
+			List<OrderedText> statusLines = tr.wrapLines(Text.literal(status), w - 24);
+			for (int i = 0; i < Math.min(2, statusLines.size()); i++) {
+				context.drawTextWithShadow(tr, statusLines.get(i), x + 12, actionY + 34 + i * 10, statusColor);
+			}
 		}
 
 		private void drawMessage(DrawContext context, TextRenderer tr, int x, int y, int w, int h) {
@@ -203,55 +220,81 @@ public final class GexpressBugReportsCategory {
 		private void drawReview(DrawContext context, TextRenderer tr, int x, int y, int w, int h,
 				int mouseX, int mouseY) {
 			fillPanel(context, x, y, w, h);
-			boolean canReview = canReview();
-			context.drawTextWithShadow(tr, Text.literal(canReview ? "Discord Forum" : "Discord Forum")
-				.formatted(Formatting.BOLD), x + 12, y + 10, TEXT);
-			if (!canReview) {
-				List<OrderedText> lines = tr.wrapLines(Text.literal(
-					"Bug reports now go to your configured Discord forum channel through the G'Express bot. If the bot is unavailable, Copy Report still saves and copies clean text."), w - 24);
-				for (int i = 0; i < lines.size(); i++) {
-					context.drawTextWithShadow(tr, lines.get(i), x + 12, y + 34 + i * 11, MUTED);
-				}
-				return;
-			}
-
-			drawButton(context, tr, BugReportStore.isGithubRefreshing() ? "Refreshing..." : "Refresh",
+			context.drawTextWithShadow(tr, Text.literal("Recent Reports").formatted(Formatting.BOLD), x + 12, y + 10, TEXT);
+			drawButton(context, tr, BugReportStore.isRemoteRefreshing() ? "Refreshing..." : "Refresh",
 				x + w - 96, y + 8, 82, 22, mouseX, mouseY, BLUE, this::refresh);
-			context.drawTextWithShadow(tr, Text.literal(BugReportStore.githubStatus()), x + 12, y + 30, MUTED);
 
-			List<BugReportStore.GitHubIssue> issues = BugReportStore.githubIssues().stream()
-				.sorted(Comparator.comparing(BugReportStore.GitHubIssue::updatedAt).reversed())
+			String[] filters = {"all", "open", "fixed", "duplicate"};
+			String[] labels = {"All", "Open", "Fixed", "Dupes"};
+			int chipY = y + 34;
+			int chipX = x + 12;
+			int chipW = Math.max(52, Math.min(70, (w - 36) / 4));
+			for (int i = 0; i < filters.length; i++) {
+				String filter = filters[i];
+				drawButton(context, tr, labels[i], chipX, chipY, chipW, 20, mouseX, mouseY,
+					filter.equals(reportFilter) ? GOLD : BLUE, () -> setReportFilter(filter));
+				chipX += chipW + 4;
+			}
+
+			List<OrderedText> statusLines = tr.wrapLines(Text.literal(BugReportStore.remoteStatus()), w - 24);
+			for (int i = 0; i < Math.min(2, statusLines.size()); i++) {
+				context.drawTextWithShadow(tr, statusLines.get(i), x + 12, y + 61 + i * 10, MUTED);
+			}
+
+			List<BugReportStore.RemoteReport> reports = BugReportStore.remoteReports().stream()
+				.sorted(Comparator.comparing(BugReportStore.RemoteReport::updatedAt).reversed())
 				.toList();
-			int listY = y + 52;
-			int listH = h - 62;
-			if (issues.isEmpty()) {
-				context.drawTextWithShadow(tr, Text.literal("No GitHub reports loaded yet.").formatted(Formatting.DARK_GRAY),
-					x + 12, listY + 8, 0xFF6F7D8A);
+			int listY = y + 88;
+			int listH = h - 98;
+			if (reports.isEmpty()) {
+				drawEmptyReports(context, tr, x + 12, listY, w - 24);
 				return;
 			}
-			int rowH = 74;
-			int contentH = issues.size() * rowH;
+			int rowH = 96;
+			int contentH = reports.size() * rowH;
 			issueScroll = Math.max(0, Math.min(issueScroll, Math.max(0, contentH - listH)));
 			int cy = listY - issueScroll;
-			for (BugReportStore.GitHubIssue issue : issues) {
-				if (cy + rowH >= listY && cy <= listY + listH) drawIssue(context, tr, issue, x + 12, cy, w - 24, rowH - 8, mouseX, mouseY);
+			for (BugReportStore.RemoteReport report : reports) {
+				if (cy + rowH >= listY && cy <= listY + listH) {
+					drawReport(context, tr, report, x + 12, cy, w - 24, rowH - 8, mouseX, mouseY);
+				}
 				cy += rowH;
 			}
 		}
 
-		private void drawIssue(DrawContext context, TextRenderer tr, BugReportStore.GitHubIssue issue,
+		private void drawEmptyReports(DrawContext context, TextRenderer tr, int x, int y, int w) {
+			context.drawTextWithShadow(tr, Text.literal("No Discord reports loaded for this filter."), x, y + 4, 0xFF6F7D8A);
+			List<OrderedText> lines = tr.wrapLines(Text.literal(
+				"Use Refresh after the bot is online. This list reads from the configured Discord forum and the bot's report store."), w);
+			for (int i = 0; i < Math.min(3, lines.size()); i++) {
+				context.drawTextWithShadow(tr, lines.get(i), x, y + 22 + i * 10, MUTED);
+			}
+		}
+
+		private void drawReport(DrawContext context, TextRenderer tr, BugReportStore.RemoteReport report,
 				int x, int y, int w, int h, int mouseX, int mouseY) {
-			context.fill(x, y, x + w, y + h, "open".equalsIgnoreCase(issue.state()) ? 0x7732241A : PANEL_SOFT);
+			int accent = reportAccent(report.status());
+			context.fill(x, y, x + w, y + h, "open".equalsIgnoreCase(report.status()) ? 0x7732241A : PANEL_SOFT);
 			context.drawBorder(x, y, w, h, BORDER);
-			String title = "#" + issue.number() + " " + issue.title();
-			context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(title, w - 18)), x + 8, y + 8,
-				"open".equalsIgnoreCase(issue.state()) ? GOLD : MUTED);
-			context.drawTextWithShadow(tr, Text.literal(issue.state() + " | updated " + issue.updatedAt()), x + 8, y + 23, MUTED);
-			int by = y + h - 25;
-			drawButton(context, tr, "Open", x + 8, by, 54, 18, mouseX, mouseY, BLUE, () -> BugReportStore.openIssue(issue));
-			drawButton(context, tr, "Fixed", x + 66, by, 56, 18, mouseX, mouseY, GREEN, () -> BugReportStore.prepareFixed(issue));
-			drawButton(context, tr, "Reopen", x + 126, by, 64, 18, mouseX, mouseY, GOLD, () -> BugReportStore.prepareReopen(issue));
-			drawButton(context, tr, "Close", x + 194, by, 56, 18, mouseX, mouseY, RED, () -> BugReportStore.prepareDeleteOrClose(issue));
+			context.fill(x, y, x + 3, y + h, accent);
+			String title = report.id() + "  " + report.title();
+			context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(title, w - 18)), x + 8, y + 7, accent);
+			String meta = statusLabel(report.status()) + " | " + report.category() + " | " + reporter(report) + " | " + shortDate(report.updatedAt());
+			context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(meta, w - 16)), x + 8, y + 21, MUTED);
+			List<OrderedText> body = tr.wrapLines(Text.literal(report.description().replaceAll("\\s+", " ")), w - 16);
+			for (int i = 0; i < Math.min(2, body.size()); i++) {
+				context.drawTextWithShadow(tr, body.get(i), x + 8, y + 36 + i * 10, i == 0 ? TEXT : MUTED);
+			}
+			int by = y + h - 24;
+			drawButton(context, tr, "Open", x + 8, by, 52, 18, mouseX, mouseY, BLUE, () -> BugReportStore.openRemoteReport(report));
+			if (!BugReportStore.canModerateRemoteReports()) return;
+			boolean fixed = "fixed".equalsIgnoreCase(report.status());
+			drawButton(context, tr, fixed ? "Reopen" : "Fixed", x + 64, by, 62, 18, mouseX, mouseY,
+				fixed ? GOLD : GREEN, () -> BugReportStore.requestRemoteAction(report, fixed ? "open" : "fixed", reportFilter));
+			drawButton(context, tr, "Dupe", x + 130, by, 54, 18, mouseX, mouseY, GOLD,
+				() -> BugReportStore.requestRemoteAction(report, "duplicate", reportFilter));
+			drawButton(context, tr, "Delete", x + 188, by, 62, 18, mouseX, mouseY, RED,
+				() -> BugReportStore.requestRemoteAction(report, "delete", reportFilter));
 		}
 
 		private void submit() {
@@ -262,9 +305,9 @@ public final class GexpressBugReportsCategory {
 				return;
 			}
 			status = submission.opened()
-				? "Saved locally and sent to Discord."
-				: "Saved locally and copied. Discord reporting is unavailable here.";
-			if (!submission.saved()) status = "Copied, but local save failed. Check the log.";
+				? "Sent to Discord. Refresh to load the forum copy."
+				: "Discord reporting is unavailable here. Copied the report text.";
+			if (!submission.saved()) status = "Copied the report text. Local fallback failed.";
 			statusColor = submission.saved() ? (submission.opened() ? GREEN : GOLD) : RED;
 			draftMessage = "";
 			textFocused = false;
@@ -278,18 +321,49 @@ public final class GexpressBugReportsCategory {
 				return;
 			}
 			status = submission.saved()
-				? "Saved locally and copied. Use this if the player has no GitHub account."
-				: "Copied, but local save failed. Check the log.";
+				? "Copied the report text for Discord fallback."
+				: "Copied the report text. Local fallback failed.";
 			statusColor = submission.saved() ? BLUE : RED;
 		}
 
 		private void refresh() {
-			status = "Refreshing GitHub reports...";
+			status = "Refreshing Discord reports...";
 			statusColor = BLUE;
-			BugReportStore.refreshGithubIssues().whenComplete((changed, error) -> {
-				status = BugReportStore.githubStatus();
-				statusColor = error == null ? GREEN : RED;
-			});
+			BugReportStore.refreshRemoteReports(reportFilter);
+		}
+
+		private void setReportFilter(String filter) {
+			reportFilter = filter == null ? "all" : filter;
+			issueScroll = 0;
+			refresh();
+		}
+
+		private int reportAccent(String status) {
+			return switch ((status == null ? "" : status).toLowerCase()) {
+				case "open" -> GOLD;
+				case "fixed" -> GREEN;
+				case "duplicate" -> BLUE;
+				case "deleted" -> RED;
+				default -> MUTED;
+			};
+		}
+
+		private String statusLabel(String status) {
+			String value = status == null ? "" : status.trim();
+			if (value.isBlank()) return "unknown";
+			return value.substring(0, 1).toUpperCase() + value.substring(1).toLowerCase();
+		}
+
+		private String reporter(BugReportStore.RemoteReport report) {
+			String name = report.reporterName();
+			return name == null || name.isBlank() ? "Unknown" : name;
+		}
+
+		private String shortDate(String raw) {
+			if (raw == null || raw.isBlank()) return "unknown";
+			int split = raw.indexOf('T');
+			if (split < 0 || raw.length() < split + 6) return raw;
+			return raw.substring(0, split) + " " + raw.substring(split + 1, split + 6);
 		}
 
 		private void fillPanel(DrawContext context, int x, int y, int w, int h) {
@@ -378,9 +452,9 @@ public final class GexpressBugReportsCategory {
 			boolean split = w >= 620;
 			int leftW = split ? Math.max(300, (int) (w * 0.48F)) : w;
 			int fieldX = x + 12;
-			int fieldY = y + 84;
+			int fieldY = y + 116;
 			int fieldW = leftW - 24;
-			int fieldH = Math.max(120, (split ? height - margin * 2 : 304) - 190);
+			int fieldH = Math.max(120, (split ? height - margin * 2 : 304) - 222);
 			return contains(mouseX, mouseY, fieldX, fieldY, fieldW, fieldH);
 		}
 
@@ -392,10 +466,6 @@ public final class GexpressBugReportsCategory {
 		protected void appendClickableNarrations(NarrationMessageBuilder builder) {
 			appendDefaultNarrations(builder);
 		}
-	}
-
-	private static boolean canReview() {
-		return false;
 	}
 
 	private record HitButton(int x, int y, int w, int h, Runnable action) {

@@ -12,9 +12,10 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import dev.mapselect.network.GexpressPresetsSyncHandler;
+import dev.mapselect.network.preset.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.preset.map.MapPreset;
+import dev.mapselect.preset.map.MapPresetValidator;
 import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
@@ -39,8 +40,9 @@ import java.util.function.Predicate;
 
 public class MapCommand {
 
-	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseSetupCommands;
-	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseSetupCommands;
+	private static final Predicate<ServerCommandSource> OP = source ->
+		GexpressPermissions.canUseMapCommands(source)
+			|| GexpressPermissions.canUseCommandBranch(source, "setup", "map");
 
 	private enum BoxKind {
 		WHOLE_MAP("whole map area"),
@@ -52,12 +54,25 @@ public class MapCommand {
 		BoxKind(String label) { this.label = label; }
 	}
 
+	private static Predicate<ServerCommandSource> mapCommand(String... subcommand) {
+		return source -> GexpressPermissions.canUseMapCommands(source)
+			|| GexpressPermissions.canUseCommandPath(source, mapPath(subcommand));
+	}
+
+	private static String[] mapPath(String... subcommand) {
+		String[] path = new String[(subcommand == null ? 0 : subcommand.length) + 2];
+		path[0] = "setup";
+		path[1] = "map";
+		if (subcommand != null) System.arraycopy(subcommand, 0, path, 2, subcommand.length);
+		return path;
+	}
+
 	public static LiteralArgumentBuilder<ServerCommandSource> buildMapTree() {
 		SuggestionProvider<ServerCommandSource> nameSuggestions = MapCommand::suggestPresetNames;
 
 		return CommandManager.literal("map")
 			.then(CommandManager.literal("create")
-				.requires(OP)
+				.requires(mapCommand("create"))
 				.then(CommandManager.argument("corner1", BlockPosArgumentType.blockPos())
 					.then(CommandManager.argument("corner2", BlockPosArgumentType.blockPos())
 						.then(CommandManager.argument("name", StringArgumentType.word())
@@ -66,12 +81,12 @@ public class MapCommand {
 								BlockPosArgumentType.getBlockPos(ctx, "corner2"),
 								StringArgumentType.getString(ctx, "name")))))))
 			.then(CommandManager.literal("delete")
-				.requires(OP)
+				.requires(mapCommand("delete"))
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.executes(ctx -> runDelete(ctx, StringArgumentType.getString(ctx, "name")))))
 			.then(CommandManager.literal("edit")
-				.requires(OP)
+				.requires(mapCommand("edit"))
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.then(CommandManager.literal("corners")
@@ -208,15 +223,20 @@ public class MapCommand {
 					.then(staticMapEditLiteral("static"))
 					.then(staticMapEditLiteral("staticmap"))))
 			.then(CommandManager.literal("list")
-				.requires(OP_OR_HOST)
+				.requires(mapCommand("list"))
 				.executes(MapCommand::runList))
 			.then(CommandManager.literal("show")
-				.requires(OP)
+				.requires(mapCommand("show"))
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.executes(ctx -> runShow(ctx, StringArgumentType.getString(ctx, "name")))))
+			.then(CommandManager.literal("validate")
+				.requires(mapCommand("validate"))
+				.then(CommandManager.argument("name", StringArgumentType.word())
+					.suggests(nameSuggestions)
+					.executes(ctx -> runValidate(ctx, StringArgumentType.getString(ctx, "name")))))
 			.then(CommandManager.literal("set")
-				.requires(OP_OR_HOST)
+				.requires(mapCommand("set"))
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.executes(ctx -> runSet(ctx, StringArgumentType.getString(ctx, "name"), null))
@@ -226,7 +246,7 @@ public class MapCommand {
 							StringArgumentType.getString(ctx, "name"),
 							StringArgumentType.getString(ctx, "trainPreset"))))))
 			.then(CommandManager.literal("default")
-				.requires(OP)
+				.requires(mapCommand("default"))
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.then(CommandManager.argument("trainPreset", StringArgumentType.word())
@@ -235,7 +255,7 @@ public class MapCommand {
 							StringArgumentType.getString(ctx, "name"),
 							StringArgumentType.getString(ctx, "trainPreset"))))))
 			.then(CommandManager.literal("snapshot")
-				.requires(OP)
+				.requires(mapCommand("snapshot"))
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.executes(ctx -> runSnapshot(ctx, StringArgumentType.getString(ctx, "name")))));
@@ -579,6 +599,9 @@ public class MapCommand {
 		}
 		preset.roomCount = MapPreset.normalizeRoomCount(neighbor.roomCount);
 		preset.couchSleepingEnabled = neighbor.isCouchSleepingEnabled();
+		preset.terrainMode = neighbor.terrainMode;
+		preset.playAreaMode = neighbor.playAreaMode;
+		preset.staticMapEnabled = neighbor.isStaticMapEnabled();
 		preset.weather = neighbor.weather == null ? WeatherType.NONE : neighbor.weather;
 		preset.fogColor = neighbor.fogColor;
 		return preset;
@@ -713,6 +736,27 @@ public class MapCommand {
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to load preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runValidate(CommandContext<ServerCommandSource> ctx, String name) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			MapPreset preset = loadOrError(src, name);
+			List<MapPresetValidator.Issue> issues = MapPresetValidator.validate(src.getServer(), name, preset);
+			long errors = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.ERROR).count();
+			long warnings = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.WARNING).count();
+			src.sendFeedback(() -> Text.literal("Map preset '" + name + "' validation: "
+				+ errors + " error(s), " + warnings + " warning(s).").formatted(errors > 0 ? Formatting.RED : Formatting.GREEN), false);
+			for (MapPresetValidator.Issue issue : issues) {
+				Formatting color = issue.severity() == MapPresetValidator.Severity.ERROR ? Formatting.RED : Formatting.YELLOW;
+				src.sendFeedback(() -> Text.literal(" - " + issue.severity().name().toLowerCase(java.util.Locale.ROOT)
+					+ ": " + issue.message()).formatted(color), false);
+			}
+			return errors == 0 ? 1 : 0;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to validate map preset: " + e.getMessage()));
 			return 0;
 		}
 	}
@@ -1062,6 +1106,7 @@ public class MapCommand {
 			MapPreset preset = loadOrError(src, name);
 			if (preset == null) return 0;
 			preset.staticMapEnabled = enabled;
+			preset.terrainMode = enabled ? MapPreset.TerrainMode.STATIC : MapPreset.TerrainMode.MOVING;
 			saveAndBroadcast(src, name, preset);
 			String state = enabled ? "enabled" : "disabled";
 			src.sendFeedback(() -> Text.literal("Static map reset for '" + name + "' is now " + state + ".")
@@ -1110,6 +1155,7 @@ public class MapCommand {
 			preset.playAreaOffset = snap.playAreaOffset;
 			preset.resetTemplateArea = snap.resetTemplateArea;
 			preset.randomSpawnPositions = snap.randomSpawnPositions;
+			preset.disabledPainterDoorways = snap.disabledPainterDoorways;
 			saveAndBroadcast(src, name, preset);
 			int count = preset.randomSpawnPositions == null ? 0 : preset.randomSpawnPositions.size();
 			src.sendFeedback(() -> Text.literal("Snapshotted current Wathe values and " + count + " RTP slot(s) into '" + name + "'.").formatted(Formatting.GREEN), true);

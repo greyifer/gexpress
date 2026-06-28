@@ -1,9 +1,10 @@
 package dev.mapselect.client.effect;
 
 import dev.mapselect.MapSelect;
-import dev.mapselect.client.ClientMafiaState;
+import dev.mapselect.client.role.cupid.ClientCupidState;
+import dev.mapselect.client.role.mafia.ClientMafiaState;
 import dev.mapselect.mixin.client.GameRendererAccessor;
-import dev.mapselect.network.TestOverlayPayload;
+import dev.mapselect.network.game.TestOverlayPayload;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
@@ -16,6 +17,8 @@ import net.minecraft.util.math.MathHelper;
 public final class ClientBlackWhiteOverlay {
 	private static final Identifier MAFIA_SHADER =
 		Identifier.of(MapSelect.MOD_ID, "shaders/post/mafia_black_white.json");
+	private static final Identifier CUPID_SHADER =
+		Identifier.of(MapSelect.MOD_ID, "shaders/post/cupid_pink.json");
 
 	private static boolean shaderActive;
 	private static Identifier activeShader;
@@ -36,10 +39,13 @@ public final class ClientBlackWhiteOverlay {
 	}
 
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {
-		float strength = overlayStrength(MinecraftClient.getInstance());
+		MinecraftClient client = MinecraftClient.getInstance();
+		float strength = overlayStrength(client);
 		if (strength <= 0.02F) return;
-		int alpha = Math.max(0, Math.min(76, Math.round(76.0F * strength)));
-		context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), alpha << 24);
+		boolean cupid = isCupidOverlay(client);
+		int alpha = Math.max(0, Math.min(cupid ? 24 : 76, Math.round((cupid ? 24.0F : 76.0F) * strength)));
+		int rgb = cupid ? 0xFFD8EA : 0x000000;
+		context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), (alpha << 24) | rgb);
 	}
 
 	private static void updateShader(MinecraftClient client) {
@@ -69,12 +75,19 @@ public final class ClientBlackWhiteOverlay {
 	private static Identifier desiredShader(MinecraftClient client) {
 		Identifier test = activeTestShader(client);
 		if (test != null) return test;
+		if (ClientCupidState.cupidOverlayStrength() > 0.02F) return CUPID_SHADER;
 		return ClientMafiaState.blackWhiteStrength() > 0.02F ? MAFIA_SHADER : null;
 	}
 
 	private static float overlayStrength(MinecraftClient client) {
 		if (activeTestShader(client) != null) return 1.0F;
+		if (ClientCupidState.cupidOverlayStrength() > 0.02F) return ClientCupidState.cupidOverlayStrength();
 		return ClientMafiaState.blackWhiteStrength();
+	}
+
+	private static boolean isCupidOverlay(MinecraftClient client) {
+		Identifier test = activeTestShader(client);
+		return CUPID_SHADER.equals(test) || (test == null && ClientCupidState.cupidOverlayStrength() > 0.02F);
 	}
 
 	private static void applyTestOverlay(MinecraftClient client, TestOverlayPayload payload) {
@@ -86,6 +99,7 @@ public final class ClientBlackWhiteOverlay {
 		if (client == null || client.world == null) return;
 		testShader = switch (payload.overlay()) {
 			case "mafia", "black_white" -> MAFIA_SHADER;
+			case "cupid", "pink", "cupid_pink" -> CUPID_SHADER;
 			default -> null;
 		};
 		testShaderUntilTick = testShader == null ? 0L : client.world.getTime() + payload.durationTicks();
@@ -124,7 +138,8 @@ public final class ClientBlackWhiteOverlay {
 				|| client.gameRenderer.getPostProcessor() == null) {
 			return;
 		}
+		float desaturation = CUPID_SHADER.equals(activeShader) ? 0.9F : 1.0F;
 		client.gameRenderer.getPostProcessor().setUniforms("Saturation",
-			MathHelper.clamp(1.0F - overlayStrength(client), 0.0F, 1.0F));
+			MathHelper.clamp(1.0F - overlayStrength(client) * desaturation, 0.0F, 1.0F));
 	}
 }

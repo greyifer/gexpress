@@ -6,7 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import dev.mapselect.network.GexpressPresetsSyncHandler;
+import dev.mapselect.network.preset.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
@@ -25,8 +25,22 @@ import java.util.function.Predicate;
 
 public class TrainCommand {
 
-	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseSetupCommands;
-	private static final Predicate<ServerCommandSource> OP_OR_HOST = GexpressPermissions::canUseSetupCommands;
+	private static final Predicate<ServerCommandSource> OP = source ->
+		GexpressPermissions.canUseTrainCommands(source)
+			|| GexpressPermissions.canUseCommandBranch(source, "setup", "train");
+
+	private static Predicate<ServerCommandSource> trainCommand(String... subcommand) {
+		return source -> GexpressPermissions.canUseTrainCommands(source)
+			|| GexpressPermissions.canUseCommandPath(source, trainPath(subcommand));
+	}
+
+	private static String[] trainPath(String... subcommand) {
+		String[] path = new String[(subcommand == null ? 0 : subcommand.length) + 2];
+		path[0] = "setup";
+		path[1] = "train";
+		if (subcommand != null) System.arraycopy(subcommand, 0, path, 2, subcommand.length);
+		return path;
+	}
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		SuggestionProvider<ServerCommandSource> trainNames = TrainCommand::suggestTrainNames;
@@ -34,20 +48,20 @@ public class TrainCommand {
 		return CommandManager.literal("train")
 			.then(CommandManager.literal("preset")
 				.then(CommandManager.literal("save")
-					.requires(OP)
+					.requires(trainCommand("preset", "save"))
 					.then(CommandManager.argument("name", StringArgumentType.word())
 						.suggests(trainNames)
 						.executes(ctx -> runSave(ctx, StringArgumentType.getString(ctx, "name")))))
 				.then(CommandManager.literal("delete")
-					.requires(OP)
+					.requires(trainCommand("preset", "delete"))
 					.then(CommandManager.argument("name", StringArgumentType.word())
 						.suggests(trainNames)
 						.executes(ctx -> runDelete(ctx, StringArgumentType.getString(ctx, "name")))))
 				.then(CommandManager.literal("list")
-					.requires(OP_OR_HOST)
+					.requires(trainCommand("preset", "list"))
 					.executes(TrainCommand::runList))
 				.then(CommandManager.literal("show")
-					.requires(OP)
+					.requires(trainCommand("preset", "show"))
 					.then(CommandManager.argument("name", StringArgumentType.word())
 						.suggests(trainNames)
 						.executes(ctx -> runShow(ctx, StringArgumentType.getString(ctx, "name"))))));

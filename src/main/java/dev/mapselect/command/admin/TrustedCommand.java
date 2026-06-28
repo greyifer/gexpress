@@ -18,15 +18,24 @@ import java.util.UUID;
 public class TrustedCommand {
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("trusted")
-			.requires(GexpressPermissions::canUseAdminCommands)
+			.requires(source -> GexpressPermissions.canUseAdminCommands(source)
+				|| GexpressPermissions.canUseCommandBranch(source, "admin", "trusted"))
 			.then(CommandManager.literal("add")
+				.requires(source -> canUseTrustedCommand(source, "add"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.executes(TrustedCommand::runAdd)))
 			.then(CommandManager.literal("remove")
+				.requires(source -> canUseTrustedCommand(source, "remove"))
 				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
 					.executes(TrustedCommand::runRemove)))
 			.then(CommandManager.literal("list")
+				.requires(source -> canUseTrustedCommand(source, "list"))
 				.executes(TrustedCommand::runList));
+	}
+
+	private static boolean canUseTrustedCommand(ServerCommandSource source, String subcommand) {
+		return GexpressPermissions.canUseAdminCommands(source)
+			|| GexpressPermissions.canUseCommandPath(source, "admin", "trusted", subcommand);
 	}
 
 	private static TrustedComponent component(ServerCommandSource src) {

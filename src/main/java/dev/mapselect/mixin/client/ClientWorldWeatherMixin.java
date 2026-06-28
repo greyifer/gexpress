@@ -2,7 +2,7 @@ package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent;
 import dev.doctor4t.wathe.index.WatheParticles;
-import dev.mapselect.client.ClientMafiaState;
+import dev.mapselect.client.role.mafia.ClientMafiaState;
 import dev.mapselect.weather.MapWeatherComponent;
 import dev.mapselect.weather.WeatherType;
 import net.minecraft.client.MinecraftClient;

@@ -1,9 +1,9 @@
 package dev.mapselect.mixin.client;
 
 import cat.rezelyn.watheextended.client.pronouns.PronounsCache;
-import dev.mapselect.client.ClientPuppetmasterState;
-import dev.mapselect.client.ClientSkincrawlerState;
-import dev.mapselect.client.ClientTricksterState;
+import dev.mapselect.client.role.puppetmaster.ClientPuppetmasterState;
+import dev.mapselect.client.role.skincrawler.ClientSkincrawlerState;
+import dev.mapselect.client.role.harlequin.ClientTricksterState;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;

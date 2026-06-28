@@ -6,9 +6,12 @@ import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.OptionGroup;
+import dev.isxander.yacl3.api.StateManager;
 import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.client.modifier.muted.ClientMutedPreferenceState;
+import dev.mapselect.client.tutorial.ClientTutorialExperience;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -28,9 +31,26 @@ public final class GexpressClientCategory {
 			category.group(group);
 		}
 		category.group(tutorialGroup());
+		category.group(mutedPreferenceGroup());
 		category.group(weaponSkinsGroup());
 		category.group(abilityHudGroup());
 		return category.build();
+	}
+
+	private static OptionGroup mutedPreferenceGroup() {
+		return OptionGroup.createBuilder()
+			.name(Text.translatable("gui.gexpress.config.group.client.muted"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.client.muted.tooltip")))
+			.collapsed(false)
+			.option(Option.<Boolean>createBuilder()
+				.name(Text.translatable("gui.gexpress.config.option.client.always_muted"))
+				.description(OptionDescription.of(Text.translatable(
+					"gui.gexpress.config.option.client.always_muted.tooltip")))
+				.stateManager(StateManager.createInstant(false, GexpressConfig::alwaysMuted,
+					ClientMutedPreferenceState::setEnabled))
+				.controller(BooleanControllerBuilder::create)
+				.build())
+			.build();
 	}
 
 	private static OptionGroup tutorialGroup() {
@@ -42,8 +62,7 @@ public final class GexpressClientCategory {
 				.name(Text.translatable("gui.gexpress.config.option.client.view_tutorial"))
 				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.client.view_tutorial.tooltip")))
 				.text(Text.translatable("gui.gexpress.config.option.client.view_tutorial.open"))
-				.action((screen, option) -> MinecraftClient.getInstance()
-					.setScreen(new GexpressTutorialScreen(screen, false)))
+				.action((screen, option) -> ClientTutorialExperience.start())
 				.build())
 			.build();
 	}
@@ -57,9 +76,9 @@ public final class GexpressClientCategory {
 				.name(Text.translatable("gui.gexpress.config.option.client.use_3d_gun_skins"))
 				.description(OptionDescription.of(
 					Text.translatable("gui.gexpress.config.option.client.use_3d_gun_skins.tooltip")))
-				.binding(true, GexpressConfig::use3dGunSkins, value -> GexpressConfig.use3dGunSkins = value)
+				.stateManager(StateManager.createInstant(true, GexpressConfig::use3dGunSkins,
+					value -> GexpressConfig.use3dGunSkins = value))
 				.controller(BooleanControllerBuilder::create)
-				.instant(true)
 				.build())
 			.build();
 	}
@@ -90,12 +109,11 @@ public final class GexpressClientCategory {
 		return Option.<Integer>createBuilder()
 			.name(Text.translatable("gui.gexpress.config.option.client." + key))
 			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.client." + key + ".tooltip")))
-			.binding(defaultValue, getter, value -> setter.accept(value))
+			.stateManager(StateManager.createInstant(defaultValue, getter, value -> setter.accept(value)))
 			.controller(opt -> IntegerSliderControllerBuilder.create(opt)
 				.range(min, max)
 				.step(step)
 				.formatValue(value -> Text.literal(formatter.apply(value))))
-			.instant(true)
 			.build();
 	}
 

@@ -15,8 +15,6 @@ public abstract class ExternalAbilityHudTextMixin {
 		at = @At("HEAD"), cancellable = true)
 	private void gexpress$hideExternalAbilityPrompts(TextRenderer textRenderer, Text text, int x, int y, int color,
 			CallbackInfoReturnable<Integer> cir) {
-		DrawContext context = (DrawContext) (Object) this;
-		if (x < context.getScaledWindowWidth() / 2 || y < context.getScaledWindowHeight() - 42) return;
 		if (isExternalAbilityPrompt(text)) cir.setReturnValue(0);
 	}
 
@@ -26,6 +24,7 @@ public abstract class ExternalAbilityHudTextMixin {
 			case "tip.kinswathe.cooldown",
 			     "tip.kinswathe.ability.can_use",
 			     "tip.kinswathe.ability.not_enough_money",
+			     "hud.kinswathe.detective.target",
 			     "tip.noellesroles.cooldown",
 			     "tip.phantom",
 			     "tip.infected",
@@ -33,11 +32,15 @@ public abstract class ExternalAbilityHudTextMixin {
 			     "tip.recaller.teleport",
 			     "tip.recaller.not_enough_money",
 			     "tip.vulture",
+			     "hud.vulture.eat",
 			     "tip.starexpress.cooldown",
 			     "tip.starexpress.starstruck",
+			     "hud.stupid_express.amnesiac.select_body",
 			     "hud.stupid_express.thief.ready",
 			     "hud.stupid_express.thief.cooldown",
-			     "hud.stupid_express.necromancer.cooldown" -> true;
+			     "hud.stupid_express.necromancer.cooldown",
+			     "hud.stupid_express.necromancer.possible_revive",
+			     "hud.stupid_express.necromancer.no_possible_revive" -> true;
 			default -> false;
 		};
 	}

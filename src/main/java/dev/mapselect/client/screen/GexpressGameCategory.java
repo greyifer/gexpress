@@ -14,6 +14,7 @@ import dev.isxander.yacl3.api.controller.EnumControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.mapselect.MapSelect;
+import dev.mapselect.client.text.GexpressRoleTexts;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
 import net.minecraft.client.gui.screen.Screen;
@@ -41,6 +42,7 @@ public final class GexpressGameCategory {
 	private static final String MEDIC_ID = MapSelect.MOD_ID + ":medic";
 	private static final String SNITCH_ID = MapSelect.MOD_ID + ":snitch";
 	private static final String SEER_ID = MapSelect.MOD_ID + ":seer";
+	private static final String TWINS_ID = MapSelect.MOD_ID + ":twins";
 	private static final String CUPID_ID = MapSelect.MOD_ID + ":cupid";
 	private static final String VENGEFUL_SPIRIT_ID = MapSelect.MOD_ID + ":vengeful_spirit";
 	private static final String TIME_MASTER_ID = MapSelect.MOD_ID + ":time_master";
@@ -53,6 +55,7 @@ public final class GexpressGameCategory {
 	private static final String VULTURE_ID = MapSelect.MOD_ID + ":pelican";
 	private static final String SCATTER_BRAIN_ID = MapSelect.MOD_ID + ":scatter_brain";
 	private static final String SKINCRAWLER_ID = MapSelect.MOD_ID + ":skincrawler";
+	private static final String PAINTER_ID = MapSelect.MOD_ID + ":painter";
 	private static final String TRACKER_ID = MapSelect.MOD_ID + ":tracker";
 	private static final String SPY_ID = MapSelect.MOD_ID + ":spy";
 	private static final String ALTRUIST_ID = MapSelect.MOD_ID + ":altruist";
@@ -71,6 +74,7 @@ public final class GexpressGameCategory {
 	private static final String HUNGRY_ID = MapSelect.MOD_ID + ":hungry";
 	private static final String THIRSTY_ID = MapSelect.MOD_ID + ":thirsty";
 	private static final String SQUEAKER_ID = MapSelect.MOD_ID + ":squeaker";
+	private static final String MUTED_ID = MapSelect.MOD_ID + ":muted";
 	private static final String LOVERS_ID = MapSelect.MOD_ID + ":lovers";
 	private static final String KILLER_ID = "wathe:killer";
 	private static final String VIGILANTE_ID = "wathe:vigilante";
@@ -132,6 +136,8 @@ public final class GexpressGameCategory {
 		globalRoleOpts.add(buildSpecialRoleOccurrenceOption());
 		globalRoleOpts.add(buildLastDeathShieldOption());
 		globalRoleOpts.add(buildGuardianAngelAllowNonInnocentsOption());
+		globalRoleOpts.add(buildLastStandOption());
+		globalRoleOpts.add(buildItemPickupPolicyOption());
 		globalRoleOpts.add(buildPassiveIncomeOption("killer", 5,
 			GexpressConfig::getPassiveIncomeKiller, v -> GexpressConfig.passiveIncomeKiller = v));
 		globalRoleOpts.add(buildPassiveIncomeOption("civilian", 0,
@@ -506,6 +512,26 @@ public final class GexpressGameCategory {
 			.build();
 	}
 
+	private static Option<Boolean> buildLastStandOption() {
+		return Option.<Boolean>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.last_stand"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.last_stand.tooltip")))
+			.binding(false, GexpressConfig::isLastStandEnabled, v -> GexpressConfig.lastStandEnabled = v)
+			.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
+				.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+			.build();
+	}
+
+	private static Option<GexpressConfig.ItemPickupPolicy> buildItemPickupPolicyOption() {
+		return Option.<GexpressConfig.ItemPickupPolicy>createBuilder()
+			.name(Text.translatable("gui.gexpress.config.option.item_pickup_policy"))
+			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.item_pickup_policy.tooltip")))
+			.binding(GexpressConfig.ItemPickupPolicy.CIVILIANS_NEUTRALS_KILLERS, GexpressConfig::getItemPickupPolicy,
+				v -> GexpressConfig.itemPickupPolicy = v.id())
+			.controller(opt -> EnumControllerBuilder.create(opt).enumClass(GexpressConfig.ItemPickupPolicy.class))
+			.build();
+	}
+
 	private static Option<Integer> buildPassiveIncomeOption(String key, int defaultValue, Supplier<Integer> getter,
 			Consumer<Integer> setter) {
 		return Option.<Integer>createBuilder()
@@ -608,7 +634,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.snitch_tasks_required")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.snitch_tasks_required.tooltip")))
-				.binding(3, GexpressConfig::getSnitchTasksRequired,
+				.binding(6, GexpressConfig::getSnitchTasksRequired,
 					v -> GexpressConfig.snitchTasksRequired = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.SNITCH_TASKS_REQUIRED_MIN, GexpressConfig.SNITCH_TASKS_REQUIRED_MAX))
@@ -627,13 +653,13 @@ public final class GexpressGameCategory {
 		if (SEER_ID.equals(roleId)) {
 			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
-				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.seer_compare_cooldown")))
-				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.seer_compare_cooldown.tooltip")))
-				.binding(45, GexpressConfig::getSeerCompareCooldownSeconds,
-					v -> GexpressConfig.seerCompareCooldownSeconds = v)
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.seer_compare_deaths_required")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.seer_compare_deaths_required.tooltip")))
+				.binding(3, GexpressConfig::getSeerCompareDeathsRequired,
+					v -> GexpressConfig.seerCompareDeathsRequired = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-					.range(GexpressConfig.SEER_COMPARE_COOLDOWN_SECONDS_MIN,
-						GexpressConfig.SEER_COMPARE_COOLDOWN_SECONDS_MAX))
+					.range(GexpressConfig.SEER_COMPARE_DEATHS_REQUIRED_MIN,
+						GexpressConfig.SEER_COMPARE_DEATHS_REQUIRED_MAX))
 				.build());
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.seer_compare_range")))
@@ -644,16 +670,37 @@ public final class GexpressGameCategory {
 				.build());
 			return out;
 		}
+		if (TWINS_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.twins_swap_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.twins_swap_cooldown.tooltip")))
+				.binding(20, GexpressConfig::getTwinsSwapCooldownSeconds,
+					v -> GexpressConfig.twinsSwapCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.TWINS_SWAP_COOLDOWN_SECONDS_MIN,
+						GexpressConfig.TWINS_SWAP_COOLDOWN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Boolean>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.twins_body_different_role")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.twins_body_different_role.tooltip")))
+				.binding(false, GexpressConfig::canTwinsBodyUseDifferentRole,
+					v -> GexpressConfig.twinsBodyDifferentRole = v)
+				.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
+					.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+				.build());
+			return out;
+		}
 		if (CUPID_ID.equals(roleId)) {
 			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.cupid_required_alive_pairs")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.cupid_required_alive_pairs.tooltip")))
-				.binding(3, GexpressConfig::getCupidRequiredAlivePairs,
-					v -> GexpressConfig.cupidRequiredAlivePairs = v)
+				.binding(75, GexpressConfig::getCupidLovePercentage,
+					v -> GexpressConfig.cupidLovePercentage = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-					.range(GexpressConfig.CUPID_REQUIRED_ALIVE_PAIRS_MIN,
-						GexpressConfig.CUPID_REQUIRED_ALIVE_PAIRS_MAX))
+					.range(GexpressConfig.CUPID_LOVE_PERCENTAGE_MIN,
+						GexpressConfig.CUPID_LOVE_PERCENTAGE_MAX))
 				.build());
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.cupid_pair_cooldown")))
@@ -747,7 +794,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.time_master_freeze_range")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.time_master_freeze_range.tooltip")))
-				.binding(8, GexpressConfig::getTimeMasterFreezeRange,
+				.binding(4, GexpressConfig::getTimeMasterFreezeRange,
 					v -> GexpressConfig.timeMasterFreezeRange = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.TIME_MASTER_FREEZE_RANGE_MIN, GexpressConfig.TIME_MASTER_FREEZE_RANGE_MAX))
@@ -898,7 +945,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.puppetmaster_control_range")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.puppetmaster_control_range.tooltip")))
-				.binding(16, GexpressConfig::getPuppetmasterControlRange,
+				.binding(4, GexpressConfig::getPuppetmasterControlRange,
 					v -> GexpressConfig.puppetmasterControlRange = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.PUPPETMASTER_CONTROL_RANGE_MIN, GexpressConfig.PUPPETMASTER_CONTROL_RANGE_MAX))
@@ -969,7 +1016,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.mafia_recruit_range.tooltip")))
-				.binding(16, GexpressConfig::getMafiaRecruitRange, v -> GexpressConfig.mafiaRecruitRange = v)
+				.binding(4, GexpressConfig::getMafiaRecruitRange, v -> GexpressConfig.mafiaRecruitRange = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.MAFIA_RECRUIT_RANGE_MIN, GexpressConfig.MAFIA_RECRUIT_RANGE_MAX))
 				.build());
@@ -1098,7 +1145,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.copycat_range")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.copycat_range.tooltip")))
-				.binding(16, GexpressConfig::getCopycatCopyRange, v -> GexpressConfig.copycatCopyRange = v)
+				.binding(4, GexpressConfig::getCopycatCopyRange, v -> GexpressConfig.copycatCopyRange = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.COPYCAT_RANGE_MIN, GexpressConfig.COPYCAT_RANGE_MAX))
 				.build());
@@ -1168,6 +1215,73 @@ public final class GexpressGameCategory {
 				.build());
 			return out;
 		}
+		if (PAINTER_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_paint_duration")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_paint_duration.tooltip")))
+				.binding(60, GexpressConfig::getPainterPaintDurationSeconds,
+					v -> GexpressConfig.painterPaintDurationSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PAINTER_PAINT_DURATION_SECONDS_MIN,
+						GexpressConfig.PAINTER_PAINT_DURATION_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_body_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_body_cooldown.tooltip")))
+				.binding(30, GexpressConfig::getPainterBodyCooldownSeconds,
+					v -> GexpressConfig.painterBodyCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PAINTER_COOLDOWN_SECONDS_MIN,
+						GexpressConfig.PAINTER_COOLDOWN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_player_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_player_cooldown.tooltip")))
+				.binding(30, GexpressConfig::getPainterPlayerCooldownSeconds,
+					v -> GexpressConfig.painterPlayerCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PAINTER_COOLDOWN_SECONDS_MIN,
+						GexpressConfig.PAINTER_COOLDOWN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_duration")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_duration.tooltip")))
+				.binding(10, GexpressConfig::getPainterDoorwayDurationSeconds,
+					v -> GexpressConfig.painterDoorwayDurationSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PAINTER_DOORWAY_DURATION_SECONDS_MIN,
+						GexpressConfig.PAINTER_DOORWAY_DURATION_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_cooldown")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_cooldown.tooltip")))
+				.binding(30, GexpressConfig::getPainterDoorwayCooldownSeconds,
+					v -> GexpressConfig.painterDoorwayCooldownSeconds = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PAINTER_COOLDOWN_SECONDS_MIN,
+						GexpressConfig.PAINTER_COOLDOWN_SECONDS_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_max_bodies")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_max_bodies.tooltip")))
+				.binding(1, GexpressConfig::getPainterMaxPaintedBodies,
+					v -> GexpressConfig.painterMaxPaintedBodies = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PAINTER_MAX_PAINTED_MIN,
+						GexpressConfig.PAINTER_MAX_PAINTED_MAX))
+				.build());
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_max_players")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_max_players.tooltip")))
+				.binding(1, GexpressConfig::getPainterMaxPaintedPlayers,
+					v -> GexpressConfig.painterMaxPaintedPlayers = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.PAINTER_MAX_PAINTED_MIN,
+						GexpressConfig.PAINTER_MAX_PAINTED_MAX))
+				.build());
+			return out;
+		}
 		if (VULTURE_ID.equals(roleId)) {
 			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
@@ -1200,7 +1314,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.tracker_range")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.tracker_range.tooltip")))
-				.binding(24, GexpressConfig::getTrackerRange, v -> GexpressConfig.trackerRange = v)
+				.binding(4, GexpressConfig::getTrackerRange, v -> GexpressConfig.trackerRange = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.TRACKER_RANGE_MIN, GexpressConfig.TRACKER_RANGE_MAX))
 				.build());
@@ -1234,7 +1348,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_range")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.spy_bug_range.tooltip")))
-				.binding(16, GexpressConfig::getSpyBugRange, v -> GexpressConfig.spyBugRange = v)
+				.binding(4, GexpressConfig::getSpyBugRange, v -> GexpressConfig.spyBugRange = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.SPY_BUG_RANGE_MIN, GexpressConfig.SPY_BUG_RANGE_MAX))
 				.build());
@@ -1255,6 +1369,10 @@ public final class GexpressGameCategory {
 	}
 
 	private static List<Option<?>> buildModifierSubOptions(String modifierId) {
+		if (MUTED_ID.equals(modifierId)) {
+			return List.of(buildShopPriceOption("muted_note_price", 10,
+				GexpressConfig::getMutedNotePrice, v -> GexpressConfig.mutedNotePrice = v));
+		}
 		if (EOD_SPECIALIST_ID.equals(modifierId)) {
 			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
@@ -1337,6 +1455,14 @@ public final class GexpressGameCategory {
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.lovers_allow_mixed_sides.tooltip")))
 				.binding(false, GexpressConfig::canLoversPairAcrossSides,
 					v -> GexpressConfig.loversAllowMixedSidePairs = v)
+				.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
+					.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+				.build());
+			out.add(Option.<Boolean>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.lovers_independent_win")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.lovers_independent_win.tooltip")))
+				.binding(false, GexpressConfig::doLoversWinIndependently,
+					v -> GexpressConfig.loversIndependentWin = v)
 				.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
 					.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
 				.build());
@@ -1495,6 +1621,9 @@ public final class GexpressGameCategory {
 	}
 
 	private static MutableText colorizedRoleName(RolesDisplay.RoleDisplay rd, String fallbackId) {
+		if (PAINTER_ID.equals(fallbackId)) {
+			return GexpressRoleTexts.painterName(rd == null ? null : rd.display());
+		}
 		if (rd == null) {
 			if (KILLER_ID.equals(fallbackId)) return Text.literal("Killer!").formatted(Formatting.RED);
 			if (VIGILANTE_ID.equals(fallbackId)) return Text.literal("Vigilante").formatted(Formatting.AQUA);

@@ -25,6 +25,8 @@ public final class GexpressLevelRewardEditorScreen extends Screen {
 	private TextFieldWidget commandTwoField;
 	private TextFieldWidget commandThreeField;
 	private int selectedLevel;
+	private int listScroll;
+	private static final int LIST_ROW_HEIGHT = 25;
 
 	public GexpressLevelRewardEditorScreen(Screen parent) {
 		super(Text.translatable("gui.gexpress.level_reward_editor.title"));
@@ -33,16 +35,19 @@ public final class GexpressLevelRewardEditorScreen extends Screen {
 
 	@Override
 	protected void init() {
-		int formX = Math.max(210, width / 2 - 150);
+		int formX = formX();
 		int formY = 54;
+		int formWidth = Math.max(220, width - formX - 28);
 		levelField = field(formX, formY, 72, 18, 8, "gui.gexpress.level_reward_editor.level");
-		rewardOneField = field(formX, formY + 35, 240, 18, 96, "gui.gexpress.level_reward_editor.reward_one");
-		rewardTwoField = field(formX, formY + 63, 240, 18, 96, "gui.gexpress.level_reward_editor.reward_two");
-		rewardThreeField = field(formX, formY + 91, 240, 18, 96, "gui.gexpress.level_reward_editor.reward_three");
-		descriptionField = field(formX, formY + 126, 360, 18, 240, "gui.gexpress.level_reward_editor.description");
-		commandOneField = field(formX, formY + 161, 420, 18, 512, "gui.gexpress.level_reward_editor.command_one");
-		commandTwoField = field(formX, formY + 189, 420, 18, 512, "gui.gexpress.level_reward_editor.command_two");
-		commandThreeField = field(formX, formY + 217, 420, 18, 512, "gui.gexpress.level_reward_editor.command_three");
+		int rewardWidth = Math.min(360, formWidth);
+		int longWidth = Math.min(520, formWidth);
+		rewardOneField = field(formX, formY + 35, rewardWidth, 18, 96, "gui.gexpress.level_reward_editor.reward_one");
+		rewardTwoField = field(formX, formY + 63, rewardWidth, 18, 96, "gui.gexpress.level_reward_editor.reward_two");
+		rewardThreeField = field(formX, formY + 91, rewardWidth, 18, 96, "gui.gexpress.level_reward_editor.reward_three");
+		descriptionField = field(formX, formY + 126, longWidth, 18, 240, "gui.gexpress.level_reward_editor.description");
+		commandOneField = field(formX, formY + 161, longWidth, 18, 512, "gui.gexpress.level_reward_editor.command_one");
+		commandTwoField = field(formX, formY + 189, longWidth, 18, 512, "gui.gexpress.level_reward_editor.command_two");
+		commandThreeField = field(formX, formY + 217, longWidth, 18, 512, "gui.gexpress.level_reward_editor.command_three");
 
 		int buttonY = Math.min(height - 58, formY + 258);
 		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.level_reward_editor.save"), button -> save())
@@ -90,6 +95,15 @@ public final class GexpressLevelRewardEditorScreen extends Screen {
 	}
 
 	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (mouseX >= 18 && mouseX < listRight() && mouseY >= 52 && mouseY < listBottom()) {
+			listScroll = Math.max(0, Math.min(maxListScroll(), listScroll - (int) Math.signum(verticalAmount) * LIST_ROW_HEIGHT));
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+	}
+
+	@Override
 	public void close() {
 		MinecraftClient.getInstance().setScreen(parent);
 	}
@@ -97,33 +111,49 @@ public final class GexpressLevelRewardEditorScreen extends Screen {
 	private void drawRewardList(DrawContext context, int mouseX, int mouseY) {
 		int x = 18;
 		int y = 52;
+		int listWidth = listRight() - x;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.level_reward_editor.rewards"),
 			x, y - 14, 0xFFFFFFFF);
+		context.enableScissor(x, y, listRight(), listBottom());
 		int row = 0;
 		for (GexpressConfig.LevelRoadmapEntry entry : entries()) {
-			int ry = y + row * 25;
+			int ry = y + row * LIST_ROW_HEIGHT - listScroll;
+			if (ry + 21 <= y || ry >= listBottom()) {
+				row++;
+				continue;
+			}
 			boolean selected = entry.level() == selectedLevel;
-			boolean hovered = mouseX >= x && mouseX < x + 170 && mouseY >= ry && mouseY < ry + 21;
-			context.fill(x, ry, x + 170, ry + 21, selected ? 0xAA2D3542 : hovered ? 0x77313A48 : 0x55212833);
-			context.drawBorder(x, ry, 170, 21, selected ? 0xAAE0B65A : 0x443C4A58);
+			boolean hovered = mouseX >= x && mouseX < listRight() && mouseY >= ry && mouseY < ry + 21;
+			context.fill(x, ry, listRight(), ry + 21, selected ? 0xAA2D3542 : hovered ? 0x77313A48 : 0x55212833);
+			context.drawBorder(x, ry, listWidth, 21, selected ? 0xAAE0B65A : 0x443C4A58);
 			context.drawTextWithShadow(textRenderer, Text.literal("Level " + entry.level()), x + 5, ry + 3,
 				0xFFFFFFFF);
 			String reward = entry.rewardTitles().isEmpty()
 				? entry.title()
 				: String.join(" + ", entry.rewardTitles());
-			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(reward, 158)),
+			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(reward, listWidth - 12)),
 				x + 5, ry + 12, 0xFFFFD57A);
 			row++;
+		}
+		context.disableScissor();
+		if (maxListScroll() > 0) {
+			int trackX = listRight() + 3;
+			int trackH = listBottom() - y;
+			int thumbH = Math.max(18, trackH * trackH / Math.max(trackH, entries().size() * LIST_ROW_HEIGHT));
+			int thumbY = y + (trackH - thumbH) * listScroll / maxListScroll();
+			context.fill(trackX, y, trackX + 2, listBottom(), 0x553C4A58);
+			context.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, 0xFFBFA35A);
 		}
 	}
 
 	private boolean clickRewardList(double mouseX, double mouseY) {
 		int x = 18;
 		int y = 52;
+		if (mouseX < x || mouseX >= listRight() || mouseY < y || mouseY >= listBottom()) return false;
 		int row = 0;
 		for (GexpressConfig.LevelRoadmapEntry entry : entries()) {
-			int ry = y + row * 25;
-			if (mouseX >= x && mouseX < x + 170 && mouseY >= ry && mouseY < ry + 21) {
+			int ry = y + row * LIST_ROW_HEIGHT - listScroll;
+			if (mouseY >= ry && mouseY < ry + 21) {
 				load(entry);
 				return true;
 			}
@@ -133,7 +163,7 @@ public final class GexpressLevelRewardEditorScreen extends Screen {
 	}
 
 	private void drawLabels(DrawContext context) {
-		int x = Math.max(210, width / 2 - 150);
+		int x = formX();
 		int y = 43;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.level_reward_editor.level"), x, y, 0xFFB9C2CE);
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.level_reward_editor.reward_one"), x, y + 35, 0xFFB9C2CE);
@@ -146,7 +176,7 @@ public final class GexpressLevelRewardEditorScreen extends Screen {
 	}
 
 	private void drawHelp(DrawContext context) {
-		int x = Math.max(210, width / 2 - 150);
+		int x = formX();
 		int y = Math.min(height - 84, 340);
 		context.drawTextWithShadow(textRenderer,
 			Text.translatable("gui.gexpress.level_reward_editor.help_1").formatted(Formatting.GRAY),
@@ -252,5 +282,21 @@ public final class GexpressLevelRewardEditorScreen extends Screen {
 
 	private String clean(String raw) {
 		return raw == null ? "" : raw.replace("|", "").strip();
+	}
+
+	private int formX() {
+		return Math.max(210, Math.min(330, width / 3));
+	}
+
+	private int listRight() {
+		return formX() - 22;
+	}
+
+	private int listBottom() {
+		return Math.max(80, height - 42);
+	}
+
+	private int maxListScroll() {
+		return Math.max(0, entries().size() * LIST_ROW_HEIGHT - (listBottom() - 52));
 	}
 }

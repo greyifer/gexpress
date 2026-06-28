@@ -1,5 +1,6 @@
 package dev.mapselect.item;
 
+import dev.mapselect.game.GexpressAbilityGuards;
 import dev.mapselect.role.bombspecialist.C4Detonation;
 import dev.mapselect.role.bombspecialist.PliersDefuseManager;
 import net.minecraft.entity.ItemEntity;
@@ -25,6 +26,7 @@ public class PliersItem extends Item {
 	@Override
 	public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
 		if (!(entity instanceof PlayerEntity target)) return ActionResult.PASS;
+		if (GexpressAbilityGuards.shouldBlockItemAbility(user)) return ActionResult.FAIL;
 		if (user.getWorld().isClient) return ActionResult.SUCCESS;
 		return PliersDefuseManager.beginPlayerDefuse(stack, user, target, hand);
 	}
@@ -32,6 +34,7 @@ public class PliersItem extends Item {
 	@Override
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
 		ItemStack stack = user.getStackInHand(hand);
+		if (GexpressAbilityGuards.shouldBlockItemAbility(user)) return TypedActionResult.fail(stack);
 		if (world.isClient) return TypedActionResult.success(stack);
 		if (!(user instanceof ServerPlayerEntity serverUser)) return TypedActionResult.pass(stack);
 		ItemEntity charge = C4Detonation.findLookedAtCharge(serverUser, 5.0D);

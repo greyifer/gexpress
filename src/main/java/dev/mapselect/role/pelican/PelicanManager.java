@@ -10,12 +10,12 @@ import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.AbilityCooldownPayload;
-import dev.mapselect.network.AbilityCooldownSync;
-import dev.mapselect.network.VultureEatPayload;
-import dev.mapselect.network.VultureProgressPayload;
-import dev.mapselect.network.VultureReleasePayload;
-import dev.mapselect.network.VultureStatePayload;
+import dev.mapselect.network.ability.AbilityCooldownPayload;
+import dev.mapselect.network.ability.AbilityCooldownSync;
+import dev.mapselect.network.role.pelican.VultureEatPayload;
+import dev.mapselect.network.role.pelican.VultureProgressPayload;
+import dev.mapselect.network.role.pelican.VultureReleasePayload;
+import dev.mapselect.network.role.pelican.VultureStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.guardian.GuardianAngelManager;
@@ -341,7 +341,12 @@ public final class PelicanManager {
 
 	private static int requiredEaten(ServerPlayerEntity vulture) {
 		int players = Math.max(1, roundParticipantCount(vulture));
-		return Math.max(1, (int) Math.floor(players * (GexpressConfig.getPelicanEatPercentage() / 100.0D)));
+		int configured = Math.max(1, (int) Math.floor(players * (GexpressConfig.getPelicanEatPercentage() / 100.0D)));
+		int otherParticipants = Math.max(0, roundParticipants(vulture).size() - 1);
+		if (otherParticipants > 0) configured = Math.min(configured, otherParticipants);
+		int eaten = eatenByVulture.getOrDefault(vulture.getUuid(), Set.of()).size();
+		int possible = eaten + aliveOtherParticipants(vulture);
+		return possible <= 0 ? configured : Math.max(1, Math.min(configured, possible));
 	}
 
 	private static int roundParticipantCount(ServerPlayerEntity vulture) {
@@ -471,16 +476,6 @@ public final class PelicanManager {
 		if (server != null && vultureId != null) {
 			ServerPlayerEntity vulture = server.getPlayerManager().getPlayer(vultureId);
 			if (vulture != null) syncProgress(vulture, true);
-		}
-	}
-
-	private static void removeMissingTarget(UUID targetId, UUID vultureId) {
-		stashedStates.remove(targetId);
-		vultureByStashed.remove(targetId);
-		Deque<UUID> belly = stashedByVulture.get(vultureId);
-		if (belly != null) {
-			belly.remove(targetId);
-			if (belly.isEmpty()) stashedByVulture.remove(vultureId);
 		}
 	}
 

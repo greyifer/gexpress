@@ -1,7 +1,7 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.ClientPuppetmasterState;
-import dev.mapselect.client.ClientTimeMasterFreezeState;
+import dev.mapselect.client.role.puppetmaster.ClientPuppetmasterState;
+import dev.mapselect.client.role.timemaster.ClientTimeMasterFreezeState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.Mouse;
 import org.spongepowered.asm.mixin.Shadow;

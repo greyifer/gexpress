@@ -5,6 +5,7 @@ import dev.doctor4t.wathe.api.WatheRoles;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
+import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.registry.MapSelectRoles;
 import net.minecraft.util.Identifier;
 import org.agmas.harpymodloader.Harpymodloader;
@@ -32,6 +33,7 @@ public final class RoleModifierTuningBridge {
 			restoreManagedMaxima();
 			applyDefaultMaxima();
 			applyExplicitMaxima();
+			disableRuntimeOnlyModifiers();
 		} catch (Throwable t) {
 			MapSelect.LOGGER.debug("Failed to apply role/modifier tuning maxima: {}", t.toString());
 		}
@@ -48,6 +50,7 @@ public final class RoleModifierTuningBridge {
 			applyDefaultMaxima();
 			applyExplicitMaxima();
 			applyRoleChanceGates();
+			disableRuntimeOnlyModifiers();
 			applySpecialRoleGates(playerCount);
 		} catch (Throwable t) {
 			MapSelect.LOGGER.warn("Failed to prepare role count tuning.", t);
@@ -138,6 +141,10 @@ public final class RoleModifierTuningBridge {
 
 	private static void disableRoles(Identifier... ids) {
 		for (Identifier id : ids) putRoleMax(id, 0);
+	}
+
+	private static void disableRuntimeOnlyModifiers() {
+		putModifierMax(MapSelectModifiers.LOVERS_ID, 0);
 	}
 
 	private static void restoreManagedMaxima() {

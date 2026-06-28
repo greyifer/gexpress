@@ -80,6 +80,52 @@ public final class GexpressConfig {
 		}
 	}
 
+	public enum ItemPickupPolicy {
+		ONLY_CIVILIANS("only_civilians", true, false, false),
+		CIVILIANS_AND_NEUTRALS("civilians_and_neutrals", true, true, false),
+		CIVILIANS_NEUTRALS_KILLERS("civilians_neutrals_killers", true, true, true);
+
+		private final String id;
+		private final boolean civilians;
+		private final boolean neutrals;
+		private final boolean killers;
+
+		ItemPickupPolicy(String id, boolean civilians, boolean neutrals, boolean killers) {
+			this.id = id;
+			this.civilians = civilians;
+			this.neutrals = neutrals;
+			this.killers = killers;
+		}
+
+		public String id() {
+			return id;
+		}
+
+		public boolean allowsSide(String side) {
+			if ("civilian".equals(side)) return civilians;
+			if ("neutral".equals(side)) return neutrals;
+			return killers;
+		}
+
+		public static ItemPickupPolicy fromId(String id) {
+			if (id != null) {
+				for (ItemPickupPolicy value : values()) {
+					if (value.id.equalsIgnoreCase(id) || value.name().equalsIgnoreCase(id)) return value;
+				}
+			}
+			return CIVILIANS_NEUTRALS_KILLERS;
+		}
+
+		@Override
+		public String toString() {
+			return switch (this) {
+				case ONLY_CIVILIANS -> "Only Civilians";
+				case CIVILIANS_AND_NEUTRALS -> "Civilians & Neutrals";
+				case CIVILIANS_NEUTRALS_KILLERS -> "Civilians, Neutrals & Killers";
+			};
+		}
+	}
+
 	private GexpressConfig() {}
 
 	public record LevelRoadmapEntry(int level, String title, String description, String command) {
@@ -122,6 +168,8 @@ public final class GexpressConfig {
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("gexpress.json");
+	public static final int CURRENT_CONFIG_VERSION = 3;
+	private static int loadedConfigVersion = CURRENT_CONFIG_VERSION;
 
 	// Defaults are deliberately chosen to feel like grenade-tier economy.
 	public static int c4Price = 500;
@@ -208,7 +256,7 @@ public final class GexpressConfig {
 	/** Whether a controlled puppet can kill the Puppetmaster's abandoned body. */
 	public static boolean puppetmasterCanKillOwnBody = false;
 	/** Maximum block range for Puppetmaster's target menu. */
-	public static int puppetmasterControlRange = 16;
+	public static int puppetmasterControlRange = 4;
 	/** Number of successful controls each Puppetmaster can start per round. */
 	public static int puppetmasterMaxUses = 3;
 	/** Seconds before the Pelican can swallow another player. */
@@ -230,7 +278,7 @@ public final class GexpressConfig {
 	/** Vertical block tolerance for Conversation task progress. */
 	public static int conversationTaskVerticalToleranceBlocks = 1;
 	/** Number of task completions before a Snitch learns the killer roster. */
-	public static int snitchTasksRequired = 3;
+	public static int snitchTasksRequired = 6;
 	/** Remaining tasks at which killers are warned and shown the Snitch. 0 disables the warning. */
 	public static int snitchWarningTasksRemaining = 1;
 	/** Seconds a Time Master rewinds the active round. */
@@ -246,19 +294,25 @@ public final class GexpressConfig {
 	/** Total number of freezes each Time Master can use in a round. */
 	public static int timeMasterFreezeMaxUses = 3;
 	/** Maximum block range for Time Master's Freeze target search. */
-	public static int timeMasterFreezeRange = 8;
+	public static int timeMasterFreezeRange = 4;
 	/** Seconds before Scatter Brain can scatter players again. */
 	public static int scatterBrainCooldownSeconds = 60;
 	/** Maximum number of players the Tracker can track at once. */
 	public static int trackerMaxTargets = 3;
 	/** Maximum block range for Tracker target search. */
-	public static int trackerRange = 24;
+	public static int trackerRange = 4;
 	/** Seconds before Tracker can change a tracked target again. */
 	public static int trackerCooldownSeconds = 10;
 	/** Seconds before Seer can compare another pair. */
 	public static int seerCompareCooldownSeconds = 45;
+	/** Number of non-Seer player deaths required before Seer can compare a pair. */
+	public static int seerCompareDeathsRequired = 3;
 	/** Maximum block range for Seer's team comparison target search. */
 	public static int seerCompareRange = 4;
+	/** Seconds before The Twins can swap bodies again. */
+	public static int twinsSwapCooldownSeconds = 20;
+	/** Whether The Twins spare body can advertise a different decoy role. */
+	public static boolean twinsBodyDifferentRole = false;
 	/** Maximum block range for Altruist's revive target search. */
 	public static int altruistRange = 4;
 	/** Seconds before Bounty Hunter's current bounty expires and changes. */
@@ -271,9 +325,23 @@ public final class GexpressConfig {
 	public static int skincrawlerCooldownSeconds = 90;
 	public static int skincrawlerStunSeconds = 5;
 	public static int skincrawlerRange = 4;
+	/** Seconds Painter disguises remain active before fading back to truth. */
+	public static int painterPaintDurationSeconds = 60;
+	/** Seconds before Painter can repaint another dead body. */
+	public static int painterBodyCooldownSeconds = 30;
+	/** Seconds before Painter can repaint another living player. */
+	public static int painterPlayerCooldownSeconds = 30;
+	/** Seconds Painter doorway portals remain active. */
+	public static int painterDoorwayDurationSeconds = 10;
+	/** Seconds before Painter can paint another doorway portal. */
+	public static int painterDoorwayCooldownSeconds = 30;
+	/** Maximum dead bodies one Painter can keep painted at once. */
+	public static int painterMaxPaintedBodies = 1;
+	/** Maximum living players one Painter can keep painted at once. */
+	public static int painterMaxPaintedPlayers = 1;
 	public static int spyBugCost = 100;
 	public static int spyBugDurationSeconds = 120;
-	public static int spyBugRange = 16;
+	public static int spyBugRange = 4;
 	public static int squeakerPitchPercent = 135;
 	public static int masqueradePitchMinPercent = 80;
 	public static int masqueradePitchMaxPercent = 145;
@@ -296,7 +364,7 @@ public final class GexpressConfig {
 	/** Coins Janitor starts with. */
 	public static int janitorStartingGold = 100;
 	/** Maximum block range for Godfather recruitment. */
-	public static int mafiaRecruitRange = 16;
+	public static int mafiaRecruitRange = 4;
 	/** Seconds before a dead Mafioso or Janitor slot can be refilled. */
 	public static int mafiaReplacementCooldownSeconds = 120;
 	/** Seconds Mafioso and Janitor revolver kills put the revolver on cooldown. */
@@ -320,17 +388,21 @@ public final class GexpressConfig {
 	/** Seconds Copycat keeps the copied ability. */
 	public static int copycatCopyDurationSeconds = 120;
 	/** Maximum block range for Copycat copying. */
-	public static int copycatCopyRange = 16;
-	/** Alive lover duos Cupid needs to win. */
+	public static int copycatCopyRange = 4;
+	/** Legacy pair-count setting kept so older config files can still deserialize. */
 	public static int cupidRequiredAlivePairs = 3;
+	/** Percent of non-Cupid round participants Cupid must link as lovers to win. */
+	public static int cupidLovePercentage = 75;
 	/** Seconds before Cupid can link another pair after a successful duo. */
 	public static int cupidPairCooldownSeconds = 20;
 	/** Maximum block range for Cupid's love target search. */
 	public static int cupidRange = 4;
-	/** Whether lovers see their partner in the bottom-left HUD. */
+	/** Whether lovers see their partner in the bottom-right HUD. */
 	public static boolean loversShowPartnerHud = true;
 	/** Whether lovers can be paired across civilian and killer/neutral sides. */
 	public static boolean loversAllowMixedSidePairs = false;
+	/** Whether each lovers pair becomes its own team and can only win together. */
+	public static boolean loversIndependentWin = false;
 	/** Seconds before Dracula or Vampire can bite again. */
 	public static int covenantBiteCooldownSeconds = 15;
 	/** Seconds after death before Vengeful Spirit rises. */
@@ -341,6 +413,10 @@ public final class GexpressConfig {
 	public static boolean lastDeathShieldEnabled = false;
 	/** Whether guardian angel can be assigned to killer, neutral, or Mafia players. */
 	public static boolean guardianAngelAllowNonInnocents = false;
+	/** Whether the final two opposed players receive revolvers and lose killer instinct. */
+	public static boolean lastStandEnabled = false;
+	/** Which role sides can pick up round weapon/utility item drops. */
+	public static String itemPickupPolicy = ItemPickupPolicy.CIVILIANS_NEUTRALS_KILLERS.id();
 	/** Whether Bodyguard protect targets are limited to civilian-side players. */
 	public static boolean bodyguardProtectOnlyCivilians = true;
 	/** Whether side count fields cap normal role assignment instead of using only per-player scaling. */
@@ -397,6 +473,8 @@ public final class GexpressConfig {
 	public static int abilityHudOffsetY = 0;
 	/** Client-only preference for rendering available 3D revolver skin models instead of flat 2D fallbacks. */
 	public static boolean use3dGunSkins = true;
+	/** Client preference to receive Muted every round without affecting random assignments. */
+	public static boolean alwaysMuted = false;
 	/** XP granted to everyone recorded at the end of a completed round. */
 	public static int levelRoundXp = 25;
 	/** Extra XP granted to players on the winning side. */
@@ -473,7 +551,7 @@ public final class GexpressConfig {
 	public static final int PUPPETMASTER_CONTROL_COOLDOWN_MIN = 0;
 	public static final int PUPPETMASTER_CONTROL_COOLDOWN_MAX = 600;
 	public static final int PUPPETMASTER_CONTROL_RANGE_MIN = 1;
-	public static final int PUPPETMASTER_CONTROL_RANGE_MAX = 64;
+	public static final int PUPPETMASTER_CONTROL_RANGE_MAX = 4;
 	public static final int PUPPETMASTER_MAX_USES_MIN = 0;
 	public static final int PUPPETMASTER_MAX_USES_MAX = 10;
 	public static final int PELICAN_EAT_COOLDOWN_MIN = 0;
@@ -509,19 +587,23 @@ public final class GexpressConfig {
 	public static final int TIME_MASTER_FREEZE_MAX_USES_MIN = 0;
 	public static final int TIME_MASTER_FREEZE_MAX_USES_MAX = 10;
 	public static final int TIME_MASTER_FREEZE_RANGE_MIN = 1;
-	public static final int TIME_MASTER_FREEZE_RANGE_MAX = 32;
+	public static final int TIME_MASTER_FREEZE_RANGE_MAX = 4;
 	public static final int SCATTER_BRAIN_COOLDOWN_SECONDS_MIN = 0;
 	public static final int SCATTER_BRAIN_COOLDOWN_SECONDS_MAX = 900;
 	public static final int TRACKER_MAX_TARGETS_MIN = 1;
 	public static final int TRACKER_MAX_TARGETS_MAX = 16;
 	public static final int TRACKER_RANGE_MIN = 1;
-	public static final int TRACKER_RANGE_MAX = 96;
+	public static final int TRACKER_RANGE_MAX = 4;
 	public static final int TRACKER_COOLDOWN_SECONDS_MIN = 0;
 	public static final int TRACKER_COOLDOWN_SECONDS_MAX = 600;
 	public static final int SEER_COMPARE_COOLDOWN_SECONDS_MIN = 0;
 	public static final int SEER_COMPARE_COOLDOWN_SECONDS_MAX = 600;
+	public static final int SEER_COMPARE_DEATHS_REQUIRED_MIN = 1;
+	public static final int SEER_COMPARE_DEATHS_REQUIRED_MAX = 16;
 	public static final int SEER_COMPARE_RANGE_MIN = 1;
 	public static final int SEER_COMPARE_RANGE_MAX = 16;
+	public static final int TWINS_SWAP_COOLDOWN_SECONDS_MIN = 0;
+	public static final int TWINS_SWAP_COOLDOWN_SECONDS_MAX = 600;
 	public static final int ALTRUIST_RANGE_MIN = 1;
 	public static final int ALTRUIST_RANGE_MAX = 16;
 	public static final int BOUNTY_HUNTER_INTERVAL_SECONDS_MIN = 10;
@@ -538,12 +620,20 @@ public final class GexpressConfig {
 	public static final int SKINCRAWLER_STUN_SECONDS_MAX = 60;
 	public static final int SKINCRAWLER_RANGE_MIN = 1;
 	public static final int SKINCRAWLER_RANGE_MAX = 16;
+	public static final int PAINTER_PAINT_DURATION_SECONDS_MIN = 5;
+	public static final int PAINTER_PAINT_DURATION_SECONDS_MAX = 600;
+	public static final int PAINTER_DOORWAY_DURATION_SECONDS_MIN = 1;
+	public static final int PAINTER_DOORWAY_DURATION_SECONDS_MAX = 600;
+	public static final int PAINTER_COOLDOWN_SECONDS_MIN = 0;
+	public static final int PAINTER_COOLDOWN_SECONDS_MAX = 900;
+	public static final int PAINTER_MAX_PAINTED_MIN = 1;
+	public static final int PAINTER_MAX_PAINTED_MAX = 8;
 	public static final int SPY_BUG_COST_MIN = 0;
 	public static final int SPY_BUG_COST_MAX = 9999;
 	public static final int SPY_BUG_DURATION_SECONDS_MIN = 10;
 	public static final int SPY_BUG_DURATION_SECONDS_MAX = 900;
 	public static final int SPY_BUG_RANGE_MIN = 1;
-	public static final int SPY_BUG_RANGE_MAX = 64;
+	public static final int SPY_BUG_RANGE_MAX = 4;
 	public static final int VOICE_PITCH_PERCENT_MIN = 50;
 	public static final int VOICE_PITCH_PERCENT_MAX = 200;
 	public static final int GODFATHER_BULLET_PRICE_MIN = 0;
@@ -557,7 +647,7 @@ public final class GexpressConfig {
 	public static final int MAFIA_MINIMUM_PLAYERS_MIN = 1;
 	public static final int MAFIA_MINIMUM_PLAYERS_MAX = 64;
 	public static final int MAFIA_RECRUIT_RANGE_MIN = 1;
-	public static final int MAFIA_RECRUIT_RANGE_MAX = 96;
+	public static final int MAFIA_RECRUIT_RANGE_MAX = 4;
 	public static final int MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MIN = 0;
 	public static final int MAFIA_REPLACEMENT_COOLDOWN_SECONDS_MAX = 900;
 	public static final int MAFIA_REVOLVER_KILL_COOLDOWN_SECONDS_MIN = 0;
@@ -581,9 +671,9 @@ public final class GexpressConfig {
 	public static final int COPYCAT_DURATION_SECONDS_MIN = 10;
 	public static final int COPYCAT_DURATION_SECONDS_MAX = 600;
 	public static final int COPYCAT_RANGE_MIN = 1;
-	public static final int COPYCAT_RANGE_MAX = 64;
-	public static final int CUPID_REQUIRED_ALIVE_PAIRS_MIN = 1;
-	public static final int CUPID_REQUIRED_ALIVE_PAIRS_MAX = 10;
+	public static final int COPYCAT_RANGE_MAX = 4;
+	public static final int CUPID_LOVE_PERCENTAGE_MIN = 1;
+	public static final int CUPID_LOVE_PERCENTAGE_MAX = 100;
 	public static final int CUPID_COOLDOWN_SECONDS_MIN = 0;
 	public static final int CUPID_COOLDOWN_SECONDS_MAX = 600;
 	public static final int CUPID_RANGE_MIN = 1;
@@ -1117,8 +1207,22 @@ public final class GexpressConfig {
 			Math.min(SEER_COMPARE_COOLDOWN_SECONDS_MAX, seerCompareCooldownSeconds));
 	}
 
+	public static int getSeerCompareDeathsRequired() {
+		return Math.max(SEER_COMPARE_DEATHS_REQUIRED_MIN,
+			Math.min(SEER_COMPARE_DEATHS_REQUIRED_MAX, seerCompareDeathsRequired));
+	}
+
 	public static int getSeerCompareRange() {
 		return Math.max(SEER_COMPARE_RANGE_MIN, Math.min(SEER_COMPARE_RANGE_MAX, seerCompareRange));
+	}
+
+	public static int getTwinsSwapCooldownSeconds() {
+		return Math.max(TWINS_SWAP_COOLDOWN_SECONDS_MIN,
+			Math.min(TWINS_SWAP_COOLDOWN_SECONDS_MAX, twinsSwapCooldownSeconds));
+	}
+
+	public static boolean canTwinsBodyUseDifferentRole() {
+		return twinsBodyDifferentRole;
 	}
 
 	public static int getAltruistRange() {
@@ -1157,6 +1261,41 @@ public final class GexpressConfig {
 
 	public static int getSkincrawlerRange() {
 		return Math.max(SKINCRAWLER_RANGE_MIN, Math.min(SKINCRAWLER_RANGE_MAX, skincrawlerRange));
+	}
+
+	public static int getPainterPaintDurationSeconds() {
+		return Math.max(PAINTER_PAINT_DURATION_SECONDS_MIN,
+			Math.min(PAINTER_PAINT_DURATION_SECONDS_MAX, painterPaintDurationSeconds));
+	}
+
+	public static int getPainterBodyCooldownSeconds() {
+		return Math.max(PAINTER_COOLDOWN_SECONDS_MIN,
+			Math.min(PAINTER_COOLDOWN_SECONDS_MAX, painterBodyCooldownSeconds));
+	}
+
+	public static int getPainterPlayerCooldownSeconds() {
+		return Math.max(PAINTER_COOLDOWN_SECONDS_MIN,
+			Math.min(PAINTER_COOLDOWN_SECONDS_MAX, painterPlayerCooldownSeconds));
+	}
+
+	public static int getPainterDoorwayDurationSeconds() {
+		return Math.max(PAINTER_DOORWAY_DURATION_SECONDS_MIN,
+			Math.min(PAINTER_DOORWAY_DURATION_SECONDS_MAX, painterDoorwayDurationSeconds));
+	}
+
+	public static int getPainterDoorwayCooldownSeconds() {
+		return Math.max(PAINTER_COOLDOWN_SECONDS_MIN,
+			Math.min(PAINTER_COOLDOWN_SECONDS_MAX, painterDoorwayCooldownSeconds));
+	}
+
+	public static int getPainterMaxPaintedBodies() {
+		return Math.max(PAINTER_MAX_PAINTED_MIN,
+			Math.min(PAINTER_MAX_PAINTED_MAX, painterMaxPaintedBodies));
+	}
+
+	public static int getPainterMaxPaintedPlayers() {
+		return Math.max(PAINTER_MAX_PAINTED_MIN,
+			Math.min(PAINTER_MAX_PAINTED_MAX, painterMaxPaintedPlayers));
 	}
 
 	public static int getSpyBugCost() {
@@ -1295,9 +1434,13 @@ public final class GexpressConfig {
 		return Math.max(COPYCAT_RANGE_MIN, Math.min(COPYCAT_RANGE_MAX, copycatCopyRange));
 	}
 
+	public static int getCupidLovePercentage() {
+		return Math.max(CUPID_LOVE_PERCENTAGE_MIN,
+			Math.min(CUPID_LOVE_PERCENTAGE_MAX, cupidLovePercentage));
+	}
+
 	public static int getCupidRequiredAlivePairs() {
-		return Math.max(CUPID_REQUIRED_ALIVE_PAIRS_MIN,
-			Math.min(CUPID_REQUIRED_ALIVE_PAIRS_MAX, cupidRequiredAlivePairs));
+		return getCupidLovePercentage();
 	}
 
 	public static int getCupidPairCooldownSeconds() {
@@ -1315,6 +1458,10 @@ public final class GexpressConfig {
 
 	public static boolean canLoversPairAcrossSides() {
 		return loversAllowMixedSidePairs;
+	}
+
+	public static boolean doLoversWinIndependently() {
+		return loversIndependentWin;
 	}
 
 	public static int getCovenantBiteCooldownSeconds() {
@@ -1346,6 +1493,18 @@ public final class GexpressConfig {
 
 	public static boolean canGuardianAngelPickNonInnocents() {
 		return guardianAngelAllowNonInnocents;
+	}
+
+	public static boolean isLastStandEnabled() {
+		return lastStandEnabled;
+	}
+
+	public static ItemPickupPolicy getItemPickupPolicy() {
+		return ItemPickupPolicy.fromId(itemPickupPolicy);
+	}
+
+	public static String getItemPickupPolicyId() {
+		return getItemPickupPolicy().id();
 	}
 
 	public static boolean isBodyguardProtectOnlyCivilians() {
@@ -1594,6 +1753,14 @@ public final class GexpressConfig {
 		return use3dGunSkins;
 	}
 
+	public static boolean alwaysMuted() {
+		return alwaysMuted;
+	}
+
+	public static int loadedConfigVersion() {
+		return loadedConfigVersion;
+	}
+
 	public static void load() {
 		try {
 			if (!Files.exists(CONFIG_PATH)) {
@@ -1603,6 +1770,8 @@ public final class GexpressConfig {
 			String json = Files.readString(CONFIG_PATH);
 			Snapshot snap = GSON.fromJson(json, Snapshot.class);
 			if (snap == null) return;
+			int sourceVersion = Math.max(0, snap.configVersion);
+			boolean migrated = migrateSnapshot(snap, sourceVersion);
 			c4Price = snap.c4Price;
 			c4FuseSeconds = snap.c4FuseSeconds;
 			c4FirstBeepSeconds = snap.c4FirstBeepSeconds;
@@ -1672,7 +1841,10 @@ public final class GexpressConfig {
 			trackerRange = snap.trackerRange;
 			trackerCooldownSeconds = snap.trackerCooldownSeconds;
 			seerCompareCooldownSeconds = snap.seerCompareCooldownSeconds;
+			seerCompareDeathsRequired = snap.seerCompareDeathsRequired;
 			seerCompareRange = snap.seerCompareRange;
+			twinsSwapCooldownSeconds = snap.twinsSwapCooldownSeconds;
+			twinsBodyDifferentRole = snap.twinsBodyDifferentRole;
 			altruistRange = snap.altruistRange;
 			bountyHunterBountyIntervalSeconds = snap.bountyHunterBountyIntervalSeconds;
 			bountyHunterRewardGold = snap.bountyHunterRewardGold;
@@ -1681,8 +1853,14 @@ public final class GexpressConfig {
 			skincrawlerCooldownSeconds = snap.skincrawlerCooldownSeconds;
 			skincrawlerStunSeconds = snap.skincrawlerStunSeconds;
 			skincrawlerRange = snap.skincrawlerRange;
+			painterPaintDurationSeconds = snap.painterPaintDurationSeconds;
+			painterBodyCooldownSeconds = snap.painterBodyCooldownSeconds;
+			painterPlayerCooldownSeconds = snap.painterPlayerCooldownSeconds;
+			painterDoorwayDurationSeconds = snap.painterDoorwayDurationSeconds;
+			painterDoorwayCooldownSeconds = snap.painterDoorwayCooldownSeconds;
+			painterMaxPaintedBodies = snap.painterMaxPaintedBodies;
+			painterMaxPaintedPlayers = snap.painterMaxPaintedPlayers;
 			spyBugCost = snap.spyBugCost;
-			if (spyBugCost == 200) spyBugCost = 100;
 			spyBugDurationSeconds = snap.spyBugDurationSeconds;
 			spyBugRange = snap.spyBugRange;
 			squeakerPitchPercent = snap.squeakerPitchPercent;
@@ -1711,15 +1889,19 @@ public final class GexpressConfig {
 			copycatCopyDurationSeconds = snap.copycatCopyDurationSeconds;
 			copycatCopyRange = snap.copycatCopyRange;
 			cupidRequiredAlivePairs = snap.cupidRequiredAlivePairs;
+			cupidLovePercentage = snap.cupidLovePercentage;
 			cupidPairCooldownSeconds = snap.cupidPairCooldownSeconds;
 			cupidRange = snap.cupidRange;
 			loversShowPartnerHud = snap.loversShowPartnerHud;
 			loversAllowMixedSidePairs = snap.loversAllowMixedSidePairs;
+			loversIndependentWin = snap.loversIndependentWin;
 			covenantBiteCooldownSeconds = snap.covenantBiteCooldownSeconds;
 			vengefulSpiritReviveDelaySeconds = snap.vengefulSpiritReviveDelaySeconds;
 			vengefulSpiritRevengeSeconds = snap.vengefulSpiritRevengeSeconds;
 			lastDeathShieldEnabled = snap.lastDeathShieldEnabled;
 			guardianAngelAllowNonInnocents = snap.guardianAngelAllowNonInnocents;
+			lastStandEnabled = snap.lastStandEnabled;
+			itemPickupPolicy = snap.itemPickupPolicy;
 			bodyguardProtectOnlyCivilians = snap.bodyguardProtectOnlyCivilians;
 			useCustomRoleCounts = snap.useCustomRoleCounts;
 			maxKillerAmount = snap.maxKillerAmount;
@@ -1757,6 +1939,7 @@ public final class GexpressConfig {
 			abilityHudOffsetX = snap.abilityHudOffsetX;
 			abilityHudOffsetY = snap.abilityHudOffsetY;
 			use3dGunSkins = snap.use3dGunSkins;
+			alwaysMuted = snap.alwaysMuted;
 			levelRoundXp = snap.levelRoundXp;
 			levelWinXp = snap.levelWinXp;
 			levelNeutralWinBonusXp = snap.levelNeutralWinBonusXp;
@@ -1770,6 +1953,12 @@ public final class GexpressConfig {
 			levelTags = normalizeStringList(snap.levelTags);
 			skinCaseRows = normalizeStringList(snap.skinCaseRows);
 			clampInPlace();
+			loadedConfigVersion = CURRENT_CONFIG_VERSION;
+			if (migrated) {
+				MapSelect.LOGGER.info("Migrated gexpress.json from config version {} to {}.",
+					sourceVersion, CURRENT_CONFIG_VERSION);
+				save();
+			}
 		} catch (IOException | JsonSyntaxException e) {
 			MapSelect.LOGGER.warn("Failed to load gexpress.json; keeping defaults.", e);
 		}
@@ -1780,6 +1969,7 @@ public final class GexpressConfig {
 			Files.createDirectories(CONFIG_PATH.getParent());
 			clampInPlace();
 			Snapshot snap = new Snapshot();
+			snap.configVersion = CURRENT_CONFIG_VERSION;
 			snap.c4Price = c4Price;
 			snap.c4FuseSeconds = c4FuseSeconds;
 			snap.c4FirstBeepSeconds = c4FirstBeepSeconds;
@@ -1848,7 +2038,10 @@ public final class GexpressConfig {
 			snap.trackerRange = trackerRange;
 			snap.trackerCooldownSeconds = trackerCooldownSeconds;
 			snap.seerCompareCooldownSeconds = seerCompareCooldownSeconds;
+			snap.seerCompareDeathsRequired = seerCompareDeathsRequired;
 			snap.seerCompareRange = seerCompareRange;
+			snap.twinsSwapCooldownSeconds = twinsSwapCooldownSeconds;
+			snap.twinsBodyDifferentRole = twinsBodyDifferentRole;
 			snap.altruistRange = altruistRange;
 			snap.bountyHunterBountyIntervalSeconds = bountyHunterBountyIntervalSeconds;
 			snap.bountyHunterRewardGold = bountyHunterRewardGold;
@@ -1857,6 +2050,13 @@ public final class GexpressConfig {
 			snap.skincrawlerCooldownSeconds = skincrawlerCooldownSeconds;
 			snap.skincrawlerStunSeconds = skincrawlerStunSeconds;
 			snap.skincrawlerRange = skincrawlerRange;
+			snap.painterPaintDurationSeconds = painterPaintDurationSeconds;
+			snap.painterBodyCooldownSeconds = painterBodyCooldownSeconds;
+			snap.painterPlayerCooldownSeconds = painterPlayerCooldownSeconds;
+			snap.painterDoorwayDurationSeconds = painterDoorwayDurationSeconds;
+			snap.painterDoorwayCooldownSeconds = painterDoorwayCooldownSeconds;
+			snap.painterMaxPaintedBodies = painterMaxPaintedBodies;
+			snap.painterMaxPaintedPlayers = painterMaxPaintedPlayers;
 			snap.spyBugCost = spyBugCost;
 			snap.spyBugDurationSeconds = spyBugDurationSeconds;
 			snap.spyBugRange = spyBugRange;
@@ -1886,15 +2086,19 @@ public final class GexpressConfig {
 			snap.copycatCopyDurationSeconds = copycatCopyDurationSeconds;
 			snap.copycatCopyRange = copycatCopyRange;
 			snap.cupidRequiredAlivePairs = cupidRequiredAlivePairs;
+			snap.cupidLovePercentage = cupidLovePercentage;
 			snap.cupidPairCooldownSeconds = cupidPairCooldownSeconds;
 			snap.cupidRange = cupidRange;
 			snap.loversShowPartnerHud = loversShowPartnerHud;
 			snap.loversAllowMixedSidePairs = loversAllowMixedSidePairs;
+			snap.loversIndependentWin = loversIndependentWin;
 			snap.covenantBiteCooldownSeconds = covenantBiteCooldownSeconds;
 			snap.vengefulSpiritReviveDelaySeconds = vengefulSpiritReviveDelaySeconds;
 			snap.vengefulSpiritRevengeSeconds = vengefulSpiritRevengeSeconds;
 			snap.lastDeathShieldEnabled = lastDeathShieldEnabled;
 			snap.guardianAngelAllowNonInnocents = guardianAngelAllowNonInnocents;
+			snap.lastStandEnabled = lastStandEnabled;
+			snap.itemPickupPolicy = getItemPickupPolicyId();
 			snap.bodyguardProtectOnlyCivilians = bodyguardProtectOnlyCivilians;
 			snap.useCustomRoleCounts = useCustomRoleCounts;
 			snap.maxKillerAmount = maxKillerAmount;
@@ -1932,6 +2136,7 @@ public final class GexpressConfig {
 			snap.abilityHudOffsetX = abilityHudOffsetX;
 			snap.abilityHudOffsetY = abilityHudOffsetY;
 			snap.use3dGunSkins = use3dGunSkins;
+			snap.alwaysMuted = alwaysMuted;
 			snap.levelRoundXp = levelRoundXp;
 			snap.levelWinXp = levelWinXp;
 			snap.levelNeutralWinBonusXp = levelNeutralWinBonusXp;
@@ -1976,9 +2181,13 @@ public final class GexpressConfig {
 			int scatterBrainCooldownSeconds, int trackerMaxTargets,
 			int trackerRange, int trackerCooldownSeconds, int altruistRange,
 			int skincrawlerBodyMaxAgeSeconds, int skincrawlerCooldownSeconds, int skincrawlerStunSeconds,
-			int skincrawlerRange, int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
+			int skincrawlerRange, int painterPaintDurationSeconds, int painterBodyCooldownSeconds,
+			int painterPlayerCooldownSeconds, int painterDoorwayDurationSeconds, int painterDoorwayCooldownSeconds,
+			int painterMaxPaintedBodies, int painterMaxPaintedPlayers,
+			int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
 			int squeakerPitchPercent, int masqueradePitchMinPercent, int masqueradePitchMaxPercent,
 			boolean lastDeathShieldEnabled, boolean guardianAngelAllowNonInnocents,
+			boolean lastStandEnabled, String itemPickupPolicy,
 			int bountyHunterBountyIntervalSeconds, int bountyHunterRewardGold,
 			int bountyHunterFailCooldownSeconds, int godfatherBulletPrice, int godfatherStartingBullets,
 			int godfatherMaxLoadedBullets, int mafiaStartingGold, int mafiaMinimumPlayers,
@@ -2002,11 +2211,13 @@ public final class GexpressConfig {
 			int medicShieldBlockFlashTicks, int medicShieldBreakFlashTicks,
 			int medicShieldBlockFlashAlpha, int medicShieldBreakFlashAlpha,
 			float silentShadowAlpha, String specialRoleOccurrence,
-			int seerCompareCooldownSeconds, int seerCompareRange,
-			int cupidRequiredAlivePairs, int cupidPairCooldownSeconds, int cupidRange,
+			int seerCompareCooldownSeconds, int seerCompareDeathsRequired, int seerCompareRange,
+			int twinsSwapCooldownSeconds, boolean twinsBodyDifferentRole,
+			int cupidLovePercentage, int cupidPairCooldownSeconds, int cupidRange,
 			boolean loversShowPartnerHud, boolean loversAllowMixedSidePairs,
 			int covenantBiteCooldownSeconds,
-			int vengefulSpiritReviveDelaySeconds, int vengefulSpiritRevengeSeconds) {
+			int vengefulSpiritReviveDelaySeconds, int vengefulSpiritRevengeSeconds,
+			boolean loversIndependentWin) {
 		GexpressConfig.c4Price = c4Price;
 		GexpressConfig.c4FuseSeconds = c4FuseSeconds;
 		GexpressConfig.c4FirstBeepSeconds = c4FirstBeepSeconds;
@@ -2063,12 +2274,22 @@ public final class GexpressConfig {
 		GexpressConfig.trackerRange = trackerRange;
 		GexpressConfig.trackerCooldownSeconds = trackerCooldownSeconds;
 		GexpressConfig.seerCompareCooldownSeconds = seerCompareCooldownSeconds;
+		GexpressConfig.seerCompareDeathsRequired = seerCompareDeathsRequired;
 		GexpressConfig.seerCompareRange = seerCompareRange;
+		GexpressConfig.twinsSwapCooldownSeconds = twinsSwapCooldownSeconds;
+		GexpressConfig.twinsBodyDifferentRole = twinsBodyDifferentRole;
 		GexpressConfig.altruistRange = altruistRange;
 		GexpressConfig.skincrawlerBodyMaxAgeSeconds = skincrawlerBodyMaxAgeSeconds;
 		GexpressConfig.skincrawlerCooldownSeconds = skincrawlerCooldownSeconds;
 		GexpressConfig.skincrawlerStunSeconds = skincrawlerStunSeconds;
 		GexpressConfig.skincrawlerRange = skincrawlerRange;
+		GexpressConfig.painterPaintDurationSeconds = painterPaintDurationSeconds;
+		GexpressConfig.painterBodyCooldownSeconds = painterBodyCooldownSeconds;
+		GexpressConfig.painterPlayerCooldownSeconds = painterPlayerCooldownSeconds;
+		GexpressConfig.painterDoorwayDurationSeconds = painterDoorwayDurationSeconds;
+		GexpressConfig.painterDoorwayCooldownSeconds = painterDoorwayCooldownSeconds;
+		GexpressConfig.painterMaxPaintedBodies = painterMaxPaintedBodies;
+		GexpressConfig.painterMaxPaintedPlayers = painterMaxPaintedPlayers;
 		GexpressConfig.spyBugCost = spyBugCost;
 		GexpressConfig.spyBugDurationSeconds = spyBugDurationSeconds;
 		GexpressConfig.spyBugRange = spyBugRange;
@@ -2099,16 +2320,19 @@ public final class GexpressConfig {
 		GexpressConfig.copycatCopyCooldownSeconds = copycatCopyCooldownSeconds;
 		GexpressConfig.copycatCopyDurationSeconds = copycatCopyDurationSeconds;
 		GexpressConfig.copycatCopyRange = copycatCopyRange;
-		GexpressConfig.cupidRequiredAlivePairs = cupidRequiredAlivePairs;
+		GexpressConfig.cupidLovePercentage = cupidLovePercentage;
 		GexpressConfig.cupidPairCooldownSeconds = cupidPairCooldownSeconds;
 		GexpressConfig.cupidRange = cupidRange;
 		GexpressConfig.loversShowPartnerHud = loversShowPartnerHud;
 		GexpressConfig.loversAllowMixedSidePairs = loversAllowMixedSidePairs;
+		GexpressConfig.loversIndependentWin = loversIndependentWin;
 		GexpressConfig.covenantBiteCooldownSeconds = covenantBiteCooldownSeconds;
 		GexpressConfig.vengefulSpiritReviveDelaySeconds = vengefulSpiritReviveDelaySeconds;
 		GexpressConfig.vengefulSpiritRevengeSeconds = vengefulSpiritRevengeSeconds;
 		GexpressConfig.lastDeathShieldEnabled = lastDeathShieldEnabled;
 		GexpressConfig.guardianAngelAllowNonInnocents = guardianAngelAllowNonInnocents;
+		GexpressConfig.lastStandEnabled = lastStandEnabled;
+		GexpressConfig.itemPickupPolicy = itemPickupPolicy;
 		GexpressConfig.useCustomRoleCounts = useCustomRoleCounts;
 		GexpressConfig.maxKillerAmount = maxKillerAmount;
 		GexpressConfig.maxVigilanteAmount = maxVigilanteAmount;
@@ -2243,7 +2467,9 @@ public final class GexpressConfig {
 		trackerRange = getTrackerRange();
 		trackerCooldownSeconds = getTrackerCooldownSeconds();
 		seerCompareCooldownSeconds = getSeerCompareCooldownSeconds();
+		seerCompareDeathsRequired = getSeerCompareDeathsRequired();
 		seerCompareRange = getSeerCompareRange();
+		twinsSwapCooldownSeconds = getTwinsSwapCooldownSeconds();
 		altruistRange = getAltruistRange();
 		bountyHunterBountyIntervalSeconds = getBountyHunterBountyIntervalSeconds();
 		bountyHunterRewardGold = getBountyHunterRewardGold();
@@ -2252,6 +2478,13 @@ public final class GexpressConfig {
 		skincrawlerCooldownSeconds = getSkincrawlerCooldownSeconds();
 		skincrawlerStunSeconds = getSkincrawlerStunSeconds();
 		skincrawlerRange = getSkincrawlerRange();
+		painterPaintDurationSeconds = getPainterPaintDurationSeconds();
+		painterBodyCooldownSeconds = getPainterBodyCooldownSeconds();
+		painterPlayerCooldownSeconds = getPainterPlayerCooldownSeconds();
+		painterDoorwayDurationSeconds = getPainterDoorwayDurationSeconds();
+		painterDoorwayCooldownSeconds = getPainterDoorwayCooldownSeconds();
+		painterMaxPaintedBodies = getPainterMaxPaintedBodies();
+		painterMaxPaintedPlayers = getPainterMaxPaintedPlayers();
 		spyBugCost = getSpyBugCost();
 		spyBugDurationSeconds = getSpyBugDurationSeconds();
 		spyBugRange = getSpyBugRange();
@@ -2280,12 +2513,13 @@ public final class GexpressConfig {
 		copycatCopyCooldownSeconds = getCopycatCopyCooldownSeconds();
 		copycatCopyDurationSeconds = getCopycatCopyDurationSeconds();
 		copycatCopyRange = getCopycatCopyRange();
-		cupidRequiredAlivePairs = getCupidRequiredAlivePairs();
+		cupidLovePercentage = getCupidLovePercentage();
 		cupidPairCooldownSeconds = getCupidPairCooldownSeconds();
 		cupidRange = getCupidRange();
 		covenantBiteCooldownSeconds = getCovenantBiteCooldownSeconds();
 		vengefulSpiritReviveDelaySeconds = getVengefulSpiritReviveDelaySeconds();
 		vengefulSpiritRevengeSeconds = getVengefulSpiritRevengeSeconds();
+		itemPickupPolicy = getItemPickupPolicyId();
 		bugReportDiscordEndpoint = getBugReportDiscordEndpoint();
 		bugReportDiscordSecret = getBugReportDiscordSecret();
 		maxKillerAmount = getMaxKillerAmount();
@@ -2615,7 +2849,18 @@ public final class GexpressConfig {
 		}
 	}
 
+	private static boolean migrateSnapshot(Snapshot snap, int sourceVersion) {
+		boolean changed = sourceVersion != CURRENT_CONFIG_VERSION;
+		if (sourceVersion < 2 && snap.spyBugCost == 200) {
+			snap.spyBugCost = 100;
+			changed = true;
+		}
+		snap.configVersion = CURRENT_CONFIG_VERSION;
+		return changed;
+	}
+
 	private static final class Snapshot {
+		int configVersion = 0;
 		int c4Price = 500;
 		int c4FuseSeconds = 15;
 		int c4FirstBeepSeconds = 3;
@@ -2659,7 +2904,7 @@ public final class GexpressConfig {
 		int puppetmasterControlCooldownSeconds = 45;
 		boolean puppetmasterRandomTarget = false;
 		boolean puppetmasterCanKillOwnBody = false;
-		int puppetmasterControlRange = 16;
+		int puppetmasterControlRange = 4;
 		int puppetmasterMaxUses = 3;
 		int pelicanEatCooldownSeconds = 20;
 		int pelicanEatPercentage = 80;
@@ -2670,7 +2915,7 @@ public final class GexpressConfig {
 		int conversationTaskDurationSeconds = 8;
 		int conversationTaskRadiusBlocks = 3;
 		int conversationTaskVerticalToleranceBlocks = 1;
-		int snitchTasksRequired = 3;
+		int snitchTasksRequired = 6;
 		int snitchWarningTasksRemaining = 1;
 		int timeMasterRewindSeconds = 10;
 		int timeMasterCooldownSeconds = 120;
@@ -2678,13 +2923,16 @@ public final class GexpressConfig {
 		int timeMasterFreezeDurationSeconds = 4;
 		int timeMasterFreezeCooldownSeconds = 30;
 		int timeMasterFreezeMaxUses = 3;
-		int timeMasterFreezeRange = 8;
+		int timeMasterFreezeRange = 4;
 		int scatterBrainCooldownSeconds = 60;
 		int trackerMaxTargets = 3;
-		int trackerRange = 24;
+		int trackerRange = 4;
 		int trackerCooldownSeconds = 10;
 		int seerCompareCooldownSeconds = 45;
+		int seerCompareDeathsRequired = 3;
 		int seerCompareRange = 4;
+		int twinsSwapCooldownSeconds = 20;
+		boolean twinsBodyDifferentRole = false;
 		int altruistRange = 4;
 		int bountyHunterBountyIntervalSeconds = 60;
 		int bountyHunterRewardGold = 200;
@@ -2693,9 +2941,16 @@ public final class GexpressConfig {
 		int skincrawlerCooldownSeconds = 90;
 		int skincrawlerStunSeconds = 5;
 		int skincrawlerRange = 4;
+		int painterPaintDurationSeconds = 60;
+		int painterBodyCooldownSeconds = 30;
+		int painterPlayerCooldownSeconds = 30;
+		int painterDoorwayDurationSeconds = 10;
+		int painterDoorwayCooldownSeconds = 30;
+		int painterMaxPaintedBodies = 1;
+		int painterMaxPaintedPlayers = 1;
 		int spyBugCost = 100;
 		int spyBugDurationSeconds = 120;
-		int spyBugRange = 16;
+		int spyBugRange = 4;
 		int squeakerPitchPercent = 135;
 		int masqueradePitchMinPercent = 80;
 		int masqueradePitchMaxPercent = 145;
@@ -2708,7 +2963,7 @@ public final class GexpressConfig {
 		int godfatherStartingGold = 100;
 		int mafiosoStartingGold = 100;
 		int janitorStartingGold = 100;
-		int mafiaRecruitRange = 16;
+		int mafiaRecruitRange = 4;
 		int mafiaReplacementCooldownSeconds = 120;
 		int mafiaRevolverKillCooldownSeconds = 60;
 		int janitorCleanRange = 4;
@@ -2720,17 +2975,21 @@ public final class GexpressConfig {
 		int pickpocketRange = 4;
 		int copycatCopyCooldownSeconds = 45;
 		int copycatCopyDurationSeconds = 120;
-		int copycatCopyRange = 16;
+		int copycatCopyRange = 4;
 		int cupidRequiredAlivePairs = 3;
+		int cupidLovePercentage = 75;
 		int cupidPairCooldownSeconds = 20;
 		int cupidRange = 4;
 		boolean loversShowPartnerHud = true;
 		boolean loversAllowMixedSidePairs = false;
+		boolean loversIndependentWin = false;
 		int covenantBiteCooldownSeconds = 15;
 		int vengefulSpiritReviveDelaySeconds = 15;
 		int vengefulSpiritRevengeSeconds = 30;
 		boolean lastDeathShieldEnabled = false;
 		boolean guardianAngelAllowNonInnocents = false;
+		boolean lastStandEnabled = false;
+		String itemPickupPolicy = ItemPickupPolicy.CIVILIANS_NEUTRALS_KILLERS.id();
 		boolean bodyguardProtectOnlyCivilians = true;
 		boolean useCustomRoleCounts = true;
 		int maxKillerAmount = 64;
@@ -2768,6 +3027,7 @@ public final class GexpressConfig {
 		int abilityHudOffsetX = 0;
 		int abilityHudOffsetY = 0;
 		boolean use3dGunSkins = true;
+		boolean alwaysMuted = false;
 		int levelRoundXp = 25;
 		int levelWinXp = 25;
 		int levelNeutralWinBonusXp = 25;

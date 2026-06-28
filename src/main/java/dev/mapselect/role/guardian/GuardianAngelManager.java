@@ -7,10 +7,11 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.GuardianAngelShieldStatePayload;
-import dev.mapselect.network.GuardianAngelShieldUsePayload;
+import dev.mapselect.network.role.guardian.GuardianAngelShieldStatePayload;
+import dev.mapselect.network.role.guardian.GuardianAngelShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
+import dev.mapselect.role.ExternalRoleCompat;
 import dev.mapselect.role.pelican.PelicanManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -111,6 +112,10 @@ public final class GuardianAngelManager {
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (!(victim instanceof ServerPlayerEntity player)) return true;
+		if (ExternalRoleCompat.isVoodooDeath(reason)) {
+			removeShield(player.getUuid(), player.getServerWorld());
+			return true;
+		}
 		Long until = shieldUntilByTarget.get(player.getUuid());
 		if (until == null || player.getWorld().getTime() >= until) {
 			shieldUntilByTarget.remove(player.getUuid());

@@ -1,10 +1,10 @@
 package dev.mapselect.mixin.client;
 
 import dev.doctor4t.wathe.client.gui.RoleNameRenderer;
-import dev.mapselect.client.ClientPuppetmasterState;
-import dev.mapselect.client.ClientSpectatorRoleRevealDelay;
-import dev.mapselect.client.ClientSilentShadowState;
-import dev.mapselect.client.ClientVultureState;
+import dev.mapselect.client.role.puppetmaster.ClientPuppetmasterState;
+import dev.mapselect.client.game.ClientSpectatorRoleRevealDelay;
+import dev.mapselect.client.role.silent.ClientSilentShadowState;
+import dev.mapselect.client.role.pelican.ClientVultureState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;

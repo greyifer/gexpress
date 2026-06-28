@@ -1,3 +1,70 @@
+# Grey's Express 1.7.3
+
+## Added
+
+- Added editable three-line floating text blocks for map builders.
+- Added room-name labels to Wathe doors after a named key is assigned to them.
+- Added a two-point Red Ribbon placement tool for creating purchasable barriers between two clicked positions.
+- Added an in-game skin editor for renaming imported gun and knife skins and adjusting every display position with a live preview.
+- Added an Axiom-powered tutorial room editor with movable markers for player, weapon, and target placement.
+
+## Changed
+
+- Replaced the old Coin Barrier appearance with one continuous lead-style ceremonial Red Ribbon between two clicked endpoints while preserving its prices, labels, collision, and purchase behavior.
+- Reworked the 3D model placement controls into clear move and rotate axes.
+- Reworked the tag, level reward, and case editors to stay readable and scroll correctly at different GUI scales.
+- Tutorial targets are now player-shaped living passengers instead of armor stands, and Escape opens a proper leave option.
+- Importing or editing skins now refreshes only weapon models and textures without starting a global resource reload.
+
+## Fixed
+
+- Fixed KinsWathe's stamina bar starting from the wrong capacity for roles with additional stamina.
+- Vengeful Spirit now revives at the death position when it is supported, or on the closest solid floor directly below it when it is in midair.
+- Renaming an imported skin now updates its displayed name everywhere while preserving its command ID, unlocks, equipped state, and case rewards.
+- Fixed imported 32x32 Blockbench textures using incorrect UV coordinates in Minecraft.
+- Fixed overlapping controls in the Skin Model Editor and added the existing built-in gun and knife skins to its lists.
+- Fixed skin imports and edits showing any loading screen; edits apply only after pressing Apply Now.
+
+# Grey's Express 1.7.0
+
+## Added
+
+- Added an optional Lovers mode where each pair forms its own team and can only win with their own partner.
+- Added an Import Skins tool to the Dev tab for Blockbench files that opens the skin folder, reloads models, and updates skin menus, cases, and commands.
+- Added automatic map and play-area calculation with static terrain, moving terrain, full-map, and train modes.
+- Added a tertiary ability keybind, defaulting to V, that lets Copycat cancel an active copied ability.
+- Added an Always Muted preference for players who want the Muted modifier every round.
+
+## Changed
+
+- Cupid's win requirement is now based on the percentage of non-Cupid players linked as lovers.
+- Copycat now keeps copied ability items visible until the ability expires or is cancelled, and receives items required by copied item-based abilities.
+- Removed the extra Copycat cooldown that started after a copied ability ended.
+- Changed dead players to enter dead spectator voice group one on each new death instead of reusing their previous group.
+- Lovers now learn their partner immediately.
+- Reduced the targeting range of Copycat, Godfather recruitment, Puppetmaster, Spy, Time Master Freeze, and Tracker to four blocks.
+- Snitch now needs six completed tasks before revealing the killers.
+
+## Fixed
+
+- Fixed Blockbench skin imports rejecting valid gun filenames, generating invalid cube rotations and texture references, and collapsing multiple textures into one file.
+- Fixed G'Express role abilities using a separate 30-second preparation lock instead of KinsWathe's configured Safe Preparation timer.
+- Fixed a startup crash caused by preparing imported skin resources before Minecraft finished initializing its client options.
+- Fixed recent bug reports not displaying correctly at 1x and 2x GUI scale, and restricted moderation actions to authorized staff and server operators.
+- Fixed Vengeful Spirit failing to respawn after Copycat, Silent Shadow, Shadow March, or Psycho-related kills.
+- Fixed Family Instinct highlighting non-Mafia players instead of only the local Mafia family.
+- Fixed Dracula's Bat Form model disappearing and added reliable flight movement while transformed.
+- Fixed Noelle's Roles Voodoo deaths being blocked by Silent, Guardian Angel, or Puppetmaster protection.
+- Fixed Harlequin Masquerade names remaining disguised in the player list after Masquerade ended.
+- Fixed Muted players being unable to buy notes when their role already provides a shop.
+- Fixed Pelican swallowing a lover killing their partner or breaking the pair.
+- Fixed Lovers wins being shared with unrelated lover pairs in independent-pair mode.
+- Fixed player-target ability highlighting disagreeing with the server near the edge of targeting range.
+- Fixed copied Seer abilities not being accepted by the server.
+- Fixed lover soul-link deaths affecting players outside the actual connected pair.
+- Fixed Altruist revives for Lovers, Muted players, Cupid, and Time Master state.
+- Revived Cupid now has 30 seconds to create a new pair when no lovers remain.
+
 # Grey's Express 1.6.7
 
 ## Added

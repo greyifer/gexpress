@@ -8,7 +8,7 @@ import dev.isxander.yacl3.gui.YACLScreen;
 import dev.isxander.yacl3.gui.tab.TabExt;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.level.LevelComponent;
-import dev.mapselect.network.ClaimLevelRewardPayload;
+import dev.mapselect.network.progression.ClaimLevelRewardPayload;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;

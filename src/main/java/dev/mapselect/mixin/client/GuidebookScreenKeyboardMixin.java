@@ -2,7 +2,7 @@ package dev.mapselect.mixin.client;
 
 import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
 import cat.rezelyn.watheextended.client.screen.guidebook.GuidebookEntry;
-import dev.mapselect.client.ClientAbilityKeys;
+import dev.mapselect.client.input.ClientAbilityKeys;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

@@ -41,7 +41,7 @@ import java.util.function.IntConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-@SuppressWarnings("deprecation")
+@SuppressWarnings({"deprecation", "unused"})
 public final class GexpressDevCategory {
 	private GexpressDevCategory() {}
 
@@ -187,7 +187,11 @@ public final class GexpressDevCategory {
 					() -> MinecraftClient.getInstance().setScreen(new GexpressLevelRewardEditorScreen(parent))),
 				new ToolTile("Case Editor", "Tune G'Express case prices and weighted skin drops.", 0xFFE0B65A,
 					() -> MinecraftClient.getInstance().setScreen(new GexpressCaseEditorScreen(parent))),
-				new ToolTile("Tutorial Editor", "Edit first-run tutorial pages.", 0xFF9AE66E,
+				new ToolTile("Import Skins", "Open the skin folder and apply models without a loading screen.", 0xFFFF8FCB,
+					() -> MinecraftClient.getInstance().setScreen(new GexpressSkinImportScreen(parent))),
+				new ToolTile("Skin Model Editor", "Rename imported skins and tune their display transforms.", 0xFFFFA6D5,
+					() -> MinecraftClient.getInstance().setScreen(new GexpressSkinEditorScreen(parent))),
+				new ToolTile("Tutorial Room Editor", "Build, place, save, and test the 3D tutorial room.", 0xFF9AE66E,
 					() -> MinecraftClient.getInstance().setScreen(new GexpressTutorialEditorScreen(parent))),
 				new ToolTile("Copy Model Defaults", "Copy current model values for code defaults.", 0xFFB8A7FF,
 					GexpressDevCategory::copyModelDefaultsToClipboard)
@@ -325,10 +329,12 @@ public final class GexpressDevCategory {
 		}
 
 		private int drawMapToolsCard(DrawContext context, TextRenderer tr, int x, int y, int w, int mouseX, int mouseY) {
-			int h = 86;
-			drawCard(context, tr, "Grenade Trace Blocks", "Use the block you are looking at as a pass-through block for grenade wall checks.", x, y, w, h);
+			int h = 122;
+			drawCard(context, tr, "Map Tools", "Grenade trace blocks and Painter doorway test helpers.", x, y, w, h);
 			int buttonX = x + 12;
 			int buttonY = y + 40;
+			context.drawTextWithShadow(tr, Text.literal("Grenade trace blocks").formatted(Formatting.GRAY),
+				buttonX, buttonY - 12, 0xFF9EACB9);
 			drawButton(context, tr, "Add Looked Block", buttonX, buttonY, 126, mouseX, mouseY,
 				() -> addLookedBlockToGrenadePassThrough(MinecraftClient.getInstance()));
 			drawButton(context, tr, "Clear List", buttonX + 134, buttonY, 82, mouseX, mouseY,
@@ -339,6 +345,13 @@ public final class GexpressDevCategory {
 			String count = GexpressConfig.getGrenadeLineOfSightPassThroughBlockStrings().size() + " configured";
 			context.drawTextWithShadow(tr, Text.literal(count).formatted(Formatting.GRAY), x + w - 18 - tr.getWidth(count),
 				buttonY + 5, 0xFF9EACB9);
+			int doorwayY = buttonY + 40;
+			context.drawTextWithShadow(tr, Text.literal("Painter doorways").formatted(Formatting.GRAY),
+				buttonX, doorwayY - 12, 0xFF9EACB9);
+			drawButton(context, tr, "Toggle Looked Door", buttonX, doorwayY, 126, mouseX, mouseY,
+				() -> sendCommand("g admin painterdoor toggle"));
+			drawButton(context, tr, "Clear Disabled", buttonX + 134, doorwayY, 106, mouseX, mouseY,
+				() -> sendCommand("g admin painterdoor clear"));
 			return y + h;
 		}
 
@@ -462,6 +475,13 @@ public final class GexpressDevCategory {
 		if (client.player != null) {
 			client.player.sendMessage(Text.literal("Added " + id + " to grenade pass-through blocks.")
 				.formatted(Formatting.GREEN), true);
+		}
+	}
+
+	private static void sendCommand(String command) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client != null && client.player != null && client.player.networkHandler != null) {
+			client.player.networkHandler.sendChatCommand(command);
 		}
 	}
 

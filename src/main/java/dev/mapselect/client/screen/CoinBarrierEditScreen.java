@@ -1,7 +1,7 @@
 package dev.mapselect.client.screen;
 
 import dev.mapselect.block.CoinBarrierBlockEntity;
-import dev.mapselect.network.CoinBarrierEditSavePayload;
+import dev.mapselect.network.coinbarrier.CoinBarrierEditSavePayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -22,7 +22,7 @@ public final class CoinBarrierEditScreen extends Screen {
 	private TextFieldWidget priceField;
 
 	public CoinBarrierEditScreen(Screen parent, BlockPos pos, int price, String title) {
-		super(Text.literal("Coin Barrier"));
+		super(Text.literal("Red Ribbon"));
 		this.parent = parent;
 		this.pos = pos;
 		this.price = price;

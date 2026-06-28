@@ -31,6 +31,7 @@ public abstract class ShopScreenMixin {
 		remap = false
 	)
 	private boolean gexpress$customShopRolesCanSeeShop(GameWorldComponent game, PlayerEntity player) {
+		if (GexpressRoleShop.usesExternalMutedNoteWidget(player)) return false;
 		return game.canUseKillerFeatures(player) || GexpressRoleShop.canUseKillerEconomy(player);
 	}
 

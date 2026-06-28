@@ -1,7 +1,7 @@
 package dev.mapselect.item;
 
 import dev.mapselect.MapSelect;
-import dev.mapselect.client.GexpressCaseItemRenderer;
+import dev.mapselect.client.render.GexpressCaseItemRenderer;
 import net.minecraft.client.render.item.BuiltinModelItemRenderer;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;

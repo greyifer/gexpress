@@ -7,13 +7,15 @@ import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
+import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.mapselect.network.AbilityCooldownPayload;
-import dev.mapselect.network.AbilityCooldownSync;
-import dev.mapselect.network.CopycatActionPayload;
-import dev.mapselect.network.CopycatStatePayload;
-import dev.mapselect.network.CopycatStatePayload.StoredAbility;
+import dev.mapselect.network.ability.AbilityCooldownPayload;
+import dev.mapselect.network.ability.AbilityCooldownSync;
+import dev.mapselect.network.role.copycat.CopycatActionPayload;
+import dev.mapselect.network.role.copycat.CopycatStatePayload;
+import dev.mapselect.network.role.copycat.CopycatStatePayload.StoredAbility;
+import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
@@ -23,7 +25,13 @@ import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -41,10 +49,11 @@ import java.util.UUID;
 
 public final class CopycatManager {
 	private static final int MAX_STORED_ABILITIES = 3;
+	private static final String BORROWED_WEAPON_KEY = "gexpress_copycat_borrowed_weapon";
+	private static final String BORROWED_WEAPON_OWNER_KEY = "gexpress_copycat_borrowed_owner";
 	private static final Map<UUID, ActiveCopy> activeCopies = new HashMap<>();
 	private static final Map<UUID, List<StoredAbility>> storedCopies = new HashMap<>();
 	private static final Map<UUID, Integer> selectedCopies = new HashMap<>();
-	private static final Map<UUID, Long> cooldownUntil = new HashMap<>();
 	private static final Map<UUID, Set<Identifier>> copiedRoles = new HashMap<>();
 
 	private CopycatManager() {}
@@ -58,6 +67,7 @@ public final class CopycatManager {
 					case ACTIVATE_STORED -> activateStored(context.player(), payload.index());
 					case SELECT_STORED -> selectStored(context.player(), payload.index());
 					case STORE_TARGET -> tryStore(context.player(), payload.targetId());
+					case CANCEL_ACTIVE -> cancelActive(context.player());
 					case STORE -> tryStore(context.player());
 				}
 			}));
@@ -83,14 +93,6 @@ public final class CopycatManager {
 		List<StoredAbility> stored = storedCopies.computeIfAbsent(copycat.getUuid(), ignored -> new ArrayList<>());
 		if (stored.size() >= MAX_STORED_ABILITIES) {
 			copycat.sendMessage(Text.literal("You can only store 3 abilities. Open your inventory to choose one.")
-				.formatted(Formatting.GRAY), true);
-			return;
-		}
-		long remaining = cooldownRemaining(copycat);
-		if (remaining > 0L && !GexpressTestState.hasCreativeAbilityBypass(copycat)) {
-			AbilityCooldownSync.send(copycat, AbilityCooldownPayload.COPYCAT_COPY, remaining,
-				(long) GexpressConfig.getCopycatCopyCooldownSeconds() * 20L, false);
-			copycat.sendMessage(Text.literal("Copy ready in " + secondsCeil(remaining) + "s.")
 				.formatted(Formatting.GRAY), true);
 			return;
 		}
@@ -163,20 +165,30 @@ public final class CopycatManager {
 			return;
 		}
 		int index = clampIndex(requestedIndex >= 0 ? requestedIndex : selectedCopies.getOrDefault(copycat.getUuid(), 0), stored.size());
-		StoredAbility storedAbility = stored.remove(index);
+		StoredAbility storedAbility = stored.get(index);
 		Identifier storedRole = storedAbility.roleId();
-		if (stored.isEmpty()) {
-			storedCopies.remove(copycat.getUuid());
-			selectedCopies.remove(copycat.getUuid());
-		} else {
-			selectedCopies.put(copycat.getUuid(), clampIndex(index, stored.size()));
-		}
+		selectedCopies.put(copycat.getUuid(), index);
 		long duration = (long) GexpressConfig.getCopycatCopyDurationSeconds() * 20L;
-		activeCopies.put(copycat.getUuid(), new ActiveCopy(storedRole, world.getTime() + duration));
+		BorrowedWeapon borrowedWeapon = borrowedWeaponForRole(storedRole);
+		activeCopies.put(copycat.getUuid(), new ActiveCopy(storedRole, world.getTime() + duration, index,
+			borrowedWeapon, false));
+		grantBorrowedWeapon(copycat, borrowedWeapon);
+		grantBorrowedShopItem(copycat, storedRole);
 		syncState(copycat, storedRole, duration);
 		AbilityCooldownSync.send(copycat, AbilityCooldownPayload.COPYCAT_COPY, duration, duration, true);
 		copycat.sendMessage(Text.literal("Activated stored ability for "
 			+ GexpressConfig.getCopycatCopyDurationSeconds() + "s.").formatted(Formatting.LIGHT_PURPLE), true);
+	}
+
+	private static void cancelActive(ServerPlayerEntity copycat) {
+		if (copycat == null || !(copycat.getWorld() instanceof ServerWorld)) return;
+		ActiveCopy copy = activeCopies.remove(copycat.getUuid());
+		if (copy == null) return;
+		removeBorrowedWeapon(copycat, copy.borrowedWeapon());
+		consumeStoredAbility(copycat.getUuid(), copy.storedIndex());
+		syncState(copycat, null, 0L);
+		AbilityCooldownSync.clear(copycat, AbilityCooldownPayload.COPYCAT_COPY);
+		copycat.sendMessage(Text.literal("Cancelled copied ability.").formatted(Formatting.GRAY), true);
 	}
 
 	private static void tick(ServerWorld world) {
@@ -184,19 +196,18 @@ public final class CopycatManager {
 		long now = world.getTime();
 		for (UUID playerId : Set.copyOf(activeCopies.keySet())) {
 			ActiveCopy copy = activeCopies.get(playerId);
-			if (copy == null || now < copy.untilTick()) continue;
 			ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(playerId);
-			activeCopies.remove(playerId);
-			if (player == null || player.getWorld() != world) continue;
-			syncState(player, null, 0L);
-			long cooldown = (long) GexpressConfig.getCopycatCopyCooldownSeconds() * 20L;
-			if (cooldown > 0L && !GexpressTestState.hasCreativeAbilityBypass(player)) {
-				cooldownUntil.put(playerId, now + cooldown);
-				AbilityCooldownSync.send(player, AbilityCooldownPayload.COPYCAT_COPY, cooldown, cooldown, false);
-			} else {
-				cooldownUntil.remove(playerId);
-				AbilityCooldownSync.clear(player, AbilityCooldownPayload.COPYCAT_COPY);
+			if (copy == null) continue;
+			if (now < copy.untilTick()) {
+				if (player != null && player.getWorld() == world) tickBorrowedWeapon(player, playerId, copy);
+				continue;
 			}
+			activeCopies.remove(playerId);
+			consumeStoredAbility(playerId, copy.storedIndex());
+			if (player == null || player.getWorld() != world) continue;
+			removeBorrowedWeapon(player, copy.borrowedWeapon());
+			syncState(player, null, 0L);
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.COPYCAT_COPY);
 			player.sendMessage(Text.literal("Your copied ability faded.").formatted(Formatting.GRAY), true);
 		}
 	}
@@ -205,7 +216,7 @@ public final class CopycatManager {
 		if (player == null) return false;
 		if (!player.getWorld().isClient) return activeCopies.containsKey(player.getUuid());
 		try {
-			Class<?> state = Class.forName("dev.mapselect.client.ClientCopycatState");
+			Class<?> state = Class.forName("dev.mapselect.client.role.copycat.ClientCopycatState");
 			return Boolean.TRUE.equals(state.getMethod("isBorrowingAbility").invoke(null));
 		} catch (Throwable ignored) {
 			return false;
@@ -221,7 +232,7 @@ public final class CopycatManager {
 			return now >= copy.untilTick() ? null : copy.copiedRole();
 		}
 		try {
-			Class<?> state = Class.forName("dev.mapselect.client.ClientCopycatState");
+			Class<?> state = Class.forName("dev.mapselect.client.role.copycat.ClientCopycatState");
 			Object value = state.getMethod("copiedRoleId").invoke(null);
 			return value instanceof Identifier id ? id : null;
 		} catch (Throwable ignored) {
@@ -270,8 +281,8 @@ public final class CopycatManager {
 				|| MapSelectRoles.BURGLAR_ID.equals(roleId)) {
 			return false;
 		}
-		if (WatheRoles.KILLER.identifier().equals(roleId) || WatheRoles.CIVILIAN.identifier().equals(roleId)
-				|| WatheRoles.VIGILANTE.identifier().equals(roleId) || WatheRoles.LOOSE_END.identifier().equals(roleId)
+		if (WatheRoles.CIVILIAN.identifier().equals(roleId)
+				|| WatheRoles.LOOSE_END.identifier().equals(roleId)
 				|| WatheRoles.DISCOVERY_CIVILIAN.identifier().equals(roleId)) {
 			return false;
 		}
@@ -294,17 +305,6 @@ public final class CopycatManager {
 			|| GexpressTestState.isRoleTester(player);
 	}
 
-	private static long cooldownRemaining(ServerPlayerEntity player) {
-		Long until = cooldownUntil.get(player.getUuid());
-		if (until == null) return 0L;
-		long remaining = until - player.getWorld().getTime();
-		if (remaining <= 0L) {
-			cooldownUntil.remove(player.getUuid());
-			return 0L;
-		}
-		return remaining;
-	}
-
 	private static void syncState(ServerPlayerEntity player, Identifier roleId, long remainingTicks) {
 		if (player != null && ServerPlayNetworking.canSend(player, CopycatStatePayload.ID)) {
 			List<StoredAbility> stored = storedCopies.getOrDefault(player.getUuid(), List.of());
@@ -313,21 +313,115 @@ public final class CopycatManager {
 		}
 	}
 
-	private static void syncClear(ServerPlayerEntity player) {
-		if (player != null && ServerPlayNetworking.canSend(player, CopycatStatePayload.ID)) {
-			ServerPlayNetworking.send(player, CopycatStatePayload.clear());
+	private static void consumeStoredAbility(UUID playerId, int index) {
+		if (playerId == null) return;
+		List<StoredAbility> stored = storedCopies.get(playerId);
+		if (stored == null || stored.isEmpty()) {
+			selectedCopies.remove(playerId);
+			return;
+		}
+		if (index >= 0 && index < stored.size()) stored.remove(index);
+		if (stored.isEmpty()) {
+			storedCopies.remove(playerId);
+			selectedCopies.remove(playerId);
+		} else {
+			selectedCopies.put(playerId, clampIndex(index, stored.size()));
 		}
 	}
 
-	private static long secondsCeil(long ticks) {
-		return Math.max(1L, (ticks + 19L) / 20L);
+	private static void grantBorrowedShopItem(ServerPlayerEntity copycat, Identifier roleId) {
+		ItemStack stack = borrowedShopItem(roleId);
+		if (copycat == null || stack.isEmpty()) return;
+		ItemStack grant = stack.copy();
+		if (!copycat.giveItemStack(grant)) copycat.dropItem(grant, false);
+		copycat.sendMessage(Text.literal("Borrowed shop item: " + stack.getName().getString() + ".")
+			.formatted(Formatting.LIGHT_PURPLE), true);
+	}
+
+	private static BorrowedWeapon borrowedWeaponForRole(Identifier roleId) {
+		if (WatheRoles.KILLER.identifier().equals(roleId)) return BorrowedWeapon.KNIFE;
+		if (WatheRoles.VIGILANTE.identifier().equals(roleId)) return BorrowedWeapon.REVOLVER;
+		return BorrowedWeapon.NONE;
+	}
+
+	private static void grantBorrowedWeapon(ServerPlayerEntity copycat, BorrowedWeapon weapon) {
+		if (copycat == null || weapon == BorrowedWeapon.NONE) return;
+		ItemStack stack = weapon.stack();
+		NbtCompound tag = new NbtCompound();
+		tag.putString(BORROWED_WEAPON_KEY, weapon.id);
+		tag.putString(BORROWED_WEAPON_OWNER_KEY, copycat.getUuidAsString());
+		stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(tag));
+		if (!copycat.giveItemStack(stack)) copycat.dropItem(stack, false);
+		copycat.playerScreenHandler.syncState();
+		copycat.sendMessage(Text.literal("Borrowed weapon: " + stack.getName().getString() + ".")
+			.formatted(Formatting.LIGHT_PURPLE), true);
+	}
+
+	private static void tickBorrowedWeapon(ServerPlayerEntity player, UUID playerId, ActiveCopy copy) {
+		if (copy.borrowedWeapon() != BorrowedWeapon.REVOLVER || copy.borrowedRevolverSpent()) return;
+		if (!player.getItemCooldownManager().isCoolingDown(WatheItems.REVOLVER)) return;
+		removeBorrowedWeapon(player, BorrowedWeapon.REVOLVER);
+		activeCopies.put(playerId, copy.withBorrowedRevolverSpent());
+		player.sendMessage(Text.literal("Borrowed vigilante revolver spent.").formatted(Formatting.GRAY), true);
+	}
+
+	private static void removeBorrowedWeapon(ServerPlayerEntity player, BorrowedWeapon weapon) {
+		if (player == null || weapon == BorrowedWeapon.NONE) return;
+		boolean changed = false;
+		for (int slot = 0; slot < player.getInventory().size(); slot++) {
+			if (!isBorrowedWeapon(player, player.getInventory().getStack(slot), weapon)) continue;
+			player.getInventory().setStack(slot, ItemStack.EMPTY);
+			changed = true;
+		}
+		if (changed) player.playerScreenHandler.syncState();
+	}
+
+	private static boolean isBorrowedWeapon(ServerPlayerEntity player, ItemStack stack, BorrowedWeapon weapon) {
+		if (stack == null || stack.isEmpty() || weapon == BorrowedWeapon.NONE || !stack.isOf(weapon.item)) return false;
+		NbtComponent customData = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
+		NbtCompound tag = customData.copyNbt();
+		return weapon.id.equals(tag.getString(BORROWED_WEAPON_KEY))
+			&& player.getUuidAsString().equals(tag.getString(BORROWED_WEAPON_OWNER_KEY));
+	}
+
+	private static ItemStack borrowedShopItem(Identifier roleId) {
+		if (roleId == null) return ItemStack.EMPTY;
+		if (MapSelectRoles.BOMB_SPECIALIST_ID.equals(roleId)) return new ItemStack(MapSelectItems.C4);
+		String namespace = roleId.getNamespace();
+		String path = roleId.getPath();
+		if ("noellesroles".equals(namespace)) {
+			return switch (path) {
+				case "trapper" -> itemStack("noellesroles", "role_mine");
+				case "bartender" -> itemStack("noellesroles", "defense_vial");
+				case "noisemaker" -> WatheItems.FIRECRACKER.getDefaultStack();
+				default -> ItemStack.EMPTY;
+			};
+		}
+		if ("starexpress".equals(namespace) && "muzzler".equals(path)) return itemStack("starexpress", "tape");
+		if ("kinswathe".equals(namespace)) {
+			return switch (path) {
+				case "cook" -> itemStack("kinswathe", "pan");
+				case "drugmaker" -> itemStack("kinswathe", "poison_injector");
+				case "hunter" -> itemStack("kinswathe", "hunting_knife");
+				case "kidnapper" -> itemStack("kinswathe", "knockout_drug");
+				case "physician" -> itemStack("kinswathe", "pill");
+				case "technician" -> itemStack("kinswathe", "capture_device");
+				default -> ItemStack.EMPTY;
+			};
+		}
+		if ("stupid_express".equals(namespace) && "arsonist".equals(path)) return itemStack("stupid_express", "jerry_can");
+		return ItemStack.EMPTY;
+	}
+
+	private static ItemStack itemStack(String namespace, String path) {
+		Item item = Registries.ITEM.get(Identifier.of(namespace, path));
+		return item.getDefaultStack();
 	}
 
 	private static void clearAll() {
 		activeCopies.clear();
 		storedCopies.clear();
 		selectedCopies.clear();
-		cooldownUntil.clear();
 		copiedRoles.clear();
 	}
 
@@ -336,5 +430,28 @@ public final class CopycatManager {
 		return Math.max(0, Math.min(size - 1, index));
 	}
 
-	private record ActiveCopy(Identifier copiedRole, long untilTick) {}
+	private enum BorrowedWeapon {
+		NONE("", null),
+		KNIFE("knife", WatheItems.KNIFE),
+		REVOLVER("revolver", WatheItems.REVOLVER);
+
+		private final String id;
+		private final Item item;
+
+		BorrowedWeapon(String id, Item item) {
+			this.id = id;
+			this.item = item;
+		}
+
+		private ItemStack stack() {
+			return item == null ? ItemStack.EMPTY : item.getDefaultStack();
+		}
+	}
+
+	private record ActiveCopy(Identifier copiedRole, long untilTick, int storedIndex,
+			BorrowedWeapon borrowedWeapon, boolean borrowedRevolverSpent) {
+		private ActiveCopy withBorrowedRevolverSpent() {
+			return new ActiveCopy(copiedRole, untilTick, storedIndex, borrowedWeapon, true);
+		}
+	}
 }

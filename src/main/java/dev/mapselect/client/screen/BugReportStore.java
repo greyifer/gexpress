@@ -7,7 +7,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.mapselect.MapSelect;
-import dev.mapselect.network.BugReportSubmitPayload;
+import dev.mapselect.network.bugreport.BugReportActionPayload;
+import dev.mapselect.network.bugreport.BugReportListPayload;
+import dev.mapselect.network.bugreport.BugReportListRequestPayload;
+import dev.mapselect.network.bugreport.BugReportSubmitPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.Util;
@@ -40,6 +43,11 @@ public final class BugReportStore {
 	private static volatile List<GitHubIssue> githubIssues = List.of();
 	private static volatile String githubStatus = "Not loaded.";
 	private static volatile boolean githubRefreshing;
+	private static volatile List<RemoteReport> remoteReports = List.of();
+	private static volatile String remoteStatus = "Not loaded.";
+	private static volatile String remoteFilter = "all";
+	private static volatile boolean remoteRefreshing;
+	private static volatile boolean canModerateRemoteReports;
 
 	private BugReportStore() {}
 
@@ -61,6 +69,26 @@ public final class BugReportStore {
 
 	public static boolean isGithubRefreshing() {
 		return githubRefreshing;
+	}
+
+	public static List<RemoteReport> remoteReports() {
+		return remoteReports;
+	}
+
+	public static String remoteStatus() {
+		return remoteRefreshing ? "Refreshing..." : remoteStatus;
+	}
+
+	public static boolean isRemoteRefreshing() {
+		return remoteRefreshing;
+	}
+
+	public static String remoteFilter() {
+		return remoteFilter;
+	}
+
+	public static boolean canModerateRemoteReports() {
+		return canModerateRemoteReports;
 	}
 
 	public static List<BugReport> load() {
@@ -111,13 +139,81 @@ public final class BugReportStore {
 		if (ClientPlayNetworking.canSend(BugReportSubmitPayload.ID)) {
 			ClientPlayNetworking.send(new BugReportSubmitPayload(safeCategory.apiValue(), clean));
 			sent = true;
+			remoteStatus = "Report sent. Refresh to see the newest Discord copy.";
 		}
 		if (!sent) copyToClipboard("Send this report to staff:\n\n" + body);
 		notifyPlayer(sent
-			? "Bug report saved locally and sent to Discord."
-			: "Bug report saved locally and copied. Discord reporting is unavailable here.",
+			? "Bug report sent to Discord."
+			: "Discord reporting is unavailable here. Copied the report text.",
 			saved ? (sent ? net.minecraft.util.Formatting.GREEN : net.minecraft.util.Formatting.GOLD) : net.minecraft.util.Formatting.RED);
 		return new Submission(sent, "", body, saved, STORE_PATH.toString());
+	}
+
+	public static void refreshRemoteReports(String status) {
+		String safeStatus = normalizeStatus(status);
+		remoteFilter = safeStatus;
+		canModerateRemoteReports = false;
+		if (!ClientPlayNetworking.canSend(BugReportListRequestPayload.ID)) {
+			remoteRefreshing = false;
+			remoteStatus = "Join a server with the G'Express bot bridge to load Discord reports.";
+			return;
+		}
+		remoteRefreshing = true;
+		remoteStatus = "Refreshing...";
+		ClientPlayNetworking.send(new BugReportListRequestPayload(safeStatus));
+	}
+
+	public static void applyRemoteReports(BugReportListPayload payload) {
+		if (payload == null) return;
+		remoteFilter = normalizeStatus(payload.status());
+		canModerateRemoteReports = payload.canModerate();
+		List<RemoteReport> reports = new ArrayList<>();
+		for (BugReportListPayload.Entry entry : payload.reports()) {
+			reports.add(new RemoteReport(
+				entry.id(),
+				entry.status(),
+				categoryLabel(entry.category()),
+				entry.title(),
+				entry.description(),
+				entry.reporterName(),
+				entry.serverName(),
+				entry.modVersion(),
+				entry.minecraftVersion(),
+				entry.createdAt(),
+				entry.updatedAt(),
+				entry.discordUrl()
+			));
+		}
+		remoteReports = List.copyOf(reports);
+		remoteStatus = payload.statusMessage().isBlank()
+			? "Loaded " + reports.size() + " Discord report(s)."
+			: payload.statusMessage();
+		remoteRefreshing = false;
+	}
+
+	public static void requestRemoteAction(RemoteReport report, String action, String statusFilter) {
+		if (report == null || report.id().isBlank()) return;
+		if (!canModerateRemoteReports) {
+			notifyPlayer("You do not have permission to moderate bug reports.", net.minecraft.util.Formatting.RED);
+			return;
+		}
+		String safeAction = action == null ? "" : action.trim().toLowerCase();
+		if (!ClientPlayNetworking.canSend(BugReportActionPayload.ID)) {
+			notifyPlayer("This server cannot update Discord reports from the game.", net.minecraft.util.Formatting.GOLD);
+			return;
+		}
+		remoteStatus = "Updating " + report.id() + "...";
+		ClientPlayNetworking.send(new BugReportActionPayload(report.id(), safeAction, normalizeStatus(statusFilter)));
+	}
+
+	public static void openRemoteReport(RemoteReport report) {
+		if (report == null) return;
+		if (report.discordUrl() != null && !report.discordUrl().isBlank()) {
+			open(URI.create(report.discordUrl()));
+			return;
+		}
+		copyToClipboard(report.id() + " - " + report.title());
+		notifyPlayer("That report has no Discord URL yet, so its ID was copied.", net.minecraft.util.Formatting.GRAY);
 	}
 
 	public static Submission copyReportToClipboard(Category category, String message) {
@@ -127,8 +223,8 @@ public final class BugReportStore {
 		String body = reportBody(category, clean);
 		copyToClipboard("Send this report to staff:\n\n" + body);
 		notifyPlayer(saved
-			? "Bug report saved locally and copied to clipboard."
-			: "Bug report copied, but local saving failed. Check the log.", saved ? net.minecraft.util.Formatting.BLUE : net.minecraft.util.Formatting.GOLD);
+			? "Bug report text copied."
+			: "Bug report text copied. Local fallback failed.", saved ? net.minecraft.util.Formatting.BLUE : net.minecraft.util.Formatting.GOLD);
 		return new Submission(false, "", body, saved, STORE_PATH.toString());
 	}
 
@@ -207,6 +303,24 @@ public final class BugReportStore {
 	private static String authorName() {
 		MinecraftClient client = MinecraftClient.getInstance();
 		return client == null || client.player == null ? "Unknown" : client.player.getGameProfile().getName();
+	}
+
+	private static String normalizeStatus(String raw) {
+		String status = raw == null ? "" : raw.trim().toLowerCase();
+		return switch (status) {
+			case "open", "fixed", "duplicate", "deleted", "all" -> status;
+			default -> "all";
+		};
+	}
+
+	private static String categoryLabel(String raw) {
+		String value = raw == null ? "" : raw.trim();
+		return switch (value.toLowerCase()) {
+			case "role/modifier", "role_modifier", "role" -> "Role/Modifier";
+			case "map" -> "Map";
+			case "miscellaneous", "misc" -> "Miscellaneous";
+			default -> value.isBlank() ? "Miscellaneous" : value;
+		};
 	}
 
 	private static List<GitHubIssue> fetchGithubIssues() throws Exception {
@@ -330,6 +444,10 @@ public final class BugReportStore {
 	}
 
 	public record BugReport(String createdAt, String author, UUID authorId, Category category, String message) {}
+
+	public record RemoteReport(String id, String status, String category, String title, String description,
+			String reporterName, String serverName, String modVersion, String minecraftVersion,
+			String createdAt, String updatedAt, String discordUrl) {}
 
 	public record GitHubIssue(int number, String title, String body, String state, String url,
 			String updatedAt, List<String> labels) {}
