@@ -20,11 +20,15 @@ final class PainterImmersivePortalBridge {
 	private PainterImmersivePortalBridge() {}
 
 	static DoorwayPortalIds spawnDoorwayPortals(ServerWorld world, UUID painterId, Vec3d sourceCenter,
-			Direction sourceThrough, Vec3d destinationCenter, Direction destinationThrough) {
+			Direction sourceThrough, Vec3d destinationCenter, Direction destinationThrough,
+			Vec3d reverseDestinationCenter) {
 		UUID sourceId = spawnDoorwayPortal(world, painterId, sourceCenter, sourceThrough,
 			destinationCenter, destinationThrough, "source");
-		UUID reverseId = spawnDoorwayPortal(world, painterId, destinationCenter, destinationThrough,
-			sourceCenter, sourceThrough, "reverse");
+		Direction reverseSourceThrough = oppositeHorizontal(destinationThrough);
+		Direction reverseDestinationThrough = oppositeHorizontal(sourceThrough);
+		UUID reverseId = spawnDoorwayPortal(world, painterId, destinationCenter, reverseSourceThrough,
+			reverseDestinationCenter == null ? sourceCenter : reverseDestinationCenter,
+			reverseDestinationThrough, "reverse");
 		return new DoorwayPortalIds(sourceId, reverseId);
 	}
 

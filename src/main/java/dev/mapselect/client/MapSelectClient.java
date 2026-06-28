@@ -18,6 +18,7 @@ import dev.mapselect.client.modifier.shortsighted.ClientShortSightedState;
 import dev.mapselect.client.render.C4BackFeatureRenderer;
 import dev.mapselect.client.render.CoinBarrierBlockEntityRenderer;
 import dev.mapselect.client.render.ClientPainterDoorwayRenderer;
+import dev.mapselect.client.render.AxiomClientRefresh;
 import dev.mapselect.client.render.DevWeaponModels;
 import dev.mapselect.client.render.DoorKeyEngravingRenderer;
 import dev.mapselect.client.render.FusedOrnamentBlockEntityRenderer;
@@ -131,6 +132,7 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientTutorialExperience.register();
 		ClientMutedPreferenceState.register();
 		ClientRenderDistanceGuard.register();
+		AxiomClientRefresh.register();
 		ClientSpectatorRoleRevealDelay.register();
 		ClientSpectatorVoiceKeys.register();
 		ClientLevelHud.register();

@@ -311,7 +311,8 @@ public final class PainterManager {
 			PainterImmersivePortalBridge.spawnDoorwayPortals(world, painter.getUuid(),
 			immersivePortalSourceCenter(world, key, target.facing(), through), through,
 			immersivePortalDestinationCenter(destination),
-			destination.through());
+			destination.through(),
+			immersivePortalReturnDestinationCenter(key, target.facing(), through));
 		activeDoorways.put(key, new ActiveDoorway(painter.getUuid(), key, target.facing(), through,
 			destination.lowerPos(), destination.facing(), destination.through(), destination.destination(),
 			now + doorwayDurationTicks(), immersivePortalIds.sourceId(), immersivePortalIds.reverseId(),
@@ -1294,6 +1295,10 @@ public final class PainterManager {
 		return portalPlaneCenter(destination.lowerPos(), destination.facing(), destination.through());
 	}
 
+	private static Vec3d immersivePortalReturnDestinationCenter(BlockPos lower, Direction facing, Direction through) {
+		return portalPlaneCenter(lower, facing, through == null ? null : through.getOpposite());
+	}
+
 	private static Vec3d sourcePortalPlaneCenter(BlockPos lower, Direction facing, Direction through) {
 		return immersivePortalSourceCenter(lower, facing, through);
 	}
@@ -1319,10 +1324,12 @@ public final class PainterManager {
 		Vec3d sourceCenter = immersivePortalSourceCenter(world, doorway.lowerPos(), doorway.facing(), doorway.through());
 		Vec3d destinationCenter = portalPlaneCenter(doorway.destinationLowerPos(),
 			doorway.destinationFacing(), doorway.destinationThrough());
+		Vec3d reverseDestinationCenter = immersivePortalReturnDestinationCenter(doorway.lowerPos(),
+			doorway.facing(), doorway.through());
 		PainterImmersivePortalBridge.updateDoorwayPortal(world, doorway.sourceImmersivePortalId(),
 			sourceCenter, destinationCenter);
 		PainterImmersivePortalBridge.updateDoorwayPortal(world, doorway.reverseImmersivePortalId(),
-			destinationCenter, sourceCenter);
+			destinationCenter, reverseDestinationCenter);
 	}
 
 	private static float slideProgress(DoorBlockEntity door) {
