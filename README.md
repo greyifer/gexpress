@@ -215,13 +215,3 @@ G'Express is an addon for that ecosystem, not a replacement for it.
 ## License
 
 G'Express is licensed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
-
-Counterfeiter is a killer role with one forge per match. Forge choices are Master Key, Trapper Trap, Medical Kit, Pill and Pan, shown when their source mods are installed. The Master Key opens Wathe doors and breaks after three successful uses. The trap uses Trapper's normal collection and report behavior but gives exactly one truthful role for a captured player other than its owner; every other reported role is false. Medical Kits, Pills and Pans are inert props. Reconnecting does not reset the forge, and a full hotbar does not spend it. Revolver, Lockpick, Firecracker and Defense Vial are excluded.
-
-### Loki
-
-Loki is a killer with four abilities (default keys R, B, V and C). Approach and look at a living player to target them, as with Seer. Voices selects two distinct players and swaps where their Simple Voice Chat audio comes from for 120 seconds (45-second cooldown). Warp turns a target's view upside down, adds distortion through Veil and reverses controls for 60 seconds, with upward gravity for the first 30 seconds (30-second cooldown). Trickster's Fuse gives a nearby non-Loki player a 30-second fuse (60-second cooldown). Right-click another player to pass it without resetting its timer. You cannot pass directly back to your previous giver, or to Loki. When time runs out, Wathe's grenade explodes at the holder, using its normal nearby-player kills and protection hooks. Transfers trigger no pranks. Loki uses the shared cooldown bars and four custom 16-pixel HUD icons.
-
-Fourth Ability instantly puts you in control of a clone for up to 180 seconds (90-second cooldown). Its inventory is empty; item use, pickup and buying are blocked. Your original body stays vulnerable and keeps your inventory. Press Fourth Ability again to return early. Killing the clone leaves a corpse with your appearance exactly where it died and returns you to the original body. Expiry or voluntary return does not leave a corpse. All cooldowns start immediately on use; changing the fourth key is supported in Controls.
-
-Operators can use `/g replay off` to stop replay recording and playback, `/g replay on` to enable them again, and `/g replay status` to check the setting. The setting survives restarts. Turning replays off deletes all saved replays and partial recordings, and clears replay caches.
