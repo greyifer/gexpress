@@ -33,6 +33,9 @@ desktop.ini
 # Local dependency jars are resolved from Maven/Modrinth in Gradle.
 /libs/
 
+# Local administration tools
+/tools/
+
 # Local tests (existing tracked tests remain tracked)
 /src/test/
 
