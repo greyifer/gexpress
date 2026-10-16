@@ -4,16 +4,15 @@ import dev.mapselect.client.hud.ClientHudVisibility;
 import dev.mapselect.client.input.ClientAbilityKeys;
 import dev.mapselect.client.role.copycat.ClientCopycatState;
 import dev.mapselect.client.role.pelican.ClientVultureState;
-import dev.mapselect.client.screen.PuppetmasterTargetScreen;
-
-
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.client.gui.screen.ingame.LimitedInventoryScreen;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterInputPayload;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterHotbarPayload;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterStatePayload;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterTargetsPayload;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterUsePayload;
+import dev.mapselect.network.role.puppetmaster.PuppetmasterSelectPayload;
 import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -26,6 +25,7 @@ import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.input.Input;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
@@ -33,6 +33,7 @@ import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 
@@ -61,19 +62,18 @@ public final class ClientPuppetmasterState {
 	private static float controllerBodyYaw;
 	private static float controllerBodyPitch;
 	private static boolean wasAbilityDown;
+	private static boolean wasUseDown;
 	private static int targetRefreshTicks;
+	private static boolean targetMenuRequested;
+	private static boolean targetMenuOpen;
+	private static int targetRequestTicks;
+	private static List<PuppetmasterTargetsPayload.Entry> targetChoices = List.of();
 
 	private ClientPuppetmasterState() {}
 
 	public static void register() {
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterTargetsPayload.ID, (payload, context) ->
-			context.client().execute(() -> {
-				if (context.client().currentScreen instanceof PuppetmasterTargetScreen screen) {
-					screen.updateTargets(payload.targets());
-				} else {
-					context.client().setScreen(new PuppetmasterTargetScreen(payload.targets()));
-				}
-			}));
+			context.client().execute(() -> applyTargets(context.client(), payload)));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterStatePayload.ID, (payload, context) ->
 			context.client().execute(() -> applyState(context.client(), payload)));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterHotbarPayload.ID, (payload, context) ->
@@ -95,6 +95,7 @@ public final class ClientPuppetmasterState {
 			hotbarInitialized = false;
 			hasPuppetLook = false;
 			hasControllerLookAnchor = false;
+			wasUseDown = false;
 			clearControllerBodyDecoy();
 			if (client.player != null) client.setCameraEntity(client.player);
 			return;
@@ -134,11 +135,18 @@ public final class ClientPuppetmasterState {
 		KeyBinding ability = resolveAbilityBinding();
 		boolean abilityDown = ability != null && ClientAbilityKeys.isDown(client, ability);
 		boolean activeController = isLocalController(client);
+		if (targetMenuOpen && !(client.currentScreen instanceof LimitedInventoryScreen)) {
+			clearTargetMenu();
+		}
+		if (targetMenuRequested && --targetRequestTicks <= 0) targetMenuRequested = false;
 		if (!ClientRoleRevealState.canUseRoleAbility(client)) {
+			clearTargetMenu();
 			wasAbilityDown = false;
 			return;
 		}
-		if (abilityDown && !wasAbilityDown && client.currentScreen instanceof PuppetmasterTargetScreen) {
+		if (abilityDown && !wasAbilityDown && targetMenuOpen
+				&& client.currentScreen instanceof LimitedInventoryScreen) {
+			clearTargetMenu();
 			client.setScreen(null);
 			wasAbilityDown = true;
 			return;
@@ -146,10 +154,15 @@ public final class ClientPuppetmasterState {
 		if (abilityDown && !wasAbilityDown && ClientPlayNetworking.canSend(PuppetmasterUsePayload.ID)
 				&& !ClientVultureState.isLocalStashed(client)
 				&& (activeController || (client.currentScreen == null && isLocalPuppetmaster(client)))) {
+			if (!activeController) {
+				targetMenuRequested = true;
+				targetRequestTicks = 40;
+			}
 			ClientPlayNetworking.send(new PuppetmasterUsePayload());
 		}
 		wasAbilityDown = abilityDown;
-		if (client.currentScreen instanceof PuppetmasterTargetScreen && ClientPlayNetworking.canSend(PuppetmasterUsePayload.ID)) {
+		if (targetMenuOpen && client.currentScreen instanceof LimitedInventoryScreen
+				&& ClientPlayNetworking.canSend(PuppetmasterUsePayload.ID)) {
 			if (targetRefreshTicks-- <= 0) {
 				targetRefreshTicks = 10;
 				ClientPlayNetworking.send(new PuppetmasterUsePayload());
@@ -164,6 +177,44 @@ public final class ClientPuppetmasterState {
 			syncLookFromLocal(client);
 			sendInput(client);
 		}
+	}
+
+	private static void applyTargets(MinecraftClient client, PuppetmasterTargetsPayload payload) {
+		if (client == null || client.player == null || payload == null
+				|| (!targetMenuRequested && !targetMenuOpen)) return;
+		targetChoices = payload.targets();
+		if (!targetMenuOpen) {
+			targetMenuOpen = true;
+			targetMenuRequested = false;
+			targetRequestTicks = 0;
+			client.setScreen(new LimitedInventoryScreen(client.player));
+		}
+	}
+
+	public static boolean shouldShowTargetInventoryMenu(MinecraftClient client) {
+		return targetMenuOpen && client != null && client.player != null && client.world != null
+			&& isLocalPuppetmaster(client) && ClientRoleRevealState.canUseRoleAbility(client);
+	}
+
+	public static List<PuppetmasterTargetsPayload.Entry> targetChoices() {
+		return List.copyOf(targetChoices);
+	}
+
+	public static void selectTarget(UUID selectedTargetId) {
+		if (!targetMenuOpen || selectedTargetId == null
+				|| !ClientPlayNetworking.canSend(PuppetmasterSelectPayload.ID)) return;
+		ClientPlayNetworking.send(new PuppetmasterSelectPayload(selectedTargetId));
+		MinecraftClient client = MinecraftClient.getInstance();
+		clearTargetMenu();
+		if (client != null) client.setScreen(null);
+	}
+
+	private static void clearTargetMenu() {
+		targetMenuRequested = false;
+		targetMenuOpen = false;
+		targetRequestTicks = 0;
+		targetRefreshTicks = 0;
+		targetChoices = List.of();
 	}
 
 	public static void sendImmediateInput(MinecraftClient client) {
@@ -185,9 +236,18 @@ public final class ClientPuppetmasterState {
 		boolean sneak = ClientAbilityKeys.isDown(client, client.options.sneakKey);
 		boolean sprint = ClientAbilityKeys.isDown(client, client.options.sprintKey);
 		boolean use = ClientAbilityKeys.isDown(client, client.options.useKey);
+		AbstractClientPlayerEntity target = getTargetPlayer(client);
+		if (target != null) {
+			if (use && !wasUseDown) {
+				target.setCurrentHand(Hand.MAIN_HAND);
+			} else if (!use && wasUseDown) {
+				target.stopUsingItem();
+			}
+		}
+		wasUseDown = use;
 		int selectedSlot = client.player.getInventory().selectedSlot;
 		if (hasSyncedHotbar()) puppetSelectedSlot = selectedSlot;
-		applyLocalPrediction(client, sideways, forward, jump, sneak, sprint);
+		applyLocalLook(client);
 		ClientPlayNetworking.send(new PuppetmasterInputPayload(sideways, forward, jump, sneak, sprint, use, puppetYaw, puppetPitch, selectedSlot));
 	}
 
@@ -262,6 +322,29 @@ public final class ClientPuppetmasterState {
 		return target instanceof AbstractClientPlayerEntity player ? player : null;
 	}
 
+	public static Entity preferredCameraEntity(MinecraftClient client, Entity requested) {
+		if (client == null || requested == null || !isLocalController(client)) return requested;
+		AbstractClientPlayerEntity target = getTargetPlayer(client);
+		return requested == client.player && target != null ? target : requested;
+	}
+
+	public static void lockControllerBodyInput(MinecraftClient client) {
+		if (client == null || client.player == null || !isLocalController(client)) return;
+		Input input = client.player.input;
+		if (input != null) {
+			input.movementSideways = 0.0F;
+			input.movementForward = 0.0F;
+			input.pressingForward = false;
+			input.pressingBack = false;
+			input.pressingLeft = false;
+			input.pressingRight = false;
+			input.jumping = false;
+			input.sneaking = false;
+		}
+		client.player.setSprinting(false);
+		client.player.setVelocity(Vec3d.ZERO);
+	}
+
 	public static UUID replacementFor(UUID playerId) {
 		return null;
 	}
@@ -302,6 +385,7 @@ public final class ClientPuppetmasterState {
 	}
 
 	private static void clearLocal() {
+		clearTargetMenu();
 		restoreSelectedSlot(MinecraftClient.getInstance());
 		controllerId = null;
 		targetId = null;
@@ -311,6 +395,7 @@ public final class ClientPuppetmasterState {
 		hotbarInitialized = false;
 		hasPuppetLook = false;
 		hasControllerLookAnchor = false;
+		wasUseDown = false;
 		clearControllerBodyDecoy();
 	}
 
@@ -349,31 +434,6 @@ public final class ClientPuppetmasterState {
 		target.setPitch(puppetPitch);
 		target.setHeadYaw(puppetYaw);
 		target.setBodyYaw(puppetYaw);
-	}
-
-	private static void applyLocalPrediction(MinecraftClient client, float sideways, float forward, boolean jumping,
-			boolean sneaking, boolean sprinting) {
-		AbstractClientPlayerEntity target = getTargetPlayer(client);
-		if (target == null) return;
-		applyLocalLook(client);
-		target.setSneaking(sneaking);
-		target.setSprinting(sprinting && forward > 0.5F && !sneaking);
-		float magnitude = MathHelper.sqrt(sideways * sideways + forward * forward);
-		if (magnitude > 1.0F) {
-			sideways /= magnitude;
-			forward /= magnitude;
-		}
-		double yawRad = puppetYaw * (Math.PI / 180.0D);
-		double sin = Math.sin(yawRad);
-		double cos = Math.cos(yawRad);
-		double speed = sneaking ? 0.10D : sprinting ? 0.30D : 0.20D;
-		double velocityX = (sideways * cos - forward * sin) * speed;
-		double velocityZ = (forward * cos + sideways * sin) * speed;
-		double velocityY = target.getVelocity().y;
-		if (jumping && target.isOnGround()) {
-			velocityY = 0.42D;
-		}
-		target.setVelocity(velocityX, velocityY, velocityZ);
 	}
 
 	private static void restoreSelectedSlot(MinecraftClient client) {

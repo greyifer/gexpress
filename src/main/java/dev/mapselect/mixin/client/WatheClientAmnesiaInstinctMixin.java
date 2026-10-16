@@ -3,6 +3,7 @@ package dev.mapselect.mixin.client;
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.client.WatheClient;
+import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.client.game.ClientLastStandState;
 import dev.mapselect.client.role.amnesia.ClientAmnesiaState;
 import dev.mapselect.client.role.mafia.ClientMafiaState;
@@ -49,6 +50,12 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 		if (client == null || client.player == null || client.world == null) {
 			return;
 		}
+		// This final veto must run before Mafia-family and spectator overrides, which can otherwise
+		// turn instinct back on after the HEAD injection disabled it for a swallowed player.
+		if (ClientVultureState.isLocalStashed(client)) {
+			cir.setReturnValue(false);
+			return;
+		}
 		if (CopycatManager.isBorrowingAbility(client.player)) {
 			cir.setReturnValue(false);
 			return;
@@ -68,6 +75,10 @@ public abstract class WatheClientAmnesiaInstinctMixin {
 	@Inject(method = "getInstinctHighlight", at = @At("HEAD"), cancellable = true)
 	private static void gexpress$renderOtherKillersAsCivilians(Entity target, CallbackInfoReturnable<Integer> cir) {
 		MinecraftClient client = MinecraftClient.getInstance();
+		if (target instanceof PlayerEntity player && GameFunctions.isPlayerSpectatingOrCreative(player)) {
+			cir.setReturnValue(-1);
+			return;
+		}
 		if (ClientVultureState.isLocalStashed(client)) {
 			cir.setReturnValue(-1);
 			return;

@@ -2,7 +2,6 @@ package dev.mapselect.role.bountyhunter;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerShopComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
@@ -10,6 +9,8 @@ import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.game.KinsWatheSafePreparation;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.role.bountyhunter.BountyHunterStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.pelican.PelicanManager;
@@ -46,12 +47,11 @@ public final class BountyHunterManager {
 		PayloadTypeRegistry.playS2C().register(BountyHunterStatePayload.ID, BountyHunterStatePayload.CODEC);
 		ServerTickEvents.END_WORLD_TICK.register(BountyHunterManager::tick);
 		AllowPlayerDeath.EVENT.register(BountyHunterManager::allowDeath);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRoundState(world));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearRoundState(world));
+		RoundLifecycleHooks.clearWorld(BountyHunterManager::clearRoundState);
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean active = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
 		if (!active && !GexpressTestState.hasRoleTesters()) {
@@ -225,15 +225,13 @@ public final class BountyHunterManager {
 	}
 
 	private static void sendBountyState(ServerPlayerEntity hunter, ServerPlayerEntity target, long remainingTicks) {
-		if (hunter == null || target == null || !ServerPlayNetworking.canSend(hunter, BountyHunterStatePayload.ID)) return;
-		ServerPlayNetworking.send(hunter, new BountyHunterStatePayload(true, target.getUuid(),
-			target.getName().getString(), GexpressConfig.getBountyHunterRewardGold(), remainingTicks));
+		if (hunter == null || target == null) return;
+		PayloadSync.sendIfChanged(hunter, BountyHunterStatePayload.ID, new BountyHunterStatePayload(true,
+			target.getUuid(), target.getName().getString(), GexpressConfig.getBountyHunterRewardGold(), remainingTicks));
 	}
 
 	private static void sendClear(ServerPlayerEntity hunter) {
-		if (hunter != null && ServerPlayNetworking.canSend(hunter, BountyHunterStatePayload.ID)) {
-			ServerPlayNetworking.send(hunter, BountyHunterStatePayload.clear());
-		}
+		PayloadSync.sendIfChanged(hunter, BountyHunterStatePayload.ID, BountyHunterStatePayload.clear());
 	}
 
 	private static void clearHunter(UUID hunterId) {

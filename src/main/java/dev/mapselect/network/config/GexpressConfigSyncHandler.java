@@ -1,16 +1,19 @@
 package dev.mapselect.network.config;
 
 import dev.mapselect.MapSelect;
-import dev.mapselect.command.admin.TagCommand;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.game.TestOverlayPayload;
 import dev.mapselect.network.progression.SkinCaseResultPayload;
 import dev.mapselect.permissions.GexpressPermissions;
+import dev.mapselect.skin.SkinShopConfig;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Registers GexpressConfigSyncPayload and keeps the server as the authoritative copy.
@@ -18,18 +21,23 @@ import net.minecraft.server.network.ServerPlayerEntity;
  * accepted values back to every connected player so client-side shop displays match buys.
  */
 public final class GexpressConfigSyncHandler {
+	private static final long CONFIG_WRITE_RATE_LIMIT_MS = 750L;
+	private static final Map<String, Long> LAST_CONFIG_WRITE_MS = new ConcurrentHashMap<>();
+
 	private GexpressConfigSyncHandler() {}
 
 	public static void register() {
 		PayloadTypeRegistry.playC2S().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(GexpressTaskConfigPayload.ID, GexpressTaskConfigPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(GexpressDevTuningPayload.ID, GexpressDevTuningPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(DoomsayerConfigPayload.ID, DoomsayerConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.ID, GexpressConfigSyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressConfigSyncPayload.LEGACY_ID, GexpressConfigSyncPayload.LEGACY_CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressTaskConfigPayload.ID, GexpressTaskConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GexpressDevTuningPayload.ID, GexpressDevTuningPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SkinShopConfigPayload.ID, SkinShopConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(PuppetmasterConfigPayload.ID, PuppetmasterConfigPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(DoomsayerConfigPayload.ID, DoomsayerConfigPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(SkinCaseResultPayload.ID, SkinCaseResultPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(TestOverlayPayload.ID, TestOverlayPayload.CODEC);
 
@@ -44,6 +52,7 @@ public final class GexpressConfigSyncHandler {
 						sender.getName().getString());
 					return;
 				}
+				if (!acceptConfigWrite(sender, "gexpress config sync")) return;
 
 				MinecraftServer server = sender.getServer();
 				if (server == null) return;
@@ -81,8 +90,7 @@ public final class GexpressConfigSyncHandler {
 						payload.skincrawlerBodyMaxAgeSeconds(), payload.skincrawlerCooldownSeconds(),
 						payload.skincrawlerStunSeconds(), payload.skincrawlerRange(),
 						payload.painterPaintDurationSeconds(), payload.painterBodyCooldownSeconds(),
-						payload.painterPlayerCooldownSeconds(), payload.painterDoorwayDurationSeconds(),
-						payload.painterDoorwayCooldownSeconds(),
+						payload.painterPlayerCooldownSeconds(),
 						payload.painterMaxPaintedBodies(), payload.painterMaxPaintedPlayers(),
 						payload.spyBugCost(), payload.spyBugDurationSeconds(), payload.spyBugRange(),
 						payload.squeakerPitchPercent(), payload.masqueradePitchMinPercent(),
@@ -124,7 +132,7 @@ public final class GexpressConfigSyncHandler {
 						payload.loversShowPartnerHud(), payload.loversAllowMixedSidePairs(),
 						payload.covenantBiteCooldownSeconds(),
 						payload.vengefulSpiritReviveDelaySeconds(), payload.vengefulSpiritRevengeSeconds(),
-						payload.loversIndependentWin());
+						payload.loversIndependentWin(), payload.veteranMaxUses());
 					GexpressConfigSyncPayload after = currentPayload();
 					if (after.equals(before)) return;
 
@@ -185,6 +193,7 @@ public final class GexpressConfigSyncHandler {
 						sender.getName().getString());
 					return;
 				}
+				if (!acceptConfigWrite(sender, "gexpress task config sync")) return;
 
 				MinecraftServer server = sender.getServer();
 				if (server == null) return;
@@ -207,48 +216,6 @@ public final class GexpressConfigSyncHandler {
 					broadcastTaskConfig(server);
 				});
 			});
-		ServerPlayNetworking.registerGlobalReceiver(GexpressDevTuningPayload.ID,
-			(payload, context) -> {
-				ServerPlayerEntity sender = context.player();
-				if (!GexpressPermissions.canEditDevTab(sender)) {
-					MapSelect.LOGGER.warn("Ignoring gexpress dev tuning sync from {} (missing dev_menus permission)",
-						sender.getName().getString());
-					return;
-				}
-
-				MinecraftServer server = sender.getServer();
-				if (server == null) return;
-				server.execute(() -> {
-					GexpressDevTuningPayload before = currentDevTuningPayload();
-					GexpressConfig.applyDevTuning(payload.levelRoundXp(), payload.levelWinXp(),
-						payload.levelNeutralWinBonusXp(), payload.levelKillXp(), payload.levelCivilianTaskXp(),
-						payload.levelBaseXp(), payload.levelXpIncrease(), payload.levelRoadmapDisplayLevels(),
-						payload.levelXpOverrides(), payload.levelRewardRoadmap(),
-						payload.levelTags(),
-						payload.grenadeLineOfSightPassThroughBlocks(),
-						payload.goldFoodPlatterPrice(), payload.goldDrinkTrayPrice(), payload.skinCaseRows(),
-						payload.mutedNotePrice());
-					GexpressDevTuningPayload after = currentDevTuningPayload();
-					if (after.equals(before)) return;
-
-					GexpressConfig.save();
-					for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-						TagCommand.refreshPlayerListName(player);
-					}
-					MapSelect.LOGGER.info("G'Express dev tuning updated by {}: xp=[round {}, win {}, neutral {}, kill {}, task {}, base {}, inc {}, roadmapLevels {}], grenadePassThrough={}",
-						sender.getName().getString(),
-						GexpressConfig.getLevelRoundXp(),
-						GexpressConfig.getLevelWinXp(),
-						GexpressConfig.getLevelNeutralWinBonusXp(),
-						GexpressConfig.getLevelKillXp(),
-						GexpressConfig.getLevelCivilianTaskXp(),
-						GexpressConfig.getLevelBaseXp(),
-						GexpressConfig.getLevelXpIncrease(),
-						GexpressConfig.getLevelRoadmapDisplayLevels(),
-						GexpressConfig.getGrenadeLineOfSightPassThroughBlockStrings());
-					broadcastDevTuning(server);
-				});
-			});
 		ServerPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID,
 			(payload, context) -> {
 				ServerPlayerEntity sender = context.player();
@@ -257,6 +224,7 @@ public final class GexpressConfigSyncHandler {
 						sender.getName().getString());
 					return;
 				}
+				if (!acceptConfigWrite(sender, "puppetmaster config sync")) return;
 
 				MinecraftServer server = sender.getServer();
 				if (server == null) return;
@@ -271,6 +239,45 @@ public final class GexpressConfigSyncHandler {
 					broadcastPuppetmasterConfig(server);
 				});
 			});
+		ServerPlayNetworking.registerGlobalReceiver(DoomsayerConfigPayload.ID,
+			(payload, context) -> {
+				ServerPlayerEntity sender = context.player();
+				if (!GexpressPermissions.canEditGameTab(sender)) {
+					MapSelect.LOGGER.warn("Ignoring doomsayer config sync from {} (missing config_edit permission)",
+						sender.getName().getString());
+					return;
+				}
+				if (!acceptConfigWrite(sender, "doomsayer config sync")) return;
+
+				MinecraftServer server = sender.getServer();
+				if (server == null) return;
+				server.execute(() -> {
+					int beforeGoal = GexpressConfig.getDoomsayerGuessesToWin();
+					boolean beforeDeath = GexpressConfig.doesDoomsayerDieOnWrongGuess();
+					GexpressConfig.doomsayerGuessesToWin = payload.guessesToWin();
+					GexpressConfig.doomsayerGuessesToWin = GexpressConfig.getDoomsayerGuessesToWin();
+					GexpressConfig.doomsayerDiesOnWrongGuess = payload.diesOnWrongGuess();
+					if (beforeGoal == GexpressConfig.getDoomsayerGuessesToWin()
+							&& beforeDeath == GexpressConfig.doesDoomsayerDieOnWrongGuess()) return;
+
+					GexpressConfig.save();
+					MapSelect.LOGGER.info("G'Express Doomsayer config updated by {}: guessesToWin={}, diesOnWrong={}",
+						sender.getName().getString(), GexpressConfig.getDoomsayerGuessesToWin(),
+						GexpressConfig.doesDoomsayerDieOnWrongGuess());
+					broadcastDoomsayerConfig(server);
+				});
+			});
+	}
+
+	private static boolean acceptConfigWrite(ServerPlayerEntity sender, String channel) {
+		long now = System.currentTimeMillis();
+		String key = sender.getUuid() + ":" + channel;
+		Long previous = LAST_CONFIG_WRITE_MS.put(key, now);
+		if (previous != null && now - previous < CONFIG_WRITE_RATE_LIMIT_MS) {
+			MapSelect.LOGGER.warn("Rate-limited {} from {}.", channel, sender.getName().getString());
+			return false;
+		}
+		return true;
 	}
 
 	public static void broadcastConfig(MinecraftServer server) {
@@ -281,7 +288,9 @@ public final class GexpressConfigSyncHandler {
 		}
 		broadcastTaskConfig(server);
 		broadcastDevTuning(server);
+		broadcastShopConfig(server);
 		broadcastPuppetmasterConfig(server);
+		broadcastDoomsayerConfig(server);
 	}
 
 	private static void sendConfigTo(ServerPlayerEntity player) {
@@ -290,7 +299,9 @@ public final class GexpressConfigSyncHandler {
 		}
 		sendTaskConfigTo(player);
 		sendDevTuningTo(player);
+		sendShopConfigTo(player);
 		sendPuppetmasterConfigTo(player);
+		sendDoomsayerConfigTo(player);
 	}
 
 	private static void broadcastTaskConfig(MinecraftServer server) {
@@ -321,6 +332,21 @@ public final class GexpressConfigSyncHandler {
 		ServerPlayNetworking.send(player, currentDevTuningPayload());
 	}
 
+	public static void broadcastShopConfig(MinecraftServer server) {
+		if (server == null) return;
+		SkinShopConfigPayload payload = new SkinShopConfigPayload(SkinShopConfig.json());
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			if (ServerPlayNetworking.canSend(player, SkinShopConfigPayload.ID)) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
+	private static void sendShopConfigTo(ServerPlayerEntity player) {
+		if (!ServerPlayNetworking.canSend(player, SkinShopConfigPayload.ID)) return;
+		ServerPlayNetworking.send(player, new SkinShopConfigPayload(SkinShopConfig.json()));
+	}
+
 	private static void broadcastPuppetmasterConfig(MinecraftServer server) {
 		PuppetmasterConfigPayload payload =
 			new PuppetmasterConfigPayload(GexpressConfig.canPuppetmasterKillOwnBody());
@@ -335,6 +361,22 @@ public final class GexpressConfigSyncHandler {
 		if (!ServerPlayNetworking.canSend(player, PuppetmasterConfigPayload.ID)) return;
 		ServerPlayNetworking.send(player,
 			new PuppetmasterConfigPayload(GexpressConfig.canPuppetmasterKillOwnBody()));
+	}
+
+	private static void broadcastDoomsayerConfig(MinecraftServer server) {
+		DoomsayerConfigPayload payload = new DoomsayerConfigPayload(
+			GexpressConfig.getDoomsayerGuessesToWin(), GexpressConfig.doesDoomsayerDieOnWrongGuess());
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			if (ServerPlayNetworking.canSend(player, DoomsayerConfigPayload.ID)) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
+	private static void sendDoomsayerConfigTo(ServerPlayerEntity player) {
+		if (!ServerPlayNetworking.canSend(player, DoomsayerConfigPayload.ID)) return;
+		ServerPlayNetworking.send(player, new DoomsayerConfigPayload(
+			GexpressConfig.getDoomsayerGuessesToWin(), GexpressConfig.doesDoomsayerDieOnWrongGuess()));
 	}
 
 	private static GexpressConfigSyncPayload currentPayload() {
@@ -402,8 +444,6 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getPainterPaintDurationSeconds(),
 			GexpressConfig.getPainterBodyCooldownSeconds(),
 			GexpressConfig.getPainterPlayerCooldownSeconds(),
-			GexpressConfig.getPainterDoorwayDurationSeconds(),
-			GexpressConfig.getPainterDoorwayCooldownSeconds(),
 			GexpressConfig.getPainterMaxPaintedBodies(),
 			GexpressConfig.getPainterMaxPaintedPlayers(),
 			GexpressConfig.getSpyBugCost(),
@@ -486,7 +526,8 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getCovenantBiteCooldownSeconds(),
 			GexpressConfig.getVengefulSpiritReviveDelaySeconds(),
 			GexpressConfig.getVengefulSpiritRevengeSeconds(),
-			GexpressConfig.doLoversWinIndependently()
+			GexpressConfig.doLoversWinIndependently(),
+			GexpressConfig.getVeteranMaxUses()
 		);
 	}
 
@@ -517,7 +558,9 @@ public final class GexpressConfigSyncHandler {
 			GexpressConfig.getGoldFoodPlatterPrice(),
 			GexpressConfig.getGoldDrinkTrayPrice(),
 			GexpressConfig.getSkinCaseRowsSyncString(),
-			GexpressConfig.getMutedNotePrice()
+			GexpressConfig.getMutedNotePrice(),
+			GexpressConfig.getLobbyPollCooldownSeconds(),
+			GexpressConfig.getLobbyPollDurationSeconds()
 		);
 	}
 }

@@ -10,14 +10,12 @@ import net.minecraft.util.Identifier;
 
 import java.util.UUID;
 
-/**
- * KinsWathe already draws the stamina HUD from Wathe's internal sprintingTicks field.
- * G'Express only needs to seed that real field when a role with more stamina becomes active.
- */
 public final class ClientStaminaBarFix {
+	private static final int KILLER_STAMINA_TICKS = 20 * 60;
 	private static UUID trackedPlayerId;
 	private static Identifier trackedRoleId;
 	private static int trackedMaximum;
+	private static boolean trackedKillerStamina;
 
 	private ClientStaminaBarFix() {}
 
@@ -39,19 +37,30 @@ public final class ClientStaminaBarFix {
 		}
 
 		Role role = game.getRole(client.player);
-		if (role == null || role.identifier() == null || role.getMaxSprintTime() <= 0) {
+		if (role == null || role.identifier() == null) {
 			reset();
 			return;
 		}
 
 		UUID playerId = client.player.getUuid();
 		Identifier roleId = role.identifier();
-		int maximum = role.getMaxSprintTime();
-		if (playerId.equals(trackedPlayerId) && roleId.equals(trackedRoleId) && maximum == trackedMaximum) return;
+		boolean killerStamina = role.canUseKiller() || game.canUseKillerFeatures(client.player);
+		if (!killerStamina && role.getMaxSprintTime() <= 0) {
+			reset();
+			return;
+		}
+		int maximum = killerStamina ? KILLER_STAMINA_TICKS : role.getMaxSprintTime();
+		if (playerId.equals(trackedPlayerId)
+				&& roleId.equals(trackedRoleId)
+				&& maximum == trackedMaximum
+				&& killerStamina == trackedKillerStamina) {
+			return;
+		}
 
 		trackedPlayerId = playerId;
 		trackedRoleId = roleId;
 		trackedMaximum = maximum;
+		trackedKillerStamina = killerStamina;
 		WatheStaminaAccess.set(client.player, maximum);
 	}
 
@@ -59,5 +68,6 @@ public final class ClientStaminaBarFix {
 		trackedPlayerId = null;
 		trackedRoleId = null;
 		trackedMaximum = 0;
+		trackedKillerStamina = false;
 	}
 }

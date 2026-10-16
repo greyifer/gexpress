@@ -13,8 +13,11 @@ import de.maxhenkel.voicechat.api.events.SoundPacketEvent;
 import de.maxhenkel.voicechat.api.events.StaticSoundPacketEvent;
 import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
 import dev.mapselect.modifier.ModifierUtils;
+import dev.mapselect.game.draft.DraftManager;
 import dev.mapselect.registry.MapSelectModifiers;
+import dev.mapselect.role.harlequin.HarlequinManager;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.twins.TwinsManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -22,6 +25,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.lang.reflect.Method;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -36,6 +40,8 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 
 	@Override
 	public void registerEvents(EventRegistration registration) {
+		registration.registerEvent(de.maxhenkel.voicechat.api.events.ClientVoicechatInitializationEvent.class,
+			event -> dev.mapselect.client.replay.ReplayVoicePlayback.initialize(event.getVoicechat()));
 		try {
 			registration.registerEvent(OpenALSoundEvent.Post.class, this::onOpenALSound);
 		} catch (Throwable ignored) {
@@ -58,6 +64,18 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 		Object level = sender.getPlayer().getServerLevel().getServerLevel();
 		if (!(level instanceof ServerWorld world)) return;
 		Object nativePlayer = sender.getPlayer().getPlayer();
+		if (nativePlayer instanceof ServerPlayerEntity viewer && dev.mapselect.replay.ReplayManager.isViewing(viewer)) {
+			event.cancel();
+			return;
+		}
+		if (DraftManager.isDrafting(world)) {
+			event.cancel();
+			return;
+		}
+		if (HarlequinManager.isMasqueradeMuted(world, senderId)) {
+			event.cancel();
+			return;
+		}
 		VoiceMuteState state = VoiceMuteState.KEY.getNullable(world);
 		if (state != null && state.isMuted(senderId)) {
 			event.cancel();
@@ -68,14 +86,23 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 			event.cancel();
 			return;
 		}
+        ServerPlayerEntity voiceBody = nativePlayer instanceof ServerPlayerEntity player
+            ? dev.mapselect.role.loki.LokiManager.voiceSource(player) : null;
+        UUID recordedSpeaker = voiceBody == null ? senderId : voiceBody.getUuid();
+		dev.mapselect.replay.ReplayRecorder.voice(world, recordedSpeaker, event.getPacket().getOpusEncodedData(),
+            (float)(event.getPacket().isWhispering()
+                ? event.getVoicechat().getServerConfig().getDouble("whisper_distance", event.getVoicechat().getVoiceChatDistance() / 2)
+                : event.getVoicechat().getVoiceChatDistance()));
 		if (nativePlayer instanceof ServerPlayerEntity player) {
-			Set<UUID> twinReceivers = TwinsManager.voiceReceiversNear(world, senderId, player.getPos());
-			if (!twinReceivers.isEmpty()) {
+			Set<UUID> relayReceivers = new HashSet<>(
+				TwinsManager.voiceReceiversNear(world, senderId, voiceBody == null ? player.getPos() : voiceBody.getPos()));
+			relayReceivers.addAll(SpyManager.bugVoiceReceivers(world, senderId, voiceBody == null ? player.getPos() : voiceBody.getPos()));
+			if (!relayReceivers.isEmpty()) {
 				StaticSoundPacket packet = event.getPacket().staticSoundPacketBuilder()
 					.channelId(senderId)
 					.opusEncodedData(event.getPacket().getOpusEncodedData())
 					.build();
-				for (UUID receiverId : twinReceivers) {
+				for (UUID receiverId : relayReceivers) {
 					VoicechatConnection connection = event.getVoicechat().getConnectionOf(receiverId);
 					if (connection != null) event.getVoicechat().sendStaticSoundPacketTo(connection, packet);
 				}
@@ -95,17 +122,51 @@ public class GreysVoicechatPlugin implements VoicechatPlugin {
 				event.cancel();
 			}
 		}
+        if (voiceBody != null && !voiceBody.getUuid().equals(senderId) && !event.isCancelled()) {
+            float distance = (float)(event.getPacket().isWhispering()
+                ? event.getVoicechat().getServerConfig().getDouble("whisper_distance", event.getVoicechat().getVoiceChatDistance()/2)
+                : event.getVoicechat().getVoiceChatDistance());
+            var packet = event.getPacket().entitySoundPacketBuilder().channelId(senderId)
+                .entityUuid(voiceBody.getUuid()).distance(distance).whispering(event.getPacket().isWhispering()).build();
+            var position = event.getVoicechat().createPosition(voiceBody.getX(), voiceBody.getEyeY(), voiceBody.getZ());
+            for (var listener : event.getVoicechat().getPlayersInRange(event.getVoicechat().fromServerLevel(world), position,
+                    Math.max(distance, event.getVoicechat().getBroadcastRange()))) {
+                if (listener.getUuid().equals(senderId)) continue;
+                var connection = event.getVoicechat().getConnectionOf(listener.getUuid());
+                if (connection != null) event.getVoicechat().sendEntitySoundPacketTo(connection, packet);
+            }
+            // Suppress normal proximity/group routing to avoid a second copy at the original body.
+            event.cancel();
+        }
+
 	}
 
 	private void onSoundPacket(SoundPacketEvent<?> event) {
 		VoicechatConnection sender = event.getSenderConnection();
 		VoicechatConnection receiver = event.getReceiverConnection();
 		if (sender == null || receiver == null) return;
+		if (receiver.getPlayer().getPlayer() instanceof ServerPlayerEntity viewer && dev.mapselect.replay.ReplayManager.isViewing(viewer)) {
+			event.cancel();
+			return;
+		}
+		if (isDrafting(sender) || isDrafting(receiver)) {
+			event.cancel();
+			return;
+		}
 		UUID senderId = sender.getPlayer().getUuid();
 		UUID receiverId = receiver.getPlayer().getUuid();
 		if (PelicanManager.shouldCancelVoice(senderId, receiverId)) {
 			event.cancel();
 		}
+	}
+
+	private static boolean isDrafting(VoicechatConnection connection) {
+		if (connection == null || connection.getPlayer() == null
+				|| connection.getPlayer().getServerLevel() == null) {
+			return false;
+		}
+		Object level = connection.getPlayer().getServerLevel().getServerLevel();
+		return level instanceof ServerWorld world && DraftManager.isDrafting(world);
 	}
 
 	private void onCreateGroup(CreateGroupEvent event) {

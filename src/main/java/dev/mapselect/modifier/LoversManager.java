@@ -9,6 +9,7 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.modifier.LoversStatePayload;
 import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.role.RoleTeams;
@@ -300,7 +301,7 @@ public final class LoversManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		if (!isRoundState(game) && !GexpressTestState.hasModifierTesters()) {
 			if (!PARTNERS.isEmpty() || !PENDING_SOUL_DEATHS.isEmpty() || !SOUL_LINK_DEATHS.isEmpty()
@@ -381,11 +382,11 @@ public final class LoversManager {
 	}
 
 	private static void sync(ServerPlayerEntity player) {
-		if (player == null || !ServerPlayNetworking.canSend(player, LoversStatePayload.ID)) return;
+		if (player == null) return;
 		UUID partnerId = PARTNERS.get(player.getUuid());
 		if (partnerId == null || !isValidPair(player.getUuid(), partnerId) || !hasActiveLoversModifier(player)) {
 			PARTNERS.remove(player.getUuid());
-			ServerPlayNetworking.send(player, LoversStatePayload.clear());
+			PayloadSync.sendIfChanged(player, LoversStatePayload.ID, LoversStatePayload.clear());
 			return;
 		}
 		ServerPlayerEntity partner = player.getServer().getPlayerManager().getPlayer(partnerId);
@@ -394,16 +395,16 @@ public final class LoversManager {
 			PARTNERS.remove(partnerId);
 			DISCOVERED_LOVERS.remove(player.getUuid());
 			DISCOVERED_LOVERS.remove(partnerId);
-			ServerPlayNetworking.send(player, LoversStatePayload.clear());
+			PayloadSync.sendIfChanged(player, LoversStatePayload.ID, LoversStatePayload.clear());
 			if (partner != null) sync(partner);
 			return;
 		}
 		if (!DISCOVERED_LOVERS.contains(player.getUuid())) {
-			ServerPlayNetworking.send(player, LoversStatePayload.clear());
+			PayloadSync.sendIfChanged(player, LoversStatePayload.ID, LoversStatePayload.clear());
 			return;
 		}
 		String name = partner == null ? "" : partner.getName().getString();
-		ServerPlayNetworking.send(player, new LoversStatePayload(true, partnerId, name));
+		PayloadSync.sendIfChanged(player, LoversStatePayload.ID, new LoversStatePayload(true, partnerId, name));
 	}
 
 	private static void clear(World world, boolean removeAllLoversModifiers) {
@@ -414,9 +415,7 @@ public final class LoversManager {
 				removeRuntimeModifiers(serverWorld);
 			}
 			for (ServerPlayerEntity player : serverWorld.getPlayers()) {
-				if (ServerPlayNetworking.canSend(player, LoversStatePayload.ID)) {
-					ServerPlayNetworking.send(player, LoversStatePayload.clear());
-				}
+				PayloadSync.sendIfChanged(player, LoversStatePayload.ID, LoversStatePayload.clear());
 			}
 		}
 		PARTNERS.clear();

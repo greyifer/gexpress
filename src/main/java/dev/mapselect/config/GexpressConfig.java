@@ -17,16 +17,21 @@ import net.minecraft.util.Identifier;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Mod-wide config persisted as JSON at config/gexpress.json. In multiplayer, the server is
@@ -168,7 +173,9 @@ public final class GexpressConfig {
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("gexpress.json");
-	public static final int CURRENT_CONFIG_VERSION = 3;
+	private static final Pattern VALID_EXPORT_NAME = Pattern.compile("[A-Za-z0-9_\\-]{1,64}");
+	private static final DateTimeFormatter EXPORT_BACKUP_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+	public static final int CURRENT_CONFIG_VERSION = 6;
 	private static int loadedConfigVersion = CURRENT_CONFIG_VERSION;
 
 	// Defaults are deliberately chosen to feel like grenade-tier economy.
@@ -263,6 +270,10 @@ public final class GexpressConfig {
 	public static int pelicanEatCooldownSeconds = 20;
 	/** Percent of the round lobby the Pelican must swallow to win. */
 	public static int pelicanEatPercentage = 80;
+	/** Correct role guesses a Doomsayer needs to win. */
+	public static int doomsayerGuessesToWin = 4;
+	/** Whether an incorrect Doomsayer guess kills the Doomsayer instead of removing one point. */
+	public static boolean doomsayerDiesOnWrongGuess = false;
 	/** Food items a Hungry player may carry from platters at once. */
 	public static int hungryFoodLimit = 2;
 	/** Drink items a Thirsty player may carry from trays at once. */
@@ -295,7 +306,7 @@ public final class GexpressConfig {
 	public static int timeMasterFreezeMaxUses = 3;
 	/** Maximum block range for Time Master's Freeze target search. */
 	public static int timeMasterFreezeRange = 4;
-	/** Seconds before Scatter Brain can scatter players again. */
+	/** Legacy removed-role value retained only for config/protocol compatibility. */
 	public static int scatterBrainCooldownSeconds = 60;
 	/** Maximum number of players the Tracker can track at once. */
 	public static int trackerMaxTargets = 3;
@@ -303,6 +314,8 @@ public final class GexpressConfig {
 	public static int trackerRange = 4;
 	/** Seconds before Tracker can change a tracked target again. */
 	public static int trackerCooldownSeconds = 10;
+	/** Total number of Alerts each Veteran can use in a round. */
+	public static int veteranMaxUses = 5;
 	/** Seconds before Seer can compare another pair. */
 	public static int seerCompareCooldownSeconds = 45;
 	/** Number of non-Seer player deaths required before Seer can compare a pair. */
@@ -310,7 +323,7 @@ public final class GexpressConfig {
 	/** Maximum block range for Seer's team comparison target search. */
 	public static int seerCompareRange = 4;
 	/** Seconds before The Twins can swap bodies again. */
-	public static int twinsSwapCooldownSeconds = 20;
+	public static int twinsSwapCooldownSeconds = 30;
 	/** Whether The Twins spare body can advertise a different decoy role. */
 	public static boolean twinsBodyDifferentRole = false;
 	/** Maximum block range for Altruist's revive target search. */
@@ -331,10 +344,6 @@ public final class GexpressConfig {
 	public static int painterBodyCooldownSeconds = 30;
 	/** Seconds before Painter can repaint another living player. */
 	public static int painterPlayerCooldownSeconds = 30;
-	/** Seconds Painter doorway portals remain active. */
-	public static int painterDoorwayDurationSeconds = 10;
-	/** Seconds before Painter can paint another doorway portal. */
-	public static int painterDoorwayCooldownSeconds = 30;
 	/** Maximum dead bodies one Painter can keep painted at once. */
 	public static int painterMaxPaintedBodies = 1;
 	/** Maximum living players one Painter can keep painted at once. */
@@ -404,7 +413,7 @@ public final class GexpressConfig {
 	/** Whether each lovers pair becomes its own team and can only win together. */
 	public static boolean loversIndependentWin = false;
 	/** Seconds before Dracula or Vampire can bite again. */
-	public static int covenantBiteCooldownSeconds = 15;
+	public static int covenantBiteCooldownSeconds = 45;
 	/** Seconds after death before Vengeful Spirit rises. */
 	public static int vengefulSpiritReviveDelaySeconds = 15;
 	/** Seconds Vengeful Spirit has to kill their killer. */
@@ -471,7 +480,11 @@ public final class GexpressConfig {
 	public static int abilityHudOffsetX = 0;
 	/** Client-only vertical offset in scaled GUI pixels from the default ability HUD anchor. */
 	public static int abilityHudOffsetY = 0;
+	/** Client-side volume multiplier for shared role ability feedback sounds. */
+	public static int abilitySoundVolumePercent = 100;
 	/** Client-only preference for rendering available 3D revolver skin models instead of flat 2D fallbacks. */
+	public static boolean replayEnabled = true;
+	public static boolean grenadeTrajectoryPreview = true;
 	public static boolean use3dGunSkins = true;
 	/** Client preference to receive Muted every round without affecting random assignments. */
 	public static boolean alwaysMuted = false;
@@ -499,6 +512,10 @@ public final class GexpressConfig {
 	public static List<String> levelTags = new ArrayList<>();
 	/** Optional rows like "harpy|G'Express Case|100|gun:gold:70;;knife:trusted:30" used by the skins case menu. */
 	public static List<String> skinCaseRows = defaultSkinCaseRows();
+	/** Seconds before the same player can propose another lobby poll. */
+	public static int lobbyPollCooldownSeconds = 600;
+	/** Seconds an active lobby poll stays open for votes. */
+	public static int lobbyPollDurationSeconds = 60;
 
 	public static final int C4_PRICE_MIN = 0;
 	public static final int C4_PRICE_MAX = 9999;
@@ -558,6 +575,8 @@ public final class GexpressConfig {
 	public static final int PELICAN_EAT_COOLDOWN_MAX = 600;
 	public static final int PELICAN_EAT_PERCENTAGE_MIN = 10;
 	public static final int PELICAN_EAT_PERCENTAGE_MAX = 100;
+	public static final int DOOMSAYER_GUESSES_TO_WIN_MIN = 1;
+	public static final int DOOMSAYER_GUESSES_TO_WIN_MAX = 20;
 	public static final int HUNGRY_FOOD_LIMIT_MIN = 1;
 	public static final int HUNGRY_FOOD_LIMIT_MAX = 9;
 	public static final int THIRSTY_DRINK_LIMIT_MIN = 1;
@@ -596,6 +615,8 @@ public final class GexpressConfig {
 	public static final int TRACKER_RANGE_MAX = 4;
 	public static final int TRACKER_COOLDOWN_SECONDS_MIN = 0;
 	public static final int TRACKER_COOLDOWN_SECONDS_MAX = 600;
+	public static final int VETERAN_MAX_USES_MIN = 0;
+	public static final int VETERAN_MAX_USES_MAX = 10;
 	public static final int SEER_COMPARE_COOLDOWN_SECONDS_MIN = 0;
 	public static final int SEER_COMPARE_COOLDOWN_SECONDS_MAX = 600;
 	public static final int SEER_COMPARE_DEATHS_REQUIRED_MIN = 1;
@@ -622,8 +643,6 @@ public final class GexpressConfig {
 	public static final int SKINCRAWLER_RANGE_MAX = 16;
 	public static final int PAINTER_PAINT_DURATION_SECONDS_MIN = 5;
 	public static final int PAINTER_PAINT_DURATION_SECONDS_MAX = 600;
-	public static final int PAINTER_DOORWAY_DURATION_SECONDS_MIN = 1;
-	public static final int PAINTER_DOORWAY_DURATION_SECONDS_MAX = 600;
 	public static final int PAINTER_COOLDOWN_SECONDS_MIN = 0;
 	public static final int PAINTER_COOLDOWN_SECONDS_MAX = 900;
 	public static final int PAINTER_MAX_PAINTED_MIN = 1;
@@ -718,6 +737,12 @@ public final class GexpressConfig {
 	public static final int ABILITY_HUD_SCALE_MAX = 175;
 	public static final int ABILITY_HUD_OFFSET_MIN = -320;
 	public static final int ABILITY_HUD_OFFSET_MAX = 320;
+	public static final int ABILITY_SOUND_VOLUME_MIN = 0;
+	public static final int ABILITY_SOUND_VOLUME_MAX = 200;
+	public static final int LOBBY_POLL_COOLDOWN_SECONDS_MIN = 60;
+	public static final int LOBBY_POLL_COOLDOWN_SECONDS_MAX = 3600;
+	public static final int LOBBY_POLL_DURATION_SECONDS_MIN = 15;
+	public static final int LOBBY_POLL_DURATION_SECONDS_MAX = 180;
 
 	public static int getC4Price() {
 		return Math.max(C4_PRICE_MIN, Math.min(C4_PRICE_MAX, c4Price));
@@ -781,6 +806,16 @@ public final class GexpressConfig {
 
 	public static int getMutedNotePrice() {
 		return Math.max(GRENADE_PRICE_MIN, Math.min(GRENADE_PRICE_MAX, mutedNotePrice));
+	}
+
+	public static int getLobbyPollCooldownSeconds() {
+		return Math.max(LOBBY_POLL_COOLDOWN_SECONDS_MIN,
+			Math.min(LOBBY_POLL_COOLDOWN_SECONDS_MAX, lobbyPollCooldownSeconds));
+	}
+
+	public static int getLobbyPollDurationSeconds() {
+		return Math.max(LOBBY_POLL_DURATION_SECONDS_MIN,
+			Math.min(LOBBY_POLL_DURATION_SECONDS_MAX, lobbyPollDurationSeconds));
 	}
 
 	public static int getGoldFoodPlatterPrice() {
@@ -1106,6 +1141,15 @@ public final class GexpressConfig {
 			Math.min(PELICAN_EAT_PERCENTAGE_MAX, pelicanEatPercentage));
 	}
 
+	public static int getDoomsayerGuessesToWin() {
+		return Math.max(DOOMSAYER_GUESSES_TO_WIN_MIN,
+			Math.min(DOOMSAYER_GUESSES_TO_WIN_MAX, doomsayerGuessesToWin));
+	}
+
+	public static boolean doesDoomsayerDieOnWrongGuess() {
+		return doomsayerDiesOnWrongGuess;
+	}
+
 	public static int getHungryFoodLimit() {
 		return Math.max(HUNGRY_FOOD_LIMIT_MIN, Math.min(HUNGRY_FOOD_LIMIT_MAX, hungryFoodLimit));
 	}
@@ -1202,6 +1246,11 @@ public final class GexpressConfig {
 			Math.min(TRACKER_COOLDOWN_SECONDS_MAX, trackerCooldownSeconds));
 	}
 
+	public static int getVeteranMaxUses() {
+		return Math.max(VETERAN_MAX_USES_MIN,
+			Math.min(VETERAN_MAX_USES_MAX, veteranMaxUses));
+	}
+
 	public static int getSeerCompareCooldownSeconds() {
 		return Math.max(SEER_COMPARE_COOLDOWN_SECONDS_MIN,
 			Math.min(SEER_COMPARE_COOLDOWN_SECONDS_MAX, seerCompareCooldownSeconds));
@@ -1276,16 +1325,6 @@ public final class GexpressConfig {
 	public static int getPainterPlayerCooldownSeconds() {
 		return Math.max(PAINTER_COOLDOWN_SECONDS_MIN,
 			Math.min(PAINTER_COOLDOWN_SECONDS_MAX, painterPlayerCooldownSeconds));
-	}
-
-	public static int getPainterDoorwayDurationSeconds() {
-		return Math.max(PAINTER_DOORWAY_DURATION_SECONDS_MIN,
-			Math.min(PAINTER_DOORWAY_DURATION_SECONDS_MAX, painterDoorwayDurationSeconds));
-	}
-
-	public static int getPainterDoorwayCooldownSeconds() {
-		return Math.max(PAINTER_COOLDOWN_SECONDS_MIN,
-			Math.min(PAINTER_COOLDOWN_SECONDS_MAX, painterDoorwayCooldownSeconds));
 	}
 
 	public static int getPainterMaxPaintedBodies() {
@@ -1749,6 +1788,10 @@ public final class GexpressConfig {
 		return Math.max(ABILITY_HUD_OFFSET_MIN, Math.min(ABILITY_HUD_OFFSET_MAX, abilityHudOffsetY));
 	}
 
+	public static int getAbilitySoundVolumePercent() {
+		return Math.max(ABILITY_SOUND_VOLUME_MIN, Math.min(ABILITY_SOUND_VOLUME_MAX, abilitySoundVolumePercent));
+	}
+
 	public static boolean use3dGunSkins() {
 		return use3dGunSkins;
 	}
@@ -1759,6 +1802,132 @@ public final class GexpressConfig {
 
 	public static int loadedConfigVersion() {
 		return loadedConfigVersion;
+	}
+
+	public static boolean isValidExportName(String name) {
+		return name != null && VALID_EXPORT_NAME.matcher(name).matches();
+	}
+
+	public static Path configPath() {
+		return CONFIG_PATH;
+	}
+
+	/** Returns the complete persisted developer configuration for the owner console. */
+	public static synchronized String currentJson() throws IOException {
+		save();
+		return Files.readString(CONFIG_PATH);
+	}
+
+	/** Validates, migrates, applies, and persists a complete owner-console configuration. */
+	public static synchronized void replaceJson(String json) throws IOException {
+		if (json == null || json.isBlank()) throw new IOException("G'Express config JSON is empty.");
+		Snapshot snap;
+		try {
+			snap = GSON.fromJson(json, Snapshot.class);
+		} catch (JsonSyntaxException e) {
+			throw new IOException("Malformed G'Express config JSON: " + e.getMessage(), e);
+		}
+		if (snap == null) throw new IOException("G'Express config JSON is empty.");
+		int sourceVersion = Math.max(0, snap.configVersion);
+		migrateSnapshot(snap, sourceVersion);
+		snap.configVersion = CURRENT_CONFIG_VERSION;
+		ConfigFiles.writeAtomically(CONFIG_PATH, GSON.toJson(snap));
+		load();
+		save();
+	}
+
+	public static Path exportDir() throws IOException {
+		Path dir = CONFIG_PATH.getParent().resolve("gexpress_exports");
+		Files.createDirectories(dir);
+		return dir;
+	}
+
+	public static Path exportFile(String name) throws IOException {
+		if (!isValidExportName(name)) throw new IOException("Invalid config export name.");
+		return exportDir().resolve(name + ".json");
+	}
+
+	public static Path exportConfig(String name) throws IOException {
+		return exportConfig(name, false);
+	}
+
+	public static Path exportConfig(String name, boolean replaceExisting) throws IOException {
+		if (!isValidExportName(name)) throw new IOException("Invalid config export name.");
+		save();
+		Path source = CONFIG_PATH;
+		if (!Files.exists(source)) throw new IOException("Current config file does not exist.");
+		Path target = exportFile(name);
+		if (Files.exists(target)) {
+			if (!replaceExisting) throw new IOException("Config export '" + name + "' already exists.");
+			backupConfigExport(name, target);
+		}
+		ConfigFiles.writeAtomically(target, Files.readString(source));
+		return target;
+	}
+
+	public static Path importConfig(String name) throws IOException {
+		Path source = exportFile(name);
+		if (!Files.exists(source)) throw new IOException("Config export '" + name + "' does not exist.");
+		Snapshot snap = readSnapshot(source);
+		int sourceVersion = Math.max(0, snap.configVersion);
+		migrateSnapshot(snap, sourceVersion);
+		snap.configVersion = CURRENT_CONFIG_VERSION;
+		ConfigFiles.writeAtomically(CONFIG_PATH, GSON.toJson(snap));
+		load();
+		save();
+		return source;
+	}
+
+	public static ConfigImportPreview previewImportConfig(String name) throws IOException {
+		Path source = exportFile(name);
+		if (!Files.exists(source)) throw new IOException("Config export '" + name + "' does not exist.");
+		Snapshot snap = readSnapshot(source);
+		int sourceVersion = Math.max(0, snap.configVersion);
+		migrateSnapshot(snap, sourceVersion);
+		return new ConfigImportPreview(source, sourceVersion, CURRENT_CONFIG_VERSION);
+	}
+
+	public record ConfigImportPreview(Path path, int sourceVersion, int targetVersion) {}
+
+	public static List<String> listConfigExports() throws IOException {
+		Path dir = exportDir();
+		List<String> names = new ArrayList<>();
+		try (Stream<Path> stream = Files.list(dir)) {
+			stream.filter(Files::isRegularFile)
+				.map(path -> path.getFileName().toString())
+				.filter(name -> name.endsWith(".json"))
+				.map(name -> name.substring(0, name.length() - 5))
+				.filter(GexpressConfig::isValidExportName)
+				.sorted(Comparator.naturalOrder())
+				.forEach(names::add);
+		}
+		return Collections.unmodifiableList(names);
+	}
+
+	private static void backupConfigExport(String name, Path source) throws IOException {
+		if (!Files.isRegularFile(source)) return;
+		Path backupDir = exportDir().resolve("backups");
+		Files.createDirectories(backupDir);
+		String timestamp = LocalDateTime.now().format(EXPORT_BACKUP_TIMESTAMP);
+		for (int attempt = 0; attempt < 1000; attempt++) {
+			String suffix = attempt == 0 ? "" : "-" + attempt;
+			Path backup = backupDir.resolve(name + "." + timestamp + suffix + ".json");
+			if (!Files.exists(backup)) {
+				Files.copy(source, backup, StandardCopyOption.COPY_ATTRIBUTES);
+				return;
+			}
+		}
+		throw new IOException("Could not allocate backup filename for config export '" + name + "'.");
+	}
+
+	private static Snapshot readSnapshot(Path path) throws IOException {
+		try {
+			Snapshot snap = GSON.fromJson(Files.readString(path), Snapshot.class);
+			if (snap == null) throw new IOException("Config export is empty.");
+			return snap;
+		} catch (JsonSyntaxException e) {
+			throw new IOException("Malformed config export JSON: " + e.getMessage(), e);
+		}
 	}
 
 	public static void load() {
@@ -1820,6 +1989,8 @@ public final class GexpressConfig {
 			puppetmasterMaxUses = snap.puppetmasterMaxUses;
 			pelicanEatCooldownSeconds = snap.pelicanEatCooldownSeconds;
 			pelicanEatPercentage = snap.pelicanEatPercentage;
+			doomsayerGuessesToWin = snap.doomsayerGuessesToWin;
+			doomsayerDiesOnWrongGuess = snap.doomsayerDiesOnWrongGuess;
 			hungryFoodLimit = snap.hungryFoodLimit;
 			thirstyDrinkLimit = snap.thirstyDrinkLimit;
 			conversationTaskEnabled = snap.conversationTaskEnabled;
@@ -1840,6 +2011,7 @@ public final class GexpressConfig {
 			trackerMaxTargets = snap.trackerMaxTargets;
 			trackerRange = snap.trackerRange;
 			trackerCooldownSeconds = snap.trackerCooldownSeconds;
+			veteranMaxUses = snap.veteranMaxUses;
 			seerCompareCooldownSeconds = snap.seerCompareCooldownSeconds;
 			seerCompareDeathsRequired = snap.seerCompareDeathsRequired;
 			seerCompareRange = snap.seerCompareRange;
@@ -1856,8 +2028,6 @@ public final class GexpressConfig {
 			painterPaintDurationSeconds = snap.painterPaintDurationSeconds;
 			painterBodyCooldownSeconds = snap.painterBodyCooldownSeconds;
 			painterPlayerCooldownSeconds = snap.painterPlayerCooldownSeconds;
-			painterDoorwayDurationSeconds = snap.painterDoorwayDurationSeconds;
-			painterDoorwayCooldownSeconds = snap.painterDoorwayCooldownSeconds;
 			painterMaxPaintedBodies = snap.painterMaxPaintedBodies;
 			painterMaxPaintedPlayers = snap.painterMaxPaintedPlayers;
 			spyBugCost = snap.spyBugCost;
@@ -1938,6 +2108,9 @@ public final class GexpressConfig {
 			abilityHudScalePercent = snap.abilityHudScalePercent;
 			abilityHudOffsetX = snap.abilityHudOffsetX;
 			abilityHudOffsetY = snap.abilityHudOffsetY;
+			abilitySoundVolumePercent = snap.abilitySoundVolumePercent;
+			replayEnabled = snap.replayEnabled;
+			grenadeTrajectoryPreview = snap.grenadeTrajectoryPreview;
 			use3dGunSkins = snap.use3dGunSkins;
 			alwaysMuted = snap.alwaysMuted;
 			levelRoundXp = snap.levelRoundXp;
@@ -1952,6 +2125,8 @@ public final class GexpressConfig {
 			levelRewardRoadmap = normalizeStringList(snap.levelRewardRoadmap);
 			levelTags = normalizeStringList(snap.levelTags);
 			skinCaseRows = normalizeStringList(snap.skinCaseRows);
+			lobbyPollCooldownSeconds = snap.lobbyPollCooldownSeconds;
+			lobbyPollDurationSeconds = snap.lobbyPollDurationSeconds;
 			clampInPlace();
 			loadedConfigVersion = CURRENT_CONFIG_VERSION;
 			if (migrated) {
@@ -2017,6 +2192,8 @@ public final class GexpressConfig {
 			snap.puppetmasterMaxUses = puppetmasterMaxUses;
 			snap.pelicanEatCooldownSeconds = pelicanEatCooldownSeconds;
 			snap.pelicanEatPercentage = pelicanEatPercentage;
+			snap.doomsayerGuessesToWin = doomsayerGuessesToWin;
+			snap.doomsayerDiesOnWrongGuess = doomsayerDiesOnWrongGuess;
 			snap.hungryFoodLimit = hungryFoodLimit;
 			snap.thirstyDrinkLimit = thirstyDrinkLimit;
 			snap.conversationTaskEnabled = conversationTaskEnabled;
@@ -2037,6 +2214,7 @@ public final class GexpressConfig {
 			snap.trackerMaxTargets = trackerMaxTargets;
 			snap.trackerRange = trackerRange;
 			snap.trackerCooldownSeconds = trackerCooldownSeconds;
+			snap.veteranMaxUses = veteranMaxUses;
 			snap.seerCompareCooldownSeconds = seerCompareCooldownSeconds;
 			snap.seerCompareDeathsRequired = seerCompareDeathsRequired;
 			snap.seerCompareRange = seerCompareRange;
@@ -2053,8 +2231,6 @@ public final class GexpressConfig {
 			snap.painterPaintDurationSeconds = painterPaintDurationSeconds;
 			snap.painterBodyCooldownSeconds = painterBodyCooldownSeconds;
 			snap.painterPlayerCooldownSeconds = painterPlayerCooldownSeconds;
-			snap.painterDoorwayDurationSeconds = painterDoorwayDurationSeconds;
-			snap.painterDoorwayCooldownSeconds = painterDoorwayCooldownSeconds;
 			snap.painterMaxPaintedBodies = painterMaxPaintedBodies;
 			snap.painterMaxPaintedPlayers = painterMaxPaintedPlayers;
 			snap.spyBugCost = spyBugCost;
@@ -2135,6 +2311,9 @@ public final class GexpressConfig {
 			snap.abilityHudScalePercent = abilityHudScalePercent;
 			snap.abilityHudOffsetX = abilityHudOffsetX;
 			snap.abilityHudOffsetY = abilityHudOffsetY;
+			snap.abilitySoundVolumePercent = abilitySoundVolumePercent;
+			snap.replayEnabled = replayEnabled;
+			snap.grenadeTrajectoryPreview = grenadeTrajectoryPreview;
 			snap.use3dGunSkins = use3dGunSkins;
 			snap.alwaysMuted = alwaysMuted;
 			snap.levelRoundXp = levelRoundXp;
@@ -2149,7 +2328,9 @@ public final class GexpressConfig {
 			snap.levelRewardRoadmap = getLevelRewardRoadmapStrings();
 			snap.levelTags = getLevelTagStrings();
 			snap.skinCaseRows = getSkinCaseRows();
-			writeAtomically(CONFIG_PATH, GSON.toJson(snap));
+			snap.lobbyPollCooldownSeconds = getLobbyPollCooldownSeconds();
+			snap.lobbyPollDurationSeconds = getLobbyPollDurationSeconds();
+			ConfigFiles.writeAtomically(CONFIG_PATH, GSON.toJson(snap));
 		} catch (IOException e) {
 			MapSelect.LOGGER.warn("Failed to save gexpress.json.", e);
 		}
@@ -2182,7 +2363,7 @@ public final class GexpressConfig {
 			int trackerRange, int trackerCooldownSeconds, int altruistRange,
 			int skincrawlerBodyMaxAgeSeconds, int skincrawlerCooldownSeconds, int skincrawlerStunSeconds,
 			int skincrawlerRange, int painterPaintDurationSeconds, int painterBodyCooldownSeconds,
-			int painterPlayerCooldownSeconds, int painterDoorwayDurationSeconds, int painterDoorwayCooldownSeconds,
+			int painterPlayerCooldownSeconds,
 			int painterMaxPaintedBodies, int painterMaxPaintedPlayers,
 			int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
 			int squeakerPitchPercent, int masqueradePitchMinPercent, int masqueradePitchMaxPercent,
@@ -2217,7 +2398,7 @@ public final class GexpressConfig {
 			boolean loversShowPartnerHud, boolean loversAllowMixedSidePairs,
 			int covenantBiteCooldownSeconds,
 			int vengefulSpiritReviveDelaySeconds, int vengefulSpiritRevengeSeconds,
-			boolean loversIndependentWin) {
+			boolean loversIndependentWin, int veteranMaxUses) {
 		GexpressConfig.c4Price = c4Price;
 		GexpressConfig.c4FuseSeconds = c4FuseSeconds;
 		GexpressConfig.c4FirstBeepSeconds = c4FirstBeepSeconds;
@@ -2286,8 +2467,6 @@ public final class GexpressConfig {
 		GexpressConfig.painterPaintDurationSeconds = painterPaintDurationSeconds;
 		GexpressConfig.painterBodyCooldownSeconds = painterBodyCooldownSeconds;
 		GexpressConfig.painterPlayerCooldownSeconds = painterPlayerCooldownSeconds;
-		GexpressConfig.painterDoorwayDurationSeconds = painterDoorwayDurationSeconds;
-		GexpressConfig.painterDoorwayCooldownSeconds = painterDoorwayCooldownSeconds;
 		GexpressConfig.painterMaxPaintedBodies = painterMaxPaintedBodies;
 		GexpressConfig.painterMaxPaintedPlayers = painterMaxPaintedPlayers;
 		GexpressConfig.spyBugCost = spyBugCost;
@@ -2366,6 +2545,7 @@ public final class GexpressConfig {
 		GexpressConfig.medicShieldBreakFlashAlpha = medicShieldBreakFlashAlpha;
 		GexpressConfig.silentShadowAlpha = silentShadowAlpha;
 		GexpressConfig.specialRoleOccurrence = specialRoleOccurrence;
+		GexpressConfig.veteranMaxUses = veteranMaxUses;
 		clampInPlace();
 	}
 
@@ -2384,7 +2564,8 @@ public final class GexpressConfig {
 			int levelKillXp, int levelCivilianTaskXp, int levelBaseXp, int levelXpIncrease,
 			int levelRoadmapDisplayLevels, String levelXpOverrides, String levelRewardRoadmap,
 			String levelTags, String grenadeLineOfSightPassThroughBlocks,
-			int goldFoodPlatterPrice, int goldDrinkTrayPrice, String skinCaseRows, int mutedNotePrice) {
+			int goldFoodPlatterPrice, int goldDrinkTrayPrice, String skinCaseRows, int mutedNotePrice,
+			int lobbyPollCooldownSeconds, int lobbyPollDurationSeconds) {
 		GexpressConfig.levelRoundXp = levelRoundXp;
 		GexpressConfig.levelWinXp = levelWinXp;
 		GexpressConfig.levelNeutralWinBonusXp = levelNeutralWinBonusXp;
@@ -2401,6 +2582,8 @@ public final class GexpressConfig {
 		GexpressConfig.goldDrinkTrayPrice = goldDrinkTrayPrice;
 		GexpressConfig.setSkinCaseRowsSyncString(skinCaseRows);
 		GexpressConfig.mutedNotePrice = mutedNotePrice;
+		GexpressConfig.lobbyPollCooldownSeconds = lobbyPollCooldownSeconds;
+		GexpressConfig.lobbyPollDurationSeconds = lobbyPollDurationSeconds;
 		clampInPlace();
 	}
 
@@ -2447,6 +2630,7 @@ public final class GexpressConfig {
 		puppetmasterMaxUses = getPuppetmasterMaxUses();
 		pelicanEatCooldownSeconds = getPelicanEatCooldownSeconds();
 		pelicanEatPercentage = getPelicanEatPercentage();
+		doomsayerGuessesToWin = getDoomsayerGuessesToWin();
 		hungryFoodLimit = getHungryFoodLimit();
 		thirstyDrinkLimit = getThirstyDrinkLimit();
 		conversationTaskChancePercent = getConversationTaskChancePercent();
@@ -2466,6 +2650,7 @@ public final class GexpressConfig {
 		trackerMaxTargets = getTrackerMaxTargets();
 		trackerRange = getTrackerRange();
 		trackerCooldownSeconds = getTrackerCooldownSeconds();
+		veteranMaxUses = getVeteranMaxUses();
 		seerCompareCooldownSeconds = getSeerCompareCooldownSeconds();
 		seerCompareDeathsRequired = getSeerCompareDeathsRequired();
 		seerCompareRange = getSeerCompareRange();
@@ -2481,8 +2666,6 @@ public final class GexpressConfig {
 		painterPaintDurationSeconds = getPainterPaintDurationSeconds();
 		painterBodyCooldownSeconds = getPainterBodyCooldownSeconds();
 		painterPlayerCooldownSeconds = getPainterPlayerCooldownSeconds();
-		painterDoorwayDurationSeconds = getPainterDoorwayDurationSeconds();
-		painterDoorwayCooldownSeconds = getPainterDoorwayCooldownSeconds();
 		painterMaxPaintedBodies = getPainterMaxPaintedBodies();
 		painterMaxPaintedPlayers = getPainterMaxPaintedPlayers();
 		spyBugCost = getSpyBugCost();
@@ -2554,6 +2737,7 @@ public final class GexpressConfig {
 		abilityHudScalePercent = getAbilityHudScalePercent();
 		abilityHudOffsetX = getAbilityHudOffsetX();
 		abilityHudOffsetY = getAbilityHudOffsetY();
+		abilitySoundVolumePercent = getAbilitySoundVolumePercent();
 		levelRoundXp = getLevelRoundXp();
 		levelWinXp = getLevelWinXp();
 		levelNeutralWinBonusXp = getLevelNeutralWinBonusXp();
@@ -2566,6 +2750,8 @@ public final class GexpressConfig {
 		levelRewardRoadmap = getLevelRewardRoadmapStrings();
 		levelTags = getLevelTagStrings();
 		skinCaseRows = getSkinCaseRows();
+		lobbyPollCooldownSeconds = getLobbyPollCooldownSeconds();
+		lobbyPollDurationSeconds = getLobbyPollDurationSeconds();
 	}
 
 	private static C4PlacementPreset currentC4PlacementPreset() {
@@ -2811,13 +2997,7 @@ public final class GexpressConfig {
 	}
 
 	private static int parseBoundedInt(String raw, int fallback, int min, int max) {
-		if (raw == null) return fallback;
-		try {
-			int value = Integer.parseInt(raw.strip());
-			return Math.max(min, Math.min(max, value));
-		} catch (NumberFormatException ignored) {
-			return fallback;
-		}
+		return ConfigBounds.parseInt(raw, fallback, min, max);
 	}
 
 	private static Integer parsePositiveInt(String raw) {
@@ -2831,28 +3011,26 @@ public final class GexpressConfig {
 	}
 
 	private static float clampFloat(float value, float min, float max, float fallback) {
-		if (!Float.isFinite(value)) return fallback;
-		return Math.max(min, Math.min(max, value));
-	}
-
-	private static void writeAtomically(Path target, String json) throws IOException {
-		Path tmp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp");
-		try {
-			Files.writeString(tmp, json);
-			try {
-				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-			} catch (AtomicMoveNotSupportedException e) {
-				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
-			}
-		} finally {
-			Files.deleteIfExists(tmp);
-		}
+		return ConfigBounds.clamp(value, min, max, fallback);
 	}
 
 	private static boolean migrateSnapshot(Snapshot snap, int sourceVersion) {
 		boolean changed = sourceVersion != CURRENT_CONFIG_VERSION;
 		if (sourceVersion < 2 && snap.spyBugCost == 200) {
 			snap.spyBugCost = 100;
+			changed = true;
+		}
+		if (sourceVersion < 4) {
+			snap.covenantBiteCooldownSeconds = 45;
+			changed = true;
+		}
+		if (sourceVersion < 5) {
+			snap.veteranMaxUses = 5;
+			changed = true;
+		}
+		if (sourceVersion < 6) {
+			snap.doomsayerGuessesToWin = 4;
+			snap.doomsayerDiesOnWrongGuess = false;
 			changed = true;
 		}
 		snap.configVersion = CURRENT_CONFIG_VERSION;
@@ -2908,6 +3086,8 @@ public final class GexpressConfig {
 		int puppetmasterMaxUses = 3;
 		int pelicanEatCooldownSeconds = 20;
 		int pelicanEatPercentage = 80;
+		int doomsayerGuessesToWin = 4;
+		boolean doomsayerDiesOnWrongGuess = false;
 		int hungryFoodLimit = 2;
 		int thirstyDrinkLimit = 2;
 		boolean conversationTaskEnabled = true;
@@ -2928,10 +3108,11 @@ public final class GexpressConfig {
 		int trackerMaxTargets = 3;
 		int trackerRange = 4;
 		int trackerCooldownSeconds = 10;
+		int veteranMaxUses = 5;
 		int seerCompareCooldownSeconds = 45;
 		int seerCompareDeathsRequired = 3;
 		int seerCompareRange = 4;
-		int twinsSwapCooldownSeconds = 20;
+		int twinsSwapCooldownSeconds = 30;
 		boolean twinsBodyDifferentRole = false;
 		int altruistRange = 4;
 		int bountyHunterBountyIntervalSeconds = 60;
@@ -2944,8 +3125,6 @@ public final class GexpressConfig {
 		int painterPaintDurationSeconds = 60;
 		int painterBodyCooldownSeconds = 30;
 		int painterPlayerCooldownSeconds = 30;
-		int painterDoorwayDurationSeconds = 10;
-		int painterDoorwayCooldownSeconds = 30;
 		int painterMaxPaintedBodies = 1;
 		int painterMaxPaintedPlayers = 1;
 		int spyBugCost = 100;
@@ -2983,7 +3162,7 @@ public final class GexpressConfig {
 		boolean loversShowPartnerHud = true;
 		boolean loversAllowMixedSidePairs = false;
 		boolean loversIndependentWin = false;
-		int covenantBiteCooldownSeconds = 15;
+		int covenantBiteCooldownSeconds = 45;
 		int vengefulSpiritReviveDelaySeconds = 15;
 		int vengefulSpiritRevengeSeconds = 30;
 		boolean lastDeathShieldEnabled = false;
@@ -3026,6 +3205,9 @@ public final class GexpressConfig {
 		int abilityHudScalePercent = 100;
 		int abilityHudOffsetX = 0;
 		int abilityHudOffsetY = 0;
+		int abilitySoundVolumePercent = 100;
+		boolean replayEnabled = true;
+		boolean grenadeTrajectoryPreview = true;
 		boolean use3dGunSkins = true;
 		boolean alwaysMuted = false;
 		int levelRoundXp = 25;
@@ -3040,5 +3222,7 @@ public final class GexpressConfig {
 		List<String> levelRewardRoadmap = new ArrayList<>();
 		List<String> levelTags = new ArrayList<>();
 		List<String> skinCaseRows = defaultSkinCaseRows();
+		int lobbyPollCooldownSeconds = 600;
+		int lobbyPollDurationSeconds = 60;
 	}
 }

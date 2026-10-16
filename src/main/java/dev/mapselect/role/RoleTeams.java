@@ -51,7 +51,10 @@ public final class RoleTeams {
 		Role role = role(game, player);
 		if (role == null) return null;
 		Identifier id = role.identifier();
-		if (isMafia(id)) return "mafia";
+		if (isMafia(id)) {
+			UUID root = dev.mapselect.role.mafia.MafiaManager.familyRoot(player.getUuid());
+			return "mafia:" + (root == null ? player.getUuid() : root);
+		}
 		if (isCovenant(id)) return "covenant";
 		if (role.isInnocent() && (game == null || !game.canUseKillerFeatures(player))) return "civilian";
 		if (role.canUseKiller() || (game != null && game.canUseKillerFeatures(player))) return "killer";

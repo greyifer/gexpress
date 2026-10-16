@@ -43,6 +43,11 @@ public final class SkinCaseManager {
 
 	public static boolean buy(ServerPlayerEntity player, String caseId) {
 		if (player == null || caseId == null || caseId.isBlank()) return false;
+		if (!SkinShopConfig.casesEnabled()) {
+			player.sendMessage(Text.literal("Case purchases are currently unavailable.")
+				.formatted(Formatting.RED), false);
+			return false;
+		}
 		GexpressConfig.SkinCaseEntry skinCase = GexpressConfig.getSkinCaseEntry(caseId);
 		if (skinCase == null || skinCase.totalWeight() <= 0) {
 			player.sendMessage(Text.literal("Unknown or empty case: " + caseId).formatted(Formatting.RED), false);

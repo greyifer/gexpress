@@ -12,6 +12,7 @@ import dev.doctor4t.wathe.index.WatheDataComponentTypes;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.role.bodyguard.BodyguardFeedPayload;
 import dev.mapselect.network.role.bodyguard.BodyguardStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -72,7 +73,7 @@ public final class BodyguardManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		if (++tickGate < 5) return;
 		tickGate = 0;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
@@ -161,6 +162,7 @@ public final class BodyguardManager {
 	}
 
 	private static boolean hasIssuedRevolver(ServerPlayerEntity bodyguard) {
+		if (isIssuedRevolver(bodyguard.currentScreenHandler.getCursorStack()) || isIssuedRevolver(bodyguard.playerScreenHandler.getCursorStack())) return true;
 		for (int slot = 0; slot < bodyguard.getInventory().size(); slot++) {
 			if (isIssuedRevolver(bodyguard.getInventory().getStack(slot))) return true;
 		}
@@ -170,6 +172,7 @@ public final class BodyguardManager {
 	private static void removeIssuedRevolver(ServerPlayerEntity bodyguard) {
 		if (bodyguard == null) return;
 		boolean changed = false;
+		if (isIssuedRevolver(bodyguard.currentScreenHandler.getCursorStack())) { bodyguard.currentScreenHandler.setCursorStack(ItemStack.EMPTY); changed = true; }
 		for (int slot = 0; slot < bodyguard.getInventory().size(); slot++) {
 			if (!isIssuedRevolver(bodyguard.getInventory().getStack(slot))) continue;
 			bodyguard.getInventory().setStack(slot, ItemStack.EMPTY);
@@ -292,17 +295,13 @@ public final class BodyguardManager {
 	}
 
 	private static void sendState(ServerPlayerEntity bodyguard, ServerPlayerEntity target) {
-		if (bodyguard == null || target == null || !ServerPlayNetworking.canSend(bodyguard, BodyguardStatePayload.ID)) {
-			return;
-		}
-		ServerPlayNetworking.send(bodyguard,
+		if (bodyguard == null || target == null) return;
+		PayloadSync.sendIfChanged(bodyguard, BodyguardStatePayload.ID,
 			new BodyguardStatePayload(true, target.getUuid(), target.getName().getString()));
 	}
 
 	private static void sendClear(ServerPlayerEntity bodyguard) {
-		if (bodyguard != null && ServerPlayNetworking.canSend(bodyguard, BodyguardStatePayload.ID)) {
-			ServerPlayNetworking.send(bodyguard, BodyguardStatePayload.clear());
-		}
+		PayloadSync.sendIfChanged(bodyguard, BodyguardStatePayload.ID, BodyguardStatePayload.clear());
 	}
 
 	private static void sendFeed(ServerPlayerEntity bodyguard, String line) {

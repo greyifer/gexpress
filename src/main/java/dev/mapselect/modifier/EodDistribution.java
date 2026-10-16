@@ -1,21 +1,24 @@
 package dev.mapselect.modifier;
 
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.MapSelect;
+import dev.mapselect.game.RoundLifecycleHooks;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.world.World;
 import org.agmas.harpymodloader.component.WorldModifierComponent;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Hands out Pliers to every player wearing the EOD Specialist modifier once per game, as
@@ -40,21 +43,20 @@ import java.util.UUID;
 public final class EodDistribution {
 	private EodDistribution() {}
 
-	/** UUIDs that received their Pliers this game. Cleared whenever the game isn't ACTIVE. */
-	private static final Set<UUID> granted = new HashSet<>();
+	/** UUIDs that received their Pliers this game, isolated per game world. */
+	private static final Map<RegistryKey<World>, Set<UUID>> grantedByWorld = new ConcurrentHashMap<>();
 	private static final int CHECK_INTERVAL_TICKS = 10;
-	private static int ticksUntilNextCheck = 0;
+	private static final Map<RegistryKey<World>, Integer> ticksUntilNextCheck = new ConcurrentHashMap<>();
 
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(EodDistribution::tick);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> reset());
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> reset());
+		RoundLifecycleHooks.clearWorld(EodDistribution::reset);
 	}
 
 	private static void tick(ServerWorld world) {
 		// Wathe games only run in the overworld; ignoring other dimensions keeps our single
 		// static state from being thrashed by non-game worlds each tick.
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean activeGame = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
@@ -65,11 +67,14 @@ public final class EodDistribution {
 		WorldModifierComponent mods = WorldModifierComponent.KEY.getNullable(world);
 		if (mods == null) return;
 
-		if (ticksUntilNextCheck > 0) {
-			ticksUntilNextCheck--;
+		RegistryKey<World> worldKey = world.getRegistryKey();
+		int remaining = ticksUntilNextCheck.getOrDefault(worldKey, 0);
+		if (remaining > 0) {
+			ticksUntilNextCheck.put(worldKey, remaining - 1);
 			return;
 		}
-		ticksUntilNextCheck = CHECK_INTERVAL_TICKS - 1;
+		ticksUntilNextCheck.put(worldKey, CHECK_INTERVAL_TICKS - 1);
+		Set<UUID> granted = grantedByWorld.computeIfAbsent(worldKey, ignored -> new HashSet<>());
 
 		for (var player : world.getPlayers()) {
 			boolean testingEod = GexpressTestState.isModifierTester(player, MapSelectModifiers.EOD_SPECIALIST);
@@ -117,8 +122,9 @@ public final class EodDistribution {
 		if (changed) player.playerScreenHandler.syncState();
 	}
 
-	private static void reset() {
-		granted.clear();
-		ticksUntilNextCheck = 0;
+	private static void reset(World world) {
+		if (world == null) return;
+		grantedByWorld.remove(world.getRegistryKey());
+		ticksUntilNextCheck.remove(world.getRegistryKey());
 	}
 }

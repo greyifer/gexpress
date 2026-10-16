@@ -32,7 +32,7 @@ import java.util.function.Supplier;
 public class GreyiferPlushBlock extends BlockWithEntity {
 	private static final MapCodec<GreyiferPlushBlock> CODEC = createCodec(GreyiferPlushBlock::new);
 	public static final DirectionProperty FACING = Properties.HORIZONTAL_FACING;
-	private static final VoxelShape SHAPE = BlockWithEntity.createCuboidShape(2.0, 0.0, 2.0, 14.0, 15.0, 14.0);
+	private static final VoxelShape SHAPE = BlockWithEntity.createCuboidShape(0.5, 0.0, 0.5, 15.5, 15.75, 15.5);
 	private final Supplier<SoundEvent> useSound;
 
 	public GreyiferPlushBlock(AbstractBlock.Settings settings) {

@@ -4,27 +4,22 @@ import cat.rezelyn.watheextended.cca.WatheExtendedWorldComponent;
 import cat.rezelyn.watheextended.game.TeleportationSlot;
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent;
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent.PosWithOrientation;
-import dev.mapselect.role.painter.PainterManager;
+import dev.mapselect.config.RoleModifierTuningConfig;
 import dev.mapselect.weather.WeatherType;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class MapPreset {
 	public enum TerrainMode { MOVING, STATIC }
 	public enum PlayAreaMode { FULL_MAP, TRAIN }
 	private static final int MAX_RANDOM_SPAWNS = 256;
-	private static final int MAX_DISABLED_PAINTER_DOORWAYS = 1024;
 	private static final double MAX_BOX_SPAN = 10000.0D;
 	public static final int DEFAULT_ROOM_COUNT = 7;
 	public static final int MIN_ROOM_COUNT = 1;
@@ -44,6 +39,7 @@ public class MapPreset {
 	public WeatherType weather = WeatherType.NONE;
 	public Integer fogColor;
 	public String defaultTrainPreset;
+	public String gameSettingsPreset;
 	public OffsetData lobbyTrainCorner;
 	public int roomCount = DEFAULT_ROOM_COUNT;
 	public Boolean couchSleepingEnabled = Boolean.TRUE;
@@ -51,7 +47,10 @@ public class MapPreset {
 	public TerrainMode terrainMode;
 	public PlayAreaMode playAreaMode;
 	public List<PosData> randomSpawnPositions = new ArrayList<>();
-	public List<BlockPosData> disabledPainterDoorways = new ArrayList<>();
+	public Map<String, Integer> roleChanceOverrides = new LinkedHashMap<>();
+	public Map<String, Integer> roleMaxOverrides = new LinkedHashMap<>();
+	public Map<String, Integer> modifierChanceOverrides = new LinkedHashMap<>();
+	public Map<String, Integer> modifierMaxOverrides = new LinkedHashMap<>();
 
 	public static MapPreset from(MapVariablesWorldComponent c) {
 		MapPreset p = new MapPreset();
@@ -69,7 +68,6 @@ public class MapPreset {
 		p.lobbyArea = BoxData.from(ext.getLobbyArea());
 		p.readyAreaSpawnPos = PosData.from(ext.getReadyAreaSpawnPos());
 		p.randomSpawnPositions = randomSpawnsFrom(world);
-		p.disabledPainterDoorways = p.disabledPainterDoorwaysFromRuntime(PainterManager.disabledDoorwaysSnapshot());
 		return p;
 	}
 
@@ -105,7 +103,6 @@ public class MapPreset {
 		WatheExtendedWorldComponent ext = WatheExtendedWorldComponent.KEY.get(world);
 		if (lobbyArea != null) ext.setLobbyArea(lobbyArea.toBox());
 		if (readyAreaSpawnPos != null) ext.setReadyAreaSpawnPos(readyAreaSpawnPos.toPosWithOrientation());
-		PainterManager.replaceDisabledDoorways(world, disabledPainterDoorwaysForRuntime());
 	}
 
 	public boolean applyRandomSpawnsTo(ServerWorld world) {
@@ -145,6 +142,10 @@ public class MapPreset {
 			defaultTrainPreset = defaultTrainPreset.trim();
 			if (defaultTrainPreset.isEmpty()) defaultTrainPreset = null;
 		}
+		if (gameSettingsPreset != null) {
+			gameSettingsPreset = gameSettingsPreset.trim();
+			if (gameSettingsPreset.isEmpty()) gameSettingsPreset = null;
+		}
 
 		List<PosData> normalizedSpawns = new ArrayList<>();
 		if (randomSpawnPositions != null) {
@@ -155,7 +156,14 @@ public class MapPreset {
 			}
 		}
 		randomSpawnPositions = normalizedSpawns;
-		disabledPainterDoorways = normalizeDisabledPainterDoorways(disabledPainterDoorways);
+		roleChanceOverrides = normalizeOverrideMap(roleChanceOverrides,
+			RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX);
+		roleMaxOverrides = normalizeOverrideMap(roleMaxOverrides,
+			RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX);
+		modifierChanceOverrides = normalizeOverrideMap(modifierChanceOverrides,
+			RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX);
+		modifierMaxOverrides = normalizeOverrideMap(modifierMaxOverrides,
+			RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX);
 	}
 
 	public int normalizedRoomCount() {
@@ -294,95 +302,16 @@ public class MapPreset {
 		return normalized;
 	}
 
-	private static List<BlockPosData> normalizeDisabledPainterDoorways(List<BlockPosData> positions) {
-		List<BlockPosData> normalized = new ArrayList<>();
-		Set<BlockPos> seen = new LinkedHashSet<>();
-		if (positions == null) return normalized;
-		for (BlockPosData position : positions) {
-			if (position == null) continue;
-			BlockPosData copy = new BlockPosData();
-			copy.x = position.x;
-			copy.y = position.y;
-			copy.z = position.z;
-			if (!seen.add(copy.toBlockPos())) continue;
-			normalized.add(copy);
-			if (normalized.size() >= MAX_DISABLED_PAINTER_DOORWAYS) break;
-		}
-		return normalized;
-	}
-
-	public static List<BlockPosData> blockPositionsFrom(Collection<BlockPos> positions) {
-		List<BlockPosData> out = new ArrayList<>();
-		if (positions != null) {
-			for (BlockPos position : positions) {
-				if (position != null) out.add(BlockPosData.from(position));
-			}
-		}
-		return normalizeDisabledPainterDoorways(out);
-	}
-
-	public static List<BlockPos> toBlockPositions(Collection<BlockPosData> positions) {
-		List<BlockPos> out = new ArrayList<>();
-		if (positions != null) {
-			for (BlockPosData position : positions) {
-				if (position != null) out.add(position.toBlockPos());
-			}
+	private static Map<String, Integer> normalizeOverrideMap(Map<String, Integer> raw, int min, int max) {
+		Map<String, Integer> out = new LinkedHashMap<>();
+		if (raw == null) return out;
+		for (Map.Entry<String, Integer> entry : raw.entrySet()) {
+			if (entry.getKey() == null || entry.getValue() == null) continue;
+			String id = entry.getKey().trim();
+			if (id.isEmpty()) continue;
+			out.put(id, Math.max(min, Math.min(max, entry.getValue())));
 		}
 		return out;
-	}
-
-	public List<BlockPosData> disabledPainterDoorwaysFromRuntime(Collection<BlockPos> positions) {
-		normalize();
-		List<BlockPos> saved = new ArrayList<>();
-		if (positions != null) {
-			for (BlockPos position : positions) {
-				if (position != null) saved.add(toTemplateDoorwayPosition(position));
-			}
-		}
-		return blockPositionsFrom(saved);
-	}
-
-	public List<BlockPos> disabledPainterDoorwaysForRuntime() {
-		normalize();
-		List<BlockPos> saved = toBlockPositions(disabledPainterDoorways);
-		List<BlockPos> runtime = new ArrayList<>();
-		for (BlockPos position : saved) {
-			if (position != null) runtime.add(toRuntimeDoorwayPosition(position));
-		}
-		return runtime;
-	}
-
-	private BlockPos toRuntimeDoorwayPosition(BlockPos saved) {
-		if (saved == null) return null;
-		Vec3i offset = disabledDoorwayOffset();
-		if (offset == null) return saved.toImmutable();
-		if (containsBlock(resetTemplateArea, saved)) {
-			BlockPos translated = saved.add(offset);
-			if (playArea == null || containsBlock(playArea, translated)) return translated.toImmutable();
-		}
-		return saved.toImmutable();
-	}
-
-	private BlockPos toTemplateDoorwayPosition(BlockPos runtime) {
-		if (runtime == null) return null;
-		Vec3i offset = disabledDoorwayOffset();
-		if (offset == null) return runtime.toImmutable();
-		if (containsBlock(playArea, runtime)) {
-			BlockPos translated = runtime.subtract(offset);
-			if (resetTemplateArea == null || containsBlock(resetTemplateArea, translated)) return translated.toImmutable();
-		}
-		return runtime.toImmutable();
-	}
-
-	private Vec3i disabledDoorwayOffset() {
-		if (playAreaOffset == null) return null;
-		if (playAreaOffset.x == 0 && playAreaOffset.y == 0 && playAreaOffset.z == 0) return null;
-		return playAreaOffset.toVec3i();
-	}
-
-	private static boolean containsBlock(BoxData box, BlockPos pos) {
-		if (box == null || pos == null) return false;
-		return box.toBox().contains(Vec3d.ofCenter(pos));
 	}
 
 	public static class PosData {
@@ -402,23 +331,6 @@ public class MapPreset {
 
 		public PosWithOrientation toPosWithOrientation() {
 			return new PosWithOrientation(new Vec3d(x, y, z), yaw, pitch);
-		}
-	}
-
-	public static class BlockPosData {
-		public int x, y, z;
-
-		public static BlockPosData from(BlockPos pos) {
-			if (pos == null) return null;
-			BlockPosData d = new BlockPosData();
-			d.x = pos.getX();
-			d.y = pos.getY();
-			d.z = pos.getZ();
-			return d;
-		}
-
-		public BlockPos toBlockPos() {
-			return new BlockPos(x, y, z);
 		}
 	}
 

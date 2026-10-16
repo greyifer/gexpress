@@ -61,7 +61,7 @@ public class FusedOrnamentItem extends Item {
 
 	private ActionResult placeOrMerge(ItemStack stack, BlockState clickedState, World world, BlockPos pos,
 			PlayerEntity player, BlockPos hitBlockPos, Direction side, Vec3d hitPos) {
-		if (player != null && player.shouldCancelInteraction()
+		if (player != null && player.isCreative() && player.shouldCancelInteraction()
 				&& clickedState.isOf(MapSelectBlocks.FUSED_ORNAMENTED_BLOCK)) {
 			return FusedOrnamentBlock.removeOrnament(clickedState, world, pos, player, side, ornamentId);
 		}

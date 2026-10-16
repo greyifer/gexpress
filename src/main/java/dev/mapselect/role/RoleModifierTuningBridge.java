@@ -5,8 +5,12 @@ import dev.doctor4t.wathe.api.WatheRoles;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
+import dev.mapselect.preset.map.MapPreset;
+import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.weather.MapWeatherComponent;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import org.agmas.harpymodloader.Harpymodloader;
 import org.agmas.harpymodloader.modifiers.HMLModifiers;
@@ -14,11 +18,14 @@ import org.agmas.harpymodloader.modifiers.Modifier;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class RoleModifierTuningBridge {
+	private static final Identifier NOELLES_TINY_ID = Identifier.of("noellesroles", "tiny");
+	private static final Identifier NOELLES_GUESSER_ID = Identifier.of("noellesroles", "guesser");
 	private static final Set<Identifier> rememberedRoleMax = new HashSet<>();
 	private static final Set<Identifier> originalRoleMaxPresent = new HashSet<>();
 	private static final Map<Identifier, Integer> originalRoleMax = new HashMap<>();
@@ -33,7 +40,9 @@ public final class RoleModifierTuningBridge {
 			restoreManagedMaxima();
 			applyDefaultMaxima();
 			applyExplicitMaxima();
+			disableBuggedRoles();
 			disableRuntimeOnlyModifiers();
+			applyRoleModifierExclusions();
 		} catch (Throwable t) {
 			MapSelect.LOGGER.debug("Failed to apply role/modifier tuning maxima: {}", t.toString());
 		}
@@ -44,14 +53,23 @@ public final class RoleModifierTuningBridge {
 	}
 
 	public static void prepareForGame(int playerCount) {
+		prepareForGame(null, playerCount);
+	}
+
+	public static void prepareForGame(ServerWorld world, int playerCount) {
 		try {
 			RoleModifierTuningConfig.load();
 			restoreManagedMaxima();
 			applyDefaultMaxima();
 			applyExplicitMaxima();
+			MapPreset mapPreset = loadActiveMapPreset(world);
+			applyMapMaxima(mapPreset);
 			applyRoleChanceGates();
+			applyMapChanceGates(mapPreset);
 			disableRuntimeOnlyModifiers();
 			applySpecialRoleGates(playerCount);
+			disableBuggedRoles();
+			applyRoleModifierExclusions();
 		} catch (Throwable t) {
 			MapSelect.LOGGER.warn("Failed to prepare role count tuning.", t);
 		}
@@ -87,12 +105,40 @@ public final class RoleModifierTuningBridge {
 		}
 	}
 
+	private static void applyMapMaxima(MapPreset preset) {
+		if (preset == null) return;
+		for (Map.Entry<String, Integer> entry : preset.roleMaxOverrides.entrySet()) {
+			Identifier id = parse(entry.getKey());
+			if (id != null) putRoleMax(id, isStupidExpressPairRole(id)
+				? fixedPairRoleMax(entry.getValue())
+				: entry.getValue());
+		}
+		for (Map.Entry<String, Integer> entry : preset.modifierMaxOverrides.entrySet()) {
+			Identifier id = parse(entry.getKey());
+			if (id != null) putModifierMax(id, isStupidExpressPairModifier(id)
+				? fixedPairModifierRolls(entry.getValue())
+				: entry.getValue());
+		}
+	}
+
 	private static void applyRoleChanceGates() {
 		for (Map.Entry<String, Integer> entry : RoleModifierTuningConfig.roleChanceEntries().entrySet()) {
 			Identifier id = parse(entry.getKey());
 			if (id != null && !passes(entry.getValue())) putRoleMax(id, 0);
 		}
 		for (Map.Entry<String, Integer> entry : RoleModifierTuningConfig.modifierChanceEntries().entrySet()) {
+			Identifier id = parse(entry.getKey());
+			if (id != null && !passes(entry.getValue())) putModifierMax(id, 0);
+		}
+	}
+
+	private static void applyMapChanceGates(MapPreset preset) {
+		if (preset == null) return;
+		for (Map.Entry<String, Integer> entry : preset.roleChanceOverrides.entrySet()) {
+			Identifier id = parse(entry.getKey());
+			if (id != null && !passes(entry.getValue())) putRoleMax(id, 0);
+		}
+		for (Map.Entry<String, Integer> entry : preset.modifierChanceOverrides.entrySet()) {
 			Identifier id = parse(entry.getKey());
 			if (id != null && !passes(entry.getValue())) putModifierMax(id, 0);
 		}
@@ -143,8 +189,31 @@ public final class RoleModifierTuningBridge {
 		for (Identifier id : ids) putRoleMax(id, 0);
 	}
 
+	private static void disableBuggedRoles() {
+		for (Identifier id : BuggedRoles.ids()) putRoleMax(id, 0);
+	}
+
 	private static void disableRuntimeOnlyModifiers() {
 		putModifierMax(MapSelectModifiers.LOVERS_ID, 0);
+	}
+
+	private static void applyRoleModifierExclusions() {
+		for (Modifier modifier : HMLModifiers.MODIFIERS) {
+			if (modifier == null) continue;
+			Role excludedRole;
+			if (NOELLES_TINY_ID.equals(modifier.identifier())) {
+				excludedRole = MapSelectRoles.RAT;
+			} else if (NOELLES_GUESSER_ID.equals(modifier.identifier())) {
+				excludedRole = MapSelectRoles.DOOMSAYER;
+			} else {
+				continue;
+			}
+			if (excludedRole == null) continue;
+			ArrayList<Role> excluded = modifier.cannotBeAppliedTo() == null
+				? new ArrayList<>() : new ArrayList<>(modifier.cannotBeAppliedTo());
+			if (!excluded.contains(excludedRole)) excluded.add(excludedRole);
+			modifier.setCannotBeAppliedTo(excluded);
+		}
 	}
 
 	private static void restoreManagedMaxima() {
@@ -183,6 +252,21 @@ public final class RoleModifierTuningBridge {
 	private static Identifier parse(String raw) {
 		if (raw == null) return null;
 		return Identifier.tryParse(raw);
+	}
+
+	private static MapPreset loadActiveMapPreset(ServerWorld world) {
+		if (world == null) return null;
+		try {
+			MapWeatherComponent weather = MapWeatherComponent.KEY.getNullable(world);
+			String mapName = weather == null ? null : weather.getCurrentMapName();
+			if (mapName == null || mapName.isBlank()) return null;
+			MapPreset preset = PresetStorage.load(world.getServer(), mapName);
+			if (preset != null) preset.normalize();
+			return preset;
+		} catch (Exception e) {
+			MapSelect.LOGGER.debug("Failed to load active map preset role overrides: {}", e.toString());
+			return null;
+		}
 	}
 
 	private static boolean passes(int chance) {

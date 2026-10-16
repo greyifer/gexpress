@@ -1,38 +1,40 @@
 package dev.mapselect.modifier;
 
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.MapSelect;
+import dev.mapselect.game.RoundLifecycleHooks;
 import dev.mapselect.registry.MapSelectModifiers;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.world.World;
 import org.agmas.harpymodloader.component.WorldModifierComponent;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class MutedNotesDistribution {
 	private static final int STARTING_NOTES = 3;
 	private static final int CHECK_INTERVAL_TICKS = 10;
-	private static final Set<UUID> granted = new HashSet<>();
-	private static int ticksUntilNextCheck = 0;
+	private static final Map<RegistryKey<World>, Set<UUID>> grantedByWorld = new ConcurrentHashMap<>();
+	private static final Map<RegistryKey<World>, Integer> ticksUntilNextCheck = new ConcurrentHashMap<>();
 
 	private MutedNotesDistribution() {}
 
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(MutedNotesDistribution::tick);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> reset());
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> reset());
+		RoundLifecycleHooks.clearWorld(MutedNotesDistribution::reset);
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean activeGame = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
@@ -43,11 +45,14 @@ public final class MutedNotesDistribution {
 		WorldModifierComponent modifiers = WorldModifierComponent.KEY.getNullable(world);
 		if (modifiers == null) return;
 
-		if (ticksUntilNextCheck > 0) {
-			ticksUntilNextCheck--;
+		RegistryKey<World> worldKey = world.getRegistryKey();
+		int remaining = ticksUntilNextCheck.getOrDefault(worldKey, 0);
+		if (remaining > 0) {
+			ticksUntilNextCheck.put(worldKey, remaining - 1);
 			return;
 		}
-		ticksUntilNextCheck = CHECK_INTERVAL_TICKS - 1;
+		ticksUntilNextCheck.put(worldKey, CHECK_INTERVAL_TICKS - 1);
+		Set<UUID> granted = grantedByWorld.computeIfAbsent(worldKey, ignored -> new HashSet<>());
 
 		for (var player : world.getPlayers()) {
 			boolean testingMuted = GexpressTestState.isModifierTester(player, MapSelectModifiers.MUTED);
@@ -77,8 +82,9 @@ public final class MutedNotesDistribution {
 		}
 	}
 
-	private static void reset() {
-		granted.clear();
-		ticksUntilNextCheck = 0;
+	private static void reset(World world) {
+		if (world == null) return;
+		grantedByWorld.remove(world.getRegistryKey());
+		ticksUntilNextCheck.remove(world.getRegistryKey());
 	}
 }

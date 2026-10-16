@@ -3,11 +3,15 @@ package dev.mapselect.client.effect;
 import dev.mapselect.MapSelect;
 import dev.mapselect.client.role.cupid.ClientCupidState;
 import dev.mapselect.client.role.mafia.ClientMafiaState;
-import dev.mapselect.mixin.client.GameRendererAccessor;
 import dev.mapselect.network.game.TestOverlayPayload;
+import foundry.veil.api.client.render.VeilRenderSystem;
+import foundry.veil.api.client.render.post.PostPipeline;
+import foundry.veil.api.client.render.post.PostProcessingManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
@@ -15,131 +19,136 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 
 public final class ClientBlackWhiteOverlay {
-	private static final Identifier MAFIA_SHADER =
-		Identifier.of(MapSelect.MOD_ID, "shaders/post/mafia_black_white.json");
-	private static final Identifier CUPID_SHADER =
-		Identifier.of(MapSelect.MOD_ID, "shaders/post/cupid_pink.json");
+	private static final Identifier VEIL_PIPELINE = Identifier.of(MapSelect.MOD_ID, "screen_overlay");
+	private static final int MODE_MAFIA = 0;
+	private static final int MODE_CUPID = 1;
+    private static final int MODE_LOKI = 2;
 
-	private static boolean shaderActive;
-	private static Identifier activeShader;
-	private static Identifier testShader;
-	private static long testShaderUntilTick;
+	private static int testMode = -1;
+	private static long testModeUntilTick;
+	private static boolean veilPipelineActive;
+	private static boolean veilRenderingCurrentEffect;
+	private static boolean loggedVeilFailure;
 
 	private ClientBlackWhiteOverlay() {}
 
 	public static void register() {
 		ClientPlayNetworking.registerGlobalReceiver(TestOverlayPayload.ID, (payload, context) ->
 			context.client().execute(() -> applyTestOverlay(context.client(), payload)));
+		WorldRenderEvents.START.register(ClientBlackWhiteOverlay::prepareFrame);
 		ClientTickEvents.END_CLIENT_TICK.register(ClientBlackWhiteOverlay::tick);
-		HudRenderCallback.EVENT.register(ClientBlackWhiteOverlay::render);
+		HudRenderCallback.EVENT.register(ClientBlackWhiteOverlay::renderFallback);
+	}
+
+	private static void prepareFrame(WorldRenderContext context) {
+		float tickDelta = context.tickCounter() == null ? 0.0F
+			: context.tickCounter().getTickDelta(true);
+		updateVeilPipeline(MinecraftClient.getInstance(), tickDelta);
 	}
 
 	private static void tick(MinecraftClient client) {
-		updateShader(client);
+		if (client == null || client.world == null) disableVeilPipeline();
+		else activeTestMode(client);
 	}
 
-	private static void render(DrawContext context, RenderTickCounter tickCounter) {
+	private static void renderFallback(DrawContext context, RenderTickCounter tickCounter) {
+		if (veilRenderingCurrentEffect) return;
 		MinecraftClient client = MinecraftClient.getInstance();
-		float strength = overlayStrength(client);
-		if (strength <= 0.02F) return;
-		boolean cupid = isCupidOverlay(client);
-		int alpha = Math.max(0, Math.min(cupid ? 24 : 76, Math.round((cupid ? 24.0F : 76.0F) * strength)));
-		int rgb = cupid ? 0xFFD8EA : 0x000000;
-		context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), (alpha << 24) | rgb);
+		float tickDelta = tickCounter == null ? 0.0F : tickCounter.getTickDelta(true);
+		OverlayEffect effect = desiredEffect(client, tickDelta);
+		if (effect == null || effect.strength <= 0.02F) return;
+
+		int maxAlpha = effect.mode == MODE_CUPID ? 38 : 76;
+		int alpha = MathHelper.clamp(Math.round(maxAlpha * effect.strength), 0, maxAlpha);
+		int rgb = effect.mode == MODE_CUPID ? 0xFF8FC5 : 0x000000;
+		context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(),
+			(alpha << 24) | rgb);
 	}
 
-	private static void updateShader(MinecraftClient client) {
-		Identifier desiredShader = desiredShader(client);
-		if (client == null || client.gameRenderer == null) {
-			shaderActive = false;
-			activeShader = null;
+	private static void updateVeilPipeline(MinecraftClient client, float tickDelta) {
+		OverlayEffect effect = desiredEffect(client, tickDelta);
+		if (effect == null || effect.strength <= 0.001F) {
+			disableVeilPipeline();
 			return;
 		}
-		if (desiredShader != null && shaderActive && client.gameRenderer.getPostProcessor() == null) {
-			shaderActive = false;
-			activeShader = null;
+		try {
+			PostProcessingManager manager = VeilRenderSystem.renderer().getPostProcessingManager();
+			PostPipeline pipeline = manager.getPipeline(VEIL_PIPELINE);
+			if (pipeline == null) {
+				veilRenderingCurrentEffect = false;
+				return;
+			}
+			if (!manager.isActive(VEIL_PIPELINE) && !manager.add(VEIL_PIPELINE)) {
+				veilRenderingCurrentEffect = false;
+				return;
+			}
+			pipeline.getUniformSafe("Mode").setInt(effect.mode);
+			pipeline.getUniformSafe("Strength").setFloat(effect.strength);
+            pipeline.getUniformSafe("Time").setFloat(client.world.getTime() + tickDelta);
+			veilPipelineActive = true;
+			veilRenderingCurrentEffect = true;
+		} catch (Throwable error) {
+			try {
+				VeilRenderSystem.renderer().getPostProcessingManager().remove(VEIL_PIPELINE);
+			} catch (Throwable ignored) {
+				// The fallback below is safe even when Veil itself is unavailable.
+			}
+			veilPipelineActive = false;
+			veilRenderingCurrentEffect = false;
+			if (!loggedVeilFailure) {
+				loggedVeilFailure = true;
+				MapSelect.LOGGER.warn("Could not initialize G'Express Veil screen effects; using HUD fallback.", error);
+			}
 		}
-		if (desiredShader == null) {
-			disable(client);
-			return;
-		}
-		if (!desiredShader.equals(activeShader)) {
-			disable(client);
-			load(client, desiredShader);
-		} else if (!shaderActive) {
-			load(client, desiredShader);
-		}
-		updateShaderStrength(client);
 	}
 
-	private static Identifier desiredShader(MinecraftClient client) {
-		Identifier test = activeTestShader(client);
-		if (test != null) return test;
-		if (ClientCupidState.cupidOverlayStrength() > 0.02F) return CUPID_SHADER;
-		return ClientMafiaState.blackWhiteStrength() > 0.02F ? MAFIA_SHADER : null;
+	public static boolean lokiWarpRendered() { return veilRenderingCurrentEffect && dev.mapselect.client.role.loki.ClientLokiState.hexed(); }
+
+	private static void disableVeilPipeline() {
+		veilRenderingCurrentEffect = false;
+		if (!veilPipelineActive) return;
+		try {
+			VeilRenderSystem.renderer().getPostProcessingManager().remove(VEIL_PIPELINE);
+		} catch (Throwable ignored) {
+			// Veil may already be shutting down during a world or resource transition.
+		}
+		veilPipelineActive = false;
 	}
 
-	private static float overlayStrength(MinecraftClient client) {
-		if (activeTestShader(client) != null) return 1.0F;
-		if (ClientCupidState.cupidOverlayStrength() > 0.02F) return ClientCupidState.cupidOverlayStrength();
-		return ClientMafiaState.blackWhiteStrength();
-	}
-
-	private static boolean isCupidOverlay(MinecraftClient client) {
-		Identifier test = activeTestShader(client);
-		return CUPID_SHADER.equals(test) || (test == null && ClientCupidState.cupidOverlayStrength() > 0.02F);
+	private static OverlayEffect desiredEffect(MinecraftClient client, float tickDelta) {
+		
+		int test = activeTestMode(client);
+		if (test >= 0) return new OverlayEffect(test, 1.0F);
+		float cupid = ClientCupidState.cupidOverlayStrength();
+		if (cupid > 0.001F) return new OverlayEffect(MODE_CUPID, cupid);
+		float mafia = ClientMafiaState.blackWhiteStrength();
+		return mafia > 0.001F ? new OverlayEffect(MODE_MAFIA, mafia) : null;
 	}
 
 	private static void applyTestOverlay(MinecraftClient client, TestOverlayPayload payload) {
 		if (payload.durationTicks() <= 0 || "clear".equals(payload.overlay())) {
-			testShader = null;
-			testShaderUntilTick = 0L;
+			testMode = -1;
+			testModeUntilTick = 0L;
 			return;
 		}
 		if (client == null || client.world == null) return;
-		testShader = switch (payload.overlay()) {
-			case "mafia", "black_white" -> MAFIA_SHADER;
-			case "cupid", "pink", "cupid_pink" -> CUPID_SHADER;
-			default -> null;
+		testMode = switch (payload.overlay()) {
+			case "mafia", "black_white" -> MODE_MAFIA;
+			case "cupid", "pink", "cupid_pink" -> MODE_CUPID;
+			default -> -1;
 		};
-		testShaderUntilTick = testShader == null ? 0L : client.world.getTime() + payload.durationTicks();
+		testModeUntilTick = testMode < 0 ? 0L : client.world.getTime() + payload.durationTicks();
 	}
 
-	private static Identifier activeTestShader(MinecraftClient client) {
-		if (testShader == null) return null;
-		if (client == null || client.world == null || client.world.getTime() >= testShaderUntilTick) {
-			testShader = null;
-			testShaderUntilTick = 0L;
-			return null;
+	private static int activeTestMode(MinecraftClient client) {
+		if (testMode < 0) return -1;
+		if (client == null || client.world == null || client.world.getTime() >= testModeUntilTick) {
+			testMode = -1;
+			testModeUntilTick = 0L;
+			return -1;
 		}
-		return testShader;
+		return testMode;
 	}
 
-	private static void load(MinecraftClient client, Identifier shader) {
-		try {
-			((GameRendererAccessor) client.gameRenderer).gexpress$loadPostProcessor(shader);
-			shaderActive = true;
-			activeShader = shader;
-		} catch (Throwable ignored) {
-			shaderActive = false;
-			activeShader = null;
-		}
-	}
-
-	private static void disable(MinecraftClient client) {
-		if (!shaderActive || client == null || client.gameRenderer == null) return;
-		client.gameRenderer.disablePostProcessor();
-		shaderActive = false;
-		activeShader = null;
-	}
-
-	private static void updateShaderStrength(MinecraftClient client) {
-		if (!shaderActive || client == null || client.gameRenderer == null
-				|| client.gameRenderer.getPostProcessor() == null) {
-			return;
-		}
-		float desaturation = CUPID_SHADER.equals(activeShader) ? 0.9F : 1.0F;
-		client.gameRenderer.getPostProcessor().setUniforms("Saturation",
-			MathHelper.clamp(1.0F - overlayStrength(client) * desaturation, 0.0F, 1.0F));
-	}
+	private record OverlayEffect(int mode, float strength) {}
 }

@@ -1,0 +1,18 @@
+{
+	"ambientocclusion": false,
+	"textures": {
+		"trap": "noellesroles:item/role_mine",
+		"particle": "noellesroles:item/role_mine"
+	},
+	"elements": [
+		{
+			"from": [4.8, 0.02, 4.8],
+			"to": [11.2, 0.03, 11.2],
+			"shade": false,
+			"faces": {
+				"up": { "texture": "#trap", "tintindex": 0 },
+				"down": { "texture": "#trap", "tintindex": 0 }
+			}
+		}
+	]
+}

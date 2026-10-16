@@ -1,112 +1,40 @@
 package dev.mapselect.client.screen;
 
-import com.google.common.collect.ImmutableList;
-import dev.isxander.yacl3.api.ConfigCategory;
-import dev.isxander.yacl3.api.CustomTabProvider;
-import dev.isxander.yacl3.api.OptionGroup;
-import dev.isxander.yacl3.gui.YACLScreen;
-import dev.isxander.yacl3.gui.tab.TabExt;
+import io.github.caspe.glib.api.client.editor.GlibContentScreen;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.level.LevelComponent;
 import dev.mapselect.network.progression.ClaimLevelRewardPayload;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.tab.Tab;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 public final class GexpressXpRoadmapCategory {
 	private GexpressXpRoadmapCategory() {}
 
-	public static ConfigCategory build(Screen parent) {
-		return new XpRoadmapCategory();
-	}
-
-	private static final class XpRoadmapCategory implements ConfigCategory, CustomTabProvider {
-		private final Text name = Text.translatable("gui.gexpress.config.category.xp_roadmap");
-		private final Text tooltip = Text.translatable("gui.gexpress.config.category.xp_roadmap.tooltip");
-
-		@Override
-		public @NotNull Text name() {
-			return name;
-		}
-
-		@Override
-		public @NotNull ImmutableList<OptionGroup> groups() {
-			return ImmutableList.of();
-		}
-
-		@Override
-		public @NotNull Text tooltip() {
-			return tooltip;
-		}
-
-		@Override
-		public Tab createTab(YACLScreen screen, ScreenRect tabArea) {
-			return new XpRoadmapTab(screen, tabArea, tooltip);
-		}
-	}
-
-	private static final class XpRoadmapTab implements TabExt {
-		private final XpRoadmapWidget panel;
-		private final ButtonWidget doneButton;
-		private final Tooltip tooltip;
-
-		private XpRoadmapTab(YACLScreen screen, ScreenRect tabArea, Text tooltipText) {
-			this.panel = new XpRoadmapWidget(tabArea.getLeft(), tabArea.getTop(), tabArea.width(), tabArea.height());
-			this.doneButton = ButtonWidget.builder(ScreenTexts.DONE, button -> screen.finishOrSave())
-				.size(Math.max(90, screen.width / 6), 20)
-				.build();
-			this.tooltip = Tooltip.of(tooltipText);
-			refreshGrid(tabArea);
-		}
-
-		@Override
-		public Text getTitle() {
-			return Text.translatable("gui.gexpress.config.category.xp_roadmap");
-		}
-
-		@Override
-		public void forEachChild(Consumer<ClickableWidget> consumer) {
-			consumer.accept(panel);
-			consumer.accept(doneButton);
-		}
-
-		@Override
-		public void refreshGrid(ScreenRect tabArea) {
-			panel.setDimensionsAndPosition(tabArea.width(), tabArea.height() - 30, tabArea.getLeft(), tabArea.getTop());
-			doneButton.setDimensionsAndPosition(Math.max(90, tabArea.width() / 5), 20,
-				tabArea.getLeft() + tabArea.width() - Math.max(90, tabArea.width() / 5) - 12,
-				tabArea.getBottom() - 24);
-		}
-
-		@Override
-		public @Nullable Tooltip getTooltip() {
-			return tooltip;
-		}
+	public static Screen createGlibScreen(Screen parent) {
+		return GlibContentScreen.builder(parent, Text.translatable("gui.gexpress.config.category.xp_roadmap"))
+			.subtitle(Text.translatable("gui.gexpress.config.category.xp_roadmap.tooltip"))
+			.accentColor(0xFF7CC9A2)
+			.content((host, rect) -> new XpRoadmapWidget(rect.x() + 4, rect.y() + 4,
+				rect.width() - 8, rect.height() - 8))
+			.build();
 	}
 
 	private static final class XpRoadmapWidget extends ClickableWidget {
-		private static final int CARD_HEIGHT = 82;
-		private static final int CARD_GAP = 8;
+		private static final int CARD_HEIGHT = 58;
+		private static final int CARD_GAP = 6;
 		private final List<LevelCard> cards = new ArrayList<>();
 		private int selectedLevel;
 		private int scroll;
@@ -142,12 +70,12 @@ public final class GexpressXpRoadmapCategory {
 			int contentTop = getY() + 102;
 			int contentBottom = getY() + height - 8;
 			boolean split = width >= 560;
-			int detailW = split ? Math.min(288, Math.max(220, width / 3)) : 0;
+			int listW = split ? Math.min(320, Math.max(230, width / 3)) : headerW;
+			int detailW = split ? headerW - listW - 14 : headerW;
 			int detailH = split ? contentBottom - contentTop : 86;
-			int detailX = split ? getX() + width - detailW - 14 : headerX;
+			int detailX = split ? headerX + listW + 14 : headerX;
 			int detailY = contentTop;
 			int listX = headerX;
-			int listW = split ? detailX - listX - 14 : headerW;
 			int listY = split ? contentTop : contentTop + detailH + 10;
 			int listH = Math.max(0, contentBottom - listY);
 
@@ -157,8 +85,8 @@ public final class GexpressXpRoadmapCategory {
 		}
 
 		private void drawHeader(DrawContext context, TextRenderer textRenderer, PlayerXp snapshot, int x, int y, int w) {
-			context.fill(x, y, x + w, y + 72, 0x55202630);
-			context.drawBorder(x, y, w, 72, 0x88AAB8C8);
+			context.fill(x, y, x + w, y + 72, 0x33111111);
+			context.drawBorder(x, y, w, 72, 0x8890A0AA);
 			context.drawTextWithShadow(textRenderer,
 				Text.translatable("gui.gexpress.config.xp_roadmap.level", snapshot.level())
 					.formatted(Formatting.BOLD),
@@ -177,7 +105,7 @@ public final class GexpressXpRoadmapCategory {
 			int barW = w - 28;
 			float progress = snapshot.neededXp() <= 0 ? 0.0F
 				: Math.min(1.0F, snapshot.levelXp() / (float) snapshot.neededXp());
-			context.fill(barX, barY, barX + barW, barY + 7, 0xCC0C1118);
+			context.fill(barX, barY, barX + barW, barY + 7, 0x55111111);
 			context.fill(barX, barY, barX + Math.round(barW * progress), barY + 7, 0xFF7CC9A2);
 			context.drawBorder(barX, barY, barW, 7, 0x885E7184);
 		}
@@ -189,9 +117,9 @@ public final class GexpressXpRoadmapCategory {
 			int nextXp = LevelComponent.xpNeededForLevel(level);
 			Status status = status(level, snapshot.level());
 			claimLevel = 0;
-			context.fill(x, y, x + w, y + h, 0x44202630);
+			context.fill(x, y, x + w, y + h, 0x33111111);
 			context.drawBorder(x, y, w, h, status.borderColor());
-			context.fill(x, y, x + 4, y + h, status.accentColor());
+			context.fill(x + 12, y + h - 3, x + w - 12, y + h - 1, status.accentColor());
 			context.drawTextWithShadow(textRenderer,
 				Text.translatable("gui.gexpress.config.xp_roadmap.level", level).formatted(Formatting.BOLD),
 				x + 14, y + 12, 0xFFFFFFFF);
@@ -256,8 +184,8 @@ public final class GexpressXpRoadmapCategory {
 			claimH = 18;
 			claimLevel = claimed ? 0 : level;
 			boolean hovered = !claimed && contains(mouseX, mouseY, claimX, claimY, claimW, claimH);
-			int fill = claimed ? 0x66343A42 : hovered ? 0xCC456D59 : 0xAA2F5D49;
-			int border = claimed ? 0x88727C86 : hovered ? 0xFFE1FFF0 : 0xCC8ADDB8;
+			int fill = claimed ? 0x44343A42 : hovered ? 0x77333333 : 0x55222222;
+			int border = claimed ? 0x88727C86 : hovered ? 0xDDEAF2FF : 0xCC8ADDB8;
 			Text label = claimed
 				? Text.translatable("gui.gexpress.config.xp_roadmap.claimed")
 				: Text.translatable("gui.gexpress.config.xp_roadmap.claim");
@@ -275,10 +203,9 @@ public final class GexpressXpRoadmapCategory {
 			gridW = w;
 			gridH = h;
 			if (h <= 0 || w <= 0) return;
-			int columns = Math.max(1, w / 144);
-			int cardW = Math.max(112, (w - (columns - 1) * CARD_GAP) / columns);
-			int rows = (maxLevel + columns - 1) / columns;
-			int contentH = rows * (CARD_HEIGHT + CARD_GAP) - CARD_GAP;
+			int columns = 1;
+			int cardW = w - 6;
+			int contentH = maxLevel * (CARD_HEIGHT + CARD_GAP) - CARD_GAP;
 			maxScroll = Math.max(0, contentH - h);
 			scroll = Math.max(0, Math.min(scroll, maxScroll));
 
@@ -308,25 +235,26 @@ public final class GexpressXpRoadmapCategory {
 			boolean hovered = contains(mouseX, mouseY, x, y, w, CARD_HEIGHT);
 			Status status = status(level, snapshot.level());
 			context.fill(x, y, x + w, y + CARD_HEIGHT,
-				selected ? 0xAA26394D : hovered ? 0x66323D49 : 0x44262E38);
-			context.drawBorder(x, y, w, CARD_HEIGHT, selected ? 0xFFE8F2FF : hovered ? 0xCCB8C8D8 : status.borderColor());
-			context.fill(x, y, x + 4, y + CARD_HEIGHT, status.accentColor());
+				selected ? 0x55353D45 : hovered ? 0x44222222 : 0x33111111);
+			context.drawBorder(x, y, w, CARD_HEIGHT, selected ? 0xDDEAF2FF : hovered ? 0xDDEAF2FF : status.borderColor());
+			context.fill(x + 10, y + CARD_HEIGHT - 3, x + w - 10, y + CARD_HEIGHT - 1, status.accentColor());
 			context.drawTextWithShadow(textRenderer,
 				Text.translatable("gui.gexpress.config.xp_roadmap.level", level).formatted(Formatting.BOLD),
 				x + 12, y + 9, 0xFFFFFFFF);
-			context.drawTextWithShadow(textRenderer, status.text(), x + 12, y + 23, status.textColor());
+			context.drawTextWithShadow(textRenderer, status.text(), x + w - textRenderer.getWidth(status.text()) - 12,
+				y + 9, status.textColor());
 			String total = level <= 1
 				? Text.translatable("gui.gexpress.config.xp_roadmap.start").getString()
 				: Text.translatable("gui.gexpress.config.xp_roadmap.total_xp",
 					LevelComponent.totalXpForLevel(level)).getString();
 			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(total, w - 24)),
-				x + 12, y + 39, 0xFFB8C6D4);
+				x + 12, y + 25, 0xFFB8C6D4);
 			GexpressConfig.LevelRoadmapEntry reward = GexpressConfig.getLevelRoadmapEntry(level);
 			String rewardText = reward.configured()
 				? String.join(" + ", reward.rewardTitles())
 				: Text.translatable("gui.gexpress.config.xp_roadmap.no_reward").getString();
 			context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(rewardText, w - 24)),
-				x + 12, y + 58, reward.configured() ? 0xFFFFD57A : 0xFF79838E);
+				x + 12, y + 41, reward.configured() ? 0xFFFFD57A : 0xFF79838E);
 			cards.add(new LevelCard(x, y, w, CARD_HEIGHT, level));
 		}
 

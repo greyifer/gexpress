@@ -1,5 +1,6 @@
 package dev.mapselect.client.input;
 import dev.mapselect.client.role.copycat.ClientCopycatState;
+import dev.mapselect.mixin.client.KeyBindingAccessor;
 
 
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -14,6 +15,7 @@ public final class ClientAbilityKeys {
 	private static KeyBinding primaryBinding;
 	private static KeyBinding secondaryBinding;
 	private static KeyBinding tertiaryBinding;
+	private static KeyBinding quaternaryBinding;
 	private static KeyBinding guidebookBinding;
 	private static KeyBinding guidebookTabBinding;
 	private static KeyBinding spectatorVoicePreviousBinding;
@@ -43,6 +45,7 @@ public final class ClientAbilityKeys {
 			GLFW.GLFW_KEY_V,
 			"category.gexpress"
 		));
+		quaternaryBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.gexpress.quaternary_ability", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_C, "category.gexpress"));
 		guidebookBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.gexpress.guidebook",
 			InputUtil.Type.KEYSYM,
@@ -81,6 +84,8 @@ public final class ClientAbilityKeys {
 		return tertiaryBinding;
 	}
 
+	public static KeyBinding quaternaryBinding() { return quaternaryBinding; }
+
 	public static KeyBinding guidebookBinding() {
 		return guidebookBinding;
 	}
@@ -111,6 +116,16 @@ public final class ClientAbilityKeys {
 		boolean down = isPhysicallyDown(client, binding);
 		if (ClientCopycatState.shouldSuppressBorrowedSecondary(client, binding, down)) return false;
 		return down;
+	}
+
+	/** Returns the key's raw pressed state before Wathe's alive-player key suppression. */
+	public static boolean isRawPressed(KeyBinding binding) {
+		if (binding == null) return false;
+		try {
+			return ((KeyBindingAccessor) binding).gexpress$pressed();
+		} catch (Throwable ignored) {
+			return binding.isPressed();
+		}
 	}
 
 	private static boolean isPhysicallyDown(MinecraftClient client, KeyBinding binding) {

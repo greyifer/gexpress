@@ -1,5 +1,6 @@
 package dev.mapselect.role;
 
+import dev.mapselect.config.GexpressConfig;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvent;
@@ -14,7 +15,9 @@ public final class AbilitySounds {
 	public static void playTo(ServerPlayerEntity player, SoundEvent sound, SoundCategory category,
 			float volume, float pitch) {
 		if (player == null || sound == null) return;
-		player.playSoundToPlayer(sound, category, volume, pitch);
+		float adjustedVolume = volume * (GexpressConfig.getAbilitySoundVolumePercent() / 100.0F);
+		if (adjustedVolume <= 0.0F) return;
+		player.playSoundToPlayer(sound, category, adjustedVolume, pitch);
 	}
 
 	public static void playTo(Collection<ServerPlayerEntity> players, SoundEvent sound, SoundCategory category,

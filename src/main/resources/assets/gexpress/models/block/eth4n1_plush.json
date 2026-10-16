@@ -1,0 +1,8 @@
+{
+	"credit": "Eth4n1 plush - Minecraft skin UVs",
+	"parent": "gexpress:block/greyifer_plush",
+	"textures": {
+		"0": "gexpress:block/eth4n1_plush",
+		"particle": "gexpress:block/eth4n1_plush"
+	}
+}

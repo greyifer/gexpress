@@ -25,7 +25,7 @@ public final class PelicanCommand {
 			ctx.getSource().sendError(Text.literal("You are not inside a Pelican."));
 			return 0;
 		}
-		ctx.getSource().sendFeedback(() -> Text.literal("You climbed out of the Pelican.")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("You climbed out of the Pelican.")
 			.formatted(Formatting.YELLOW), false);
 		return 1;
 	}

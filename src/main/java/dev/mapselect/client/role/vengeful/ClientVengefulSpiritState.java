@@ -58,14 +58,6 @@ public final class ClientVengefulSpiritState {
 		Text text = Text.literal(label);
 		int x = (context.getScaledWindowWidth() - client.textRenderer.getWidth(text)) / 2;
 		int right = x + client.textRenderer.getWidth(text) + 7;
-		context.fill(x - 7, 7, right, 24, 0xB0121B22);
 		context.drawTextWithShadow(client.textRenderer, text, x, 10, 0xFF75E9FF);
-		if (totalTicks > 0L) {
-			int barWidth = Math.max(1, right - (x - 7));
-			int filled = Math.max(0, Math.min(barWidth,
-				(int) Math.round(barWidth * (remainingTicks / (double) totalTicks))));
-			context.fill(x - 7, 22, right, 24, 0xFF263944);
-			context.fill(x - 7, 22, x - 7 + filled, 24, 0xFF55E6FF);
-		}
 	}
 }

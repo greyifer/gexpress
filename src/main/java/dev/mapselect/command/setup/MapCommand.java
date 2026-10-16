@@ -12,6 +12,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.config.GexpressConfigSyncHandler;
 import dev.mapselect.network.preset.GexpressPresetsSyncHandler;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.preset.map.MapPreset;
@@ -69,6 +71,7 @@ public class MapCommand {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildMapTree() {
 		SuggestionProvider<ServerCommandSource> nameSuggestions = MapCommand::suggestPresetNames;
+		SuggestionProvider<ServerCommandSource> configSuggestions = MapCommand::suggestConfigPresetNames;
 
 		return CommandManager.literal("map")
 			.then(CommandManager.literal("create")
@@ -85,6 +88,37 @@ public class MapCommand {
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.executes(ctx -> runDelete(ctx, StringArgumentType.getString(ctx, "name")))))
+			.then(CommandManager.literal("duplicate")
+				.requires(mapCommand("duplicate"))
+				.then(CommandManager.argument("source", StringArgumentType.word())
+					.suggests(nameSuggestions)
+					.then(CommandManager.argument("target", StringArgumentType.word())
+						.executes(ctx -> runDuplicate(ctx,
+							StringArgumentType.getString(ctx, "source"),
+							StringArgumentType.getString(ctx, "target"))))))
+			
+			.then(CommandManager.literal("rename")
+				.requires(mapCommand("rename"))
+				.then(CommandManager.argument("oldName", StringArgumentType.word())
+					.suggests(nameSuggestions)
+					.then(CommandManager.argument("newName", StringArgumentType.word())
+						.then(CommandManager.literal("confirm")
+							.executes(ctx -> runEditRename(ctx,
+								StringArgumentType.getString(ctx, "oldName"),
+								StringArgumentType.getString(ctx, "newName")))))))
+			.then(CommandManager.literal("backup")
+				.requires(mapCommand("backup"))
+				.then(CommandManager.argument("name", StringArgumentType.word())
+					.suggests(nameSuggestions)
+					.then(CommandManager.literal("list")
+						.executes(ctx -> runBackupList(ctx, StringArgumentType.getString(ctx, "name"))))
+					.then(CommandManager.literal("restore")
+						.then(CommandManager.argument("backupId", StringArgumentType.word())
+							.suggests(MapCommand::suggestPresetBackupIds)
+							.then(CommandManager.literal("confirm")
+								.executes(ctx -> runBackupRestore(ctx,
+									StringArgumentType.getString(ctx, "name"),
+									StringArgumentType.getString(ctx, "backupId"))))))))
 			.then(CommandManager.literal("edit")
 				.requires(mapCommand("edit"))
 				.then(CommandManager.argument("name", StringArgumentType.word())
@@ -100,15 +134,7 @@ public class MapCommand {
 									StringArgumentType.getString(ctx, "name"),
 									BlockPosArgumentType.getBlockPos(ctx, "corner1"),
 									BlockPosArgumentType.getBlockPos(ctx, "corner2"))))))
-					.then(CommandManager.literal("rename")
-						.then(CommandManager.argument("newName", StringArgumentType.word())
-							.suggests((c, b) -> {
-								b.suggest(StringArgumentType.getString(c, "name"));
-								return b.buildFuture();
-							})
-							.executes(ctx -> runEditRename(ctx,
-								StringArgumentType.getString(ctx, "name"),
-								StringArgumentType.getString(ctx, "newName")))))
+					
 					.then(CommandManager.literal("weather")
 						.then(CommandManager.argument("type", StringArgumentType.word())
 							.suggests((c, b) -> {
@@ -136,6 +162,24 @@ public class MapCommand {
 							.executes(ctx -> runEditFogColor(ctx,
 								StringArgumentType.getString(ctx, "name"),
 								StringArgumentType.getString(ctx, "hex")))))
+					.then(CommandManager.literal("gamesettings")
+						.then(CommandManager.literal("clear")
+							.executes(ctx -> runEditGameSettingsPreset(ctx,
+								StringArgumentType.getString(ctx, "name"), null)))
+						.then(CommandManager.argument("configPreset", StringArgumentType.word())
+							.suggests(configSuggestions)
+							.executes(ctx -> runEditGameSettingsPreset(ctx,
+								StringArgumentType.getString(ctx, "name"),
+								StringArgumentType.getString(ctx, "configPreset")))))
+					.then(CommandManager.literal("settings")
+						.then(CommandManager.literal("clear")
+							.executes(ctx -> runEditGameSettingsPreset(ctx,
+								StringArgumentType.getString(ctx, "name"), null)))
+						.then(CommandManager.argument("configPreset", StringArgumentType.word())
+							.suggests(configSuggestions)
+							.executes(ctx -> runEditGameSettingsPreset(ctx,
+								StringArgumentType.getString(ctx, "name"),
+								StringArgumentType.getString(ctx, "configPreset")))))
 					.then(CommandManager.literal("wholemap")
 						.then(intArg("minX", p -> p.wholeMapArea == null ? null : fmtNum(p.wholeMapArea.minX),
 							intArg("minY", p -> p.wholeMapArea == null ? null : fmtNum(p.wholeMapArea.minY),
@@ -232,6 +276,9 @@ public class MapCommand {
 					.executes(ctx -> runShow(ctx, StringArgumentType.getString(ctx, "name")))))
 			.then(CommandManager.literal("validate")
 				.requires(mapCommand("validate"))
+				.executes(MapCommand::runValidateAll)
+				.then(CommandManager.literal("issues")
+					.executes(MapCommand::runValidateIssues))
 				.then(CommandManager.argument("name", StringArgumentType.word())
 					.suggests(nameSuggestions)
 					.executes(ctx -> runValidate(ctx, StringArgumentType.getString(ctx, "name")))))
@@ -408,6 +455,32 @@ public class MapCommand {
 		return builder.buildFuture();
 	}
 
+	private static CompletableFuture<Suggestions> suggestConfigPresetNames(CommandContext<ServerCommandSource> ctx, SuggestionsBuilder builder) {
+		try {
+			List<String> names = GexpressConfig.listConfigExports();
+			String remaining = builder.getRemainingLowerCase();
+			for (String n : names) {
+				if (n.toLowerCase(java.util.Locale.ROOT).startsWith(remaining)) {
+					builder.suggest(n);
+				}
+			}
+		} catch (IOException ignored) {
+		}
+		return builder.buildFuture();
+	}
+
+	private static CompletableFuture<Suggestions> suggestPresetBackupIds(CommandContext<ServerCommandSource> ctx, SuggestionsBuilder builder) {
+		try {
+			String name = StringArgumentType.getString(ctx, "name");
+			String remaining = builder.getRemainingLowerCase();
+			for (String id : PresetStorage.listBackups(ctx.getSource().getServer(), name)) {
+				if (id.toLowerCase(java.util.Locale.ROOT).startsWith(remaining)) builder.suggest(id);
+			}
+		} catch (Exception ignored) {
+		}
+		return builder.buildFuture();
+	}
+
 	private static final double Z_STEP_AREA = 730.0;
 	private static final double Z_STEP_OFFSET = 720.0;
 
@@ -464,7 +537,7 @@ public class MapCommand {
 
 			saveAndBroadcast(src, name, preset);
 			final String suffix = feedbackSuffix;
-			src.sendFeedback(() -> Text.literal("Created '" + name + "'" + suffix).formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Created '" + name + "'" + suffix).formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to create preset: " + e.getMessage()));
@@ -604,6 +677,7 @@ public class MapCommand {
 		preset.staticMapEnabled = neighbor.isStaticMapEnabled();
 		preset.weather = neighbor.weather == null ? WeatherType.NONE : neighbor.weather;
 		preset.fogColor = neighbor.fogColor;
+		preset.gameSettingsPreset = neighbor.gameSettingsPreset;
 		return preset;
 	}
 
@@ -620,10 +694,59 @@ public class MapCommand {
 				return 0;
 			}
 			GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
-			src.sendFeedback(() -> Text.literal("Deleted preset '" + name + "'.").formatted(Formatting.YELLOW), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Deleted preset '" + name + "'.").formatted(Formatting.YELLOW), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to delete preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runDuplicate(CommandContext<ServerCommandSource> ctx, String sourceName, String targetName) {
+		ServerCommandSource src = ctx.getSource();
+		if (!PresetStorage.isValidName(sourceName) || !PresetStorage.isValidName(targetName)) {
+			src.sendError(Text.literal("Invalid preset name. Use letters, digits, '_' or '-', up to 64 chars."));
+			return 0;
+		}
+		try {
+			PresetStorage.duplicate(src.getServer(), sourceName, targetName);
+			GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Duplicated map preset '" + sourceName
+				+ "' to '" + targetName + "'.").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal(e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runBackupList(CommandContext<ServerCommandSource> ctx, String name) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			List<String> backups = PresetStorage.listBackups(src.getServer(), name);
+			if (backups.isEmpty()) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No backups found for map preset '" + name + "'."), false);
+				return 1;
+			}
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Backups for map preset '" + name + "': "
+				+ String.join(", ", backups)), false);
+			return backups.size();
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to list map preset backups: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runBackupRestore(CommandContext<ServerCommandSource> ctx, String name, String backupId) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			PresetStorage.restoreBackup(src.getServer(), name, backupId);
+			GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Restored map preset '" + name
+				+ "' from backup " + backupId + ".").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to restore map preset backup: " + e.getMessage()));
 			return 0;
 		}
 	}
@@ -663,7 +786,7 @@ public class MapCommand {
 
 			saveAndBroadcast(src, name, preset);
 			final String suffix = feedbackSuffix;
-			src.sendFeedback(() -> Text.literal("Updated corners for '" + name + "'" + suffix).formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Updated corners for '" + name + "'" + suffix).formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
@@ -684,7 +807,7 @@ public class MapCommand {
 		try {
 			PresetStorage.rename(src.getServer(), oldName, newName);
 			GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
-			src.sendFeedback(() -> Text.literal("Renamed '" + oldName + "' to '" + newName + "'.").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Renamed '" + oldName + "' to '" + newName + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal(e.getMessage()));
@@ -697,11 +820,11 @@ public class MapCommand {
 		try {
 			List<String> names = PresetStorage.list(src.getServer());
 			if (names.isEmpty()) {
-				src.sendFeedback(() -> Text.literal("No presets saved. Use /g setup map create <corner1> <corner2> <name>."), false);
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No presets saved. Use /g setup map create <corner1> <corner2> <name>."), false);
 				return 1;
 			}
 			String joined = String.join(", ", names);
-			src.sendFeedback(() -> Text.literal("Presets (" + names.size() + "): " + joined), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Presets (" + names.size() + "): " + joined), false);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to list presets: " + e.getMessage()));
@@ -715,7 +838,7 @@ public class MapCommand {
 			MapPreset preset = loadOrError(src, name);
 			if (preset == null) return 0;
 
-			src.sendFeedback(() -> Text.literal("─── Map '" + name + "' ───").formatted(Formatting.GOLD, Formatting.BOLD), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("─── Map '" + name + "' ───").formatted(Formatting.GOLD, Formatting.BOLD), false);
 			sendBoxLine(src, "Whole Map Area", preset.wholeMapArea);
 			sendBoxLine(src, "Lobby Area", preset.lobbyArea);
 			sendBoxLine(src, "Ready Area", preset.readyArea);
@@ -728,6 +851,7 @@ public class MapCommand {
 			sendWeatherLine(src, "Weather", preset.weather);
 			sendFogLine(src, "Fog Color", preset.fogColor);
 			sendDefaultTrainLine(src, "Default Train", preset.defaultTrainPreset);
+			sendStringLine(src, "Game Settings", preset.gameSettingsPreset);
 			sendRoomCountLine(src, "Room Key Count", preset.roomCount);
 			sendBooleanLine(src, "Couch Sleeping", preset.isCouchSleepingEnabled());
 			sendBooleanLine(src, "Static Map Reset", preset.isStaticMapEnabled());
@@ -747,16 +871,91 @@ public class MapCommand {
 			List<MapPresetValidator.Issue> issues = MapPresetValidator.validate(src.getServer(), name, preset);
 			long errors = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.ERROR).count();
 			long warnings = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.WARNING).count();
-			src.sendFeedback(() -> Text.literal("Map preset '" + name + "' validation: "
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Map preset '" + name + "' validation: "
 				+ errors + " error(s), " + warnings + " warning(s).").formatted(errors > 0 ? Formatting.RED : Formatting.GREEN), false);
 			for (MapPresetValidator.Issue issue : issues) {
 				Formatting color = issue.severity() == MapPresetValidator.Severity.ERROR ? Formatting.RED : Formatting.YELLOW;
-				src.sendFeedback(() -> Text.literal(" - " + issue.severity().name().toLowerCase(java.util.Locale.ROOT)
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(" - " + issue.severity().name().toLowerCase(java.util.Locale.ROOT)
 					+ ": " + issue.message()).formatted(color), false);
 			}
 			return errors == 0 ? 1 : 0;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to validate map preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runValidateAll(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			List<String> names = PresetStorage.list(src.getServer());
+			if (names.isEmpty()) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No map presets to validate."), false);
+				return 1;
+			}
+			int errors = 0;
+			int warnings = 0;
+			for (String name : names) {
+				MapPreset preset = PresetStorage.load(src.getServer(), name);
+				List<MapPresetValidator.Issue> issues = MapPresetValidator.validate(src.getServer(), name, preset);
+				long presetErrors = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.ERROR).count();
+				long presetWarnings = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.WARNING).count();
+				errors += (int) presetErrors;
+				warnings += (int) presetWarnings;
+				Formatting color = presetErrors > 0 ? Formatting.RED : (presetWarnings > 0 ? Formatting.YELLOW : Formatting.GREEN);
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(" - " + name + ": "
+					+ presetErrors + " error(s), " + presetWarnings + " warning(s)").formatted(color), false);
+			}
+			final int totalErrors = errors;
+			final int totalWarnings = warnings;
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Map validation: " + names.size()
+				+ " preset(s), " + totalErrors + " error(s), " + totalWarnings + " warning(s).")
+				.formatted(totalErrors > 0 ? Formatting.RED : Formatting.GREEN), false);
+			return totalErrors == 0 ? 1 : 0;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to validate map presets: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runValidateIssues(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			List<String> names = PresetStorage.list(src.getServer());
+			if (names.isEmpty()) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No map presets to validate."), false);
+				return 1;
+			}
+			int errors = 0;
+			int warnings = 0;
+			int presetsWithIssues = 0;
+			for (String name : names) {
+				MapPreset preset = PresetStorage.load(src.getServer(), name);
+				List<MapPresetValidator.Issue> issues = MapPresetValidator.validate(src.getServer(), name, preset);
+				long presetErrors = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.ERROR).count();
+				long presetWarnings = issues.stream().filter(issue -> issue.severity() == MapPresetValidator.Severity.WARNING).count();
+				if (presetErrors == 0 && presetWarnings == 0) continue;
+				presetsWithIssues++;
+				errors += (int) presetErrors;
+				warnings += (int) presetWarnings;
+				Formatting color = presetErrors > 0 ? Formatting.RED : Formatting.YELLOW;
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(" - " + name + ": "
+					+ presetErrors + " error(s), " + presetWarnings + " warning(s)").formatted(color), false);
+			}
+			if (presetsWithIssues == 0) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Map validation: no issues across "
+					+ names.size() + " preset(s).").formatted(Formatting.GREEN), false);
+				return 1;
+			}
+			final int issueCount = presetsWithIssues;
+			final int totalErrors = errors;
+			final int totalWarnings = warnings;
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Map validation issues: " + issueCount + "/"
+				+ names.size() + " preset(s), " + totalErrors + " error(s), " + totalWarnings + " warning(s).")
+				.formatted(totalErrors > 0 ? Formatting.RED : Formatting.YELLOW), false);
+			return totalErrors == 0 ? 1 : 0;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to validate map presets: " + e.getMessage()));
 			return 0;
 		}
 	}
@@ -772,7 +971,7 @@ public class MapCommand {
 			value = Text.literal(coords).formatted(Formatting.WHITE)
 				.append(Text.literal("  [" + size + "]").formatted(Formatting.DARK_GRAY));
 		}
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static void sendOffsetLine(ServerCommandSource src, String label, MapPreset.OffsetData o) {
@@ -783,7 +982,7 @@ public class MapCommand {
 			String coords = "(" + o.x + ", " + o.y + ", " + o.z + ")";
 			value = Text.literal(coords).formatted(Formatting.WHITE);
 		}
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static void sendPosLine(ServerCommandSource src, String label, MapPreset.PosData p) {
@@ -796,7 +995,7 @@ public class MapCommand {
 			value = Text.literal(coords).formatted(Formatting.WHITE)
 				.append(Text.literal("  [" + facing + "]").formatted(Formatting.DARK_GRAY));
 		}
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static Vec3d toVec(BlockPos p) {
@@ -812,7 +1011,7 @@ public class MapCommand {
 
 	private static void sendWeatherLine(ServerCommandSource src, String label, WeatherType w) {
 		String v = (w == null ? WeatherType.NONE : w).name().toLowerCase(java.util.Locale.ROOT);
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA)
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA)
 			.append(Text.literal(v).formatted(Formatting.WHITE)), false);
 	}
 
@@ -823,24 +1022,34 @@ public class MapCommand {
 		} else {
 			value = Text.literal(trainName).formatted(Formatting.WHITE);
 		}
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+	}
+
+	private static void sendStringLine(ServerCommandSource src, String label, String text) {
+		Text value;
+		if (text == null || text.isBlank()) {
+			value = Text.literal("(none)").formatted(Formatting.DARK_GRAY);
+		} else {
+			value = Text.literal(text).formatted(Formatting.WHITE);
+		}
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static void sendRandomSpawnsLine(ServerCommandSource src, String label, List<MapPreset.PosData> spawns) {
 		int count = spawns == null ? 0 : spawns.size();
 		Text value = Text.literal(Integer.toString(count)).formatted(count == 0 ? Formatting.DARK_GRAY : Formatting.WHITE);
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static void sendRoomCountLine(ServerCommandSource src, String label, int roomCount) {
 		int count = MapPreset.normalizeRoomCount(roomCount);
 		Text value = Text.literal(Integer.toString(count)).formatted(Formatting.WHITE);
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static void sendBooleanLine(ServerCommandSource src, String label, boolean enabled) {
 		Text value = Text.literal(enabled ? "enabled" : "disabled").formatted(enabled ? Formatting.GREEN : Formatting.RED);
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static void sendFogLine(ServerCommandSource src, String label, Integer fogColor) {
@@ -850,7 +1059,7 @@ public class MapCommand {
 		} else {
 			value = Text.literal(String.format(java.util.Locale.ROOT, "#%06X", fogColor & 0xFFFFFF)).formatted(Formatting.WHITE);
 		}
-		src.sendFeedback(() -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(label + ": ").formatted(Formatting.AQUA).append(value), false);
 	}
 
 	private static Integer parseHexColor(String s) {
@@ -876,7 +1085,7 @@ public class MapCommand {
 			if (preset == null) return 0;
 			preset.weather = w;
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Set weather for '" + name + "' to " + w.name().toLowerCase(java.util.Locale.ROOT) + ".").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Set weather for '" + name + "' to " + w.name().toLowerCase(java.util.Locale.ROOT) + ".").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
@@ -900,7 +1109,7 @@ public class MapCommand {
 			if ("clear".equalsIgnoreCase(hex) || "none".equalsIgnoreCase(hex)) {
 				preset.fogColor = null;
 				saveAndBroadcast(src, name, preset);
-				src.sendFeedback(() -> Text.literal("Cleared fog color override for '" + name + "'.").formatted(Formatting.GREEN), true);
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared fog color override for '" + name + "'.").formatted(Formatting.GREEN), true);
 				return 1;
 			}
 			Integer color = parseHexColor(hex);
@@ -911,10 +1120,40 @@ public class MapCommand {
 			preset.fogColor = color;
 			saveAndBroadcast(src, name, preset);
 			final String shown = String.format(java.util.Locale.ROOT, "#%06X", color);
-			src.sendFeedback(() -> Text.literal("Set fog color for '" + name + "' to " + shown + ".").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Set fog color for '" + name + "' to " + shown + ".").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runEditGameSettingsPreset(CommandContext<ServerCommandSource> ctx, String name, String configPreset) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			MapPreset preset = loadOrError(src, name);
+			if (preset == null) return 0;
+			if (configPreset == null || "clear".equalsIgnoreCase(configPreset) || "none".equalsIgnoreCase(configPreset)) {
+				preset.gameSettingsPreset = null;
+				saveAndBroadcast(src, name, preset);
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared game settings preset for '" + name + "'.").formatted(Formatting.YELLOW), true);
+				return 1;
+			}
+			if (!GexpressConfig.isValidExportName(configPreset)) {
+				src.sendError(Text.literal("Invalid config preset name."));
+				return 0;
+			}
+			if (!GexpressConfig.listConfigExports().contains(configPreset)) {
+				src.sendError(Text.literal("Config preset '" + configPreset + "' does not exist. Save one with /g admin config preset save " + configPreset + "."));
+				return 0;
+			}
+			preset.gameSettingsPreset = configPreset;
+			saveAndBroadcast(src, name, preset);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Linked map '" + name
+				+ "' to game settings preset '" + configPreset + "'.").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to edit game settings preset: " + e.getMessage()));
 			return 0;
 		}
 	}
@@ -944,7 +1183,7 @@ public class MapCommand {
 						}
 						// Default train preset was deleted — warn, skip lobby update, but continue map switch.
 						final String missing = trainToApply;
-						src.sendFeedback(() -> Text.literal("Default train '" + missing + "' no longer exists — lobby not updated.").formatted(Formatting.YELLOW), false);
+						dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Default train '" + missing + "' no longer exists — lobby not updated.").formatted(Formatting.YELLOW), false);
 						trainToApply = null;
 					} else {
 						train.applyTo(src.getWorld());
@@ -953,6 +1192,7 @@ public class MapCommand {
 				}
 			}
 
+			String settingsSuffix = applyLinkedGameSettings(src, preset.gameSettingsPreset);
 			preset.applyTo(src.getWorld());
 			boolean appliedRandomSpawns = preset.applyRandomSpawnsTo(src.getWorld());
 			MapWeatherComponent weather = MapWeatherComponent.KEY.get(src.getWorld());
@@ -974,13 +1214,31 @@ public class MapCommand {
 			}
 
 			final String ts = trainSuffix;
+			final String gs = settingsSuffix;
 			final String ps = previewSuffix;
 			final String rs = appliedRandomSpawns ? " (map RTP slots applied)" : "";
-			src.sendFeedback(() -> Text.literal("Set active map to '" + name + "'" + ts + ps + rs + ".").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Set active map to '" + name + "'" + ts + gs + ps + rs + ".").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to set preset: " + e.getMessage()));
 			return 0;
+		}
+	}
+
+	private static String applyLinkedGameSettings(ServerCommandSource src, String configPreset) {
+		if (configPreset == null || configPreset.isBlank()) return "";
+		if (!GexpressConfig.isValidExportName(configPreset)) {
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Linked game settings preset name is invalid; map settings were applied without config import.").formatted(Formatting.YELLOW), false);
+			return " (settings skipped)";
+		}
+		try {
+			GexpressConfig.importConfig(configPreset);
+			GexpressConfigSyncHandler.broadcastConfig(src.getServer());
+			return " with settings '" + configPreset + "'";
+		} catch (IOException e) {
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Could not apply linked game settings '"
+				+ configPreset + "': " + e.getMessage()).formatted(Formatting.YELLOW), false);
+			return " (settings skipped)";
 		}
 	}
 
@@ -1010,7 +1268,7 @@ public class MapCommand {
 			o.z = corner.getZ();
 			preset.lobbyTrainCorner = o;
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Ready-area train corner for '" + name + "' set to ("
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Ready-area train corner for '" + name + "' set to ("
 				+ corner.getX() + ", " + corner.getY() + ", " + corner.getZ() + ").").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
@@ -1027,7 +1285,7 @@ public class MapCommand {
 			if (preset == null) return 0;
 			preset.lobbyTrainCorner = null;
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Cleared ready-area train preview for '" + name + "'.").formatted(Formatting.YELLOW), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared ready-area train preview for '" + name + "'.").formatted(Formatting.YELLOW), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
@@ -1044,7 +1302,7 @@ public class MapCommand {
 			preset.randomSpawnPositions = MapPreset.randomSpawnsFrom(src.getWorld());
 			saveAndBroadcast(src, name, preset);
 			int count = preset.randomSpawnPositions == null ? 0 : preset.randomSpawnPositions.size();
-			src.sendFeedback(() -> Text.literal("Imported " + count + " active RTP slot(s) into '" + name + "'.").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Imported " + count + " active RTP slot(s) into '" + name + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to import RTP slots: " + e.getMessage()));
@@ -1061,7 +1319,7 @@ public class MapCommand {
 			int count = preset.randomSpawnPositions == null ? 0 : preset.randomSpawnPositions.size();
 			preset.randomSpawnPositions = new java.util.ArrayList<>();
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Cleared " + count + " random spawn position(s) from '" + name + "'.").formatted(Formatting.YELLOW), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared " + count + " random spawn position(s) from '" + name + "'.").formatted(Formatting.YELLOW), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to clear random spawns: " + e.getMessage()));
@@ -1076,7 +1334,7 @@ public class MapCommand {
 			if (preset == null) return 0;
 			preset.roomCount = MapPreset.normalizeRoomCount(roomCount);
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Set room key count for '" + name + "' to " + preset.roomCount + ".").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Set room key count for '" + name + "' to " + preset.roomCount + ".").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit room key count: " + e.getMessage()));
@@ -1092,7 +1350,7 @@ public class MapCommand {
 			preset.couchSleepingEnabled = enabled;
 			saveAndBroadcast(src, name, preset);
 			String state = enabled ? "enabled" : "disabled";
-			src.sendFeedback(() -> Text.literal("Couch sleeping for '" + name + "' is now " + state + ".").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Couch sleeping for '" + name + "' is now " + state + ".").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit couch sleeping: " + e.getMessage()));
@@ -1109,7 +1367,7 @@ public class MapCommand {
 			preset.terrainMode = enabled ? MapPreset.TerrainMode.STATIC : MapPreset.TerrainMode.MOVING;
 			saveAndBroadcast(src, name, preset);
 			String state = enabled ? "enabled" : "disabled";
-			src.sendFeedback(() -> Text.literal("Static map reset for '" + name + "' is now " + state + ".")
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Static map reset for '" + name + "' is now " + state + ".")
 				.formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
@@ -1133,7 +1391,7 @@ public class MapCommand {
 			}
 			preset.defaultTrainPreset = trainName;
 			saveAndBroadcast(src, mapName, preset);
-			src.sendFeedback(() -> Text.literal("Default train for '" + mapName + "' set to '" + trainName + "'.").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Default train for '" + mapName + "' set to '" + trainName + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to set default train: " + e.getMessage()));
@@ -1155,10 +1413,9 @@ public class MapCommand {
 			preset.playAreaOffset = snap.playAreaOffset;
 			preset.resetTemplateArea = snap.resetTemplateArea;
 			preset.randomSpawnPositions = snap.randomSpawnPositions;
-			preset.disabledPainterDoorways = snap.disabledPainterDoorways;
 			saveAndBroadcast(src, name, preset);
 			int count = preset.randomSpawnPositions == null ? 0 : preset.randomSpawnPositions.size();
-			src.sendFeedback(() -> Text.literal("Snapshotted current Wathe values and " + count + " RTP slot(s) into '" + name + "'.").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Snapshotted current Wathe values and " + count + " RTP slot(s) into '" + name + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to snapshot preset: " + e.getMessage()));
@@ -1199,7 +1456,7 @@ public class MapCommand {
 				}
 			}
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Updated " + kind.label + " for '" + name + "'.").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Updated " + kind.label + " for '" + name + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
@@ -1223,7 +1480,7 @@ public class MapCommand {
 				}
 			}
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Cleared " + kind.label + " for '" + name + "'.").formatted(Formatting.YELLOW), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared " + kind.label + " for '" + name + "'.").formatted(Formatting.YELLOW), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
@@ -1259,7 +1516,7 @@ public class MapCommand {
 			preset.freshAirAreas.add(area);
 			if (preset.freshAirArea == null) preset.freshAirArea = box;
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Added fresh air area for '" + name
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Added fresh air area for '" + name
 				+ "' (" + area.sanityPercent + "% sanity, outside sounds "
 				+ (area.playOutsideAmbience ? "on" : "off") + ").").formatted(Formatting.GREEN), true);
 			return 1;
@@ -1277,7 +1534,7 @@ public class MapCommand {
 			if (preset == null) return 0;
 			preset.normalize();
 			if (preset.freshAirAreas == null || preset.freshAirAreas.isEmpty()) {
-				src.sendFeedback(() -> Text.literal("No fresh air areas for '" + name + "'.").formatted(Formatting.GRAY), false);
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No fresh air areas for '" + name + "'.").formatted(Formatting.GRAY), false);
 				return 0;
 			}
 			int i = 1;
@@ -1286,7 +1543,7 @@ public class MapCommand {
 				MapPreset.BoxData b = area.area;
 				String coords = b == null ? "(not set)" : "(" + fmt(b.minX) + ", " + fmt(b.minY) + ", " + fmt(b.minZ)
 					+ ") -> (" + fmt(b.maxX) + ", " + fmt(b.maxY) + ", " + fmt(b.maxZ) + ")";
-				src.sendFeedback(() -> Text.literal(index + ". ")
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(index + ". ")
 					.append(Text.literal(coords).formatted(Formatting.WHITE))
 					.append(Text.literal(" (" + area.sanityPercent + "% sanity, outside sounds "
 						+ (area.playOutsideAmbience ? "on" : "off") + ")")), false);
@@ -1308,7 +1565,7 @@ public class MapCommand {
 			o.x = x; o.y = y; o.z = z;
 			preset.playAreaOffset = o;
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Updated play area offset for '" + name + "'.").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Updated play area offset for '" + name + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));
@@ -1327,7 +1584,7 @@ public class MapCommand {
 			p.x = x; p.y = y; p.z = z; p.yaw = yaw; p.pitch = pitch;
 			preset.spectatorSpawnPos = p;
 			saveAndBroadcast(src, name, preset);
-			src.sendFeedback(() -> Text.literal("Updated spectator spawn for '" + name + "'.").formatted(Formatting.GREEN), true);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Updated spectator spawn for '" + name + "'.").formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to edit preset: " + e.getMessage()));

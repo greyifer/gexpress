@@ -1,52 +1,57 @@
 package dev.mapselect.entity;
 
+import dev.mapselect.role.twins.TwinsManager;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.mob.ZombieEntity;
+import net.minecraft.entity.mob.PathAwareEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.TeleportTarget;
 import net.minecraft.world.World;
 
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
-/** Stationary, player-rendered spare body used by The Twins. */
-public final class TwinBodyEntity extends ZombieEntity {
+/**
+ * The inactive physical body owned by a Twins player.
+ *
+ * This is a separate living entity with its own health, effects, equipment,
+ * motion, collision, and inventory snapshot. The owner only exchanges state
+ * with it when swapping bodies.
+ */
+public final class TwinBodyEntity extends PathAwareEntity {
 	private static final TrackedData<Optional<UUID>> OWNER_UUID =
 		DataTracker.registerData(TwinBodyEntity.class, TrackedDataHandlerRegistry.OPTIONAL_UUID);
 	private static final TrackedData<String> OWNER_NAME =
 		DataTracker.registerData(TwinBodyEntity.class, TrackedDataHandlerRegistry.STRING);
 	private static final TrackedData<String> DECOY_ROLE_ID =
 		DataTracker.registerData(TwinBodyEntity.class, TrackedDataHandlerRegistry.STRING);
-	private boolean anchored;
-	private double anchorX;
-	private double anchorY;
-	private double anchorZ;
-	private float anchorYaw;
-	private float anchorPitch;
-	private boolean anchorMove;
+	private static final String INVENTORY_NBT_KEY = "TwinInventory";
+	private static final String SELECTED_SLOT_NBT_KEY = "TwinSelectedSlot";
 
-	public TwinBodyEntity(EntityType<? extends ZombieEntity> type, World world) {
+	private NbtList storedInventory = new NbtList();
+	private int storedSelectedSlot;
+	private boolean deathReported;
+
+	public TwinBodyEntity(EntityType<? extends PathAwareEntity> type, World world) {
 		super(type, world);
 		setAiDisabled(true);
-		setNoGravity(true);
-		setSilent(true);
-		setInvulnerable(true);
 		setPersistent();
 		setCanPickUpLoot(false);
-		noClip = true;
+		for (EquipmentSlot slot : EquipmentSlot.values()) {
+			setEquipmentDropChance(slot, 0.0F);
+		}
 	}
 
 	@Override
@@ -61,10 +66,8 @@ public final class TwinBodyEntity extends ZombieEntity {
 		dataTracker.set(OWNER_UUID, Optional.ofNullable(ownerId));
 		dataTracker.set(OWNER_NAME, ownerName == null ? "" : ownerName);
 		dataTracker.set(DECOY_ROLE_ID, decoyRoleId == null ? "" : decoyRoleId);
-		if (ownerName != null && !ownerName.isBlank()) {
-			setCustomName(Text.literal(ownerName));
-			setCustomNameVisible(false);
-		}
+		setCustomName(null);
+		setCustomNameVisible(false);
 	}
 
 	public Optional<UUID> ownerId() {
@@ -79,136 +82,74 @@ public final class TwinBodyEntity extends ZombieEntity {
 		return dataTracker.get(DECOY_ROLE_ID);
 	}
 
-	public void copyEquipmentFrom(LivingEntity owner) {
+	public void storeInventoryFrom(ServerPlayerEntity owner) {
 		if (owner == null) return;
+		storedInventory = (NbtList) owner.getInventory().writeNbt(new NbtList()).copy();
+		storedSelectedSlot = owner.getInventory().selectedSlot;
 		for (EquipmentSlot slot : EquipmentSlot.values()) {
 			ItemStack stack = owner.getEquippedStack(slot);
 			equipStack(slot, stack == null ? ItemStack.EMPTY : stack.copy());
 		}
 	}
 
+	public NbtList copyStoredInventory() {
+		return (NbtList) storedInventory.copy();
+	}
+
+	public int storedSelectedSlot() {
+		return storedSelectedSlot;
+	}
+
+	public void restoreStoredInventory(ServerPlayerEntity player) {
+		if (player == null) return;
+		player.getInventory().clear();
+		player.getInventory().readNbt(copyStoredInventory());
+		player.getInventory().selectedSlot = Math.max(0, Math.min(8, storedSelectedSlot));
+		player.getInventory().markDirty();
+	}
+
+	/** Moves this entity only when the player swaps which body is active. */
 	public void setTwinAnchor(double x, double y, double z, float yaw, float pitch) {
-		anchored = true;
-		anchorX = x;
-		anchorY = y;
-		anchorZ = z;
-		anchorYaw = yaw;
-		anchorPitch = pitch;
-		snapToAnchor();
-	}
-
-	@Override
-	public void tick() {
-		super.tick();
-		if (anchored) maintainAnchor();
-	}
-
-	@Override
-	public void setPosition(double x, double y, double z) {
-		if (blocksExternalMove(x, y, z)) return;
-		super.setPosition(x, y, z);
-	}
-
-	@Override
-	public void refreshPositionAfterTeleport(double x, double y, double z) {
-		if (blocksExternalMove(x, y, z)) return;
-		super.refreshPositionAfterTeleport(x, y, z);
-	}
-
-	@Override
-	public void refreshPositionAfterTeleport(Vec3d pos) {
-		if (pos != null && blocksExternalMove(pos.x, pos.y, pos.z)) return;
-		super.refreshPositionAfterTeleport(pos);
-	}
-
-	@Override
-	public void refreshPositionAndAngles(double x, double y, double z, float yaw, float pitch) {
-		if (blocksExternalMove(x, y, z)) return;
-		super.refreshPositionAndAngles(x, y, z, yaw, pitch);
-	}
-
-	@Override
-	public void refreshPositionAndAngles(Vec3d pos, float yaw, float pitch) {
-		if (pos != null && blocksExternalMove(pos.x, pos.y, pos.z)) return;
-		super.refreshPositionAndAngles(pos, yaw, pitch);
-	}
-
-	@Override
-	public void refreshPositionAndAngles(BlockPos pos, float yaw, float pitch) {
-		if (pos != null && blocksExternalMove(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D)) return;
-		super.refreshPositionAndAngles(pos, yaw, pitch);
-	}
-
-	@Override
-	public void tickMovement() {
-		stopMovement();
+		refreshPositionAndAngles(x, y, z, yaw, pitch);
+		setHeadYaw(yaw);
+		setBodyYaw(yaw);
 		setVelocity(Vec3d.ZERO);
-		velocityModified = false;
+		velocityModified = true;
 		fallDistance = 0.0F;
 	}
 
 	@Override
+	protected ActionResult interactMob(PlayerEntity player, Hand hand) {
+		if (getWorld().isClient) return ActionResult.SUCCESS;
+		if (player == null || hand == null) return ActionResult.PASS;
+		ItemStack stack = player.getStackInHand(hand);
+		return stack.isEmpty() ? ActionResult.PASS : stack.useOnEntity(player, this, hand);
+	}
+
+	@Override
 	public boolean isPushable() {
-		return false;
+		return true;
 	}
 
 	@Override
-	public boolean isPushedByFluids() {
-		return false;
+	public void takeKnockback(double strength, double x, double z) {
+		super.takeKnockback(strength, x, z);
+		velocityModified = true;
 	}
 
 	@Override
-	public void pushAwayFrom(Entity entity) {
-	}
-
-	@Override
-	public boolean isBaby() {
-		return false;
-	}
-
-	@Override
-	public boolean canImmediatelyDespawn(double distanceSquared) {
-		return false;
-	}
-
-	@Override
-	public boolean teleport(ServerWorld world, double destX, double destY, double destZ, Set<PositionFlag> flags,
-			float yaw, float pitch) {
-		if (blocksExternalMove(destX, destY, destZ)) return false;
-		return super.teleport(world, destX, destY, destZ, flags, yaw, pitch);
-	}
-
-	@Override
-	public boolean teleport(double x, double y, double z, boolean particleEffects) {
-		if (blocksExternalMove(x, y, z)) return false;
-		return super.teleport(x, y, z, particleEffects);
-	}
-
-	@Override
-	public void requestTeleport(double destX, double destY, double destZ) {
-		if (blocksExternalMove(destX, destY, destZ)) return;
-		super.requestTeleport(destX, destY, destZ);
-	}
-
-	@Override
-	public void requestTeleportAndDismount(double destX, double destY, double destZ) {
-		if (blocksExternalMove(destX, destY, destZ)) return;
-		super.requestTeleportAndDismount(destX, destY, destZ);
-	}
-
-	@Override
-	public void requestTeleportOffset(double offsetX, double offsetY, double offsetZ) {
-		if (anchored && !anchorMove) return;
-		super.requestTeleportOffset(offsetX, offsetY, offsetZ);
-	}
-
-	@Override
-	public Entity teleportTo(TeleportTarget teleportTarget) {
-		if (teleportTarget != null && blocksExternalMove(teleportTarget.pos().x, teleportTarget.pos().y,
-				teleportTarget.pos().z)) {
-			return this;
+	public void onDeath(DamageSource source) {
+		super.onDeath(source);
+		if (!getWorld().isClient && !deathReported) {
+			deathReported = true;
+			discard(); // Legacy saved mob bodies are retired; new twins use native player actors.
 		}
-		return super.teleportTo(teleportTarget);
+	}
+
+	@Override
+	protected void dropEquipment(ServerWorld world, DamageSource source, boolean causedByPlayer) {
+		// The equipped stacks are visual mirrors of this body's stored inventory.
+		// Do not let MobEntity drop a second copy of them.
 	}
 
 	@Override
@@ -216,12 +157,7 @@ public final class TwinBodyEntity extends ZombieEntity {
 	}
 
 	@Override
-	protected boolean burnsInDaylight() {
-		return false;
-	}
-
-	@Override
-	protected boolean canConvertInWater() {
+	public boolean canImmediatelyDespawn(double distanceSquared) {
 		return false;
 	}
 
@@ -231,12 +167,8 @@ public final class TwinBodyEntity extends ZombieEntity {
 		ownerId().ifPresent(uuid -> nbt.putUuid("Owner", uuid));
 		nbt.putString("OwnerName", ownerName());
 		nbt.putString("DecoyRole", decoyRoleId());
-		nbt.putBoolean("TwinAnchored", anchored);
-		nbt.putDouble("TwinAnchorX", anchorX);
-		nbt.putDouble("TwinAnchorY", anchorY);
-		nbt.putDouble("TwinAnchorZ", anchorZ);
-		nbt.putFloat("TwinAnchorYaw", anchorYaw);
-		nbt.putFloat("TwinAnchorPitch", anchorPitch);
+		nbt.put(INVENTORY_NBT_KEY, storedInventory.copy());
+		nbt.putInt(SELECTED_SLOT_NBT_KEY, storedSelectedSlot);
 	}
 
 	@Override
@@ -244,52 +176,9 @@ public final class TwinBodyEntity extends ZombieEntity {
 		super.readCustomDataFromNbt(nbt);
 		UUID owner = nbt.containsUuid("Owner") ? nbt.getUuid("Owner") : null;
 		initializeTwin(owner, nbt.getString("OwnerName"), nbt.getString("DecoyRole"));
-		anchored = nbt.getBoolean("TwinAnchored");
-		anchorX = nbt.getDouble("TwinAnchorX");
-		anchorY = nbt.getDouble("TwinAnchorY");
-		anchorZ = nbt.getDouble("TwinAnchorZ");
-		anchorYaw = nbt.getFloat("TwinAnchorYaw");
-		anchorPitch = nbt.getFloat("TwinAnchorPitch");
-		if (anchored) snapToAnchor();
-	}
-
-	private void snapToAnchor() {
-		noClip = true;
-		setNoGravity(true);
-		anchorMove = true;
-		try {
-			refreshPositionAndAngles(anchorX, anchorY, anchorZ, anchorYaw, anchorPitch);
-			setHeadYaw(anchorYaw);
-			setBodyYaw(anchorYaw);
-			setVelocity(Vec3d.ZERO);
-			velocityModified = false;
-			fallDistance = 0.0F;
-		} finally {
-			anchorMove = false;
-		}
-	}
-
-	private void maintainAnchor() {
-		noClip = true;
-		setNoGravity(true);
-		setVelocity(Vec3d.ZERO);
-		velocityModified = false;
-		fallDistance = 0.0F;
-		double dx = getX() - anchorX;
-		double dy = getY() - anchorY;
-		double dz = getZ() - anchorZ;
-		if (dx * dx + dy * dy + dz * dz > 1.0E-4D
-				|| Math.abs(getYaw() - anchorYaw) > 0.01F
-				|| Math.abs(getPitch() - anchorPitch) > 0.01F) {
-			snapToAnchor();
-		}
-	}
-
-	private boolean blocksExternalMove(double x, double y, double z) {
-		if (!anchored || anchorMove) return false;
-		double dx = x - anchorX;
-		double dy = y - anchorY;
-		double dz = z - anchorZ;
-		return dx * dx + dy * dy + dz * dz > 1.0E-4D;
+		storedInventory = nbt.contains(INVENTORY_NBT_KEY, NbtElement.LIST_TYPE)
+			? (NbtList) nbt.getList(INVENTORY_NBT_KEY, NbtElement.COMPOUND_TYPE).copy()
+			: new NbtList();
+		storedSelectedSlot = nbt.getInt(SELECTED_SLOT_NBT_KEY);
 	}
 }

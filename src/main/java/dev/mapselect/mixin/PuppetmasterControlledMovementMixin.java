@@ -3,6 +3,7 @@ package dev.mapselect.mixin;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.rat.RatManager;
 import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
@@ -22,7 +23,8 @@ public abstract class PuppetmasterControlledMovementMixin {
 	private void gexpress$blockControlledMovement(PlayerMoveC2SPacket packet, CallbackInfo ci) {
 		if (PuppetmasterManager.isControlled(player) || PuppetmasterManager.isController(player)
 				|| PelicanManager.isStashed(player)
-				|| TimeMasterManager.isFrozen(player)) {
+				|| TimeMasterManager.isFrozen(player)
+				|| RatManager.isPlayingDead(player)) {
 			ci.cancel();
 		}
 	}
@@ -31,7 +33,8 @@ public abstract class PuppetmasterControlledMovementMixin {
 	private void gexpress$blockControlledInput(PlayerInputC2SPacket packet, CallbackInfo ci) {
 		if (PuppetmasterManager.isControlled(player) || PuppetmasterManager.isController(player)
 				|| PelicanManager.isStashed(player)
-				|| TimeMasterManager.isFrozen(player)) {
+				|| TimeMasterManager.isFrozen(player)
+				|| RatManager.isPlayingDead(player)) {
 			ci.cancel();
 		}
 	}

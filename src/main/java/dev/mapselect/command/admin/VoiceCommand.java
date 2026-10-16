@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import dev.mapselect.command.CommandPlayerFormat;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.voice.DeadVoiceGroupManager;
 import dev.mapselect.voice.VoiceMuteState;
@@ -77,7 +78,12 @@ public class VoiceCommand {
 							.executes(VoiceCommand::runDeadAdminList))))
 			.then(CommandManager.literal("list")
 				.requires(source -> canUseVoiceCommand(source, "list"))
-				.executes(VoiceCommand::runList));
+				.executes(VoiceCommand::runList))
+			.then(CommandManager.literal("status")
+				.requires(source -> canUseVoiceCommand(source, "status"))
+				.executes(VoiceCommand::runStatusSummary)
+				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+					.executes(VoiceCommand::runStatus)));
 	}
 
 	private static boolean canUseVoiceCommand(ServerCommandSource source, String subcommand) {
@@ -91,14 +97,6 @@ public class VoiceCommand {
 
 	private static boolean isOp(MinecraftServer server, UUID uuid) {
 		return GexpressPermissions.isOperatorLike(server, uuid);
-	}
-
-	private static String nameFor(ServerCommandSource src, UUID uuid) {
-		ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(uuid);
-		if (online != null) return online.getGameProfile().getName();
-		var cache = src.getServer().getUserCache();
-		return cache == null ? uuid.toString()
-			: cache.getByUuid(uuid).map(GameProfile::getName).orElse(uuid.toString());
 	}
 
 	private static int runMute(CommandContext<ServerCommandSource> ctx) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
@@ -122,7 +120,7 @@ public class VoiceCommand {
 		}
 		final int fm = muted;
 		final int fs = skippedPrivileged;
-		src.sendFeedback(() -> {
+		dev.mapselect.command.GexpressFeedback.send(src, () -> {
 			Text base = Text.literal("Muted " + fm + " player(s).").formatted(Formatting.GREEN);
 			if (fs > 0) return base.copy().append(Text.literal(" (" + fs + " privileged skipped)").formatted(Formatting.GRAY));
 			return base;
@@ -145,7 +143,7 @@ public class VoiceCommand {
 			}
 		}
 		final int fn = n;
-		src.sendFeedback(() -> Text.literal("Unmuted " + fn + " player(s).").formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Unmuted " + fn + " player(s).").formatted(Formatting.GREEN), true);
 		return n;
 	}
 
@@ -161,7 +159,7 @@ public class VoiceCommand {
 			}
 		}
 		final int fn = n;
-		src.sendFeedback(() -> Text.literal("Muted " + fn + " player(s) (privileged excluded).").formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Muted " + fn + " player(s) (privileged excluded).").formatted(Formatting.GREEN), true);
 		return n;
 	}
 
@@ -173,7 +171,7 @@ public class VoiceCommand {
 		for (ServerPlayerEntity p : src.getServer().getPlayerManager().getPlayerList()) {
 			p.sendMessage(Text.literal("Voice mutes cleared.").formatted(Formatting.GREEN), false);
 		}
-		src.sendFeedback(() -> Text.literal("Cleared all " + n + " voice mute(s).").formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared all " + n + " voice mute(s).").formatted(Formatting.GREEN), true);
 		return n;
 	}
 
@@ -181,23 +179,23 @@ public class VoiceCommand {
 		ServerCommandSource src = ctx.getSource();
 		VoiceMuteState st = state(src);
 		if (st.getMuted().isEmpty()) {
-			src.sendFeedback(() -> Text.literal("No voice mutes.").formatted(Formatting.GRAY), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No voice mutes.").formatted(Formatting.GRAY), false);
 			return 0;
 		}
 		StringBuilder sb = new StringBuilder();
 		for (UUID u : st.getMuted()) {
 			if (sb.length() > 0) sb.append(", ");
-			sb.append(nameFor(src, u));
+			sb.append(CommandPlayerFormat.cachedName(src, u));
 		}
 		final String joined = sb.toString();
-		src.sendFeedback(() -> Text.literal("Voice-muted (" + st.getMuted().size() + "): " + joined), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Voice-muted (" + st.getMuted().size() + "): " + joined), false);
 		return st.getMuted().size();
 	}
 
 	private static int runDeadGroupsList(CommandContext<ServerCommandSource> ctx) {
 		ServerCommandSource src = ctx.getSource();
 		int groups = DeadVoiceGroupManager.normalGroupCount(src.getWorld());
-		src.sendFeedback(() -> Text.literal("Dead voice groups: " + groups
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Dead voice groups: " + groups
 			+ " normal group(s) plus the admin group.").formatted(Formatting.AQUA), false);
 		return groups;
 	}
@@ -207,7 +205,7 @@ public class VoiceCommand {
 		int before = DeadVoiceGroupManager.normalGroupCount(src.getWorld());
 		int after = DeadVoiceGroupManager.addNormalGroups(src.getWorld(), amount);
 		int added = Math.max(0, after - before);
-		src.sendFeedback(() -> Text.literal("Dead voice groups: " + before + " -> " + after
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Dead voice groups: " + before + " -> " + after
 			+ " normal group(s). Admin group is unchanged.").formatted(Formatting.GREEN), true);
 		return added;
 	}
@@ -217,7 +215,7 @@ public class VoiceCommand {
 		int before = DeadVoiceGroupManager.normalGroupCount(src.getWorld());
 		int after = DeadVoiceGroupManager.removeNormalGroups(src.getWorld(), amount);
 		int removed = Math.max(0, before - after);
-		src.sendFeedback(() -> Text.literal("Dead voice groups: " + before + " -> " + after
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Dead voice groups: " + before + " -> " + after
 			+ " normal group(s). Admin group is unchanged.").formatted(Formatting.GREEN), true);
 		return removed;
 	}
@@ -226,7 +224,7 @@ public class VoiceCommand {
 		ServerCommandSource src = ctx.getSource();
 		int requested = IntegerArgumentType.getInteger(ctx, "count");
 		int after = DeadVoiceGroupManager.setNormalGroupCount(src.getWorld(), requested);
-		src.sendFeedback(() -> Text.literal("Dead voice groups set to " + after
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Dead voice groups set to " + after
 			+ " normal group(s) plus the admin group.").formatted(Formatting.GREEN), true);
 		return after;
 	}
@@ -236,7 +234,7 @@ public class VoiceCommand {
 		int group = IntegerArgumentType.getInteger(ctx, "group");
 		int available = DeadVoiceGroupManager.normalGroupCount(src.getWorld());
 		if (group > available) {
-			src.sendFeedback(() -> Text.literal("Dead voice group " + group + " does not exist. Current normal groups: "
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Dead voice group " + group + " does not exist. Current normal groups: "
 				+ available + ".").formatted(Formatting.RED), false);
 			return 0;
 		}
@@ -246,7 +244,7 @@ public class VoiceCommand {
 			if (DeadVoiceGroupManager.moveToNormalGroup(src.getWorld(), profile.getId(), group)) moved++;
 		}
 		final int fm = moved;
-		src.sendFeedback(() -> Text.literal("Moved " + fm + " player(s) to dead voice group " + group + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Moved " + fm + " player(s) to dead voice group " + group + ".")
 			.formatted(Formatting.GREEN), true);
 		return moved;
 	}
@@ -262,7 +260,7 @@ public class VoiceCommand {
 		}
 		final int fa = applied;
 		final int fc = changed;
-		src.sendFeedback(() -> Text.literal("Admin dead voice applied to " + fa + " player(s) ("
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Admin dead voice applied to " + fa + " player(s) ("
 			+ fc + " new lock(s)).").formatted(Formatting.GREEN), true);
 		return applied;
 	}
@@ -275,7 +273,7 @@ public class VoiceCommand {
 			if (DeadVoiceGroupManager.unlockAdminGroup(src.getWorld(), profile.getId())) removed++;
 		}
 		final int fr = removed;
-		src.sendFeedback(() -> Text.literal("Removed admin dead voice lock from " + fr + " player(s).")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Removed admin dead voice lock from " + fr + " player(s).")
 			.formatted(Formatting.GREEN), true);
 		return removed;
 	}
@@ -283,7 +281,7 @@ public class VoiceCommand {
 	private static int runDeadAdminClear(CommandContext<ServerCommandSource> ctx) {
 		ServerCommandSource src = ctx.getSource();
 		int cleared = DeadVoiceGroupManager.clearAdminLocks(src.getWorld());
-		src.sendFeedback(() -> Text.literal("Cleared " + cleared + " admin dead voice lock(s).")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared " + cleared + " admin dead voice lock(s).")
 			.formatted(Formatting.GREEN), true);
 		return cleared;
 	}
@@ -292,17 +290,45 @@ public class VoiceCommand {
 		ServerCommandSource src = ctx.getSource();
 		Set<UUID> locked = DeadVoiceGroupManager.adminLockedPlayers(src.getWorld());
 		if (locked.isEmpty()) {
-			src.sendFeedback(() -> Text.literal("No admin dead voice locks.").formatted(Formatting.GRAY), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No admin dead voice locks.").formatted(Formatting.GRAY), false);
 			return 0;
 		}
 		StringBuilder sb = new StringBuilder();
 		for (UUID uuid : locked) {
 			if (sb.length() > 0) sb.append(", ");
-			sb.append(nameFor(src, uuid));
+			sb.append(CommandPlayerFormat.cachedName(src, uuid));
 		}
 		final int count = locked.size();
 		final String joined = sb.toString();
-		src.sendFeedback(() -> Text.literal("Admin dead voice locked (" + count + "): " + joined), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Admin dead voice locked (" + count + "): " + joined), false);
 		return count;
+	}
+
+	private static int runStatusSummary(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		VoiceMuteState st = state(src);
+		int muted = st.getMuted().size();
+		int adminLocks = DeadVoiceGroupManager.adminLockedPlayers(src.getWorld()).size();
+		int groups = DeadVoiceGroupManager.normalGroupCount(src.getWorld());
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Voice status: muted=" + muted
+			+ ", deadGroups=" + groups + ", adminLocks=" + adminLocks
+			+ ". Use /g admin voice status <players> for connection details.").formatted(Formatting.AQUA), false);
+		return muted + adminLocks + groups;
+	}
+
+	private static int runStatus(CommandContext<ServerCommandSource> ctx) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+		ServerCommandSource src = ctx.getSource();
+		Collection<GameProfile> profiles = GameProfileArgumentType.getProfileArgument(ctx, "players");
+		int shown = 0;
+		for (GameProfile profile : profiles) {
+			if (profile == null || profile.getId() == null) continue;
+			ServerPlayerEntity player = src.getServer().getPlayerManager().getPlayer(profile.getId());
+			String status = player == null ? "offline" : DeadVoiceGroupManager.status(player);
+			String name = player == null ? profile.getName() : player.getName().getString();
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(name + ": " + status)
+				.formatted(player == null ? Formatting.GRAY : Formatting.WHITE), false);
+			shown++;
+		}
+		return shown;
 	}
 }

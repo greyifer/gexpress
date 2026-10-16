@@ -11,27 +11,21 @@ import dev.mapselect.client.role.pelican.ClientVultureState;
 import dev.mapselect.client.screen.PainterChoiceScreen;
 import dev.mapselect.network.role.painter.PainterBodyUsePayload;
 import dev.mapselect.network.role.painter.PainterChoiceOpenPayload;
-import dev.mapselect.network.role.painter.PainterDoorwayUsePayload;
-import dev.mapselect.network.role.painter.PainterDoorwayTransitionPayload;
 import dev.mapselect.network.role.painter.PainterReturnParticlesPayload;
 import dev.mapselect.network.role.painter.PainterStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -42,13 +36,11 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class ClientPainterState {
 	private static final Map<UUID, PaintTint> BODY_TINTS = new HashMap<>();
 	private static final Map<UUID, PaintTint> PLAYER_TINTS = new HashMap<>();
-	private static final Map<BlockPos, DoorwayTint> DOORWAY_TINTS = new HashMap<>();
 	private static final List<ReturnParticleTrail> RETURN_TRAILS = new ArrayList<>();
 	private static final int RETURN_TRAIL_TICKS = 40;
 	private static final int RETURN_CLUMPS = 5;
 	private static final int RETURN_PARTICLES_PER_CLUMP = 9;
 	private static boolean wasBodyKeyDown;
-	private static boolean wasDoorwayKeyDown;
 	private static Object syncedWorld;
 
 	private ClientPainterState() {}
@@ -60,8 +52,6 @@ public final class ClientPainterState {
 			context.client().execute(() -> context.client().setScreen(new PainterChoiceScreen(payload))));
 		ClientPlayNetworking.registerGlobalReceiver(PainterReturnParticlesPayload.ID, (payload, context) ->
 			context.client().execute(() -> spawnReturnParticles(context.client(), payload)));
-		ClientPlayNetworking.registerGlobalReceiver(PainterDoorwayTransitionPayload.ID, (payload, context) ->
-			context.client().execute(() -> ClientPainterDoorwayTransition.start(context.client(), payload)));
 		ClientTickEvents.END_CLIENT_TICK.register(ClientPainterState::tick);
 	}
 
@@ -104,36 +94,10 @@ public final class ClientPainterState {
 			: color;
 	}
 
-	public static boolean isDoorwayActive(BlockPos pos) {
-		return active(doorway(pos));
-	}
-
-	public static int doorwayColor(BlockPos pos) {
-		DoorwayTint tint = doorway(pos);
-		return glowColor(tint == null ? null : tint.asPaintTint());
-	}
-
-	public static Collection<DoorwayTint> doorways() {
-		MinecraftClient client = MinecraftClient.getInstance();
-		if (client.world != null) {
-			long now = client.world.getTime();
-			DOORWAY_TINTS.entrySet().removeIf(entry -> entry.getValue().expiresAtTick() <= now);
-		}
-		return List.copyOf(DOORWAY_TINTS.values());
-	}
-
-	public static boolean canShowDoorwayTarget(MinecraftClient client) {
-		return client != null && client.currentScreen == null && client.player != null && client.world != null
-			&& !ClientVultureState.isLocalStashed(client)
-			&& ClientRoleRevealState.canUseRoleAbility(client)
-			&& isLocalPainter(client);
-	}
-
 	private static void apply(MinecraftClient client, PainterStatePayload payload) {
 		checkWorld(client);
 		BODY_TINTS.clear();
 		PLAYER_TINTS.clear();
-		DOORWAY_TINTS.clear();
 		if (client == null || client.world == null || payload == null) return;
 		long now = client.world.getTime();
 		for (PainterStatePayload.Entry entry : payload.bodyTints()) {
@@ -142,26 +106,19 @@ public final class ClientPainterState {
 		for (PainterStatePayload.Entry entry : payload.playerTints()) {
 			PLAYER_TINTS.put(entry.targetId(), PaintTint.from(entry, now));
 		}
-		for (PainterStatePayload.DoorwayEntry entry : payload.doorways()) {
-			DoorwayTint tint = DoorwayTint.from(entry, now);
-			DOORWAY_TINTS.put(tint.lowerPos(), tint);
-		}
 	}
 
 	private static void tick(MinecraftClient client) {
 		checkWorld(client);
-		ClientPainterDoorwayTransition.tick(client);
 		if (client == null || client.player == null || client.world == null) return;
 		long now = client.world.getTime();
 		BODY_TINTS.entrySet().removeIf(entry -> entry.getValue().expiresAtTick() <= now);
 		PLAYER_TINTS.entrySet().removeIf(entry -> entry.getValue().expiresAtTick() <= now);
-		DOORWAY_TINTS.entrySet().removeIf(entry -> entry.getValue().expiresAtTick() <= now);
 		tickReturnTrails(client, now);
 
 		if (client.currentScreen != null || ClientVultureState.isLocalStashed(client)
 				|| !ClientRoleRevealState.canUseRoleAbility(client) || !isLocalPainter(client)) {
 			wasBodyKeyDown = false;
-			wasDoorwayKeyDown = false;
 			return;
 		}
 
@@ -171,13 +128,6 @@ public final class ClientPainterState {
 			ClientPlayNetworking.send(new PainterBodyUsePayload());
 		}
 		wasBodyKeyDown = paintDown;
-
-		KeyBinding doorwayKey = ClientAbilityKeys.secondaryBinding();
-		boolean doorwayDown = doorwayKey != null && ClientAbilityKeys.isDown(client, doorwayKey);
-		if (doorwayDown && !wasDoorwayKeyDown && ClientPlayNetworking.canSend(PainterDoorwayUsePayload.ID)) {
-			ClientPlayNetworking.send(new PainterDoorwayUsePayload());
-		}
-		wasDoorwayKeyDown = doorwayDown;
 	}
 
 	private static boolean isLocalPainter(MinecraftClient client) {
@@ -200,27 +150,13 @@ public final class ClientPainterState {
 		syncedWorld = world;
 		BODY_TINTS.clear();
 		PLAYER_TINTS.clear();
-		DOORWAY_TINTS.clear();
 		RETURN_TRAILS.clear();
 		wasBodyKeyDown = false;
-		wasDoorwayKeyDown = false;
 	}
 
 	private static boolean active(PaintTint tint) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		return tint != null && client.world != null && tint.expiresAtTick() > client.world.getTime();
-	}
-
-	private static boolean active(DoorwayTint tint) {
-		MinecraftClient client = MinecraftClient.getInstance();
-		return tint != null && client.world != null && tint.expiresAtTick() > client.world.getTime();
-	}
-
-	private static DoorwayTint doorway(BlockPos pos) {
-		if (pos == null) return null;
-		DoorwayTint tint = DOORWAY_TINTS.get(pos);
-		if (tint != null) return tint;
-		return DOORWAY_TINTS.get(pos.down());
 	}
 
 	private static void spawnReturnParticles(MinecraftClient client, PainterReturnParticlesPayload payload) {
@@ -326,45 +262,6 @@ public final class ClientPainterState {
 	private record PaintTint(int color, long expiresAtTick, int totalTicks) {
 		private static PaintTint from(PainterStatePayload.Entry entry, long now) {
 			return new PaintTint(entry.color(), now + entry.remainingTicks(), entry.totalTicks());
-		}
-	}
-
-	public record DoorwayTint(BlockPos lowerPos, int color, long expiresAtTick, int totalTicks,
-			Direction facing, Direction through, BlockPos destinationLowerPos,
-			Direction destinationFacing, Direction destinationThrough, Vec3d destination,
-			List<DoorwayPlayer> players, List<DoorwayBlock> blocks) {
-		private static DoorwayTint from(PainterStatePayload.DoorwayEntry entry, long now) {
-			return new DoorwayTint(entry.lowerPos(), entry.color(), now + entry.remainingTicks(),
-				entry.totalTicks(), entry.facing(), entry.through(), entry.destinationLowerPos(),
-				entry.destinationFacing(), entry.destinationThrough(), entry.destination(),
-				entry.players().stream().map(DoorwayPlayer::from).toList(),
-				entry.blocks().stream()
-					.map(block -> DoorwayBlock.from(entry.destinationLowerPos(), block))
-					.toList());
-		}
-
-		private PaintTint asPaintTint() {
-			return new PaintTint(color, expiresAtTick, totalTicks);
-		}
-
-		public float remaining() {
-			return ClientPainterState.remaining(asPaintTint());
-		}
-	}
-
-	public record DoorwayPlayer(UUID playerId, String name, Vec3d pos, float yaw, float pitch,
-			float bodyYaw, float headYaw, boolean sneaking, boolean sprinting, boolean invisible) {
-		private static DoorwayPlayer from(PainterStatePayload.DoorwayPlayerEntry entry) {
-			return new DoorwayPlayer(entry.playerId(), entry.name(), new Vec3d(entry.x(), entry.y(), entry.z()),
-				entry.yaw(), entry.pitch(), entry.bodyYaw(), entry.headYaw(),
-				entry.sneaking(), entry.sprinting(), entry.invisible());
-		}
-	}
-
-	public record DoorwayBlock(BlockPos pos, BlockState state) {
-		private static DoorwayBlock from(BlockPos origin, PainterStatePayload.DoorwayBlockEntry entry) {
-			BlockPos base = origin == null ? BlockPos.ORIGIN : origin;
-			return new DoorwayBlock(base.add(entry.dx(), entry.dy(), entry.dz()), entry.state());
 		}
 	}
 

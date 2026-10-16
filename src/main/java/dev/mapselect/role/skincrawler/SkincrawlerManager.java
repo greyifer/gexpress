@@ -2,19 +2,21 @@ package dev.mapselect.role.skincrawler;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.entity.PlayerBodyEntity;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheEntities;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.skincrawler.SkincrawlerSkinPayload;
 import dev.mapselect.network.role.skincrawler.SkincrawlerUsePayload;
 import dev.mapselect.network.role.timemaster.TimeMasterFreezeStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -56,7 +58,7 @@ public final class SkincrawlerManager {
 		ServerTickEvents.END_WORLD_TICK.register(SkincrawlerManager::tick);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> sync(handler.player)));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear(world));
+		RoundLifecycleHooks.clearWorld(SkincrawlerManager::clear);
 	}
 
 	private static void tryStealSkin(ServerPlayerEntity skincrawler) {
@@ -91,7 +93,7 @@ public final class SkincrawlerManager {
 		if (creativeBypass) {
 			AbilityCooldownSync.clear(skincrawler, AbilityCooldownPayload.SKINCRAWLER_STEAL);
 		} else {
-			cooldownUntil.put(skincrawler.getUuid(), world.getTime() + cooldown);
+			AbilityCooldowns.start(cooldownUntil, skincrawler, cooldown);
 			AbilityCooldownSync.send(skincrawler, AbilityCooldownPayload.SKINCRAWLER_STEAL, cooldown, cooldown, false);
 		}
 		skincrawler.sendMessage(Text.literal("Skin stolen."), true);
@@ -138,7 +140,7 @@ public final class SkincrawlerManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		for (PlayerBodyEntity body : world.getEntitiesByType(WatheEntities.PLAYER_BODY, entity -> true)) {
 			UUID owner = preservedBodyOwners.get(body.getUuid());
 			if (owner != null) {
@@ -208,26 +210,14 @@ public final class SkincrawlerManager {
 	}
 
 	private static long cooldownRemaining(ServerPlayerEntity player) {
-		Long until = cooldownUntil.get(player.getUuid());
-		if (until == null) return 0L;
-		long remaining = until - player.getWorld().getTime();
-		if (remaining <= 0L) {
-			cooldownUntil.remove(player.getUuid());
-			return 0L;
-		}
-		return remaining;
+		return AbilityCooldowns.remaining(cooldownUntil, player);
 	}
 
 	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
-		if (player == null || ticks <= 0L) return cooldownRemaining(player);
-		long remaining = cooldownRemaining(player);
-		if (remaining <= 0L) return 0L;
-		long next = Math.max(0L, remaining - ticks);
+		long next = AbilityCooldowns.reduce(cooldownUntil, player, ticks);
 		if (next <= 0L) {
-			cooldownUntil.remove(player.getUuid());
-			AbilityCooldownSync.clear(player, AbilityCooldownPayload.SKINCRAWLER_STEAL);
+			if (player != null) AbilityCooldownSync.clear(player, AbilityCooldownPayload.SKINCRAWLER_STEAL);
 		} else {
-			cooldownUntil.put(player.getUuid(), player.getWorld().getTime() + next);
 			AbilityCooldownSync.send(player, AbilityCooldownPayload.SKINCRAWLER_STEAL, next,
 				(long) GexpressConfig.getSkincrawlerCooldownSeconds() * 20L, false);
 		}
@@ -235,17 +225,14 @@ public final class SkincrawlerManager {
 	}
 
 	private static void sync(ServerPlayerEntity player) {
-		if (player != null && ServerPlayNetworking.canSend(player, SkincrawlerSkinPayload.ID)) {
-			ServerPlayNetworking.send(player, new SkincrawlerSkinPayload(new HashMap<>(skinSwaps)));
-		}
+		PayloadSync.sendIfChanged(player, SkincrawlerSkinPayload.ID,
+			new SkincrawlerSkinPayload(new HashMap<>(skinSwaps)));
 	}
 
 	private static void broadcast(ServerWorld world) {
 		SkincrawlerSkinPayload payload = new SkincrawlerSkinPayload(new HashMap<>(skinSwaps));
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (ServerPlayNetworking.canSend(player, SkincrawlerSkinPayload.ID)) {
-				ServerPlayNetworking.send(player, payload);
-			}
+			PayloadSync.sendIfChanged(player, SkincrawlerSkinPayload.ID, payload);
 		}
 	}
 
@@ -255,9 +242,7 @@ public final class SkincrawlerManager {
 			? new TimeMasterFreezeStatePayload(true, target.getUuid(), null, durationTicks)
 			: TimeMasterFreezeStatePayload.clear(target.getUuid());
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (ServerPlayNetworking.canSend(player, TimeMasterFreezeStatePayload.ID)) {
-				ServerPlayNetworking.send(player, payload);
-			}
+			PayloadSync.sendIfChanged(player, TimeMasterFreezeStatePayload.ID, payload);
 		}
 	}
 
@@ -266,6 +251,7 @@ public final class SkincrawlerManager {
 		cooldownUntil.clear();
 		stunned.clear();
 		preservedBodyOwners.clear();
+		PayloadSync.forgetAll(SkincrawlerSkinPayload.ID);
 		if (world instanceof ServerWorld serverWorld) broadcast(serverWorld);
 	}
 

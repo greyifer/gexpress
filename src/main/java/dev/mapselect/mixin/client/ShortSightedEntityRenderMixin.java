@@ -1,8 +1,8 @@
 package dev.mapselect.mixin.client;
 
-import dev.mapselect.client.render.ClientPainterDoorwayRenderer;
 import dev.mapselect.client.modifier.shortsighted.ClientShortSightedState;
 import dev.mapselect.client.role.pelican.ClientVultureState;
+import dev.mapselect.client.role.twins.ClientTwinsFeedRenderer;
 import dev.mapselect.config.GexpressConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -27,7 +27,7 @@ public abstract class ShortSightedEntityRenderMixin {
 			return;
 		}
 
-		if (ClientPainterDoorwayRenderer.isRenderingPortalContent()) return;
+		if (ClientTwinsFeedRenderer.isRenderingFeed()) return;
 		if (!ClientShortSightedState.isShortSighted()) return;
 		Entity viewer = client.cameraEntity != null ? client.cameraEntity : client.player;
 		if (viewer == null || entity == viewer) return;

@@ -1,7 +1,9 @@
 package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.cca.PlayerShopComponent;
+import dev.doctor4t.wathe.index.WatheItems;
 import dev.doctor4t.wathe.util.ShopEntry;
+import dev.mapselect.modifier.PestControlManager;
 import dev.mapselect.role.GexpressRoleShop;
 import net.minecraft.entity.player.ItemCooldownManager;
 import net.minecraft.entity.player.PlayerEntity;
@@ -32,12 +34,20 @@ public abstract class ShopPurchaseMixin {
 	@Shadow public abstract void sync();
 
 	@Inject(method = "tryBuy", at = @At("HEAD"), cancellable = true)
-	private void gexpress$buyMutedExternalNote(int index, CallbackInfo ci) {
-		if (index != GexpressRoleShop.MUTED_EXTERNAL_NOTE_INDEX
-				|| !GexpressRoleShop.usesExternalMutedNoteWidget(this.player)) {
+	private void gexpress$buyExternalShopItem(int index, CallbackInfo ci) {
+        if(this.player instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer && dev.mapselect.role.loki.LokiManager.isControllingClone(serverPlayer)){
+            this.player.sendMessage(net.minecraft.text.Text.literal("Loki's clone cannot buy items."),true);ci.cancel();return;
+        }
+		ShopEntry entry;
+		if (index == GexpressRoleShop.MUTED_EXTERNAL_NOTE_INDEX
+				&& GexpressRoleShop.hasMutedModifier(this.player)) {
+			entry = GexpressRoleShop.mutedNoteEntry();
+		} else if (index == GexpressRoleShop.PEST_CONTROL_EXTERNAL_TRAP_INDEX
+				&& PestControlManager.has(this.player)) {
+			entry = GexpressRoleShop.ratTrapEntry();
+		} else {
 			return;
 		}
-		ShopEntry entry = GexpressRoleShop.mutedNoteEntry();
 		if (this.balance >= entry.price() && entry.onBuy(this.player)) {
 			this.balance -= entry.price();
 			sync();
@@ -66,6 +76,6 @@ public abstract class ShopPurchaseMixin {
 		)
 	)
 	private boolean gexpress$allowPurchasingCooldownItems(ItemCooldownManager cooldowns, Item item) {
-		return false;
+		return item == WatheItems.PSYCHO_MODE && cooldowns.isCoolingDown(item);
 	}
 }

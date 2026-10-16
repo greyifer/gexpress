@@ -123,12 +123,12 @@ public final class GexpressTrainCartsScreen {
 			.build();
 	}
 
-	private static String trainName(MapPreset preset) {
+	static String trainName(MapPreset preset) {
 		if (preset == null || preset.defaultTrainPreset == null || preset.defaultTrainPreset.isBlank()) return null;
 		return preset.defaultTrainPreset;
 	}
 
-	private static TrainPreset mutableTrainPreset(String name, TrainPreset original) {
+	static TrainPreset mutableTrainPreset(String name, TrainPreset original) {
 		TrainPreset copy = pendingEdits.computeIfAbsent(name, k -> cloneTrainPreset(original));
 		if (copy.trainCarts == null) copy.trainCarts = new ArrayList<>();
 		return copy;
@@ -189,7 +189,7 @@ public final class GexpressTrainCartsScreen {
 		return out;
 	}
 
-	private static List<String> cartRows(TrainPreset preset) {
+	static List<String> cartRows(TrainPreset preset) {
 		List<String> out = new ArrayList<>();
 		if (preset.trainCarts == null) return out;
 		for (TrainPreset.CartData cart : preset.trainCarts) {
@@ -215,7 +215,7 @@ public final class GexpressTrainCartsScreen {
 			+ fmt(cart.area.maxX) + " " + fmt(cart.area.maxY) + " " + fmt(cart.area.maxZ);
 	}
 
-	private static TrainPreset.CartData parseCart(String raw) {
+	static TrainPreset.CartData parseCart(String raw) {
 		if (raw == null) return null;
 		String[] parts = raw.trim().split("\\s+");
 		if (parts.length != 6) return null;
@@ -240,7 +240,7 @@ public final class GexpressTrainCartsScreen {
 		}
 	}
 
-	private static String currentPlayerCartString() {
+	static String currentPlayerCartString() {
 		ClientPlayerEntity player = MinecraftClient.getInstance().player;
 		if (player == null) return "0 0 0 0 0 0";
 		int x = player.getBlockPos().getX();

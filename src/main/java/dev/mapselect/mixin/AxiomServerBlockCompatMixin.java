@@ -1,5 +1,6 @@
 package dev.mapselect.mixin;
 
+import dev.mapselect.MapSelect;
 import dev.mapselect.server.AxiomServerRefresh;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -17,6 +18,8 @@ import java.lang.reflect.Field;
 public abstract class AxiomServerBlockCompatMixin {
 	@Unique
 	private static Field gexpress$blocksField;
+	@Unique
+	private static boolean gexpress$warnedBlocksField;
 
 	@Inject(method = "handle", at = @At("RETURN"), require = 0, remap = false)
 	private void gexpress$refreshAxiomEditedBlocks(MinecraftServer server, ServerPlayerEntity player,
@@ -33,7 +36,11 @@ public abstract class AxiomServerBlockCompatMixin {
 				gexpress$blocksField.setAccessible(true);
 			}
 			return gexpress$blocksField.get(this);
-		} catch (Throwable ignored) {
+		} catch (Throwable t) {
+			if (!gexpress$warnedBlocksField) {
+				gexpress$warnedBlocksField = true;
+				MapSelect.LOGGER.warn("Axiom block edit compat could not read packet field 'blocks'; live block refresh after Axiom edits is disabled for this packet shape.", t);
+			}
 			return null;
 		}
 	}

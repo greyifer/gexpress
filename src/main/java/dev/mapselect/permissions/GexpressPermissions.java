@@ -57,6 +57,7 @@ public final class GexpressPermissions {
 	public static final String PERMISSION_ECONOMY_MANAGE = "economy_manage";
 	public static final String PERMISSION_PROGRESSION_MANAGE = "progression_manage";
 	public static final String PERMISSION_DIAGNOSTICS = "diagnostics";
+	public static final String PERMISSION_VIRTUAL_ROOMS = "virtual_rooms";
 	public static final String PERMISSION_PLAYERS_TAB = "tab_players";
 	public static final String PERMISSION_GAME_TAB = "tab_game";
 	public static final String PERMISSION_GAME_TAB_EDIT = "tab_game_edit";
@@ -316,6 +317,11 @@ public final class GexpressPermissions {
 			|| hasCommandPathPermission(player, "admin", "debug");
 	}
 
+	public static boolean canUseVirtualRooms(PlayerEntity player) {
+		return player != null && (hasBroadAdmin(player) || isHostOrDev(player)
+			|| hasAnyTagPermission(player, PERMISSION_VIRTUAL_ROOMS));
+	}
+
 	public static boolean canModerateBugReports(PlayerEntity player) {
 		return player != null && (player.hasPermissionLevel(2) || isDev(player) || isStaff(player)
 			|| hasAnyTagPermission(player, PERMISSION_BUG_REPORTS_MODERATE, PERMISSION_ADMIN_COMMANDS));
@@ -394,7 +400,7 @@ public final class GexpressPermissions {
 
 	public static List<TagInfo> effectiveTagInfos(PlayerEntity player) {
 		if (player == null) return List.of(TagInfo.from(PlayerTag.PASSENGER));
-		return effectiveTagInfos(player.getWorld(), player.getUuid(), player.getGameProfile().getName());
+		return effectiveTagInfos(player.getWorld(), dev.mapselect.role.loki.BodyDisplayIdentity.uuid(player), player.getGameProfile().getName());
 	}
 
 	public static List<TagInfo> effectiveTagInfos(World world, UUID uuid, String name) {
@@ -579,6 +585,7 @@ public final class GexpressPermissions {
 			case "economy", "gcoin", "coins" -> PERMISSION_ECONOMY_MANAGE;
 			case "progression", "level", "levels", "xp" -> PERMISSION_PROGRESSION_MANAGE;
 			case "debug", "diag" -> PERMISSION_DIAGNOSTICS;
+			case "virtual_room", "rooms" -> PERMISSION_VIRTUAL_ROOMS;
 			case "players", "players_tab" -> PERMISSION_PLAYERS_TAB;
 			case "game_tab" -> PERMISSION_GAME_TAB;
 			case "game_edit", "game_tab_edit" -> PERMISSION_GAME_TAB_EDIT;
@@ -624,24 +631,33 @@ public final class GexpressPermissions {
 		addCommand(out, "Command Paths", "/g admin voice", "Use every /g admin voice command.", "admin", "voice");
 		addCommand(out, "Command Paths", "/g admin level", "Use every /g admin level command.", "admin", "level");
 		addCommand(out, "Command Paths", "/g admin skins", "Use every /g admin skins command.", "admin", "skins");
+		addCommand(out, "Command Paths", "/g admin config", "Use every /g admin config command.", "admin", "config");
+		addCommand(out, "Command Paths", "/g admin force", "Use every /g admin force command.", "admin", "force");
 		addCommand(out, "Command Paths", "/g admin host", "Use every /g admin host command.", "admin", "host");
 		addCommand(out, "Command Paths", "/g admin trusted", "Use every /g admin trusted command.", "admin", "trusted");
 		addCommand(out, "Command Paths", "/g admin diagnostics", "Use /g admin diagnostics commands.", "admin", "diagnostics");
-		addCommand(out, "Command Paths", "/g admin painterdoor", "Use Painter doorway dev controls.", "admin", "painterdoor");
 		addCommand(out, "Command Paths", "/g open", "Open the server.", "open");
 		addCommand(out, "Command Paths", "/g close", "Close the server and kick lower-access players.", "close");
 		addCommand(out, "Individual Commands", "/g game start", "Start games.", "game", "start");
 		addCommand(out, "Individual Commands", "/g game end", "End games.", "game", "end");
+		addCommand(out, "Individual Commands", "/g setup checklist", "Run the setup readiness checklist.", "setup", "checklist");
 		addCommand(out, "Individual Commands", "/g setup map list", "List map presets.", "setup", "map", "list");
 		addCommand(out, "Individual Commands", "/g setup map show", "Show map preset information.", "setup", "map", "show");
 		addCommand(out, "Individual Commands", "/g setup map set", "Set the active map preset.", "setup", "map", "set");
 		addCommand(out, "Individual Commands", "/g setup map validate", "Validate map presets.", "setup", "map", "validate");
 		addCommand(out, "Individual Commands", "/g setup map create", "Create map presets.", "setup", "map", "create");
 		addCommand(out, "Individual Commands", "/g setup map edit", "Edit map presets.", "setup", "map", "edit");
+		addCommand(out, "Individual Commands", "/g setup map duplicate", "Duplicate map presets.", "setup", "map", "duplicate");
+		addCommand(out, "Individual Commands", "/g setup map rename", "Rename map presets.", "setup", "map", "rename");
+		addCommand(out, "Individual Commands", "/g setup map backup", "List and restore map preset backups.", "setup", "map", "backup");
 		addCommand(out, "Individual Commands", "/g setup map delete", "Delete map presets.", "setup", "map", "delete");
 		addCommand(out, "Individual Commands", "/g setup train preset list", "List train presets.", "setup", "train", "preset", "list");
 		addCommand(out, "Individual Commands", "/g setup train preset show", "Show train presets.", "setup", "train", "preset", "show");
 		addCommand(out, "Individual Commands", "/g setup train preset save", "Save train presets.", "setup", "train", "preset", "save");
+		addCommand(out, "Individual Commands", "/g setup train preset duplicate", "Duplicate train presets.", "setup", "train", "preset", "duplicate");
+		addCommand(out, "Individual Commands", "/g setup train preset backup", "List and restore train preset backups.", "setup", "train", "preset", "backup");
+		addCommand(out, "Individual Commands", "/g setup train preset rename", "Rename train presets.", "setup", "train", "preset", "rename");
+		addCommand(out, "Individual Commands", "/g setup train preset validate", "Validate train presets.", "setup", "train", "preset", "validate");
 		addCommand(out, "Individual Commands", "/g setup train preset delete", "Delete train presets.", "setup", "train", "preset", "delete");
 		addCommand(out, "Individual Commands", "/g setup rtp list", "List RTP slots.", "setup", "rtp", "list");
 		addCommand(out, "Individual Commands", "/g setup rtp add", "Add RTP slots.", "setup", "rtp", "add");
@@ -656,6 +672,11 @@ public final class GexpressPermissions {
 		addCommand(out, "Individual Commands", "/g admin tag custom", "Create or edit custom tags.", "admin", "tag", "custom");
 		addCommand(out, "Individual Commands", "/g admin tag list", "List player tags.", "admin", "tag", "list");
 		addCommand(out, "Individual Commands", "/g admin tag permissions", "List available tag permissions.", "admin", "tag", "permissions");
+		addCommand(out, "Individual Commands", "/g admin tag preview", "Preview effective tag permissions for players.", "admin", "tag", "preview");
+		addCommand(out, "Individual Commands", "/g admin config export", "Export the current G'Express config.", "admin", "config", "export");
+		addCommand(out, "Individual Commands", "/g admin config import", "Import a saved G'Express config export.", "admin", "config", "import");
+		addCommand(out, "Individual Commands", "/g admin config diff", "Compare a config export with the current config.", "admin", "config", "diff");
+		addCommand(out, "Individual Commands", "/g admin config list", "List saved G'Express config exports.", "admin", "config", "list");
 		addCommand(out, "Individual Commands", "/g admin gcoin set", "Set G'Coin balances.", "admin", "gcoin", "set");
 		addCommand(out, "Individual Commands", "/g admin gcoin give", "Give G'Coin.", "admin", "gcoin", "give");
 		addCommand(out, "Individual Commands", "/g admin gcoin remove", "Remove G'Coin.", "admin", "gcoin", "remove");
@@ -667,6 +688,14 @@ public final class GexpressPermissions {
 		addCommand(out, "Individual Commands", "/g admin voice unmute", "Voice unmute players.", "admin", "voice", "unmute");
 		addCommand(out, "Individual Commands", "/g admin voice dead", "Manage dead voice groups.", "admin", "voice", "dead");
 		addCommand(out, "Individual Commands", "/g admin voice list", "List voice mutes.", "admin", "voice", "list");
+		addCommand(out, "Individual Commands", "/g admin voice status", "Inspect voice connection and spectator voice state.", "admin", "voice", "status");
+		addCommand(out, "Individual Commands", "/g admin force role set", "Force or queue player roles.", "admin", "force", "role", "set");
+		addCommand(out, "Individual Commands", "/g admin force role clear", "Clear forced player roles.", "admin", "force", "role", "clear");
+		addCommand(out, "Individual Commands", "/g admin force role reroll", "Reroll player roles.", "admin", "force", "role", "reroll");
+		addCommand(out, "Individual Commands", "/g admin force modifier add", "Force or queue player modifiers.", "admin", "force", "modifier", "add");
+		addCommand(out, "Individual Commands", "/g admin force modifier remove", "Remove forced player modifiers.", "admin", "force", "modifier", "remove");
+		addCommand(out, "Individual Commands", "/g admin force modifier clear", "Clear forced player modifiers.", "admin", "force", "modifier", "clear");
+		addCommand(out, "Individual Commands", "/g admin force modifier reroll", "Reroll player modifiers.", "admin", "force", "modifier", "reroll");
 		addCommand(out, "Individual Commands", "/g admin skins give", "Give weapon skins.", "admin", "skins", "give");
 		addCommand(out, "Individual Commands", "/g admin skins remove", "Remove weapon skins.", "admin", "skins", "remove");
 		addCommand(out, "Individual Commands", "/g admin skins case give", "Give skin cases.", "admin", "skins", "case", "give");
@@ -677,10 +706,10 @@ public final class GexpressPermissions {
 		addCommand(out, "Individual Commands", "/g admin trusted add", "Add trusted players.", "admin", "trusted", "add");
 		addCommand(out, "Individual Commands", "/g admin trusted remove", "Remove trusted players.", "admin", "trusted", "remove");
 		addCommand(out, "Individual Commands", "/g admin trusted list", "List trusted players.", "admin", "trusted", "list");
-		addCommand(out, "Individual Commands", "/g admin painterdoor toggle", "Toggle Painter doorway use for the looked-at door.", "admin", "painterdoor", "toggle");
-		addCommand(out, "Individual Commands", "/g admin painterdoor disable", "Disable Painter doorway use for the looked-at door.", "admin", "painterdoor", "disable");
-		addCommand(out, "Individual Commands", "/g admin painterdoor enable", "Enable Painter doorway use for the looked-at door.", "admin", "painterdoor", "enable");
-		addCommand(out, "Individual Commands", "/g admin painterdoor clear", "Clear disabled Painter doorway doors.", "admin", "painterdoor", "clear");
+		addCommand(out, "Individual Commands", "/g admin diagnostics config", "Show a focused config summary.", "admin", "diagnostics", "config");
+		addCommand(out, "Individual Commands", "/g admin diagnostics presets", "Show map/train preset health counts.", "admin", "diagnostics", "presets");
+		addCommand(out, "Individual Commands", "/g admin diagnostics round", "Show round-state debug counts.", "admin", "diagnostics", "round");
+		addCommand(out, "Individual Commands", "/g admin diagnostics localization", "Check expected localization keys.", "admin", "diagnostics", "localization");
 		add(out, "Tabs", PERMISSION_PLAYERS_TAB, "Players tab", "Open the Players tab; editing still needs tag, progression, or economy permissions.");
 		add(out, "Tabs", PERMISSION_GAME_TAB, "Game tab", "Open the gameplay tuning tab.");
 		add(out, "Tabs", PERMISSION_MAPS_TAB, "Maps tab", "Open the map preset tab.");
@@ -696,6 +725,7 @@ public final class GexpressPermissions {
 		add(out, "Management", PERMISSION_ECONOMY_MANAGE, "Economy", "Grant, remove, and set G'Coin balances.");
 		add(out, "Management", PERMISSION_BUG_REPORTS_MODERATE, "Bug reports", "Mark bug reports open, fixed, or duplicate, and delete reports.");
 		add(out, "Management", PERMISSION_MAP_TOOLS, "Setup tools bundle", "Create, edit, validate, and apply G'Express map/train setup presets.");
+		add(out, "Management", PERMISSION_VIRTUAL_ROOMS, "Virtual rooms", "Open and use the G'Lib virtual-room library and commands.");
 		add(out, "Status Flags", PERMISSION_TRUSTED, "Trusted", "Counts as Trusted for trusted-only bypasses and display.");
 		add(out, "Status Flags", PERMISSION_STAFF, "Staff", "Counts as Staff for display and staff checks.");
 		add(out, "Status Flags", PERMISSION_OWNER, "Owner", "Owner display tag; default Owner receives broad command and edit permissions.");

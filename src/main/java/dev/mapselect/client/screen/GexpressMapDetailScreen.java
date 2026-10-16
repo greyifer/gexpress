@@ -31,7 +31,7 @@ public final class GexpressMapDetailScreen {
 			.description(OptionDescription.of(
 				Text.translatable("gui.gexpress.config.maps.back.tooltip").formatted(Formatting.GRAY)))
 			.option(ButtonOption.createBuilder()
-				.name(Text.literal("← ").formatted(Formatting.AQUA)
+				.name(Text.literal("< ").formatted(Formatting.AQUA)
 					.append(Text.translatable("gui.gexpress.config.maps.back").formatted(Formatting.AQUA)))
 				.text(Text.translatable("gui.gexpress.config.maps.back.action").formatted(Formatting.WHITE))
 				.action((scr, opt) -> GexpressOptionsScreen.navigateMaps(parent, null))

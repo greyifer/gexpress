@@ -1,6 +1,6 @@
 {
 	"credit": "EvieEveee plush - Minecraft skin UVs",
-	"parent": "gexpress:block/greyifer_plush",
+	"parent": "gexpress:block/greyifer_plush_slim",
 	"textures": {
 		"0": "gexpress:block/evieeveee_plush",
 		"particle": "gexpress:block/evieeveee_plush"

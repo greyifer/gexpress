@@ -20,7 +20,6 @@ import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
-import dev.mapselect.role.painter.PainterManager;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.command.argument.GameProfileArgumentType;
 import net.minecraft.server.command.CommandManager;
@@ -133,15 +132,6 @@ public final class DevCommand {
 							FloatArgumentType.getFloat(ctx, "value"),
 							v -> GexpressConfig.silentShadowAlpha = v,
 							GexpressConfig::getSilentShadowAlpha)))))
-			.then(adminDevLiteral("painterdoor")
-				.then(CommandManager.literal("toggle")
-					.executes(ctx -> runPainterDoorToggle(ctx, null)))
-				.then(CommandManager.literal("disable")
-					.executes(ctx -> runPainterDoorToggle(ctx, true)))
-				.then(CommandManager.literal("enable")
-					.executes(ctx -> runPainterDoorToggle(ctx, false)))
-				.then(CommandManager.literal("clear")
-					.executes(DevCommand::runPainterDoorClear)))
 			.then(adminDevLiteral("traincart")
 				.then(CommandManager.argument("preset", StringArgumentType.word())
 					.suggests(trainNames)
@@ -215,34 +205,6 @@ public final class DevCommand {
 			|| GexpressPermissions.canUseCommandPath(source, "admin", "dev", "level", subcommand);
 	}
 
-	private static int runPainterDoorToggle(CommandContext<ServerCommandSource> ctx, Boolean disabled)
-			throws CommandSyntaxException {
-		ServerCommandSource source = ctx.getSource();
-		ServerPlayerEntity player = source.getPlayerOrThrow();
-		PainterManager.DoorwayToggleResult result = PainterManager.setLookedDoorwayDisabled(player, disabled);
-		return sendPainterDoorToggleFeedback(source, result);
-	}
-
-	private static int sendPainterDoorToggleFeedback(ServerCommandSource source,
-			PainterManager.DoorwayToggleResult result) {
-		if (!result.found()) {
-			source.sendError(Text.literal("Choose a door to toggle Painter doorway destination access."));
-			return 0;
-		}
-		source.sendFeedback(() -> Text.literal((result.disabled() ? "Disabled" : "Enabled")
-				+ " Painter doorway destination at " + formatBlockPos(result.lowerPos()) + ".")
-			.formatted(result.disabled() ? Formatting.YELLOW : Formatting.GREEN), true);
-		return 1;
-	}
-
-	private static int runPainterDoorClear(CommandContext<ServerCommandSource> ctx) {
-		int count = PainterManager.clearDisabledDoorways(ctx.getSource().getWorld());
-		ctx.getSource().sendFeedback(() -> Text.literal("Cleared " + count + " disabled Painter doorway"
-				+ (count == 1 ? "." : "s."))
-			.formatted(Formatting.GREEN), true);
-		return count;
-	}
-
 	private static String formatBlockPos(BlockPos pos) {
 		return pos == null ? "unknown" : pos.getX() + " " + pos.getY() + " " + pos.getZ();
 	}
@@ -262,7 +224,7 @@ public final class DevCommand {
 			}
 		}
 		final int finalChanged = changed;
-		src.sendFeedback(() -> Text.literal("Set level XP progress to " + progress + " for "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Set level XP progress to " + progress + " for "
 				+ finalChanged + " player(s).").formatted(Formatting.GREEN), true);
 		return changed;
 	}
@@ -280,7 +242,7 @@ public final class DevCommand {
 			}
 		}
 		final int finalChanged = changed;
-		src.sendFeedback(() -> Text.literal("Set level to " + level + " for "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Set level to " + level + " for "
 				+ finalChanged + " player(s).").formatted(Formatting.GREEN), true);
 		return changed;
 	}
@@ -296,7 +258,7 @@ public final class DevCommand {
 			changed++;
 		}
 		final int finalChanged = changed;
-		src.sendFeedback(() -> Text.literal("Reset level, XP, and claimed roadmap rewards for "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Reset level, XP, and claimed roadmap rewards for "
 				+ finalChanged + " player(s).").formatted(Formatting.YELLOW), true);
 		return changed;
 	}
@@ -312,7 +274,7 @@ public final class DevCommand {
 			changed++;
 		}
 		final int finalChanged = changed;
-		src.sendFeedback(() -> Text.literal("Reset claimed XP Roadmap rewards for "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Reset claimed XP Roadmap rewards for "
 				+ finalChanged + " player(s).").formatted(Formatting.YELLOW), true);
 		return changed;
 	}
@@ -328,7 +290,7 @@ public final class DevCommand {
 			changed++;
 		}
 		final int finalChanged = changed;
-		src.sendFeedback(() -> Text.literal("Reset level " + level + " XP Roadmap reward claim for "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Reset level " + level + " XP Roadmap reward claim for "
 				+ finalChanged + " player(s).").formatted(Formatting.YELLOW), true);
 		return changed;
 	}
@@ -356,7 +318,7 @@ public final class DevCommand {
 			Consumer<Float> setter, Supplier<Float> getter) {
 		setter.accept(value);
 		syncConfig(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal("Set " + label + " to " + format(getter.get()) + ".")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Set " + label + " to " + format(getter.get()) + ".")
 			.formatted(Formatting.GREEN), true);
 		return 1;
 	}
@@ -365,7 +327,7 @@ public final class DevCommand {
 			IntConsumer setter, IntSupplier getter) {
 		setter.accept(value);
 		syncConfig(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal("Set " + label + " to " + getter.getAsInt() + ".")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Set " + label + " to " + getter.getAsInt() + ".")
 			.formatted(Formatting.GREEN), true);
 		return 1;
 	}
@@ -381,7 +343,7 @@ public final class DevCommand {
 		GexpressConfig.setC4PlacementPresetStrings(presets);
 		syncConfig(ctx.getSource());
 		int index = GexpressConfig.getC4PlacementPresetStrings().size();
-		ctx.getSource().sendFeedback(() -> Text.literal("Added C4 placement preset #" + index + ".")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Added C4 placement preset #" + index + ".")
 			.formatted(Formatting.GREEN), true);
 		return 1;
 	}
@@ -389,13 +351,13 @@ public final class DevCommand {
 	private static int runC4PresetList(CommandContext<ServerCommandSource> ctx) {
 		List<String> presets = GexpressConfig.getC4PlacementPresetStrings();
 		if (presets.isEmpty()) {
-			ctx.getSource().sendFeedback(() -> Text.literal("No C4 placement presets."), false);
+			dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("No C4 placement presets."), false);
 			return 1;
 		}
 		for (int i = 0; i < presets.size(); i++) {
 			final int index = i + 1;
 			final String value = presets.get(i);
-			ctx.getSource().sendFeedback(() -> Text.literal("#" + index + " " + value), false);
+			dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("#" + index + " " + value), false);
 		}
 		return presets.size();
 	}
@@ -409,7 +371,7 @@ public final class DevCommand {
 		presets.remove(oneBasedIndex - 1);
 		GexpressConfig.setC4PlacementPresetStrings(presets);
 		syncConfig(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal("Removed C4 placement preset #" + oneBasedIndex + ".")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Removed C4 placement preset #" + oneBasedIndex + ".")
 			.formatted(Formatting.YELLOW), true);
 		return 1;
 	}
@@ -417,7 +379,7 @@ public final class DevCommand {
 	private static int runC4PresetClear(CommandContext<ServerCommandSource> ctx) {
 		GexpressConfig.setC4PlacementPresetStrings(List.of());
 		syncConfig(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal("Cleared C4 placement presets.")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Cleared C4 placement presets.")
 			.formatted(Formatting.YELLOW), true);
 		return 1;
 	}
@@ -430,7 +392,7 @@ public final class DevCommand {
 		GexpressConfig.setRoleDescriptionOverride(rolePath, description);
 		syncConfig(ctx.getSource());
 		boolean cleared = description == null || description.isBlank();
-		ctx.getSource().sendFeedback(() -> Text.literal((cleared ? "Cleared" : "Set") + " role description for " + rolePath + ".")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal((cleared ? "Cleared" : "Set") + " role description for " + rolePath + ".")
 			.formatted(cleared ? Formatting.YELLOW : Formatting.GREEN), true);
 		return 1;
 	}
@@ -449,7 +411,7 @@ public final class DevCommand {
 			return 0;
 		}
 		final int cartIndex = index;
-		src.sendFeedback(() -> Text.literal("Added train cart #" + cartIndex + " to preset '" + name + "'.")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Added train cart #" + cartIndex + " to preset '" + name + "'.")
 			.formatted(Formatting.GREEN), true);
 		return 1;
 	}
@@ -459,14 +421,14 @@ public final class DevCommand {
 		TrainPreset preset = loadTrainPreset(src, name);
 		if (preset == null) return 0;
 		if (preset.trainCarts == null || preset.trainCarts.isEmpty()) {
-			src.sendFeedback(() -> Text.literal("No train carts in preset '" + name + "'."), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No train carts in preset '" + name + "'."), false);
 			return 1;
 		}
 		for (int i = 0; i < preset.trainCarts.size(); i++) {
 			final int index = i + 1;
 			final String marker = index == 1 ? " front" : index == preset.trainCarts.size() ? " back" : "";
 			final String box = boxStr(preset.trainCarts.get(i).area);
-			src.sendFeedback(() -> Text.literal("#" + index + marker + " " + box), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("#" + index + marker + " " + box), false);
 		}
 		return preset.trainCarts.size();
 	}
@@ -486,7 +448,7 @@ public final class DevCommand {
 			src.sendError(Text.literal("Failed to save train preset: " + e.getMessage()));
 			return 0;
 		}
-		src.sendFeedback(() -> Text.literal("Removed train cart #" + oneBasedIndex + " from preset '" + name + "'.")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Removed train cart #" + oneBasedIndex + " from preset '" + name + "'.")
 			.formatted(Formatting.YELLOW), true);
 		return 1;
 	}
@@ -503,7 +465,7 @@ public final class DevCommand {
 			src.sendError(Text.literal("Failed to save train preset: " + e.getMessage()));
 			return 0;
 		}
-		src.sendFeedback(() -> Text.literal("Cleared train carts for preset '" + name + "'.")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared train carts for preset '" + name + "'.")
 			.formatted(Formatting.YELLOW), true);
 		return 1;
 	}

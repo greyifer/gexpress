@@ -40,6 +40,11 @@ public final class OptionVisibility {
 		return alias != null && alias.contains(query.toLowerCase(Locale.ROOT));
 	}
 
+	/** True for options that belong to a named dropdown/group owner. */
+	public static boolean hasSearchAlias(Option<?> option) {
+		return option != null && SEARCH_ALIASES.containsKey(option);
+	}
+
 	public static boolean updateSearchAliasMatch(Option<?> option, String query) {
 		boolean matches = matchesSearchAlias(option, query);
 		if (option != null) {

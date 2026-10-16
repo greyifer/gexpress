@@ -41,4 +41,5 @@ public abstract class PainterBodyRendererMixin {
 	private int gexpress$painterBodyColor(int originalColor) {
 		return ClientPainterState.bodyColor(GEXPRESS_RENDERING_BODY.get(), originalColor);
 	}
+
 }

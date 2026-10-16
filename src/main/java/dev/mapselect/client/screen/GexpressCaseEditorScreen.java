@@ -3,12 +3,12 @@ package dev.mapselect.client.screen;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.skin.WeaponSkin;
 import dev.mapselect.skin.WeaponSkinType;
-import net.minecraft.client.MinecraftClient;
+import io.github.caspe.glib.api.client.editor.GlibWorkbenchScreen;
+import io.github.caspe.glib.api.client.ui.GlibButton;
+import io.github.caspe.glib.api.client.ui.GlibRect;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
@@ -18,7 +18,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-public final class GexpressCaseEditorScreen extends Screen {
+public final class GexpressCaseEditorScreen extends GlibWorkbenchScreen {
 	private static final int CASE_ROW_HEIGHT = 40;
 	private static final int REWARD_ROW_HEIGHT = 36;
 	private static final int SKIN_ROW_HEIGHT = 36;
@@ -33,18 +33,17 @@ public final class GexpressCaseEditorScreen extends Screen {
 	private static final int TEXT = 0xFFE8EDF2;
 	private static final int MUTED = 0xFF9DA9B6;
 
-	private final Screen parent;
+	private GlibRect workspace;
 	private final List<DraftReward> rewards = new ArrayList<>();
 	private final List<Hit> hits = new ArrayList<>();
 	private TextFieldWidget idField;
 	private TextFieldWidget nameField;
 	private TextFieldWidget priceField;
-	private ButtonWidget saveButton;
-	private ButtonWidget deleteButton;
-	private ButtonWidget newButton;
-	private ButtonWidget doneButton;
-	private ButtonWidget addRewardButton;
-	private ButtonWidget panelToggleButton;
+	private GlibButton saveButton;
+	private GlibButton deleteButton;
+	private GlibButton newButton;
+	private GlibButton addRewardButton;
+	private GlibButton panelToggleButton;
 	private String selectedId = "";
 	private String status = "Select a case or create a new one.";
 	private int statusColor = MUTED;
@@ -56,25 +55,25 @@ public final class GexpressCaseEditorScreen extends Screen {
 	private boolean compactSkinLibrary;
 
 	public GexpressCaseEditorScreen(Screen parent) {
-		super(Text.literal("Case Editor"));
-		this.parent = parent;
+		super(parent, Text.literal("Case Editor"),
+			Text.literal("Cases, prices, and weighted knife/gun drops"), GOLD);
 	}
 
 	@Override
-	protected void init() {
+	protected void initWorkbench(GlibRect workspace) {
+		this.workspace = workspace;
 		hits.clear();
 		idField = addField(0, 0, 120, 18, 48, "case_id");
 		nameField = addField(0, 0, 160, 18, 80, "Display name");
 		priceField = addField(0, 0, 64, 18, 8, "Price");
-		addRewardButton = addDrawableChild(ButtonWidget.builder(Text.literal("Add Reward"), button -> addSelectedReward()).build());
-		panelToggleButton = addDrawableChild(ButtonWidget.builder(Text.literal("Browse Skins"), button -> {
+		addRewardButton = addDrawableChild(new GlibButton(0, 0, 100, 20, Text.literal("Add Reward"), GOLD, this::addSelectedReward));
+		panelToggleButton = addDrawableChild(new GlibButton(0, 0, 100, 20, Text.literal("Browse Skins"), GOLD, () -> {
 			compactSkinLibrary = !compactSkinLibrary;
 			updatePanelButtons();
-		}).build());
-		saveButton = addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> save()).build());
-		deleteButton = addDrawableChild(ButtonWidget.builder(Text.literal("Delete"), button -> delete()).build());
-		newButton = addDrawableChild(ButtonWidget.builder(Text.literal("New"), button -> clearForm()).build());
-		doneButton = addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).build());
+		}));
+		saveButton = addDrawableChild(new GlibButton(0, 0, 72, 20, Text.literal("Save"), GREEN, this::save));
+		deleteButton = addDrawableChild(new GlibButton(0, 0, 72, 20, Text.literal("Delete"), RED, this::delete));
+		newButton = addDrawableChild(new GlibButton(0, 0, 72, 20, Text.literal("New"), BLUE, this::clearForm));
 		layoutWidgets();
 		ensureSelectedSkin();
 
@@ -95,23 +94,17 @@ public final class GexpressCaseEditorScreen extends Screen {
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+	protected void renderWorkbench(DrawContext context, GlibRect workspace, int mouseX, int mouseY, float delta) {
 		layoutWidgets();
 		clampScrolls();
 		hits.clear();
-		context.fill(0, 0, width, height, 0xF00E1116);
-		drawHeader(context);
 		drawCaseList(context, mouseX, mouseY);
 		drawEditor(context, mouseX, mouseY);
-		super.render(context, mouseX, mouseY, delta);
-	}
-
-	@Override
-	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
 	}
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (helpActive()) return super.mouseClicked(mouseX, mouseY, button);
 		if (button == 0) {
 			for (Hit hit : List.copyOf(hits)) {
 				if (inside(mouseX, mouseY, hit.x, hit.y, hit.w, hit.h)) {
@@ -126,6 +119,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (helpActive()) return true;
 		if (inside(mouseX, mouseY, listX(), listY(), listW(), listH())) {
 			int max = Math.max(0, entries().size() * CASE_ROW_HEIGHT - (listH() - 38));
 			caseScroll = MathHelper.clamp(caseScroll - (int) Math.round(verticalAmount * 24.0D), 0, max);
@@ -142,20 +136,6 @@ public final class GexpressCaseEditorScreen extends Screen {
 			return true;
 		}
 		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-	}
-
-	@Override
-	public void close() {
-		MinecraftClient.getInstance().setScreen(parent);
-	}
-
-	private void drawHeader(DrawContext context) {
-		context.fill(0, 0, width, 42, 0xEE111820);
-		context.fill(0, 40, width, 42, GOLD);
-		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 11, TEXT);
-		context.drawCenteredTextWithShadow(textRenderer,
-			Text.literal("Cases, prices, and weighted knife/gun drops").formatted(Formatting.GRAY),
-			width / 2, 24, MUTED);
 	}
 
 	private void drawCaseList(DrawContext context, int mouseX, int mouseY) {
@@ -211,7 +191,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 		context.drawTextWithShadow(textRenderer, Text.literal("Id"), idField.getX(), idField.getY() - 11, MUTED);
 		context.drawTextWithShadow(textRenderer, Text.literal("Display Name"), nameField.getX(), nameField.getY() - 11, MUTED);
 		context.drawTextWithShadow(textRenderer, Text.literal("Price"), priceField.getX(), priceField.getY() - 11, MUTED);
-		context.drawTextWithShadow(textRenderer, Text.literal(status), x + 14, y + 84, statusColor);
+		context.drawTextWithShadow(textRenderer, Text.literal(status), x + 270, y + 82, statusColor);
 		if (!compactLayout() || !compactSkinLibrary) drawRewardPanel(context, mouseX, mouseY);
 		if (!compactLayout() || compactSkinLibrary) drawSkinPanel(context, mouseX, mouseY);
 	}
@@ -221,8 +201,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 		int y = rewardY();
 		int w = rewardW();
 		int h = rewardH();
-		context.fill(x, y, x + w, y + h, 0xAA10161E);
-		context.drawBorder(x, y, w, h, BORDER);
+		drawWorkbenchPanel(context, x, y, w, h);
 		context.drawTextWithShadow(textRenderer, Text.literal("Rewards").formatted(Formatting.BOLD), x + 10, y + 9, TEXT);
 		context.drawTextWithShadow(textRenderer, Text.literal(rewards.size() + " selected"), x + 100, y + 10, MUTED);
 		context.drawTextWithShadow(textRenderer, Text.literal("Type"), x + 18, y + 28, MUTED);
@@ -280,8 +259,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 		int y = skinY();
 		int w = skinW();
 		int h = skinH();
-		context.fill(x, y, x + w, y + h, 0xAA10161E);
-		context.drawBorder(x, y, w, h, BORDER);
+		drawWorkbenchPanel(context, x, y, w, h);
 		context.drawTextWithShadow(textRenderer, Text.literal("Available Skins").formatted(Formatting.BOLD), x + 10, y + 9, TEXT);
 		context.drawTextWithShadow(textRenderer, Text.literal("Click a skin to add or remove it."), x + 10, y + 23, MUTED);
 
@@ -327,8 +305,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 	}
 
 	private void panel(DrawContext context, int x, int y, int w, int h, String title) {
-		context.fill(x, y, x + w, y + h, PANEL);
-		context.drawBorder(x, y, w, h, BORDER);
+		drawWorkbenchPanel(context, x, y, w, h);
 		context.fill(x, y, x + w, y + 2, GOLD);
 		context.drawTextWithShadow(textRenderer, Text.literal(title).formatted(Formatting.BOLD), x + 12, y + 11, TEXT);
 	}
@@ -366,11 +343,10 @@ public final class GexpressCaseEditorScreen extends Screen {
 		updatePanelButtons();
 		updateAddButton();
 
-		int buttonY = height - 32;
+		int buttonY = listY() + 76;
 		saveButton.setDimensionsAndPosition(78, 20, editorX() + 14, buttonY);
 		deleteButton.setDimensionsAndPosition(78, 20, editorX() + 98, buttonY);
 		newButton.setDimensionsAndPosition(78, 20, editorX() + 182, buttonY);
-		doneButton.setDimensionsAndPosition(90, 20, width - 114, buttonY);
 	}
 
 	private void updateAddButton() {
@@ -598,19 +574,19 @@ public final class GexpressCaseEditorScreen extends Screen {
 	}
 
 	private int listX() {
-		return 22;
+		return workspace.x() + 8;
 	}
 
 	private int listY() {
-		return 54;
+		return workspace.y() + 8;
 	}
 
 	private int listW() {
-		return Math.min(282, Math.max(220, width / 4));
+		return Math.min(282, Math.max(220, workspace.width() / 4));
 	}
 
 	private int listH() {
-		return Math.max(170, height - listY() - 54);
+		return Math.max(170, workspace.height() - 16);
 	}
 
 	private int editorX() {
@@ -618,7 +594,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 	}
 
 	private int editorW() {
-		return Math.max(440, width - editorX() - 22);
+		return Math.max(440, workspace.x() + workspace.width() - editorX() - 8);
 	}
 
 	private int rewardX() {
@@ -635,8 +611,7 @@ public final class GexpressCaseEditorScreen extends Screen {
 	}
 
 	private int rewardH() {
-		if (splitPanels()) return Math.max(148, height - rewardY() - 90);
-		return Math.max(148, height - rewardY() - 90);
+		return Math.max(148, workspace.y() + workspace.height() - rewardY() - 10);
 	}
 
 	private int skinX() {

@@ -10,8 +10,10 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.network.role.covenant.CovenantBatPayload;
 import dev.mapselect.network.role.covenant.CovenantBatMovementPayload;
+import dev.mapselect.network.role.covenant.CovenantBatRenderPayload;
 import dev.mapselect.network.role.covenant.CovenantBitePayload;
 import dev.mapselect.network.role.covenant.CovenantStatePayload;
+import dev.mapselect.network.role.covenant.CovenantTurnPayload;
 import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -20,24 +22,39 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 public final class ClientCovenantState {
+	private static final float BAT_FLY_SPEED = 0.10F;
+	private static final double BAT_HORIZONTAL_SPEED = 0.45D;
+	private static final double BAT_VERTICAL_SPEED = 0.34D;
+	private static final Set<UUID> BAT_FORM_PLAYERS = new HashSet<>();
 	private static boolean active;
 	private static int bloodTicks;
 	private static int maxBloodTicks = 1;
 	private static int batTicks;
 	private static int maxBatTicks = 1;
 	private static boolean batForm;
+	private static boolean dracula;
 	private static boolean wasBiteDown;
 	private static boolean wasBatDown;
+	private static boolean wasTurnDown;
 
 	private ClientCovenantState() {}
 
 	public static void register() {
 		ClientPlayNetworking.registerGlobalReceiver(CovenantStatePayload.ID, (payload, context) ->
 			context.client().execute(() -> apply(payload)));
+		ClientPlayNetworking.registerGlobalReceiver(CovenantBatRenderPayload.ID, (payload, context) ->
+			context.client().execute(() -> applyBatRender(payload)));
 		ClientTickEvents.END_CLIENT_TICK.register(ClientCovenantState::tick);
 		HudRenderCallback.EVENT.register(ClientCovenantState::render);
 	}
@@ -58,8 +75,22 @@ public final class ClientCovenantState {
 		return batForm;
 	}
 
+	public static float turnReadiness() {
+		int required = Math.max(1, (int) Math.ceil(maxBloodTicks * 0.75D));
+		return Math.max(0.0F, Math.min(1.0F, bloodTicks / (float) required));
+	}
+
+	public static boolean isBatForm(PlayerEntity player) {
+		if (player == null) return false;
+		if (BAT_FORM_PLAYERS.contains(player.getUuid())) return true;
+		MinecraftClient client = MinecraftClient.getInstance();
+		return client != null && client.player != null
+			&& client.player.getUuid().equals(player.getUuid()) && batForm;
+	}
+
 	private static void apply(CovenantStatePayload payload) {
 		active = payload.active();
+		dracula = payload.dracula();
 		bloodTicks = payload.bloodTicks();
 		maxBloodTicks = payload.maxBloodTicks();
 		batTicks = payload.batTicks();
@@ -67,12 +98,21 @@ public final class ClientCovenantState {
 		batForm = payload.batForm();
 	}
 
+	private static void applyBatRender(CovenantBatRenderPayload payload) {
+		BAT_FORM_PLAYERS.clear();
+		if (payload != null) BAT_FORM_PLAYERS.addAll(payload.playerIds());
+	}
+
 	private static void tick(MinecraftClient client) {
+		if (client == null || client.world == null) {
+			BAT_FORM_PLAYERS.clear();
+		}
 		if (client == null || client.player == null || client.world == null || ClientVultureState.isLocalStashed(client)
 				|| !ClientRoleRevealState.canUseRoleAbility(client) || !isLocalCovenant(client)
 				|| client.currentScreen != null) {
 			wasBiteDown = false;
 			wasBatDown = false;
+			wasTurnDown = false;
 			return;
 		}
 
@@ -90,12 +130,21 @@ public final class ClientCovenantState {
 		}
 		wasBiteDown = biteDown;
 
+		KeyBinding turn = ClientAbilityKeys.tertiaryBinding();
+		boolean turnDown = turn != null && ClientAbilityKeys.isDown(client, turn);
+		if (!batForm && isLocalDracula(client) && turnDown && !wasTurnDown
+				&& ClientPlayNetworking.canSend(CovenantTurnPayload.ID)) {
+			ClientPlayNetworking.send(new CovenantTurnPayload());
+		}
+		wasTurnDown = turnDown;
+
 		if (batForm) maintainBatFlight(client);
 	}
 
 	private static void maintainBatFlight(MinecraftClient client) {
 		client.player.getAbilities().allowFlying = true;
 		client.player.getAbilities().flying = true;
+		client.player.getAbilities().setFlySpeed(BAT_FLY_SPEED);
 		client.player.fallDistance = 0.0F;
 		float forward = 0.0F;
 		float sideways = 0.0F;
@@ -106,27 +155,35 @@ public final class ClientCovenantState {
 		boolean ascending = ClientAbilityKeys.isDown(client, client.options.jumpKey);
 		boolean descending = ClientAbilityKeys.isDown(client, client.options.sneakKey);
 		boolean sprinting = ClientAbilityKeys.isDown(client, client.options.sprintKey);
-		applyLocalBatVelocity(client, sideways, forward, ascending, descending, sprinting);
+		applyBatVelocity(client.player, sideways, forward, ascending, descending, sprinting);
 		if (ClientPlayNetworking.canSend(CovenantBatMovementPayload.ID)) {
-			ClientPlayNetworking.send(new CovenantBatMovementPayload(sideways, forward, ascending, descending, sprinting));
+			ClientPlayNetworking.send(new CovenantBatMovementPayload(sideways, forward,
+				ascending, descending, sprinting));
 		}
 	}
 
-	private static void applyLocalBatVelocity(MinecraftClient client, float sideways, float forward,
+	private static void applyBatVelocity(PlayerEntity player, float sideways, float forward,
 			boolean ascending, boolean descending, boolean sprinting) {
-		float magnitude = (float) Math.sqrt(sideways * sideways + forward * forward);
-		if (magnitude > 1.0F) {
-			sideways /= magnitude;
-			forward /= magnitude;
+		if (player == null) return;
+		Vec3d velocity = player.getVelocity();
+		double targetY = ascending == descending ? 0.0D : ascending ? BAT_VERTICAL_SPEED : -BAT_VERTICAL_SPEED;
+		double inputLength = Math.sqrt(sideways * sideways + forward * forward);
+		if (inputLength < 0.001D) {
+			player.setVelocity(velocity.x * 0.72D,
+				MathHelper.lerp(0.58D, velocity.y, targetY), velocity.z * 0.72D);
+			return;
 		}
-		double yaw = Math.toRadians(client.player.getYaw());
-		double sin = Math.sin(yaw);
-		double cos = Math.cos(yaw);
-		double speed = sprinting && forward > 0.0F ? 0.38D : 0.27D;
-		double velocityX = (sideways * cos - forward * sin) * speed;
-		double velocityZ = (forward * cos + sideways * sin) * speed;
-		double velocityY = ascending == descending ? 0.0D : ascending ? 0.27D : -0.27D;
-		client.player.setVelocity(velocityX, velocityY, velocityZ);
+		double normalizedSideways = sideways / inputLength;
+		double normalizedForward = forward / inputLength;
+		double yaw = Math.toRadians(player.getYaw());
+		double directionX = normalizedSideways * Math.cos(yaw) - normalizedForward * Math.sin(yaw);
+		double directionZ = normalizedForward * Math.cos(yaw) + normalizedSideways * Math.sin(yaw);
+		double speed = BAT_HORIZONTAL_SPEED * (sprinting ? 1.18D : 1.0D);
+		player.setVelocity(
+			MathHelper.lerp(0.48D, velocity.x, directionX * speed),
+			MathHelper.lerp(0.58D, velocity.y, targetY),
+			MathHelper.lerp(0.48D, velocity.z, directionZ * speed)
+		);
 	}
 
 	private static void render(DrawContext context, RenderTickCounter tickCounter) {

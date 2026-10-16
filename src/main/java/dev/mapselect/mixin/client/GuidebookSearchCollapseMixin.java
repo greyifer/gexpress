@@ -21,10 +21,57 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Mixin(value = GuidebookScreen.class, remap = false, priority = 900)
 public abstract class GuidebookSearchCollapseMixin extends Screen {
+	@Unique private static final String GEXPRESS$ROLE_DESC_PREFIX = "gui.watheextended.guidebook.role.desc.";
+	@Unique private static final String GEXPRESS$ROLE_ABILITY_PREFIX = "gui.watheextended.guidebook.role.abilities.";
+	@Unique private static final Map<String, String> GEXPRESS$SEARCH_ALIASES = Map.ofEntries(
+		Map.entry("bomb_specialist", "bomb c4 explosive detonate demolition"),
+		Map.entry("medic", "doctor shield protect save"),
+		Map.entry("snitch", "task evidence reveal killer"),
+		Map.entry("seer", "soul read compare team allegiance death"),
+		Map.entry("twins", "swap clone spare body camera"),
+		Map.entry("sniffer", "poison food drink tray"),
+		Map.entry("time_master", "rewind freeze time snapshot revive"),
+		Map.entry("the_silent", "silent shadow stealth vanish footstep"),
+		Map.entry("warlock", "curse mark hex omen remote kill"),
+		Map.entry("juggernaut", "solo shield momentum endurance"),
+		Map.entry("cupid", "love lover lovers match pair"),
+		Map.entry("trickster", "harlequin masquerade disguise mute teleport scatter cart shuffle"),
+		Map.entry("puppetmaster", "control possession puppet strings"),
+		Map.entry("bounty_hunter", "target bounty coin hunt"),
+		Map.entry("pelican", "swallow eat belly spit"),
+		Map.entry("skincrawler", "skin disguise body corpse"),
+		Map.entry("painter", "paint fake role body evidence"),
+		Map.entry("tracker", "track glow highlight suspect"),
+		Map.entry("veteran", "alert retaliate shoot visitor defense"),
+		Map.entry("spy", "bug feed observe coin"),
+		Map.entry("bodyguard", "guard protect revolver close"),
+		Map.entry("altruist", "revive sacrifice body"),
+		Map.entry("vengeful_spirit", "revenge spirit killer respawn"),
+		Map.entry("godfather", "mafia family recruit bullet revolver"),
+		Map.entry("mafioso", "mafia family enforcer weapon"),
+		Map.entry("janitor", "mafia family clean body poison"),
+		Map.entry("pickpocket", "mafia family steal coin thief"),
+		Map.entry("burglar", "mafia family crowbar lockpick door"),
+		Map.entry("copycat", "copy mimic borrow ability"),
+		Map.entry("dracula", "covenant vampire blood bite bat"),
+		Map.entry("vampire", "covenant dracula blood bite"),
+		Map.entry("eod_specialist", "bomb c4 pliers defuse wire"),
+		Map.entry("short_sighted", "blind vision distance sight"),
+		Map.entry("night_vision", "dark light vision"),
+		Map.entry("hungry", "food platter carry"),
+		Map.entry("thirsty", "drink tray carry"),
+		Map.entry("muted", "voice microphone mic"),
+		Map.entry("paranoid", "weapon hallucination sanity"),
+		Map.entry("squeaker", "voice pitch high"),
+		Map.entry("lovers", "love cupid pair linked"),
+		Map.entry("tall", "scale height big large")
+	);
+
 	@Shadow private int leftPageX;
 	@Shadow private int leftPageY;
 	@Shadow private int leftPageW;
@@ -209,7 +256,39 @@ public abstract class GuidebookSearchCollapseMixin extends Screen {
 		return gexpress$contains(entry.text(), query)
 			|| gexpress$contains(entry.displayTitle(), query)
 			|| gexpress$contains(entry.id(), query)
-			|| gexpress$contains(entry.descriptionKey(), query);
+			|| gexpress$contains(entry.descriptionKey(), query)
+			|| gexpress$containsTranslated(entry.descriptionKey(), query)
+			|| gexpress$containsAbilityText(entry.descriptionKey(), query)
+			|| gexpress$contains(GEXPRESS$SEARCH_ALIASES.get(gexpress$entryPath(entry)), query);
+	}
+
+	@Unique
+	private boolean gexpress$containsAbilityText(String descriptionKey, String query) {
+		if (descriptionKey == null || !descriptionKey.startsWith(GEXPRESS$ROLE_DESC_PREFIX)) return false;
+		return gexpress$containsTranslated(GEXPRESS$ROLE_ABILITY_PREFIX
+			+ descriptionKey.substring(GEXPRESS$ROLE_DESC_PREFIX.length()), query);
+	}
+
+	@Unique
+	private boolean gexpress$containsTranslated(String key, String query) {
+		if (key == null || key.isBlank()) return false;
+		String translated = Text.translatable(key).getString();
+		return !translated.equals(key) && gexpress$contains(translated, query);
+	}
+
+	@Unique
+	private String gexpress$entryPath(GuidebookEntry entry) {
+		if (entry == null) return "";
+		String id = entry.id();
+		if (id != null) {
+			int split = id.indexOf(':');
+			if (split >= 0 && split + 1 < id.length()) return id.substring(split + 1);
+			if (!id.isBlank()) return id;
+		}
+		String key = entry.descriptionKey();
+		if (key == null) return "";
+		int split = key.lastIndexOf('.');
+		return split >= 0 && split + 1 < key.length() ? key.substring(split + 1) : key;
 	}
 
 	@Unique

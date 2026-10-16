@@ -32,10 +32,7 @@ public abstract class GameRoundEndWinnerMixin {
 			cir.setReturnValue(LoversManager.didIndependentPairWin(uuid, game.getLooseEndWinner()));
 			return;
 		}
-		if (uuid.equals(game.getLooseEndWinner())
-				|| MafiaManager.isSameFamily(uuid, game.getLooseEndWinner())) {
-			cir.setReturnValue(true);
-		}
+		cir.setReturnValue(uuid.equals(game.getLooseEndWinner()) || MafiaManager.isSameFamily(uuid, game.getLooseEndWinner()));
 	}
 
 	@Inject(method = "didWin", at = @At("HEAD"), cancellable = true)

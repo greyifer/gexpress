@@ -12,6 +12,7 @@ import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
+import dev.mapselect.preset.train.TrainPresetValidator;
 import dev.mapselect.weather.MapWeatherComponent;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -57,6 +58,45 @@ public class TrainCommand {
 					.then(CommandManager.argument("name", StringArgumentType.word())
 						.suggests(trainNames)
 						.executes(ctx -> runDelete(ctx, StringArgumentType.getString(ctx, "name")))))
+				.then(CommandManager.literal("duplicate")
+					.requires(trainCommand("preset", "duplicate"))
+					.then(CommandManager.argument("source", StringArgumentType.word())
+						.suggests(trainNames)
+						.then(CommandManager.argument("target", StringArgumentType.word())
+							.executes(ctx -> runDuplicate(ctx,
+								StringArgumentType.getString(ctx, "source"),
+								StringArgumentType.getString(ctx, "target"))))))
+				
+				.then(CommandManager.literal("backup")
+					.requires(trainCommand("preset", "backup"))
+					.then(CommandManager.argument("name", StringArgumentType.word())
+						.suggests(trainNames)
+						.then(CommandManager.literal("list")
+							.executes(ctx -> runBackupList(ctx, StringArgumentType.getString(ctx, "name"))))
+						.then(CommandManager.literal("restore")
+							.then(CommandManager.argument("backupId", StringArgumentType.word())
+								.suggests(TrainCommand::suggestTrainBackupIds)
+								.then(CommandManager.literal("confirm")
+									.executes(ctx -> runBackupRestore(ctx,
+										StringArgumentType.getString(ctx, "name"),
+										StringArgumentType.getString(ctx, "backupId"))))))))
+				.then(CommandManager.literal("rename")
+					.requires(trainCommand("preset", "rename"))
+					.then(CommandManager.argument("oldName", StringArgumentType.word())
+						.suggests(trainNames)
+						.then(CommandManager.argument("newName", StringArgumentType.word())
+							.then(CommandManager.literal("confirm")
+								.executes(ctx -> runRename(ctx,
+									StringArgumentType.getString(ctx, "oldName"),
+									StringArgumentType.getString(ctx, "newName")))))))
+				.then(CommandManager.literal("validate")
+					.requires(trainCommand("preset", "validate"))
+					.executes(TrainCommand::runValidateAll)
+					.then(CommandManager.literal("issues")
+						.executes(TrainCommand::runValidateIssues))
+					.then(CommandManager.argument("name", StringArgumentType.word())
+						.suggests(trainNames)
+						.executes(ctx -> runValidate(ctx, StringArgumentType.getString(ctx, "name")))))
 				.then(CommandManager.literal("list")
 					.requires(trainCommand("preset", "list"))
 					.executes(TrainCommand::runList))
@@ -75,6 +115,18 @@ public class TrainCommand {
 				if (n.toLowerCase().startsWith(remaining)) builder.suggest(n);
 			}
 		} catch (IOException ignored) {
+		}
+		return builder.buildFuture();
+	}
+
+	private static CompletableFuture<Suggestions> suggestTrainBackupIds(CommandContext<ServerCommandSource> ctx, SuggestionsBuilder builder) {
+		try {
+			String name = StringArgumentType.getString(ctx, "name");
+			String remaining = builder.getRemainingLowerCase();
+			for (String id : TrainPresetStorage.listBackups(ctx.getSource().getServer(), name)) {
+				if (id.toLowerCase(java.util.Locale.ROOT).startsWith(remaining)) builder.suggest(id);
+			}
+		} catch (Exception ignored) {
 		}
 		return builder.buildFuture();
 	}
@@ -119,7 +171,7 @@ public class TrainCommand {
 			final int slots = preset.slotCount();
 			final int carts = preset.cartCount();
 			final String s = suffix;
-			src.sendFeedback(() -> Text.literal("Saved train preset '" + name + "' (" + slots + " TP slot" + (slots == 1 ? "" : "s")
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Saved train preset '" + name + "' (" + slots + " TP slot" + (slots == 1 ? "" : "s")
 				+ ", " + carts + " cart" + (carts == 1 ? "" : "s") + ")." + s).formatted(Formatting.GREEN), true);
 			return 1;
 		} catch (IOException e) {
@@ -146,7 +198,7 @@ public class TrainCommand {
 			}
 			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
 			final int cleared = clearedDefaults;
-			src.sendFeedback(() -> {
+			dev.mapselect.command.GexpressFeedback.send(src, () -> {
 				Text base = Text.literal("Deleted train preset '" + name + "'.").formatted(Formatting.YELLOW);
 				if (cleared > 0) {
 					return base.copy().append(Text.literal(" Cleared it from " + cleared + " map preset(s).").formatted(Formatting.GRAY));
@@ -158,6 +210,187 @@ public class TrainCommand {
 			src.sendError(Text.literal("Failed to delete train preset: " + e.getMessage()));
 			return 0;
 		}
+	}
+
+	private static int runDuplicate(CommandContext<ServerCommandSource> ctx, String sourceName, String targetName) {
+		ServerCommandSource src = ctx.getSource();
+		if (!TrainPresetStorage.isValidName(sourceName) || !TrainPresetStorage.isValidName(targetName)) {
+			src.sendError(Text.literal("Invalid train preset name. Use letters, digits, '_' or '-', up to 64 chars."));
+			return 0;
+		}
+		try {
+			TrainPresetStorage.duplicate(src.getServer(), sourceName, targetName);
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Duplicated train preset '" + sourceName
+				+ "' to '" + targetName + "'.").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal(e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runBackupList(CommandContext<ServerCommandSource> ctx, String name) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			List<String> backups = TrainPresetStorage.listBackups(src.getServer(), name);
+			if (backups.isEmpty()) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No backups found for train preset '" + name + "'."), false);
+				return 1;
+			}
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Backups for train preset '" + name + "': "
+				+ String.join(", ", backups)), false);
+			return backups.size();
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to list train preset backups: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runBackupRestore(CommandContext<ServerCommandSource> ctx, String name, String backupId) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			TrainPresetStorage.restoreBackup(src.getServer(), name, backupId);
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Restored train preset '" + name
+				+ "' from backup " + backupId + ".").formatted(Formatting.GREEN), true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to restore train preset backup: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runRename(CommandContext<ServerCommandSource> ctx, String oldName, String newName) {
+		ServerCommandSource src = ctx.getSource();
+		if (!TrainPresetStorage.isValidName(oldName) || !TrainPresetStorage.isValidName(newName)) {
+			src.sendError(Text.literal("Invalid train preset name. Use letters, digits, '_' or '-', up to 64 chars."));
+			return 0;
+		}
+		if (oldName.equals(newName)) {
+			src.sendError(Text.literal("New name is the same as the old name."));
+			return 0;
+		}
+		try {
+			TrainPresetStorage.rename(src.getServer(), oldName, newName);
+			int updatedDefaults = updateDefaultTrainReferences(src, oldName, newName);
+			if (updatedDefaults > 0) {
+				GexpressPresetsSyncHandler.broadcastPresets(src.getServer());
+			}
+			GexpressPresetsSyncHandler.broadcastTrainPresets(src.getServer());
+			final int updated = updatedDefaults;
+			dev.mapselect.command.GexpressFeedback.send(src, () -> {
+				Text base = Text.literal("Renamed train preset '" + oldName + "' to '" + newName + "'.").formatted(Formatting.GREEN);
+				if (updated > 0) {
+					return base.copy().append(Text.literal(" Updated " + updated + " map preset default(s).").formatted(Formatting.GRAY));
+				}
+				return base;
+			}, true);
+			return 1;
+		} catch (IOException e) {
+			src.sendError(Text.literal(e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runValidate(CommandContext<ServerCommandSource> ctx, String name) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			TrainPreset preset = TrainPresetStorage.load(src.getServer(), name);
+			List<TrainPresetValidator.Issue> issues = TrainPresetValidator.validate(name, preset);
+			return sendValidation(src, name, issues);
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to validate train preset: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runValidateAll(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			List<String> names = TrainPresetStorage.list(src.getServer());
+			if (names.isEmpty()) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No train presets to validate."), false);
+				return 1;
+			}
+			int errors = 0;
+			int warnings = 0;
+			for (String name : names) {
+				TrainPreset preset = TrainPresetStorage.load(src.getServer(), name);
+				List<TrainPresetValidator.Issue> issues = TrainPresetValidator.validate(name, preset);
+				long mapErrors = issues.stream().filter(issue -> issue.severity() == TrainPresetValidator.Severity.ERROR).count();
+				long mapWarnings = issues.stream().filter(issue -> issue.severity() == TrainPresetValidator.Severity.WARNING).count();
+				errors += (int) mapErrors;
+				warnings += (int) mapWarnings;
+				Formatting color = mapErrors > 0 ? Formatting.RED : (mapWarnings > 0 ? Formatting.YELLOW : Formatting.GREEN);
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(" - " + name + ": "
+					+ mapErrors + " error(s), " + mapWarnings + " warning(s)").formatted(color), false);
+			}
+			final int totalErrors = errors;
+			final int totalWarnings = warnings;
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Train validation: " + names.size()
+				+ " preset(s), " + totalErrors + " error(s), " + totalWarnings + " warning(s).")
+				.formatted(totalErrors > 0 ? Formatting.RED : Formatting.GREEN), false);
+			return totalErrors == 0 ? 1 : 0;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to validate train presets: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int runValidateIssues(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		try {
+			List<String> names = TrainPresetStorage.list(src.getServer());
+			if (names.isEmpty()) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No train presets to validate."), false);
+				return 1;
+			}
+			int errors = 0;
+			int warnings = 0;
+			int presetsWithIssues = 0;
+			for (String name : names) {
+				TrainPreset preset = TrainPresetStorage.load(src.getServer(), name);
+				List<TrainPresetValidator.Issue> issues = TrainPresetValidator.validate(name, preset);
+				long presetErrors = issues.stream().filter(issue -> issue.severity() == TrainPresetValidator.Severity.ERROR).count();
+				long presetWarnings = issues.stream().filter(issue -> issue.severity() == TrainPresetValidator.Severity.WARNING).count();
+				if (presetErrors == 0 && presetWarnings == 0) continue;
+				presetsWithIssues++;
+				errors += (int) presetErrors;
+				warnings += (int) presetWarnings;
+				Formatting color = presetErrors > 0 ? Formatting.RED : Formatting.YELLOW;
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(" - " + name + ": "
+					+ presetErrors + " error(s), " + presetWarnings + " warning(s)").formatted(color), false);
+			}
+			if (presetsWithIssues == 0) {
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Train validation: no issues across "
+					+ names.size() + " preset(s).").formatted(Formatting.GREEN), false);
+				return 1;
+			}
+			final int issueCount = presetsWithIssues;
+			final int totalErrors = errors;
+			final int totalWarnings = warnings;
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Train validation issues: " + issueCount + "/"
+				+ names.size() + " preset(s), " + totalErrors + " error(s), " + totalWarnings + " warning(s).")
+				.formatted(totalErrors > 0 ? Formatting.RED : Formatting.YELLOW), false);
+			return totalErrors == 0 ? 1 : 0;
+		} catch (IOException e) {
+			src.sendError(Text.literal("Failed to validate train presets: " + e.getMessage()));
+			return 0;
+		}
+	}
+
+	private static int sendValidation(ServerCommandSource src, String name, List<TrainPresetValidator.Issue> issues) {
+		long errors = issues.stream().filter(issue -> issue.severity() == TrainPresetValidator.Severity.ERROR).count();
+		long warnings = issues.stream().filter(issue -> issue.severity() == TrainPresetValidator.Severity.WARNING).count();
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Train preset '" + name + "' validation: "
+			+ errors + " error(s), " + warnings + " warning(s).").formatted(errors > 0 ? Formatting.RED : Formatting.GREEN), false);
+		for (TrainPresetValidator.Issue issue : issues) {
+			Formatting color = issue.severity() == TrainPresetValidator.Severity.ERROR ? Formatting.RED : Formatting.YELLOW;
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(" - " + issue.severity().name().toLowerCase(java.util.Locale.ROOT)
+				+ ": " + issue.message()).formatted(color), false);
+		}
+		return errors == 0 ? 1 : 0;
 	}
 
 	private static int clearDefaultTrainReferences(ServerCommandSource src, String trainName) throws IOException {
@@ -172,16 +405,28 @@ public class TrainCommand {
 		return cleared;
 	}
 
+	private static int updateDefaultTrainReferences(ServerCommandSource src, String oldTrainName, String newTrainName) throws IOException {
+		int updated = 0;
+		for (String mapName : PresetStorage.list(src.getServer())) {
+			MapPreset preset = PresetStorage.load(src.getServer(), mapName);
+			if (preset == null || !oldTrainName.equals(preset.defaultTrainPreset)) continue;
+			preset.defaultTrainPreset = newTrainName;
+			PresetStorage.save(src.getServer(), mapName, preset);
+			updated++;
+		}
+		return updated;
+	}
+
 	private static int runList(CommandContext<ServerCommandSource> ctx) {
 		ServerCommandSource src = ctx.getSource();
 		try {
 			List<String> names = TrainPresetStorage.list(src.getServer());
 			if (names.isEmpty()) {
-				src.sendFeedback(() -> Text.literal("No train presets. Use /g setup train preset save <name>."), false);
+				dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No train presets. Use /g setup train preset save <name>."), false);
 				return 1;
 			}
 			String joined = String.join(", ", names);
-			src.sendFeedback(() -> Text.literal("Train presets (" + names.size() + "): " + joined), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Train presets (" + names.size() + "): " + joined), false);
 			return 1;
 		} catch (IOException e) {
 			src.sendError(Text.literal("Failed to list train presets: " + e.getMessage()));
@@ -201,16 +446,16 @@ public class TrainCommand {
 				src.sendError(Text.literal("Train preset '" + name + "' does not exist."));
 				return 0;
 			}
-			src.sendFeedback(() -> Text.literal("─── Train '" + name + "' ───").formatted(Formatting.GOLD, Formatting.BOLD), false);
-			src.sendFeedback(() -> Text.literal("Template Area: ").formatted(Formatting.AQUA)
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("─── Train '" + name + "' ───").formatted(Formatting.GOLD, Formatting.BOLD), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Template Area: ").formatted(Formatting.AQUA)
 				.append(Text.literal(boxStr(preset.resetTemplateArea)).formatted(Formatting.WHITE)), false);
-			src.sendFeedback(() -> Text.literal("Paste Offset: ").formatted(Formatting.AQUA)
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Paste Offset: ").formatted(Formatting.AQUA)
 				.append(Text.literal(offsetStr(preset.resetPasteOffset)).formatted(Formatting.WHITE)), false);
 			final int slots = preset.slotCount();
-			src.sendFeedback(() -> Text.literal("TP Slots: ").formatted(Formatting.AQUA)
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("TP Slots: ").formatted(Formatting.AQUA)
 				.append(Text.literal(Integer.toString(slots)).formatted(Formatting.WHITE)), false);
 			final int carts = preset.cartCount();
-			src.sendFeedback(() -> Text.literal("Train Carts: ").formatted(Formatting.AQUA)
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Train Carts: ").formatted(Formatting.AQUA)
 				.append(Text.literal(Integer.toString(carts)).formatted(Formatting.WHITE)), false);
 			return 1;
 		} catch (IOException e) {

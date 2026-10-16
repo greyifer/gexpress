@@ -23,6 +23,16 @@ public final class LastDeathShieldManager {
 
 	private LastDeathShieldManager() {}
 
+	public static boolean hasShield(UUID player) { return player != null && player.equals(shieldedPlayer); }
+	public static TestingState snapshotForTesting() { return new TestingState(lastRoundFirstDeath, currentRoundFirstDeath, shieldedPlayer); }
+	public static void restoreAfterTesting(TestingState state) {
+		lastRoundFirstDeath = state.previous(); currentRoundFirstDeath = state.current(); shieldedPlayer = state.shielded();
+	}
+	public static void applyTestShield(ServerPlayerEntity player) {
+		if (GexpressGameModes.isTest(GameWorldComponent.KEY.get(player.getWorld()))) shieldedPlayer = player.getUuid();
+	}
+	public record TestingState(UUID previous, UUID current, UUID shielded) {}
+
 	public static void register() {
 		AllowPlayerDeath.EVENT.register(LastDeathShieldManager::allowDeath);
 		GameEvents.ON_FINISH_INITIALIZE.register(LastDeathShieldManager::onFinishInitialize);

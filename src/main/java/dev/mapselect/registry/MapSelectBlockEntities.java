@@ -6,6 +6,9 @@ import dev.mapselect.block.FusedOrnamentBlockEntity;
 import dev.mapselect.block.FloatingTextBlockEntity;
 import dev.mapselect.block.GoldBeveragePlateBlockEntity;
 import dev.mapselect.block.GreyiferPlushBlockEntity;
+import dev.mapselect.block.KeycardReaderBlockEntity;
+import dev.mapselect.block.LargeWoodDoorBlockEntity;
+import dev.mapselect.block.LeaderboardBlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -19,6 +22,10 @@ public final class MapSelectBlockEntities {
 	public static BlockEntityType<FusedOrnamentBlockEntity> FUSED_ORNAMENT;
 	public static BlockEntityType<CoinBarrierBlockEntity> COIN_BARRIER;
 	public static BlockEntityType<FloatingTextBlockEntity> FLOATING_TEXT;
+	public static BlockEntityType<KeycardReaderBlockEntity> KEYCARD_READER;
+	public static BlockEntityType<LargeWoodDoorBlockEntity> LARGE_WOOD_DOOR;
+	public static BlockEntityType<LeaderboardBlockEntity> LEADERBOARD;
+	public static BlockEntityType<dev.mapselect.block.SettingsPanelBlockEntity> SETTINGS_PANEL;
 
 	public static void register() {
 		GREYIFER_PLUSH = Registry.register(
@@ -33,7 +40,12 @@ public final class MapSelectBlockEntities {
 				MapSelectBlocks.JEMSEA_PLUSH,
 				MapSelectBlocks.PARROTMARROW_PLUSH,
 				MapSelectBlocks.EVIEEVEEE_PLUSH,
-				MapSelectBlocks.ASTRONOMIKYU_PLUSH).build(null)
+				MapSelectBlocks.ETH4N1_PLUSH,
+				MapSelectBlocks.DOMEKIQN_PLUSH,
+				MapSelectBlocks.SEAFOX_PLUSH,
+				MapSelectBlocks.REDDISHACORN_PLUSH,
+				MapSelectBlocks.ASTRONOMIKYU_PLUSH,
+				MapSelectBlocks.LIV_54_PLUSH).build(null)
 		);
 		GOLD_BEVERAGE_PLATE = Registry.register(
 			Registries.BLOCK_ENTITY_TYPE,
@@ -60,5 +72,25 @@ public final class MapSelectBlockEntities {
 			BlockEntityType.Builder.create(FloatingTextBlockEntity::new,
 				MapSelectBlocks.FLOATING_TEXT).build(null)
 		);
+		KEYCARD_READER = Registry.register(
+			Registries.BLOCK_ENTITY_TYPE,
+			Identifier.of(MapSelect.MOD_ID, "keycard_reader"),
+			BlockEntityType.Builder.create(KeycardReaderBlockEntity::new,
+				MapSelectBlocks.KEYCARD_READER).build(null)
+		);
+		LARGE_WOOD_DOOR = Registry.register(
+			Registries.BLOCK_ENTITY_TYPE,
+			Identifier.of(MapSelect.MOD_ID, "large_wood_door"),
+			BlockEntityType.Builder.create(LargeWoodDoorBlockEntity::new,
+				MapSelectBlocks.LARGE_WOOD_DOOR).build(null)
+		);
+		LEADERBOARD = Registry.register(
+			Registries.BLOCK_ENTITY_TYPE,
+			Identifier.of(MapSelect.MOD_ID, "leaderboard"),
+			BlockEntityType.Builder.create(LeaderboardBlockEntity::new,
+				MapSelectBlocks.LEADERBOARD).build(null)
+		);
+		SETTINGS_PANEL = Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of(MapSelect.MOD_ID, "settings_panel"),
+			BlockEntityType.Builder.create(dev.mapselect.block.SettingsPanelBlockEntity::new, MapSelectBlocks.SETTINGS_PANEL).build(null));
 	}
 }

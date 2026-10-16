@@ -4,12 +4,13 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
 import dev.mapselect.permissions.GexpressPermissions;
+import io.github.caspe.glib.api.client.editor.GlibWorkbenchScreen;
+import io.github.caspe.glib.api.client.ui.GlibButton;
+import io.github.caspe.glib.api.client.ui.GlibRect;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
@@ -21,7 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-public final class GexpressTagEditorScreen extends Screen {
+public final class GexpressTagEditorScreen extends GlibWorkbenchScreen {
 	private static final List<GexpressPermissions.PermissionEntry> PERMISSIONS = GexpressPermissions.permissionEntries();
 	private static final List<String> PERMISSION_KEYS = GexpressPermissions.permissionKeys();
 	private static final List<PermissionRow> PERMISSION_ROWS = buildPermissionRows();
@@ -29,15 +30,15 @@ public final class GexpressTagEditorScreen extends Screen {
 	private static final int PERMISSION_ROW_HEIGHT = 31;
 	private static final int PERMISSION_HEADER_HEIGHT = 17;
 	private static final int SELECTED_PERMISSION_ROW_HEIGHT = 22;
-	private final Screen parent;
+	private GlibRect workspace;
 	private TextFieldWidget idField;
 	private TextFieldWidget nameField;
 	private TextFieldWidget colorField;
 	private TextFieldWidget priorityField;
 	private TextFieldWidget permissionSearchField;
-	private ButtonWidget deleteButton;
-	private ButtonWidget playerTagsButton;
-	private ButtonWidget levelTagsButton;
+	private GlibButton deleteButton;
+	private GlibButton playerTagsButton;
+	private GlibButton levelTagsButton;
 	private final Set<String> enabledPermissions = new LinkedHashSet<>();
 	private Mode mode = Mode.PLAYER_TAGS;
 	private String selectedId = "";
@@ -52,8 +53,8 @@ public final class GexpressTagEditorScreen extends Screen {
 	private int addedPermissionScroll;
 
 	public GexpressTagEditorScreen(Screen parent) {
-		super(Text.translatable("gui.gexpress.tag_editor.title"));
-		this.parent = parent;
+		super(parent, Text.translatable("gui.gexpress.tag_editor.title"),
+			Text.translatable("gui.gexpress.tag_editor.subtitle"), 0xFF67E8F9);
 	}
 
 	private static List<PermissionRow> buildPermissionRows() {
@@ -70,9 +71,10 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	@Override
-	protected void init() {
+	protected void initWorkbench(GlibRect workspace) {
+		this.workspace = workspace;
 		int formX = formX();
-		int formY = 54;
+		int formY = workspace.y() + 30;
 		int fieldWidth = Math.min(240, Math.max(128, contentWidth()));
 		idField = addDrawableChild(new TextFieldWidget(textRenderer, formX, formY, fieldWidth, 18,
 			Text.translatable("gui.gexpress.tag_editor.id")));
@@ -88,41 +90,26 @@ public final class GexpressTagEditorScreen extends Screen {
 			contentWidth(), 18, Text.literal("Search commands and permissions")));
 		permissionSearchField.setMaxLength(96);
 
-		playerTagsButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.player_tags"),
-				button -> setMode(Mode.PLAYER_TAGS))
-			.dimensions(18, 28, 92, 20)
-			.build());
-		levelTagsButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.level_tags"),
-				button -> setMode(Mode.LEVEL_TAGS))
-			.dimensions(114, 28, 92, 20)
-			.build());
+		playerTagsButton = addDrawableChild(new GlibButton(listX(), workspace.y() + 8, 92, 20,
+			Text.translatable("gui.gexpress.tag_editor.player_tags"), 0xFF67E8F9, () -> setMode(Mode.PLAYER_TAGS)));
+		levelTagsButton = addDrawableChild(new GlibButton(listX() + 96, workspace.y() + 8, 92, 20,
+			Text.translatable("gui.gexpress.tag_editor.level_tags"), 0xFF67E8F9, () -> setMode(Mode.LEVEL_TAGS)));
 
-		int buttonY = Math.max(formY + 292, height - 58);
-		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.save"), button -> save())
-			.dimensions(formX, buttonY, 72, 20)
-			.build());
-		deleteButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.delete"),
-				button -> delete())
-			.dimensions(formX + 80, buttonY, 72, 20)
-			.build());
-		addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.tag_editor.new"), button -> clearForNew())
-			.dimensions(formX + 160, buttonY, 72, 20)
-			.build());
-		addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> close())
-			.dimensions(width / 2 - 45, height - 28, 90, 20)
-			.build());
+		int buttonY = workspace.y() + workspace.height() - 26;
+		addDrawableChild(new GlibButton(formX, buttonY, 72, 20,
+			Text.translatable("gui.gexpress.tag_editor.save"), 0xFF7CC9A2, this::save));
+		deleteButton = addDrawableChild(new GlibButton(formX + 80, buttonY, 72, 20,
+			Text.translatable("gui.gexpress.tag_editor.delete"), 0xFFFF718D, this::delete));
+		addDrawableChild(new GlibButton(formX + 160, buttonY, 72, 20,
+			Text.translatable("gui.gexpress.tag_editor.new"), 0xFF60A5FA, this::clearForNew));
 		updateModeWidgets();
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		context.fill(0, 0, width, height, 0xAA11151B);
-		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 16, 0xFFFFFFFF);
-		context.drawCenteredTextWithShadow(textRenderer,
-			Text.translatable(mode == Mode.LEVEL_TAGS
-				? "gui.gexpress.tag_editor.level_subtitle"
-				: "gui.gexpress.tag_editor.subtitle").formatted(Formatting.GRAY),
-			width / 2, 29, 0xFF9BA3AE);
+	protected void renderWorkbench(DrawContext context, GlibRect workspace, int mouseX, int mouseY, float delta) {
+		drawWorkbenchPanel(context, listX() - 6, workspace.y() + 4, listWidth() + 12, workspace.height() - 8);
+		drawWorkbenchPanel(context, formX() - 8, workspace.y() + 4, contentWidth() + 16, workspace.height() - 8);
+		drawWorkbenchPanel(context, pickerX() - 8, workspace.y() + 4, pickerWidth() + 16, workspace.height() - 8);
 		drawTagList(context, mouseX, mouseY);
 		drawLabels(context);
 		if (mode == Mode.PLAYER_TAGS) {
@@ -131,15 +118,18 @@ public final class GexpressTagEditorScreen extends Screen {
 			drawLevelTagHelp(context);
 		}
 		drawColorPicker(context, mouseX, mouseY);
-		super.render(context, mouseX, mouseY, delta);
 	}
 
 	@Override
-	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+	protected Text workbenchSubtitle() {
+		return Text.translatable(mode == Mode.LEVEL_TAGS
+			? "gui.gexpress.tag_editor.level_subtitle"
+			: "gui.gexpress.tag_editor.subtitle");
 	}
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (helpActive()) return super.mouseClicked(mouseX, mouseY, button);
 		if (button == 0) {
 			if (clickTagList(mouseX, mouseY)
 					|| (mode == Mode.PLAYER_TAGS && clickPermission(mouseX, mouseY))
@@ -167,13 +157,9 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	@Override
-	public void close() {
-		MinecraftClient.getInstance().setScreen(parent);
-	}
-
-	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-		if (mouseX >= 18 && mouseX < 18 + listWidth() && mouseY >= tagListTop() && mouseY < tagListBottom()) {
+		if (helpActive()) return true;
+		if (mouseX >= listX() && mouseX < listX() + listWidth() && mouseY >= tagListTop() && mouseY < tagListBottom()) {
 			tagListScroll = scrollBy(tagListScroll, verticalAmount, maxTagListScroll());
 			return true;
 		}
@@ -191,7 +177,7 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private void drawTagList(DrawContext context, int mouseX, int mouseY) {
-		int x = 18;
+		int x = listX();
 		int y = tagListTop();
 		int listWidth = listWidth();
 		List<EditableTag> tags = visibleTags();
@@ -226,7 +212,7 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private boolean clickTagList(double mouseX, double mouseY) {
-		int x = 18;
+		int x = listX();
 		int y = tagListTop();
 		if (mouseX < x || mouseX >= x + listWidth() || mouseY < y || mouseY >= tagListBottom()) return false;
 		int row = 0;
@@ -243,7 +229,7 @@ public final class GexpressTagEditorScreen extends Screen {
 
 	private void drawLabels(DrawContext context) {
 		int labelX = formX();
-		int y = 43;
+		int y = workspace.y() + 19;
 		context.drawTextWithShadow(textRenderer, Text.literal(mode == Mode.LEVEL_TAGS ? "Level" : "Id"),
 			labelX, y, 0xFFB9C2CE);
 		context.drawTextWithShadow(textRenderer, Text.literal("Name"), labelX, y + 28, 0xFFB9C2CE);
@@ -253,7 +239,7 @@ public final class GexpressTagEditorScreen extends Screen {
 
 	private void drawLevelTagHelp(DrawContext context) {
 		int x = formX();
-		int y = 174;
+		int y = permissionTop();
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.level_tag_rules"),
 			x, y - 14, 0xFFFFFFFF);
 		List<Text> lines = List.of(
@@ -416,7 +402,7 @@ public final class GexpressTagEditorScreen extends Screen {
 
 	private void drawColorPicker(DrawContext context, int mouseX, int mouseY) {
 		int x = pickerX();
-		int y = 54;
+		int y = workspace.y() + 30;
 		int w = pickerWidth();
 		int h = 110;
 		context.drawTextWithShadow(textRenderer, Text.translatable("gui.gexpress.tag_editor.color_picker"), x, y - 14,
@@ -452,7 +438,7 @@ public final class GexpressTagEditorScreen extends Screen {
 
 	private boolean clickColor(double mouseX, double mouseY) {
 		int x = pickerX();
-		int y = 54;
+		int y = workspace.y() + 30;
 		int w = pickerWidth();
 		int h = 110;
 		if (mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h) {
@@ -471,7 +457,7 @@ public final class GexpressTagEditorScreen extends Screen {
 
 	private void updateColor(double mouseX, double mouseY, boolean hueOnly) {
 		int x = pickerX();
-		int y = 54;
+		int y = workspace.y() + 30;
 		int w = pickerWidth();
 		int h = 110;
 		if (hueOnly) {
@@ -693,19 +679,23 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private int listWidth() {
-		return MathHelper.clamp(width / 5, 142, 190);
+		return MathHelper.clamp(workspace.width() / 5, 142, 190);
+	}
+
+	private int listX() {
+		return workspace.x() + 8;
 	}
 
 	private int formX() {
-		return 18 + listWidth() + 24;
+		return listX() + listWidth() + 24;
 	}
 
 	private int pickerWidth() {
-		return MathHelper.clamp(width / 4, 180, 260);
+		return MathHelper.clamp(workspace.width() / 4, 180, 260);
 	}
 
 	private int pickerX() {
-		return width - pickerWidth() - 18;
+		return workspace.x() + workspace.width() - pickerWidth() - 8;
 	}
 
 	private int contentWidth() {
@@ -717,15 +707,15 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private int tagListTop() {
-		return 52;
+		return workspace.y() + 44;
 	}
 
 	private int tagListBottom() {
-		return Math.max(tagListTop() + 24, height - 44);
+		return Math.max(tagListTop() + 24, workspace.y() + workspace.height() - 18);
 	}
 
 	private int permissionTop() {
-		return 174;
+		return workspace.y() + 150;
 	}
 
 	private int selectedPermissionTop() {
@@ -741,7 +731,7 @@ public final class GexpressTagEditorScreen extends Screen {
 	}
 
 	private int permissionBottom() {
-		return Math.max(permissionTop() + 24, height - 70);
+		return Math.max(permissionTop() + 24, workspace.y() + workspace.height() - 38);
 	}
 
 	private int maxTagListScroll() {

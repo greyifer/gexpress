@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class GexpressPresetsSyncHandler {
 	private GexpressPresetsSyncHandler() {}
@@ -26,6 +27,8 @@ public final class GexpressPresetsSyncHandler {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final int MAX_PRESET_SAVE_COUNT = 128;
 	private static final int MAX_PRESET_JSON_CHARS = 65536;
+	private static final long PRESET_SAVE_RATE_LIMIT_MS = 1000L;
+	private static final Map<String, Long> LAST_PRESET_SAVE_MS = new ConcurrentHashMap<>();
 
 	public static void register() {
 		PayloadTypeRegistry.playS2C().register(GexpressPresetsSyncPayload.ID, GexpressPresetsSyncPayload.CODEC);
@@ -50,6 +53,7 @@ public final class GexpressPresetsSyncHandler {
 					sender.getName().getString());
 				return;
 			}
+			if (!acceptPresetSave(sender, "map presets")) return;
 			Map<String, String> copy = new LinkedHashMap<>(payload.presets());
 			server.execute(() -> {
 				int ok = 0, fail = 0;
@@ -92,6 +96,7 @@ public final class GexpressPresetsSyncHandler {
 					sender.getName().getString());
 				return;
 			}
+			if (!acceptPresetSave(sender, "train presets")) return;
 			Map<String, String> copy = new LinkedHashMap<>(payload.presets());
 			server.execute(() -> {
 				int ok = 0, fail = 0;
@@ -123,6 +128,17 @@ public final class GexpressPresetsSyncHandler {
 				broadcastTrainPresets(server);
 			});
 		});
+	}
+
+	private static boolean acceptPresetSave(ServerPlayerEntity sender, String channel) {
+		long now = System.currentTimeMillis();
+		String key = sender.getUuid() + ":" + channel;
+		Long previous = LAST_PRESET_SAVE_MS.put(key, now);
+		if (previous != null && now - previous < PRESET_SAVE_RATE_LIMIT_MS) {
+			MapSelect.LOGGER.warn("Rate-limited {} save packet from {}.", channel, sender.getName().getString());
+			return false;
+		}
+		return true;
 	}
 
 	public static void broadcastPresets(MinecraftServer server) {

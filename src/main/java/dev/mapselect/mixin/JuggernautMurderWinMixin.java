@@ -9,6 +9,8 @@ import dev.mapselect.role.juggernaut.JuggernautManager;
 import dev.mapselect.role.mafia.MafiaManager;
 import dev.mapselect.modifier.LoversManager;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.rat.RatManager;
+import dev.mapselect.role.doomsayer.DoomsayerManager;
 import net.minecraft.server.world.ServerWorld;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,7 +21,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class JuggernautMurderWinMixin {
 	@Inject(method = "tickServerGameLoop", at = @At("HEAD"), cancellable = true)
 	private void gexpress$soloJuggernautWin(ServerWorld world, GameWorldComponent game, CallbackInfo ci) {
-		if (PelicanManager.handleMurderTick(world, game)
+		if (game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE) {
+			java.util.List<net.minecraft.server.network.ServerPlayerEntity> survivors = world.getPlayers(player ->
+				game.getRoles().containsKey(player.getUuid()) && !(player instanceof dev.mapselect.entity.TwinFakePlayerEntity)
+					&& (dev.doctor4t.wathe.game.GameFunctions.isPlayerAliveAndSurvival(player) || PelicanManager.isStashed(player)));
+			if (survivors.size() == 1) {
+				var winner = survivors.getFirst();
+				game.setLooseEndWinner(winner.getUuid());
+				var role = game.getRole(winner);
+				dev.mapselect.role.NeutralWinManager.announce(world, winner, "announcement.win.gexpress.last_survivor", role == null ? 0xFFFFFF : role.color());
+				dev.doctor4t.wathe.cca.GameRoundEndComponent.KEY.get(world).setRoundEndData(world.getPlayers(), dev.doctor4t.wathe.game.GameFunctions.WinStatus.LOOSE_END);
+				dev.doctor4t.wathe.game.GameFunctions.stopGame(world); ci.cancel(); return;
+			}
+		}
+		if (DoomsayerManager.handleMurderTick(world, game)
+				|| RatManager.handleMurderTick(world, game)
+				|| PelicanManager.handleMurderTick(world, game)
 				|| CupidManager.handleMurderTick(world, game)
 				|| LoversManager.handleMurderTick(world, game)
 				|| MafiaManager.handleMurderTick(world, game)

@@ -2,17 +2,18 @@ package dev.mapselect.role.medic;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
 import dev.mapselect.network.role.medic.MedicShieldFlashPayload;
 import dev.mapselect.network.role.medic.MedicShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -43,17 +44,18 @@ public final class MedicShieldManager {
 		ServerPlayNetworking.registerGlobalReceiver(MedicShieldUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryShield(context.player())));
 		AllowPlayerDeath.EVENT.register(MedicShieldManager::allowDeath);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearWorld(world));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearWorld(world));
+		RoundLifecycleHooks.clearWorld(MedicShieldManager::clearWorld);
 		ServerTickEvents.END_WORLD_TICK.register(MedicShieldManager::tick);
 	}
 
-	private static void tryShield(ServerPlayerEntity medic) {
+	public static void tryShield(ServerPlayerEntity medic) {
 		if (medic == null || medic.getWorld().isClient) return;
 		if (PelicanManager.isStashed(medic)) return;
 		ServerPlayerEntity target = findLookTarget(medic);
 		if (target == null) {
-			medic.sendMessage(Text.literal("No living player close enough to shield."), true);
+			medic.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(medic,
+				medic.getServerWorld().getPlayers(), SHIELD_RANGE, 0.0D, true,
+				candidate -> isPlayableForMedic(candidate, medic), "shield")), true);
 			return;
 		}
 		if (!canUseMedicHere(medic.getWorld(), medic) || !isMedic(medic)) return;
@@ -80,6 +82,7 @@ public final class MedicShieldManager {
 			medic.sendMessage(Text.literal(target.getName().getString() + " is already shielded."), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(medic, target)) return;
 
 		if (!comp.assignShield(medic.getUuid(), target.getUuid())) {
 			medic.sendMessage(Text.literal("Could not apply shield."), true);
@@ -136,7 +139,7 @@ public final class MedicShieldManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 
 		MedicShieldComponent comp = MedicShieldComponent.KEY.getNullable(world);
 		if (comp == null) return;
@@ -165,7 +168,9 @@ public final class MedicShieldManager {
 		if (server == null || medicId == null || targetId == null) return;
 		ServerPlayerEntity medic = server.getPlayerManager().getPlayer(medicId);
 		if (medic == null) return;
-		ServerPlayNetworking.send(medic, new MedicShieldFlashPayload(targetId, broken));
+		if (ServerPlayNetworking.canSend(medic, MedicShieldFlashPayload.ID)) {
+			ServerPlayNetworking.send(medic, new MedicShieldFlashPayload(targetId, broken));
+		}
 		medic.sendMessage(Text.literal(broken ? "Your shield was broken." : "Your shield blocked a hit."), true);
 	}
 

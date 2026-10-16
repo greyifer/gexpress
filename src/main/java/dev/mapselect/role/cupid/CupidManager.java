@@ -1,7 +1,6 @@
 package dev.mapselect.role.cupid;
 
 import dev.doctor4t.wathe.api.Role;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
@@ -9,16 +8,20 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.modifier.LoversManager;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.cupid.CupidStatePayload;
 import dev.mapselect.network.role.cupid.CupidUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -52,16 +55,11 @@ public final class CupidManager {
 		ServerPlayNetworking.registerGlobalReceiver(CupidUsePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryUse(context.player(), payload)));
 		ServerTickEvents.END_WORLD_TICK.register(CupidManager::tick);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clear(world));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear(world));
+		RoundLifecycleHooks.clearWorld(CupidManager::clear);
 	}
 
 	public static void reduceCooldown(ServerPlayerEntity player, long ticks) {
-		if (player == null || ticks <= 0L) return;
-		UUID id = player.getUuid();
-		Long until = COOLDOWN_UNTIL.get(id);
-		if (until == null) return;
-		COOLDOWN_UNTIL.put(id, Math.max(0L, until - ticks));
+		AbilityCooldowns.reduce(COOLDOWN_UNTIL, player, ticks);
 	}
 
 	private static void tryUse(ServerPlayerEntity cupid, CupidUsePayload payload) {
@@ -72,8 +70,7 @@ public final class CupidManager {
 			return;
 		}
 
-		long now = world.getTime();
-		long remaining = COOLDOWN_UNTIL.getOrDefault(cupid.getUuid(), 0L) - now;
+		long remaining = AbilityCooldowns.remaining(COOLDOWN_UNTIL, cupid);
 		if (remaining > 0L && !GexpressTestState.hasCreativeAbilityBypass(cupid)) {
 			AbilityCooldownSync.send(cupid, AbilityCooldownPayload.CUPID_LINK, remaining,
 				GexpressConfig.getCupidPairCooldownSeconds() * 20L, false);
@@ -87,7 +84,10 @@ public final class CupidManager {
 					candidate != cupid && !PelicanManager.isStashed(candidate) && isPlayable(candidate));
 		}
 		if (target == null) {
-			cupid.sendMessage(Text.literal("No living player close enough to charm.").formatted(Formatting.RED), true);
+			cupid.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(cupid, world.getPlayers(),
+				GexpressConfig.getCupidRange(), 0.25D, true,
+				candidate -> candidate != cupid && !PelicanManager.isStashed(candidate) && isPlayable(candidate),
+				"charm")).formatted(Formatting.RED), true);
 			return;
 		}
 		if (LoversManager.isLinked(target.getUuid())) {
@@ -95,6 +95,7 @@ public final class CupidManager {
 				.formatted(Formatting.RED), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(cupid, target)) return;
 
 		UUID firstId = FIRST_TARGETS.get(cupid.getUuid());
 		if (firstId == null) {
@@ -120,7 +121,7 @@ public final class CupidManager {
 			NO_PAIR_GRACE_UNTIL.remove(cupid.getUuid());
 			if (!GexpressTestState.hasCreativeAbilityBypass(cupid)) {
 				long total = GexpressConfig.getCupidPairCooldownSeconds() * 20L;
-				COOLDOWN_UNTIL.put(cupid.getUuid(), now + total);
+				AbilityCooldowns.start(COOLDOWN_UNTIL, cupid, total);
 				AbilityCooldownSync.send(cupid, AbilityCooldownPayload.CUPID_LINK, total, total, false);
 			}
 		}
@@ -128,7 +129,7 @@ public final class CupidManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		if (++winCheckTicker < 20) return;
 		winCheckTicker = 0;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
@@ -294,14 +295,11 @@ public final class CupidManager {
 	}
 
 	private static void sendState(ServerPlayerEntity cupid, ServerPlayerEntity firstTarget) {
-		if (cupid == null || !(cupid.getWorld() instanceof ServerWorld world)
-				|| !ServerPlayNetworking.canSend(cupid, CupidStatePayload.ID)) {
-			return;
-		}
+		if (cupid == null || !(cupid.getWorld() instanceof ServerWorld world)) return;
 		List<CupidStatePayload.Pair> pairs = LoversManager.pairViews(world).stream()
 			.map(pair -> new CupidStatePayload.Pair(pair.firstId(), pair.firstName(), pair.secondId(), pair.secondName()))
 			.toList();
-		ServerPlayNetworking.send(cupid, new CupidStatePayload(firstTarget != null,
+		PayloadSync.sendIfChanged(cupid, CupidStatePayload.ID, new CupidStatePayload(firstTarget != null,
 			firstTarget == null ? null : firstTarget.getUuid(),
 			firstTarget == null ? "" : firstTarget.getName().getString(),
 			pairs, livingLinkedNonCupidParticipants(world, GameWorldComponent.KEY.getNullable(world)),
@@ -324,9 +322,7 @@ public final class CupidManager {
 		winCheckTicker = 0;
 		if (!(world instanceof ServerWorld serverWorld)) return;
 		for (ServerPlayerEntity player : serverWorld.getPlayers()) {
-			if (ServerPlayNetworking.canSend(player, CupidStatePayload.ID)) {
-				ServerPlayNetworking.send(player, CupidStatePayload.clear());
-			}
+			PayloadSync.sendIfChanged(player, CupidStatePayload.ID, CupidStatePayload.clear());
 		}
 	}
 }

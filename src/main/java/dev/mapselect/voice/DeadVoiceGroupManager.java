@@ -3,6 +3,7 @@ package dev.mapselect.voice;
 import de.maxhenkel.voicechat.api.Group;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.mapselect.MapSelect;
 import dev.mapselect.game.DeadPlayerStatus;
@@ -10,6 +11,7 @@ import dev.mapselect.network.voice.SpectatorVoiceGroupPayload;
 import dev.mapselect.role.pelican.PelicanManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -40,6 +42,15 @@ public final class DeadVoiceGroupManager {
 		ServerPlayNetworking.registerGlobalReceiver(SpectatorVoiceGroupPayload.ID,
 			(payload, context) -> context.server().execute(() -> switchGroup(context.player(), payload.delta())));
 		ServerTickEvents.END_WORLD_TICK.register(DeadVoiceGroupManager::tick);
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			UUID playerId = handler.player.getUuid();
+			preferredGroups.remove(playerId);
+			activeDeadVoicePlayers.remove(playerId);
+		});
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
+			activeDeadVoicePlayers.clear();
+			tickDelay = 0;
+		});
 	}
 
 	public static boolean canJoinDeadVoice(UUID playerId) {
@@ -145,8 +156,23 @@ public final class DeadVoiceGroupManager {
 		return state != null && state.isAdminDeadVoiceLocked(player.getUuid());
 	}
 
+	public static String status(ServerPlayerEntity player) {
+		if (player == null) return "offline";
+		if (TrainVoicePlugin.SERVER_API == null) return "voice API unavailable";
+		VoicechatConnection connection = TrainVoicePlugin.SERVER_API.getConnectionOf(player.getUuid());
+		if (connection == null) return "not connected to voice chat";
+		boolean eligible = shouldBeInDeadVoice(player);
+		Group group = connection.getGroup();
+		String groupName = groupName(group);
+		if (!eligible) return "alive/non-spectator, currentGroup=" + groupName;
+		if (isAdminLocked(player)) return "eligible, admin locked, currentGroup=" + groupName;
+		int groupCount = normalGroupCount(player.getServerWorld());
+		return "eligible, preferred=" + groupName(preferredGroup(player.getUuid(), groupCount))
+			+ ", currentGroup=" + groupName;
+	}
+
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		if (TrainVoicePlugin.SERVER_API == null || tickDelay++ % 5 != 0) return;
 		ensureConfiguredGroups(world);
 		for (ServerPlayerEntity player : world.getPlayers()) {
@@ -390,6 +416,19 @@ public final class DeadVoiceGroupManager {
 			return group.getId();
 		} catch (Throwable ignored) {
 			return null;
+		}
+	}
+
+	private static String groupName(Group group) {
+		if (group == null) return "(none)";
+		try {
+			String name = group.getName();
+			if (name != null && !name.isBlank()) return name;
+			UUID id = safeGroupId(group);
+			return id == null ? "(unknown)" : id.toString();
+		} catch (Throwable ignored) {
+			UUID id = safeGroupId(group);
+			return id == null ? "(unknown)" : id.toString();
 		}
 	}
 }

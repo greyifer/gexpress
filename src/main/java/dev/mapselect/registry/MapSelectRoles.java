@@ -12,6 +12,7 @@ public final class MapSelectRoles {
 
 	public static final Identifier BOMB_SPECIALIST_ID = Identifier.of(MapSelect.MOD_ID, "bomb_specialist");
 	public static final Identifier MEDIC_ID = Identifier.of(MapSelect.MOD_ID, "medic");
+	public static final Identifier VETERAN_ID = Identifier.of(MapSelect.MOD_ID, "veteran");
 	public static final Identifier SNITCH_ID = Identifier.of(MapSelect.MOD_ID, "snitch");
 	public static final Identifier SEER_ID = Identifier.of(MapSelect.MOD_ID, "seer");
 	public static final Identifier TWINS_ID = Identifier.of(MapSelect.MOD_ID, "twins");
@@ -28,7 +29,6 @@ public final class MapSelectRoles {
 	public static final Identifier SKINCRAWLER_ID = Identifier.of(MapSelect.MOD_ID, "skincrawler");
 	public static final Identifier PAINTER_ID = Identifier.of(MapSelect.MOD_ID, "painter");
 	public static final Identifier VULTURE_ID = Identifier.of(MapSelect.MOD_ID, "pelican");
-	public static final Identifier SCATTER_BRAIN_ID = Identifier.of(MapSelect.MOD_ID, "scatter_brain");
 	public static final Identifier TRACKER_ID = Identifier.of(MapSelect.MOD_ID, "tracker");
 	public static final Identifier ALTRUIST_ID = Identifier.of(MapSelect.MOD_ID, "altruist");
 	public static final Identifier SPY_ID = Identifier.of(MapSelect.MOD_ID, "spy");
@@ -41,9 +41,15 @@ public final class MapSelectRoles {
 	public static final Identifier COPYCAT_ID = Identifier.of(MapSelect.MOD_ID, "copycat");
 	public static final Identifier DRACULA_ID = Identifier.of(MapSelect.MOD_ID, "dracula");
 	public static final Identifier VAMPIRE_ID = Identifier.of(MapSelect.MOD_ID, "vampire");
+	public static final Identifier RAT_ID = Identifier.of(MapSelect.MOD_ID, "rat");
+	public static final Identifier DOOMSAYER_ID = Identifier.of(MapSelect.MOD_ID, "doomsayer");
+	public static final Identifier LOKI_ID = Identifier.of(MapSelect.MOD_ID, "loki");
+	public static final Identifier COUNTERFEITER_ID = Identifier.of(MapSelect.MOD_ID, "counterfeiter");
+	public static final Identifier CATALOGER_ID = Identifier.of(MapSelect.MOD_ID, "cataloger");
 
 	public static Role BOMB_SPECIALIST;
 	public static Role MEDIC;
+	public static Role VETERAN;
 	public static Role SNITCH;
 	public static Role SEER;
 	public static Role TWINS;
@@ -60,7 +66,6 @@ public final class MapSelectRoles {
 	public static Role SKINCRAWLER;
 	public static Role PAINTER;
 	public static Role VULTURE;
-	public static Role SCATTER_BRAIN;
 	public static Role TRACKER;
 	public static Role ALTRUIST;
 	public static Role SPY;
@@ -73,8 +78,16 @@ public final class MapSelectRoles {
 	public static Role COPYCAT;
 	public static Role DRACULA;
 	public static Role VAMPIRE;
+	public static Role RAT;
+	public static Role DOOMSAYER;
+	public static Role LOKI;
+	public static Role COUNTERFEITER;
+	public static Role CATALOGER;
 
 	public static void register() {
+		LOKI = WatheRoles.registerRole(new Role(LOKI_ID, 0x49B967, false, true, Role.MoodType.FAKE, -1, true));
+		COUNTERFEITER = WatheRoles.registerRole(new Role(COUNTERFEITER_ID, 0x38BFC0, false, true, Role.MoodType.FAKE, -1, true));
+
 		// Killer-side role. Same build as vanilla Killer:
 		//   isInnocent=false, canUseKiller=true, MoodType.FAKE,
 		//   maxSprintTime=-1 (infinite stamina -> "Athletic"), canSeeTime=true
@@ -91,6 +104,16 @@ public final class MapSelectRoles {
 		MEDIC = WatheRoles.registerRole(new Role(
 			MEDIC_ID,
 			0x35D06F, // clear support green
+			true,
+			false,
+			Role.MoodType.REAL,
+			CIVILIAN_STAMINA,
+			false
+		));
+
+		VETERAN = WatheRoles.registerRole(new Role(
+			VETERAN_ID,
+			0xC49354, // veteran bronze
 			true,
 			false,
 			Role.MoodType.REAL,
@@ -248,16 +271,6 @@ public final class MapSelectRoles {
 			true
 		));
 
-		SCATTER_BRAIN = WatheRoles.registerRole(new Role(
-			SCATTER_BRAIN_ID,
-			0xE36A2E,
-			false,
-			true,
-			Role.MoodType.FAKE,
-			-1,
-			true
-		));
-
 		VULTURE = WatheRoles.registerRole(new Role(
 			VULTURE_ID,
 			0x6F8A24, // pelican green, neutral solo
@@ -386,6 +399,36 @@ public final class MapSelectRoles {
 			Role.MoodType.FAKE,
 			DOUBLE_CIVILIAN_STAMINA,
 			true
+		));
+
+		RAT = WatheRoles.registerRole(new Role(
+			RAT_ID,
+			0x8A7256,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		DOOMSAYER = WatheRoles.registerRole(new Role(
+			DOOMSAYER_ID,
+			0x18C978,
+			false,
+			false,
+			Role.MoodType.FAKE,
+			DOUBLE_CIVILIAN_STAMINA,
+			true
+		));
+
+		CATALOGER = WatheRoles.registerRole(new Role(
+			CATALOGER_ID,
+			0xC79B55,
+			true,
+			false,
+			Role.MoodType.REAL,
+			CIVILIAN_STAMINA,
+			false
 		));
 	}
 

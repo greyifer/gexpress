@@ -15,7 +15,7 @@ public final class NeutralWinManager {
 
 	public static void announce(ServerWorld world, ServerPlayerEntity winner, String translationKey, int color) {
 		if (world == null || winner == null) return;
-		NeutralWinPayload payload = new NeutralWinPayload(winner.getUuid(), translationKey, color);
+		NeutralWinPayload payload = new NeutralWinPayload(winner.getUuid(), translationKey, color, winner.getGameProfile().getName());
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (ServerPlayNetworking.canSend(player, NeutralWinPayload.ID)) {
 				ServerPlayNetworking.send(player, payload);

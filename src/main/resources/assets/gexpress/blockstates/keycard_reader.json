@@ -1,0 +1,8 @@
+{
+	"variants": {
+		"facing=north": { "model": "gexpress:block/keycard_reader" },
+		"facing=east": { "model": "gexpress:block/keycard_reader", "y": 90 },
+		"facing=south": { "model": "gexpress:block/keycard_reader", "y": 180 },
+		"facing=west": { "model": "gexpress:block/keycard_reader", "y": 270 }
+	}
+}

@@ -1,69 +1,59 @@
 package dev.mapselect.client.render;
 
+import dev.mapselect.MapSelect;
+import dev.mapselect.network.axiom.AxiomEditRefreshPayload;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.util.math.BlockPos;
 
 import java.lang.reflect.Method;
 
 public final class AxiomClientRefresh {
-	private static final long LIGHT_REFRESH_THROTTLE_NANOS = 50_000_000L;
-	private static final long FULL_REFRESH_THROTTLE_NANOS = 750_000_000L;
-	private static int pendingLightPasses;
-	private static int pendingFullPasses;
-	private static long lastLightRefreshNanos;
-	private static long lastFullRefreshNanos;
+	private static final long REFRESH_THROTTLE_NANOS = 100_000_000L;
+	private static int pendingPasses;
+	private static long lastRefreshNanos;
+	private static boolean loggedRefreshFailure;
 
 	private AxiomClientRefresh() {}
 
 	public static void register() {
+		ClientPlayNetworking.registerGlobalReceiver(AxiomEditRefreshPayload.ID, (payload, context) ->
+			context.client().execute(AxiomClientRefresh::requestAxiomEditRefresh));
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			if (pendingLightPasses <= 0 && pendingFullPasses <= 0) return;
-			boolean full = pendingFullPasses > 0;
-			refresh(client, full);
-			if (pendingLightPasses > 0) pendingLightPasses--;
-			if (pendingFullPasses > 0) pendingFullPasses--;
+			if (pendingPasses <= 0) return;
+			refresh(client);
+			pendingPasses--;
 		});
 	}
 
 	public static void requestLight() {
-		request(false);
+		requestAxiomEditRefresh();
 	}
 
 	public static void requestFull() {
-		request(true);
+		requestAxiomEditRefresh();
 	}
 
-	private static void request(boolean full) {
+	public static void requestAxiomEditRefresh() {
 		if (!FabricLoader.getInstance().isModLoaded("axiom")) return;
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null) return;
-		pendingLightPasses = Math.max(pendingLightPasses, 4);
-		if (full) pendingFullPasses = Math.max(pendingFullPasses, 2);
-		client.execute(() -> refresh(client, full));
+		pendingPasses = Math.max(pendingPasses, 2);
+		client.execute(() -> refresh(client));
 	}
 
-	private static void refresh(MinecraftClient client, boolean full) {
+	private static void refresh(MinecraftClient client) {
 		if (client == null || client.world == null) return;
 		long now = System.nanoTime();
-		if (now - lastLightRefreshNanos < LIGHT_REFRESH_THROTTLE_NANOS && !full) return;
-		lastLightRefreshNanos = now;
+		if (now - lastRefreshNanos < REFRESH_THROTTLE_NANOS) return;
+		lastRefreshNanos = now;
 
 		clearAxiomChunkOverride();
 		WorldRenderer renderer = client.worldRenderer;
 		if (renderer == null) return;
 		renderer.scheduleTerrainUpdate();
-		if (client.player != null) {
-			BlockPos pos = client.player.getBlockPos();
-			renderer.scheduleBlockRenders(pos.getX() - 32, pos.getY() - 32, pos.getZ() - 32,
-				pos.getX() + 32, pos.getY() + 32, pos.getZ() + 32);
-		}
-		if (full && now - lastFullRefreshNanos >= FULL_REFRESH_THROTTLE_NANOS) {
-			lastFullRefreshNanos = now;
-			renderer.reload();
-		}
 	}
 
 	private static void clearAxiomChunkOverride() {
@@ -72,7 +62,11 @@ public final class AxiomClientRefresh {
 				AxiomClientRefresh.class.getClassLoader());
 			Method clear = overrider.getMethod("clear");
 			clear.invoke(null);
-		} catch (Throwable ignored) {
+		} catch (Throwable error) {
+			if (!loggedRefreshFailure) {
+				loggedRefreshFailure = true;
+				MapSelect.LOGGER.warn("Axiom is loaded, but G'Express could not call its chunk refresh API. Edits may need a manual chunk refresh.", error);
+			}
 		}
 	}
 }

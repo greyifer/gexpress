@@ -2,6 +2,8 @@ package dev.mapselect.item;
 
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.registry.MapSelectBlocks;
+import dev.mapselect.game.RoundLifecycleHooks;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.item.Item;
@@ -31,6 +33,13 @@ public final class RedRibbonItem extends Item {
 
 	public RedRibbonItem(Settings settings) {
 		super(settings);
+	}
+
+	public static void registerCleanup() {
+		RoundLifecycleHooks.clear(FIRST_POINTS::clear);
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			if (handler.getPlayer() != null) FIRST_POINTS.remove(handler.getPlayer().getUuid());
+		});
 	}
 
 	@Override

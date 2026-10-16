@@ -5,13 +5,17 @@ import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.RoundLifecycleHooks;
 import dev.mapselect.network.role.silent.ShadowMarchUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.ExternalRoleCompat;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
@@ -36,6 +40,9 @@ public final class SilentShadowManager {
 			(payload, context) -> context.server().execute(() -> tryActivate(context.player())));
 		AllowPlayerDeath.EVENT.register(SilentShadowManager::allowDeath);
 		ServerTickEvents.END_WORLD_TICK.register(SilentShadowManager::tick);
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+			server.execute(() -> resolveRejoinedShadow(server, handler.player)));
+		RoundLifecycleHooks.clearWorld(SilentShadowManager::clear);
 	}
 
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
@@ -64,7 +71,7 @@ public final class SilentShadowManager {
 		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(player);
 		long cooldown = creativeBypass ? 0L : comp.cooldownRemainingTicks(player.getUuid());
 		if (!creativeBypass && cooldown > 0L) {
-			player.sendMessage(Text.literal("Shadow March ready in " + secondsCeil(cooldown) + "s."), true);
+			player.sendMessage(Text.literal("Shadow March ready in " + Math.max(1L, AbilityCooldowns.secondsCeil(cooldown)) + "s."), true);
 			return;
 		}
 
@@ -77,12 +84,12 @@ public final class SilentShadowManager {
 
 		player.addStatusEffect(new StatusEffectInstance(StatusEffects.SPEED,
 			durationTicks + 5, 0, false, false, false));
-		player.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 0.45F, 0.65F);
+		AbilitySounds.playTo(player, SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 0.45F, 0.65F);
 		player.sendMessage(Text.literal("Shadow March."), true);
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 
 		SilentShadowComponent comp = SilentShadowComponent.KEY.getNullable(world);
 		if (comp == null) return;
@@ -97,21 +104,47 @@ public final class SilentShadowManager {
 		for (UUID playerId : comp.getActivePlayerIds()) {
 			ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
 			SilentShadowComponent.ShadowState state = comp.getState(playerId);
-			if (player == null || state == null) {
+			if (state == null) {
 				comp.remove(playerId);
 				continue;
 			}
-			if (PelicanManager.isStashed(player) || !canUseSilentHere(world, player)
-					|| !isPlayableForSilent(player) || !isSilent(player)) {
+			// Retain the persisted phase marker while offline. Rejoin handling resolves any
+			// saved position that is still embedded in blocks before removing protection.
+			if (player == null) continue;
+			if (PelicanManager.isStashed(player) || !isPlayableForSilent(player)) {
+				comp.remove(playerId);
+				continue;
+			}
+			if (player.getWorld() != world || !canUseSilentHere(world, player) || !isSilent(player)) {
 				comp.end(player, false);
 				continue;
 			}
 			if (now >= state.activeUntil()) {
-				comp.end(player, true);
-				player.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 0.55F, 0.85F);
-				player.sendMessage(Text.literal("Returned from Shadow March."), true);
+				if (comp.end(player, true)) {
+					AbilitySounds.playTo(player, SoundEvents.ENTITY_ENDERMAN_TELEPORT,
+						SoundCategory.PLAYERS, 0.55F, 0.85F);
+					player.sendMessage(Text.literal("Returned from Shadow March."), true);
+				}
 			}
 		}
+	}
+
+	private static void resolveRejoinedShadow(MinecraftServer server, ServerPlayerEntity player) {
+		if (server == null || player == null) return;
+		for (ServerWorld world : server.getWorlds()) {
+			SilentShadowComponent comp = SilentShadowComponent.KEY.getNullable(world);
+			if (comp == null || !comp.isActive(player.getUuid())) continue;
+			if (PelicanManager.isStashed(player) || !isPlayableForSilent(player)) {
+				comp.remove(player.getUuid());
+			} else {
+				comp.end(player, false);
+			}
+		}
+	}
+
+	private static void clear(World world) {
+		SilentShadowComponent comp = SilentShadowComponent.KEY.getNullable(world);
+		if (comp != null) comp.clearAll();
 	}
 
 	private static boolean isSilent(PlayerEntity player) {
@@ -136,7 +169,4 @@ public final class SilentShadowManager {
 		return GameFunctions.isPlayerAliveAndSurvival(player) || GexpressTestState.isRoleTester(player);
 	}
 
-	private static long secondsCeil(long ticks) {
-		return Math.max(1L, (ticks + 19L) / 20L);
-	}
 }

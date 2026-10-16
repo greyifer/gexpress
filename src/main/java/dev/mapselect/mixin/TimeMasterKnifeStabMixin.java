@@ -2,6 +2,8 @@ package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.util.KnifeStabPayload;
 import dev.mapselect.role.timemaster.TimeMasterManager;
+import dev.mapselect.role.juggernaut.JuggernautManager;
+import dev.mapselect.role.silent.SilentShadowComponent;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,7 +19,10 @@ public abstract class TimeMasterKnifeStabMixin {
 	)
 	private void gexpress$blockFrozenKnifeStab(KnifeStabPayload payload,
 			ServerPlayNetworking.Context context, CallbackInfo ci) {
-		if (TimeMasterManager.isFrozen(context.player()) || TimeMasterManager.isRewinding(context.player())) ci.cancel();
+		if (SilentShadowComponent.isShadowed(context.player())
+				|| TimeMasterManager.isFrozen(context.player()) || TimeMasterManager.isRewinding(context.player())) {
+			ci.cancel();
+		}
 	}
 
 	@Inject(
@@ -31,5 +36,9 @@ public abstract class TimeMasterKnifeStabMixin {
 	private void gexpress$recordTimeMasterKnifeStab(KnifeStabPayload payload,
 			ServerPlayNetworking.Context context, CallbackInfo ci) {
 		TimeMasterManager.recordWeaponEvent(context.player(), TimeMasterManager.WeaponEventType.KNIFE_STAB);
+		if (context.player().getServer() != null) {
+			context.player().getServer().execute(() -> JuggernautManager.applyCurrentWeaponCooldown(
+				context.player(), JuggernautManager.WeaponKind.KNIFE));
+		}
 	}
 }

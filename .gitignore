@@ -32,3 +32,35 @@ desktop.ini
 
 # Local dependency jars are resolved from Maven/Modrinth in Gradle.
 /libs/
+
+# Local tests (existing tracked tests remain tracked)
+/src/test/
+
+# Environment secrets; keep shareable templates
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Local Railway CLI state (deployment manifests remain versioned)
+.railway/
+
+# Private keys and keystores
+.ssh/
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_ed25519
+
+# Runtime server configuration containing tokens/secrets
+gexpress-console.json
+gexpress.json
+
+# Nested tool build output
+**/bin/
+**/obj/

@@ -19,4 +19,5 @@ public abstract class PlayerCollisionMixin {
 			cir.setReturnValue(true);
 		}
 	}
+
 }

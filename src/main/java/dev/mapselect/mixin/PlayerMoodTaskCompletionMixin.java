@@ -5,6 +5,7 @@ import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.level.LevelManager;
 import dev.mapselect.role.AbilityCooldownReducers;
 import dev.mapselect.role.bodyguard.BodyguardManager;
+import dev.mapselect.role.altruist.AltruistManager;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.task.ConversationTask;
 import dev.mapselect.task.FreshAirAreaManager;
@@ -72,6 +73,7 @@ public abstract class PlayerMoodTaskCompletionMixin {
 			}
 			SpyManager.recordTask(player, completedTask);
 			BodyguardManager.recordTask(player, completedTask);
+			AltruistManager.recordTask(player, completedTask);
 			if (player instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
 				LevelManager.grantCivilianTaskXp(serverPlayer);
 				AbilityCooldownReducers.reduceForTask(serverPlayer);

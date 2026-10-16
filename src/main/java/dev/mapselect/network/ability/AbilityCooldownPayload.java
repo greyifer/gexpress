@@ -14,9 +14,13 @@ public record AbilityCooldownPayload(String key, int remainingTicks, int totalTi
 	public static final String HARLEQUIN_MASQUERADE = "harlequin_masquerade";
 	public static final String HARLEQUIN_DANCING_CARTS = "harlequin_dancing_carts";
 	public static final String JUGGERNAUT_WEAPONS = "juggernaut_weapons";
+	public static final String JUGGERNAUT_KNIFE = "juggernaut_knife";
+	public static final String JUGGERNAUT_REVOLVER = "juggernaut_revolver";
 	public static final String JUGGERNAUT_SHIELD = "juggernaut_shield";
-	public static final String SCATTER_BRAIN_SCATTER = "scatter_brain_scatter";
+	public static final String JUGGERNAUT_DOOR_BREAK = "juggernaut_door_break";
 	public static final String TRACKER_TRACK = "tracker_track";
+	public static final String SNIFFER_SNIFF = "sniffer_sniff";
+	public static final String VETERAN_ALERT = "veteran_alert";
 	public static final String SEER_COMPARE = "seer_compare";
 	public static final String CUPID_LINK = "cupid_link";
 	public static final String COVENANT_BITE = "covenant_bite";
@@ -29,10 +33,10 @@ public record AbilityCooldownPayload(String key, int remainingTicks, int totalTi
 	public static final String SKINCRAWLER_STEAL = "skincrawler_steal";
 	public static final String PAINTER_BODY = "painter_body";
 	public static final String PAINTER_PLAYER = "painter_player";
-	public static final String PAINTER_DOORWAY = "painter_doorway";
 	public static final String COPYCAT_COPY = "copycat_copy";
 	public static final String SPY_BUG = "spy_bug";
 	public static final String TWINS_SWAP = "twins_swap";
+	public static final String RAT_INFECT = "rat_infect";
 
 	public static final CustomPayload.Id<AbilityCooldownPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "ability_cooldown"));

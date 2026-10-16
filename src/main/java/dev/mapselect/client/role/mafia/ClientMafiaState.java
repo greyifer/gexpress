@@ -1,19 +1,19 @@
 package dev.mapselect.client.role.mafia;
+import dev.mapselect.client.ability.ClientAbilityTargetState;
 import dev.mapselect.client.game.ClientRoleRevealState;
 import dev.mapselect.client.hud.ClientHudVisibility;
 import dev.mapselect.client.input.ClientAbilityKeys;
 import dev.mapselect.client.role.cupid.ClientCupidState;
 import dev.mapselect.client.role.pelican.ClientVultureState;
-import dev.mapselect.client.screen.GodfatherRecruitScreen;
-
-
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.client.WatheClient;
+import dev.doctor4t.wathe.client.gui.screen.ingame.LimitedInventoryScreen;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.network.role.mafia.MafiaActionPayload;
 import dev.mapselect.network.role.mafia.MafiaAmmoPayload;
 import dev.mapselect.network.role.mafia.MafiaIntroPayload;
+import dev.mapselect.network.role.mafia.MafiaRecruitOpenPayload;
 import dev.mapselect.network.role.mafia.MafiaStatePayload;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectRoles;
@@ -57,6 +57,11 @@ public final class ClientMafiaState {
 	private static boolean playedMafiaIntroThisRound;
 	private static int mafiaThunderFlashTicks;
 	private static long nextMafiaThunderTick;
+	private static boolean recruitMenuRequested;
+	private static boolean recruitMenuOpen;
+	private static int recruitRequestTicks;
+	private static UUID recruitTargetId;
+	private static String recruitTargetName = "";
 
 	private ClientMafiaState() {}
 
@@ -77,6 +82,8 @@ public final class ClientMafiaState {
 				loadedBullets = Math.max(0, payload.loadedBullets());
 				maxBullets = Math.max(1, payload.maxBullets());
 			}));
+		ClientPlayNetworking.registerGlobalReceiver(MafiaRecruitOpenPayload.ID, (payload, context) ->
+			context.client().execute(() -> openRecruitInventory(context.client(), payload)));
 		ClientTickEvents.END_CLIENT_TICK.register(ClientMafiaState::tick);
 		HudRenderCallback.EVENT.register(ClientMafiaState::renderHud);
 	}
@@ -110,19 +117,20 @@ public final class ClientMafiaState {
 		if (blackWhiteStrength < 0.01F) blackWhiteStrength = 0.0F;
 		if (blackWhiteStrength > 0.99F) blackWhiteStrength = 1.0F;
 		ammoAlpha = MathHelper.lerp(0.22F, ammoAlpha, shouldShowAmmo(client) ? 1.0F : 0.0F);
-		if (client == null || client.player == null || client.world == null
-				|| client.currentScreen != null || ClientVultureState.isLocalStashed(client)
-				|| !ClientRoleRevealState.canUseRoleAbility(client)) {
+		if (client == null || client.player == null || client.world == null) {
+			clearRecruitMenu();
 			wasPrimaryDown = false;
 			return;
 		}
 		Identifier roleId = localRoleId(client);
 		if (MapSelectRoles.GODFATHER_ID.equals(roleId)) {
-			boolean primary = isDown(client, ClientAbilityKeys.primaryBinding());
-			if (primary && !wasPrimaryDown) {
-				client.setScreen(new GodfatherRecruitScreen());
-			}
-			wasPrimaryDown = primary;
+			tickGodfatherRecruitMenu(client);
+			return;
+		}
+		clearRecruitMenu();
+		if (client.currentScreen != null || ClientVultureState.isLocalStashed(client)
+				|| !ClientRoleRevealState.canUseRoleAbility(client)) {
+			wasPrimaryDown = false;
 			return;
 		}
 		if (MapSelectRoles.JANITOR_ID.equals(roleId)) {
@@ -147,6 +155,84 @@ public final class ClientMafiaState {
 			return;
 		}
 		wasPrimaryDown = false;
+	}
+
+	private static void tickGodfatherRecruitMenu(MinecraftClient client) {
+		if (recruitMenuOpen && !(client.currentScreen instanceof LimitedInventoryScreen)) {
+			clearRecruitMenu();
+		}
+		if (recruitMenuRequested && --recruitRequestTicks <= 0) {
+			recruitMenuRequested = false;
+		}
+		boolean primary = isDown(client, ClientAbilityKeys.primaryBinding());
+		if (ClientVultureState.isLocalStashed(client)
+				|| !ClientRoleRevealState.canUseRoleAbility(client)) {
+			clearRecruitMenu();
+			wasPrimaryDown = primary;
+			return;
+		}
+		if (primary && !wasPrimaryDown) {
+			if (recruitMenuOpen && client.currentScreen instanceof LimitedInventoryScreen) {
+				clearRecruitMenu();
+				client.setScreen(null);
+			} else if (client.currentScreen == null && !recruitMenuRequested) {
+				UUID targetId = ClientAbilityTargetState.currentTargetId();
+				if (targetId == null) {
+					client.player.sendMessage(Text.literal("Look at a nearby living player to recruit.")
+						.formatted(Formatting.GRAY), true);
+				} else if (familyIds.contains(targetId)) {
+					client.player.sendMessage(Text.literal("That player is already part of the family.")
+						.formatted(Formatting.GRAY), true);
+				} else if (ClientPlayNetworking.canSend(MafiaActionPayload.ID)) {
+					recruitMenuRequested = true;
+					recruitRequestTicks = 40;
+					ClientPlayNetworking.send(new MafiaActionPayload(
+						MafiaActionPayload.OPEN_RECRUIT_MENU, targetId));
+				}
+			}
+		}
+		wasPrimaryDown = primary;
+	}
+
+	private static void openRecruitInventory(MinecraftClient client, MafiaRecruitOpenPayload payload) {
+		if (client == null || client.player == null || payload == null || !recruitMenuRequested) return;
+		recruitMenuRequested = false;
+		recruitRequestTicks = 0;
+		recruitMenuOpen = true;
+		recruitTargetId = payload.targetId();
+		recruitTargetName = payload.targetName();
+		client.setScreen(new LimitedInventoryScreen(client.player));
+	}
+
+	public static boolean shouldShowRecruitInventoryMenu(MinecraftClient client) {
+		return recruitMenuOpen && recruitTargetId != null && client != null && client.player != null
+			&& MapSelectRoles.GODFATHER_ID.equals(localRoleId(client))
+			&& ClientRoleRevealState.canUseRoleAbility(client);
+	}
+
+	public static UUID recruitTargetId() {
+		return recruitTargetId;
+	}
+
+	public static String recruitTargetName() {
+		return recruitTargetName;
+	}
+
+	public static void recruitAs(int action) {
+		UUID targetId = recruitTargetId;
+		if (!recruitMenuOpen || targetId == null || !ClientPlayNetworking.canSend(MafiaActionPayload.ID)) return;
+		ClientPlayNetworking.send(new MafiaActionPayload(action, targetId));
+		MinecraftClient client = MinecraftClient.getInstance();
+		clearRecruitMenu();
+		if (client != null) client.setScreen(null);
+	}
+
+	private static void clearRecruitMenu() {
+		recruitMenuRequested = false;
+		recruitMenuOpen = false;
+		recruitRequestTicks = 0;
+		recruitTargetId = null;
+		recruitTargetName = "";
 	}
 
 	private static boolean isDown(MinecraftClient client, KeyBinding binding) {

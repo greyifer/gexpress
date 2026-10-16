@@ -2,6 +2,7 @@ package dev.mapselect.role.timemaster;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.role.AbilityCooldowns;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -51,31 +52,14 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 	}
 
 	private long cooldownRemainingTicks(Map<UUID, Long> cooldowns, UUID playerId) {
-		if (playerId == null) return 0L;
-		Long until = cooldowns.get(playerId);
-		if (until == null) return 0L;
-		long remaining = until - world.getTime();
-		if (remaining <= 0L) {
-			cooldowns.remove(playerId);
-			KEY.sync(world);
-			return 0L;
-		}
+		boolean hadCooldown = cooldowns != null && playerId != null && cooldowns.containsKey(playerId);
+		long remaining = AbilityCooldowns.remaining(cooldowns, playerId, world.getTime());
+		if (remaining <= 0L && hadCooldown) KEY.sync(world);
 		return remaining;
 	}
 
 	private long reduceCooldown(Map<UUID, Long> cooldowns, UUID playerId, long ticks) {
-		if (playerId == null || ticks <= 0L) return cooldownRemainingTicks(cooldowns, playerId);
-		Long until = cooldowns.get(playerId);
-		if (until == null) return 0L;
-		long remaining = until - world.getTime();
-		if (remaining <= 0L) {
-			cooldowns.remove(playerId);
-			KEY.sync(world);
-			return 0L;
-		}
-		long nextRemaining = Math.max(0L, remaining - ticks);
-		if (nextRemaining <= 0L) cooldowns.remove(playerId);
-		else cooldowns.put(playerId, world.getTime() + nextRemaining);
+		long nextRemaining = AbilityCooldowns.reduce(cooldowns, playerId, world.getTime(), ticks);
 		KEY.sync(world);
 		return nextRemaining;
 	}
@@ -111,22 +95,14 @@ public class TimeMasterComponent implements AutoSyncedComponent {
 
 	private void setRewindCooldown(UUID playerId) {
 		long cooldownTicks = (long) GexpressConfig.getTimeMasterCooldownSeconds() * 20L;
-		if (cooldownTicks > 0L) {
-			cooldownUntil.put(playerId, world.getTime() + cooldownTicks);
-		} else {
-			cooldownUntil.remove(playerId);
-		}
+		AbilityCooldowns.start(cooldownUntil, playerId, world.getTime(), cooldownTicks);
 		KEY.sync(world);
 	}
 
 	public void setFreezeCooldown(UUID playerId) {
 		if (playerId == null) return;
 		long cooldownTicks = (long) GexpressConfig.getTimeMasterFreezeCooldownSeconds() * 20L;
-		if (cooldownTicks > 0L) {
-			freezeCooldownUntil.put(playerId, world.getTime() + cooldownTicks);
-		} else {
-			freezeCooldownUntil.remove(playerId);
-		}
+		AbilityCooldowns.start(freezeCooldownUntil, playerId, world.getTime(), cooldownTicks);
 		KEY.sync(world);
 	}
 

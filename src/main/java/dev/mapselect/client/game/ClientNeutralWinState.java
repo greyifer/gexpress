@@ -13,6 +13,7 @@ public final class ClientNeutralWinState {
 	private static UUID winnerId;
 	private static String translationKey;
 	private static int color;
+	private static String winnerName = "";
 
 	private ClientNeutralWinState() {}
 
@@ -27,6 +28,12 @@ public final class ClientNeutralWinState {
 				|| !winnerId.equals(requestedWinner)) {
 			return null;
 		}
+		if ("announcement.win.gexpress.last_survivor".equals(translationKey)) {
+			var client = MinecraftClient.getInstance();
+			var entry = client.getNetworkHandler() == null ? null : client.getNetworkHandler().getPlayerListEntry(winnerId);
+			String name = !winnerName.isBlank() ? winnerName : entry == null ? "Last survivor" : entry.getProfile().getName();
+			return Text.translatable(translationKey, name).withColor(color);
+		}
 		return Text.translatable(translationKey).withColor(color);
 	}
 
@@ -34,13 +41,13 @@ public final class ClientNeutralWinState {
 		winnerId = payload.winnerId();
 		translationKey = payload.translationKey();
 		color = payload.color();
+		winnerName = payload.winnerName();
 	}
 
 	private static void tick(MinecraftClient client) {
 		if (client == null || client.world == null) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
-		if (game != null && (game.getGameStatus() == GameWorldComponent.GameStatus.STARTING
-				|| game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE)) {
+		if (game != null && game.getGameStatus() == GameWorldComponent.GameStatus.STARTING) {
 			reset();
 		}
 	}
@@ -49,5 +56,6 @@ public final class ClientNeutralWinState {
 		winnerId = null;
 		translationKey = null;
 		color = 0xFFFFFF;
+		winnerName = "";
 	}
 }

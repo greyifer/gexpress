@@ -38,6 +38,8 @@ public final class ClientSnitchState {
 	private static float progressX = 22.0F;
 	private static float infoAlpha;
 	private static int watheTaskVisibleTicks;
+	private static Object stateWorld;
+	private static boolean observedRunningRound;
 
 	private ClientSnitchState() {}
 
@@ -69,6 +71,7 @@ public final class ClientSnitchState {
 	}
 
 	private static void apply(SnitchProgressPayload payload) {
+		stateWorld = MinecraftClient.getInstance().world;
 		receivedPayload = true;
 		completedTasks = payload.completedTasks();
 		requiredTasks = payload.requiredTasks();
@@ -77,8 +80,18 @@ public final class ClientSnitchState {
 	}
 
 	private static void tick(MinecraftClient client) {
-		if (!isRoundRunning(client)) {
+		Object currentWorld = client == null ? null : client.world;
+		if (currentWorld != stateWorld) {
 			reset();
+			stateWorld = currentWorld;
+			observedRunningRound = false;
+		}
+		boolean roundRunning = isRoundRunning(client);
+		if (roundRunning) {
+			observedRunningRound = true;
+		} else if (observedRunningRound) {
+			reset();
+			observedRunningRound = false;
 			return;
 		}
 		if (requiredTasks <= 0) {

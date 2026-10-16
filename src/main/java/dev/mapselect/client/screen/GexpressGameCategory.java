@@ -4,7 +4,6 @@ import cat.rezelyn.watheextended.api.hml.ConfigHelper;
 import cat.rezelyn.watheextended.api.hml.ModifiersDisplay;
 import cat.rezelyn.watheextended.api.wathe.RolesDisplay;
 import cat.rezelyn.watheextended.client.screen.config.OptionsCategory;
-import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.LabelOption;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
@@ -17,6 +16,7 @@ import dev.mapselect.MapSelect;
 import dev.mapselect.client.text.GexpressRoleTexts;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
+import dev.mapselect.role.BuggedRoles;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
@@ -53,10 +53,11 @@ public final class GexpressGameCategory {
 	private static final String PUPPETMASTER_ID = MapSelect.MOD_ID + ":puppetmaster";
 	private static final String BOUNTY_HUNTER_ID = MapSelect.MOD_ID + ":bounty_hunter";
 	private static final String VULTURE_ID = MapSelect.MOD_ID + ":pelican";
-	private static final String SCATTER_BRAIN_ID = MapSelect.MOD_ID + ":scatter_brain";
+	private static final String DOOMSAYER_ID = MapSelect.MOD_ID + ":doomsayer";
 	private static final String SKINCRAWLER_ID = MapSelect.MOD_ID + ":skincrawler";
 	private static final String PAINTER_ID = MapSelect.MOD_ID + ":painter";
 	private static final String TRACKER_ID = MapSelect.MOD_ID + ":tracker";
+	private static final String VETERAN_ID = MapSelect.MOD_ID + ":veteran";
 	private static final String SPY_ID = MapSelect.MOD_ID + ":spy";
 	private static final String ALTRUIST_ID = MapSelect.MOD_ID + ":altruist";
 	private static final String GODFATHER_ID = MapSelect.MOD_ID + ":godfather";
@@ -90,11 +91,26 @@ public final class GexpressGameCategory {
 	private static final String WE_ROLES_OPTS_PREFIX = WE_ROLES_KEY + ".";
 	private static final String WE_MOD_OPTS_PREFIX = WE_MODIFIERS_KEY + ".";
 
-	public static ConfigCategory build(Screen parent, BiConsumer<String, Screen> stage) {
-		ConfigCategory.Builder category = ConfigCategory.createBuilder()
-			.name(Text.translatable("gui.gexpress.config.category.game"))
-			.tooltip(Text.translatable("gui.gexpress.config.category.game.tooltip"));
+	public static Screen createGlibScreen(Screen parent) {
+		GameSections sections = buildSections(parent, GexpressOptionsScreen::stage);
+		return GexpressGlibEditor.screen(parent, "Gameplay",
+			"Roles, modifiers, tasks, and round rules.", 0xFF7CC9A2, List.of(
+				new GexpressGlibEditor.PageSource(Text.literal("Game Rules"),
+					Text.literal("Gamerules, WATHE options, and tasks."), sections.gameRules()),
+				new GexpressGlibEditor.PageSource(Text.literal("Killer Roles"),
+					Text.literal("Murder-side role settings and ability tuning."), sections.killerRoles()),
+				new GexpressGlibEditor.PageSource(Text.literal("Civilian Roles"),
+					Text.literal("Crew-side role settings and utility abilities."), sections.civilianRoles()),
+				new GexpressGlibEditor.PageSource(Text.literal("Neutral Roles"),
+					Text.literal("Independent role settings and win conditions."), sections.neutralRoles()),
+				new GexpressGlibEditor.PageSource(Text.literal("Misc Roles"),
+					Text.literal("Mafia, covenant, and grouped specialty roles."), sections.miscRoles()),
+				new GexpressGlibEditor.PageSource(Text.literal("Modifiers"),
+					Text.literal("Modifier toggles, chances, and extra options."), sections.modifiers())
+			));
+	}
 
+	private static GameSections buildSections(Screen parent, BiConsumer<String, Screen> stage) {
 		List<OptionGroup> weGroups = tryBuildWeGroups(parent, stage);
 
 		Map<String, OptionGroup> weGroupByKey = new LinkedHashMap<>();
@@ -103,11 +119,12 @@ public final class GexpressGameCategory {
 			if (key != null) weGroupByKey.put(key, g);
 		}
 
+		List<OptionGroup> gameRuleGroups = new ArrayList<>();
 		OptionGroup gamerules = weGroupByKey.get(WE_GAMERULES_KEY);
-		if (gamerules != null) category.group(gamerules);
+		if (gamerules != null) gameRuleGroups.add(gamerules);
 		OptionGroup watheOptions = weGroupByKey.get(WE_OPTIONS_KEY);
-		if (watheOptions != null) category.group(watheOptions);
-		category.group(buildTasksGroup());
+		if (watheOptions != null) gameRuleGroups.add(watheOptions);
+		gameRuleGroups.add(buildTasksGroup());
 
 		Map<String, List<Option<?>>> roleKeyToWeOpts = new LinkedHashMap<>();
 		List<Option<?>> globalRoleOpts = new ArrayList<>();
@@ -154,29 +171,33 @@ public final class GexpressGameCategory {
 		globalModOpts.add(buildMaxModifiersPerPlayerOption());
 
 		if (!globalRoleOpts.isEmpty()) {
-			category.group(buildPassthroughGroup("gui.gexpress.config.group.roles.global", globalRoleOpts));
+			gameRuleGroups.add(buildPassthroughGroup("gui.gexpress.config.group.roles.global", globalRoleOpts));
 		}
 
-		Map<String, RolesDisplay.RoleDisplay> roleDisplay;
+		RoleSections roleSections;
 		try {
-			roleDisplay = RolesDisplay.get();
+			roleSections = buildRoleSections(RolesDisplay.get(), roleKeyToWeOpts, parent, stage);
 		} catch (Throwable t) {
-			roleDisplay = Map.of();
-			category.group(errorGroup("gui.gexpress.config.group.roles.error"));
+			roleSections = new RoleSections(List.of(), List.of(), List.of(),
+				List.of(errorGroup("gui.gexpress.config.group.roles.error")));
 		}
 
-		for (OptionGroup sideGroup : buildRoleSideGroups(roleDisplay, roleKeyToWeOpts, parent, stage)) {
-			category.group(sideGroup);
-		}
-
-		category.group(buildModifiersGroup(modKeyToWeOpts, parent, stage));
-
+		List<OptionGroup> modifierGroups = new ArrayList<>();
+		modifierGroups.add(buildModifiersGroup(modKeyToWeOpts, parent, stage));
 		if (!globalModOpts.isEmpty()) {
-			category.group(buildPassthroughGroup("gui.gexpress.config.group.modifiers.global", globalModOpts));
+			modifierGroups.add(buildPassthroughGroup("gui.gexpress.config.group.modifiers.global", globalModOpts));
 		}
 
-		return category.build();
+		return new GameSections(gameRuleGroups, roleSections.killers(), roleSections.civilians(),
+			roleSections.neutrals(), roleSections.misc(), modifierGroups);
 	}
+
+	private record GameSections(List<OptionGroup> gameRules, List<OptionGroup> killerRoles,
+			List<OptionGroup> civilianRoles, List<OptionGroup> neutralRoles, List<OptionGroup> miscRoles,
+			List<OptionGroup> modifiers) {}
+
+	private record RoleSections(List<OptionGroup> killers, List<OptionGroup> civilians, List<OptionGroup> neutrals,
+			List<OptionGroup> misc) {}
 
 	private static OptionGroup buildTasksGroup() {
 		return OptionGroup.createBuilder()
@@ -274,6 +295,68 @@ public final class GexpressGameCategory {
 		return name.replace("_", "").toLowerCase();
 	}
 
+	private static RoleSections buildRoleSections(Map<String, RolesDisplay.RoleDisplay> display,
+	                                                Map<String, List<Option<?>>> weOptsByRole,
+	                                                Screen parent, BiConsumer<String, Screen> stage) {
+		Map<RolesDisplay.Side, List<String>> bySide = new EnumMap<>(RolesDisplay.Side.class);
+		bySide.put(RolesDisplay.Side.KILLER, new ArrayList<>());
+		bySide.put(RolesDisplay.Side.INNOCENT, new ArrayList<>());
+		bySide.put(RolesDisplay.Side.NEUTRAL, new ArrayList<>());
+		List<String> mafiaRoles = new ArrayList<>();
+		List<String> covenantRoles = new ArrayList<>();
+
+		for (Map.Entry<String, RolesDisplay.RoleDisplay> e : display.entrySet()) {
+			if (isBuiltinNonConfigRole(e.getKey()) || isRetiredExternalVulture(e.getKey())) continue;
+			if (isMafiaRoleId(e.getKey())) {
+				mafiaRoles.add(e.getKey());
+				continue;
+			}
+			if (isCovenantRoleId(e.getKey())) {
+				covenantRoles.add(e.getKey());
+				continue;
+			}
+			RolesDisplay.RoleDisplay rd = e.getValue();
+			RolesDisplay.Side side = rd != null ? rd.side() : RolesDisplay.Side.NEUTRAL;
+			if (JUGGERNAUT_ID.equals(e.getKey()) || VULTURE_ID.equals(e.getKey()) || CUPID_ID.equals(e.getKey())
+					|| DOOMSAYER_ID.equals(e.getKey())) {
+				side = RolesDisplay.Side.NEUTRAL;
+			}
+			bySide.get(side).add(e.getKey());
+		}
+		if (!bySide.get(RolesDisplay.Side.KILLER).contains(KILLER_ID)) {
+			bySide.get(RolesDisplay.Side.KILLER).add(0, KILLER_ID);
+		}
+		if (!bySide.get(RolesDisplay.Side.INNOCENT).contains(VIGILANTE_ID)) {
+			bySide.get(RolesDisplay.Side.INNOCENT).add(0, VIGILANTE_ID);
+		}
+
+		List<OptionGroup> killers = new ArrayList<>();
+		List<OptionGroup> civilians = new ArrayList<>();
+		List<OptionGroup> neutrals = new ArrayList<>();
+		List<OptionGroup> misc = new ArrayList<>();
+		if (!bySide.get(RolesDisplay.Side.KILLER).isEmpty()) {
+			killers.add(buildRoleSideGroup(RolesDisplay.Side.KILLER, bySide.get(RolesDisplay.Side.KILLER),
+				display, weOptsByRole, parent, stage));
+		}
+		if (!bySide.get(RolesDisplay.Side.INNOCENT).isEmpty()) {
+			civilians.add(buildRoleSideGroup(RolesDisplay.Side.INNOCENT, bySide.get(RolesDisplay.Side.INNOCENT),
+				display, weOptsByRole, parent, stage));
+		}
+		if (!bySide.get(RolesDisplay.Side.NEUTRAL).isEmpty()) {
+			neutrals.add(buildRoleSideGroup(RolesDisplay.Side.NEUTRAL, bySide.get(RolesDisplay.Side.NEUTRAL),
+				display, weOptsByRole, parent, stage));
+		}
+		if (!mafiaRoles.isEmpty()) {
+			misc.add(buildRoleGroup(Text.translatable("gui.gexpress.config.group.roles.mafia").formatted(Formatting.DARK_GRAY),
+				mafiaRoles, display, weOptsByRole, parent, stage));
+		}
+		if (!covenantRoles.isEmpty()) {
+			misc.add(buildRoleGroup(Text.translatable("gui.gexpress.config.group.roles.covenant").formatted(Formatting.DARK_RED),
+				covenantRoles, display, weOptsByRole, parent, stage));
+		}
+		return new RoleSections(killers, civilians, neutrals, misc);
+	}
+
 	private static List<OptionGroup> buildRoleSideGroups(Map<String, RolesDisplay.RoleDisplay> display,
 	                                                Map<String, List<Option<?>>> weOptsByRole,
 	                                                Screen parent, BiConsumer<String, Screen> stage) {
@@ -296,7 +379,8 @@ public final class GexpressGameCategory {
 			}
 			RolesDisplay.RoleDisplay rd = e.getValue();
 			RolesDisplay.Side side = rd != null ? rd.side() : RolesDisplay.Side.NEUTRAL;
-			if (JUGGERNAUT_ID.equals(e.getKey()) || VULTURE_ID.equals(e.getKey()) || CUPID_ID.equals(e.getKey())) {
+			if (JUGGERNAUT_ID.equals(e.getKey()) || VULTURE_ID.equals(e.getKey()) || CUPID_ID.equals(e.getKey())
+					|| DOOMSAYER_ID.equals(e.getKey())) {
 				side = RolesDisplay.Side.NEUTRAL;
 			}
 			bySide.get(side).add(e.getKey());
@@ -359,18 +443,28 @@ public final class GexpressGameCategory {
 
 	private static Option<Boolean> buildRoleToggle(String id, RolesDisplay.RoleDisplay rd,
 			Screen parent, BiConsumer<String, Screen> stage) {
+		boolean bugged = BuggedRoles.isBugged(id);
 		MutableText name = colorizedRoleName(rd, id);
+		if (bugged) {
+			name.append(Text.literal(" \uE502").formatted(Formatting.WHITE));
+		}
 		OptionDescription desc = buildRoleDescription(id, rd);
 
 		return Option.<Boolean>createBuilder()
 			.name(name)
 			.description(desc)
+			.available(!bugged)
 			.binding(true, () -> {
+				if (bugged) return false;
 				if (GexpressOptionsScreen.pendingRoleState.containsKey(id)) {
 					return GexpressOptionsScreen.pendingRoleState.get(id);
 				}
 				return !ConfigHelper.getDisabledRoles().contains(id);
 			}, v -> {
+				if (bugged) {
+					GexpressOptionsScreen.pendingRoleState.put(id, false);
+					return;
+				}
 				GexpressOptionsScreen.pendingRoleState.put(id, v);
 				stage.accept("setEnabledRole " + id + " " + v, parent);
 			})
@@ -675,7 +769,7 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.twins_swap_cooldown")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.twins_swap_cooldown.tooltip")))
-				.binding(20, GexpressConfig::getTwinsSwapCooldownSeconds,
+				.binding(30, GexpressConfig::getTwinsSwapCooldownSeconds,
 					v -> GexpressConfig.twinsSwapCooldownSeconds = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.TWINS_SWAP_COOLDOWN_SECONDS_MIN,
@@ -1156,24 +1250,11 @@ public final class GexpressGameCategory {
 			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.covenant_bite_cooldown")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.covenant_bite_cooldown.tooltip")))
-				.binding(15, GexpressConfig::getCovenantBiteCooldownSeconds,
+				.binding(45, GexpressConfig::getCovenantBiteCooldownSeconds,
 					v -> GexpressConfig.covenantBiteCooldownSeconds = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.COVENANT_BITE_COOLDOWN_SECONDS_MIN,
 						GexpressConfig.COVENANT_BITE_COOLDOWN_SECONDS_MAX))
-				.build());
-			return out;
-		}
-		if (SCATTER_BRAIN_ID.equals(roleId)) {
-			List<Option<?>> out = new ArrayList<>();
-			out.add(Option.<Integer>createBuilder()
-				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.scatter_brain_cooldown")))
-				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.scatter_brain_cooldown.tooltip")))
-				.binding(60, GexpressConfig::getScatterBrainCooldownSeconds,
-					v -> GexpressConfig.scatterBrainCooldownSeconds = v)
-				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-					.range(GexpressConfig.SCATTER_BRAIN_COOLDOWN_SECONDS_MIN,
-						GexpressConfig.SCATTER_BRAIN_COOLDOWN_SECONDS_MAX))
 				.build());
 			return out;
 		}
@@ -1245,24 +1326,6 @@ public final class GexpressGameCategory {
 						GexpressConfig.PAINTER_COOLDOWN_SECONDS_MAX))
 				.build());
 			out.add(Option.<Integer>createBuilder()
-				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_duration")))
-				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_duration.tooltip")))
-				.binding(10, GexpressConfig::getPainterDoorwayDurationSeconds,
-					v -> GexpressConfig.painterDoorwayDurationSeconds = v)
-				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-					.range(GexpressConfig.PAINTER_DOORWAY_DURATION_SECONDS_MIN,
-						GexpressConfig.PAINTER_DOORWAY_DURATION_SECONDS_MAX))
-				.build());
-			out.add(Option.<Integer>createBuilder()
-				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_cooldown")))
-				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_doorway_cooldown.tooltip")))
-				.binding(30, GexpressConfig::getPainterDoorwayCooldownSeconds,
-					v -> GexpressConfig.painterDoorwayCooldownSeconds = v)
-				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-					.range(GexpressConfig.PAINTER_COOLDOWN_SECONDS_MIN,
-						GexpressConfig.PAINTER_COOLDOWN_SECONDS_MAX))
-				.build());
-			out.add(Option.<Integer>createBuilder()
 				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.painter_max_bodies")))
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.painter_max_bodies.tooltip")))
 				.binding(1, GexpressConfig::getPainterMaxPaintedBodies,
@@ -1302,6 +1365,27 @@ public final class GexpressGameCategory {
 				.build());
 			return out;
 		}
+		if (DOOMSAYER_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.doomsayer_guesses_to_win")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.doomsayer_guesses_to_win.tooltip")))
+				.binding(4, GexpressConfig::getDoomsayerGuessesToWin,
+					v -> GexpressConfig.doomsayerGuessesToWin = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.DOOMSAYER_GUESSES_TO_WIN_MIN,
+						GexpressConfig.DOOMSAYER_GUESSES_TO_WIN_MAX))
+				.build());
+			out.add(Option.<Boolean>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.doomsayer_dies_on_wrong")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.doomsayer_dies_on_wrong.tooltip")))
+				.binding(false, GexpressConfig::doesDoomsayerDieOnWrongGuess,
+					v -> GexpressConfig.doomsayerDiesOnWrongGuess = v)
+				.controller(opt -> BooleanControllerBuilder.create(opt).coloured(true)
+					.formatValue(b -> Text.translatable(b ? "text.watheextended.enabled" : "text.watheextended.disabled")))
+				.build());
+			return out;
+		}
 		if (TRACKER_ID.equals(roleId)) {
 			List<Option<?>> out = new ArrayList<>();
 			out.add(Option.<Integer>createBuilder()
@@ -1324,6 +1408,17 @@ public final class GexpressGameCategory {
 				.binding(10, GexpressConfig::getTrackerCooldownSeconds, v -> GexpressConfig.trackerCooldownSeconds = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.TRACKER_COOLDOWN_SECONDS_MIN, GexpressConfig.TRACKER_COOLDOWN_SECONDS_MAX))
+				.build());
+			return out;
+		}
+		if (VETERAN_ID.equals(roleId)) {
+			List<Option<?>> out = new ArrayList<>();
+			out.add(Option.<Integer>createBuilder()
+				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.veteran_max_uses")))
+				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.veteran_max_uses.tooltip")))
+				.binding(5, GexpressConfig::getVeteranMaxUses, v -> GexpressConfig.veteranMaxUses = v)
+				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
+					.range(GexpressConfig.VETERAN_MAX_USES_MIN, GexpressConfig.VETERAN_MAX_USES_MAX))
 				.build());
 			return out;
 		}
@@ -1420,22 +1515,6 @@ public final class GexpressGameCategory {
 				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.squeaker_pitch.tooltip")))
 				.binding(135, GexpressConfig::getSqueakerPitchPercent,
 					v -> GexpressConfig.squeakerPitchPercent = v)
-				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-					.range(GexpressConfig.VOICE_PITCH_PERCENT_MIN, GexpressConfig.VOICE_PITCH_PERCENT_MAX))
-				.build());
-			out.add(Option.<Integer>createBuilder()
-				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_min")))
-				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_min.tooltip")))
-				.binding(80, GexpressConfig::getMasqueradePitchMinPercent,
-					v -> GexpressConfig.masqueradePitchMinPercent = v)
-				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
-					.range(GexpressConfig.VOICE_PITCH_PERCENT_MIN, GexpressConfig.VOICE_PITCH_PERCENT_MAX))
-				.build());
-			out.add(Option.<Integer>createBuilder()
-				.name(indented(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_max")))
-				.description(OptionDescription.of(Text.translatable("gui.watheextended.config.option.gexpress.masquerade_pitch_max.tooltip")))
-				.binding(145, GexpressConfig::getMasqueradePitchMaxPercent,
-					v -> GexpressConfig.masqueradePitchMaxPercent = v)
 				.controller(opt -> IntegerFieldControllerBuilder.create(opt)
 					.range(GexpressConfig.VOICE_PITCH_PERCENT_MIN, GexpressConfig.VOICE_PITCH_PERCENT_MAX))
 				.build());

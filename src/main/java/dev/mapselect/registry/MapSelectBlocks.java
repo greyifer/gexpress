@@ -10,11 +10,16 @@ import dev.mapselect.block.GoldDrinkTrayBlock;
 import dev.mapselect.block.GoldFoodPlatterBlock;
 import dev.mapselect.block.GoldLedgeBlock;
 import dev.mapselect.block.GreyiferPlushBlock;
+import dev.mapselect.block.KeycardReaderBlock;
+import dev.mapselect.block.LargeWoodDoorBlock;
+import dev.mapselect.block.LeaderboardBlock;
 import dev.mapselect.block.PebbleBlock;
+import dev.mapselect.block.RatTrapBlock;
 import dev.mapselect.block.SandLayerBlock;
 import dev.doctor4t.wathe.block.PanelBlock;
 import dev.mapselect.item.FusedLedgeItem;
 import dev.mapselect.item.FusedOrnamentItem;
+import dev.mapselect.item.RatTrapItem;
 import dev.mapselect.item.RedRibbonItem;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.block.AbstractBlock;
@@ -106,7 +111,42 @@ public final class MapSelectBlocks {
 		.nonOpaque()
 		.pistonBehavior(PistonBehavior.DESTROY));
 
+	public static final Block ETH4N1_PLUSH = new GreyiferPlushBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.BLACK)
+		.strength(0.5f)
+		.sounds(BlockSoundGroup.WOOL)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
+	public static final Block DOMEKIQN_PLUSH = new GreyiferPlushBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.BLACK)
+		.strength(0.5f)
+		.sounds(BlockSoundGroup.WOOL)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
+	public static final Block SEAFOX_PLUSH = new GreyiferPlushBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.BLACK)
+		.strength(0.5f)
+		.sounds(BlockSoundGroup.WOOL)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
+	public static final Block REDDISHACORN_PLUSH = new GreyiferPlushBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.BLACK)
+		.strength(0.5f)
+		.sounds(BlockSoundGroup.WOOL)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
 	public static final Block ASTRONOMIKYU_PLUSH = new GreyiferPlushBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.BLACK)
+		.strength(0.5f)
+		.sounds(BlockSoundGroup.WOOL)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
+	public static final Block LIV_54_PLUSH = new GreyiferPlushBlock(AbstractBlock.Settings.create()
 		.mapColor(MapColor.BLACK)
 		.strength(0.5f)
 		.sounds(BlockSoundGroup.WOOL)
@@ -132,6 +172,14 @@ public final class MapSelectBlocks {
 		.nonOpaque()
 		.pistonBehavior(PistonBehavior.DESTROY));
 
+	public static final Block RAT_TRAP = new RatTrapBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.IRON_GRAY)
+		.breakInstantly()
+		.sounds(BlockSoundGroup.METAL)
+		.nonOpaque()
+		.noCollision()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
 	public static final Block COIN_BARRIER = new CoinBarrierBlock(AbstractBlock.Settings.create()
 		.mapColor(MapColor.BLACK)
 		.strength(3.0f, 1200.0f)
@@ -142,6 +190,29 @@ public final class MapSelectBlocks {
 	public static final Block FLOATING_TEXT = new FloatingTextBlock(AbstractBlock.Settings.create()
 		.mapColor(MapColor.CLEAR)
 		.strength(1.0f)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
+	public static final Block LEADERBOARD = new LeaderboardBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.BLACK)
+		.strength(2.0f, 6.0f)
+		.sounds(BlockSoundGroup.METAL)
+		.luminance(state -> 3)
+		.pistonBehavior(PistonBehavior.BLOCK));
+
+	public static final Block SETTINGS_PANEL = new dev.mapselect.block.SettingsPanelBlock(AbstractBlock.Settings.copy(LEADERBOARD));
+
+	public static final Block KEYCARD_READER = new KeycardReaderBlock(AbstractBlock.Settings.create()
+		.mapColor(MapColor.BLACK)
+		.strength(1.0f)
+		.sounds(BlockSoundGroup.METAL)
+		.nonOpaque()
+		.pistonBehavior(PistonBehavior.DESTROY));
+
+	public static final Block LARGE_WOOD_DOOR = new LargeWoodDoorBlock(AbstractBlock.Settings.copy(Blocks.OAK_PLANKS)
+		.mapColor(MapColor.OAK_TAN)
+		.strength(2.0f, 3.0f)
+		.sounds(BlockSoundGroup.WOOD)
 		.nonOpaque()
 		.pistonBehavior(PistonBehavior.DESTROY));
 
@@ -242,12 +313,22 @@ public final class MapSelectBlocks {
 	public static final BlockItem JEMSEA_PLUSH_ITEM = new BlockItem(JEMSEA_PLUSH, new Item.Settings());
 	public static final BlockItem PARROTMARROW_PLUSH_ITEM = new BlockItem(PARROTMARROW_PLUSH, new Item.Settings());
 	public static final BlockItem EVIEEVEEE_PLUSH_ITEM = new BlockItem(EVIEEVEEE_PLUSH, new Item.Settings());
+	public static final BlockItem ETH4N1_PLUSH_ITEM = new BlockItem(ETH4N1_PLUSH, new Item.Settings());
+	public static final BlockItem DOMEKIQN_PLUSH_ITEM = new BlockItem(DOMEKIQN_PLUSH, new Item.Settings());
+	public static final BlockItem SEAFOX_PLUSH_ITEM = new BlockItem(SEAFOX_PLUSH, new Item.Settings());
+	public static final BlockItem REDDISHACORN_PLUSH_ITEM = new BlockItem(REDDISHACORN_PLUSH, new Item.Settings());
 	public static final BlockItem ASTRONOMIKYU_PLUSH_ITEM = new BlockItem(ASTRONOMIKYU_PLUSH, new Item.Settings());
+	public static final BlockItem LIV_54_PLUSH_ITEM = new BlockItem(LIV_54_PLUSH, new Item.Settings());
 	public static final BlockItem FAKE_SUSPICIOUS_SAND_ITEM = new BlockItem(FAKE_SUSPICIOUS_SAND, new Item.Settings());
 	public static final BlockItem FAKE_SUSPICIOUS_GRAVEL_ITEM = new BlockItem(FAKE_SUSPICIOUS_GRAVEL, new Item.Settings());
 	public static final BlockItem PEBBLE_BLOCK_ITEM = new BlockItem(PEBBLE_BLOCK, new Item.Settings());
+	public static final Item RAT_TRAP_ITEM = new RatTrapItem(new Item.Settings().maxCount(4));
 	public static final Item COIN_BARRIER_ITEM = new RedRibbonItem(new Item.Settings().maxCount(1));
 	public static final BlockItem FLOATING_TEXT_ITEM = new BlockItem(FLOATING_TEXT, new Item.Settings());
+	public static final BlockItem LEADERBOARD_ITEM = new BlockItem(LEADERBOARD, new Item.Settings());
+	public static final BlockItem SETTINGS_PANEL_ITEM = new BlockItem(SETTINGS_PANEL, new Item.Settings());
+	public static final BlockItem KEYCARD_READER_ITEM = new BlockItem(KEYCARD_READER, new Item.Settings());
+	public static final BlockItem LARGE_WOOD_DOOR_ITEM = new BlockItem(LARGE_WOOD_DOOR, new Item.Settings());
 	public static final BlockItem OLIVE_PLANKS_ITEM = new BlockItem(OLIVE_PLANKS, new Item.Settings());
 	public static final BlockItem OLIVE_PLANKS_STAIRS_ITEM = new BlockItem(OLIVE_PLANKS_STAIRS, new Item.Settings());
 	public static final BlockItem OLIVE_PLANKS_SLAB_ITEM = new BlockItem(OLIVE_PLANKS_SLAB, new Item.Settings());
@@ -330,8 +411,12 @@ public final class MapSelectBlocks {
 		FAKE_SUSPICIOUS_SAND_ITEM,
 		FAKE_SUSPICIOUS_GRAVEL_ITEM,
 		PEBBLE_BLOCK_ITEM,
+		RAT_TRAP_ITEM,
 		COIN_BARRIER_ITEM,
-		FLOATING_TEXT_ITEM
+		FLOATING_TEXT_ITEM,
+		LEADERBOARD_ITEM,
+		SETTINGS_PANEL_ITEM,
+		KEYCARD_READER_ITEM
 	};
 
 	private static final Item[] BUILDING_BLOCK_ITEMS = {
@@ -382,7 +467,12 @@ public final class MapSelectBlocks {
 		JEMSEA_PLUSH_ITEM,
 		PARROTMARROW_PLUSH_ITEM,
 		EVIEEVEEE_PLUSH_ITEM,
+		ETH4N1_PLUSH_ITEM,
+		DOMEKIQN_PLUSH_ITEM,
+		SEAFOX_PLUSH_ITEM,
+		REDDISHACORN_PLUSH_ITEM,
 		ASTRONOMIKYU_PLUSH_ITEM,
+		LIV_54_PLUSH_ITEM,
 		GOLD_FOOD_PLATTER_ITEM,
 		GOLD_DRINK_TRAY_ITEM,
 		GILDED_ORNAMENT_ITEM,
@@ -397,6 +487,7 @@ public final class MapSelectBlocks {
 		MAROON_STEEL_ORNAMENT_ITEM,
 		MUNTZ_STEEL_ORNAMENT_ITEM,
 		NAVY_STEEL_ORNAMENT_ITEM,
+		LARGE_WOOD_DOOR_ITEM,
 		ACACIA_CABINET_ITEM,
 		BIRCH_CABINET_ITEM,
 		CHERRY_CABINET_ITEM,
@@ -420,12 +511,21 @@ public final class MapSelectBlocks {
 		Identifier jemseaPlushId = Identifier.of(MapSelect.MOD_ID, "jemsea_plush");
 		Identifier parrotmarrowPlushId = Identifier.of(MapSelect.MOD_ID, "parrotmarrow_plush");
 		Identifier evieeveeePlushId = Identifier.of(MapSelect.MOD_ID, "evieeveee_plush");
+		Identifier eth4n1PlushId = Identifier.of(MapSelect.MOD_ID, "eth4n1_plush");
+		Identifier domekiqnPlushId = Identifier.of(MapSelect.MOD_ID, "domekiqn_plush");
+		Identifier seafoxPlushId = Identifier.of(MapSelect.MOD_ID, "seafox_plush");
+		Identifier reddishacornPlushId = Identifier.of(MapSelect.MOD_ID, "reddishacorn_plush");
 		Identifier astronomikyuPlushId = Identifier.of(MapSelect.MOD_ID, "astronomikyu_plush");
+		Identifier liv54PlushId = Identifier.of(MapSelect.MOD_ID, "liv_54_plush");
 		Identifier fakeSuspiciousSandId = Identifier.of(MapSelect.MOD_ID, "fake_suspicious_sand");
 		Identifier fakeSuspiciousGravelId = Identifier.of(MapSelect.MOD_ID, "fake_suspicious_gravel");
 		Identifier pebbleBlockId = Identifier.of(MapSelect.MOD_ID, "pebble_block");
+		Identifier ratTrapId = Identifier.of(MapSelect.MOD_ID, "rat_trap");
 		Identifier coinBarrierId = Identifier.of(MapSelect.MOD_ID, "coin_barrier");
 		Identifier floatingTextId = Identifier.of(MapSelect.MOD_ID, "floating_text");
+		Identifier leaderboardId = Identifier.of(MapSelect.MOD_ID, "leaderboard");
+		Identifier keycardReaderId = Identifier.of(MapSelect.MOD_ID, "keycard_reader");
+		Identifier largeWoodDoorId = Identifier.of(MapSelect.MOD_ID, "large_wood_door");
 		Identifier olivePlanksId = Identifier.of(MapSelect.MOD_ID, "olive_planks");
 		Identifier olivePlanksStairsId = Identifier.of(MapSelect.MOD_ID, "olive_planks_stairs");
 		Identifier olivePlanksSlabId = Identifier.of(MapSelect.MOD_ID, "olive_planks_slab");
@@ -495,12 +595,22 @@ public final class MapSelectBlocks {
 		Registry.register(Registries.BLOCK, jemseaPlushId, JEMSEA_PLUSH);
 		Registry.register(Registries.BLOCK, parrotmarrowPlushId, PARROTMARROW_PLUSH);
 		Registry.register(Registries.BLOCK, evieeveeePlushId, EVIEEVEEE_PLUSH);
+		Registry.register(Registries.BLOCK, eth4n1PlushId, ETH4N1_PLUSH);
+		Registry.register(Registries.BLOCK, domekiqnPlushId, DOMEKIQN_PLUSH);
+		Registry.register(Registries.BLOCK, seafoxPlushId, SEAFOX_PLUSH);
+		Registry.register(Registries.BLOCK, reddishacornPlushId, REDDISHACORN_PLUSH);
 		Registry.register(Registries.BLOCK, astronomikyuPlushId, ASTRONOMIKYU_PLUSH);
+		Registry.register(Registries.BLOCK, liv54PlushId, LIV_54_PLUSH);
 		Registry.register(Registries.BLOCK, fakeSuspiciousSandId, FAKE_SUSPICIOUS_SAND);
 		Registry.register(Registries.BLOCK, fakeSuspiciousGravelId, FAKE_SUSPICIOUS_GRAVEL);
 		Registry.register(Registries.BLOCK, pebbleBlockId, PEBBLE_BLOCK);
+		Registry.register(Registries.BLOCK, ratTrapId, RAT_TRAP);
 		Registry.register(Registries.BLOCK, coinBarrierId, COIN_BARRIER);
 		Registry.register(Registries.BLOCK, floatingTextId, FLOATING_TEXT);
+		Registry.register(Registries.BLOCK, leaderboardId, LEADERBOARD);
+		Registry.register(Registries.BLOCK, Identifier.of(MapSelect.MOD_ID, "settings_panel"), SETTINGS_PANEL);
+		Registry.register(Registries.BLOCK, keycardReaderId, KEYCARD_READER);
+		Registry.register(Registries.BLOCK, largeWoodDoorId, LARGE_WOOD_DOOR);
 		Registry.register(Registries.BLOCK, olivePlanksId, OLIVE_PLANKS);
 		Registry.register(Registries.BLOCK, olivePlanksStairsId, OLIVE_PLANKS_STAIRS);
 		Registry.register(Registries.BLOCK, olivePlanksSlabId, OLIVE_PLANKS_SLAB);
@@ -564,12 +674,22 @@ public final class MapSelectBlocks {
 		Registry.register(Registries.ITEM, jemseaPlushId, JEMSEA_PLUSH_ITEM);
 		Registry.register(Registries.ITEM, parrotmarrowPlushId, PARROTMARROW_PLUSH_ITEM);
 		Registry.register(Registries.ITEM, evieeveeePlushId, EVIEEVEEE_PLUSH_ITEM);
+		Registry.register(Registries.ITEM, eth4n1PlushId, ETH4N1_PLUSH_ITEM);
+		Registry.register(Registries.ITEM, domekiqnPlushId, DOMEKIQN_PLUSH_ITEM);
+		Registry.register(Registries.ITEM, seafoxPlushId, SEAFOX_PLUSH_ITEM);
+		Registry.register(Registries.ITEM, reddishacornPlushId, REDDISHACORN_PLUSH_ITEM);
 		Registry.register(Registries.ITEM, astronomikyuPlushId, ASTRONOMIKYU_PLUSH_ITEM);
+		Registry.register(Registries.ITEM, liv54PlushId, LIV_54_PLUSH_ITEM);
 		Registry.register(Registries.ITEM, fakeSuspiciousSandId, FAKE_SUSPICIOUS_SAND_ITEM);
 		Registry.register(Registries.ITEM, fakeSuspiciousGravelId, FAKE_SUSPICIOUS_GRAVEL_ITEM);
 		Registry.register(Registries.ITEM, pebbleBlockId, PEBBLE_BLOCK_ITEM);
+		Registry.register(Registries.ITEM, ratTrapId, RAT_TRAP_ITEM);
 		Registry.register(Registries.ITEM, coinBarrierId, COIN_BARRIER_ITEM);
 		Registry.register(Registries.ITEM, floatingTextId, FLOATING_TEXT_ITEM);
+		Registry.register(Registries.ITEM, leaderboardId, LEADERBOARD_ITEM);
+		Registry.register(Registries.ITEM, Identifier.of(MapSelect.MOD_ID, "settings_panel"), SETTINGS_PANEL_ITEM);
+		Registry.register(Registries.ITEM, keycardReaderId, KEYCARD_READER_ITEM);
+		Registry.register(Registries.ITEM, largeWoodDoorId, LARGE_WOOD_DOOR_ITEM);
 		Registry.register(Registries.ITEM, olivePlanksId, OLIVE_PLANKS_ITEM);
 		Registry.register(Registries.ITEM, olivePlanksStairsId, OLIVE_PLANKS_STAIRS_ITEM);
 		Registry.register(Registries.ITEM, olivePlanksSlabId, OLIVE_PLANKS_SLAB_ITEM);

@@ -2,13 +2,13 @@ package dev.mapselect.task;
 
 import dev.mapselect.preset.map.MapPreset;
 import dev.mapselect.preset.map.PresetStorage;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.game.FreshAirAmbienceStatePayload;
 import dev.mapselect.weather.MapWeatherComponent;
 import dev.doctor4t.wathe.cca.MapVariablesWorldComponent;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class FreshAirAreaManager {
@@ -30,15 +29,13 @@ public final class FreshAirAreaManager {
 	public static final String TAG = "gexpress_fresh_air_area";
 	public static final String AMBIENCE_TAG = "gexpress_fresh_air_ambience";
 	private static final Map<RegistryKey<World>, CachedArea> CACHE = new ConcurrentHashMap<>();
-	private static final Map<UUID, Boolean> LAST_AMBIENCE_BY_PLAYER = new ConcurrentHashMap<>();
 	private static volatile boolean clientLocalFreshAirAmbience;
-	private static int tickDelay;
+	private static final Map<RegistryKey<World>, Integer> TICK_DELAYS = new ConcurrentHashMap<>();
 
 	public static void register() {
 		PayloadTypeRegistry.playS2C().register(FreshAirAmbienceStatePayload.ID, FreshAirAmbienceStatePayload.CODEC);
 		ServerTickEvents.END_WORLD_TICK.register(FreshAirAreaManager::tick);
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
-			LAST_AMBIENCE_BY_PLAYER.remove(handler.player.getUuid()));
+		RoundLifecycleHooks.clearWorld(FreshAirAreaManager::clearRoundState);
 	}
 
 	public static boolean countsAsFreshAir(Entity entity) {
@@ -82,8 +79,11 @@ public final class FreshAirAreaManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
-		if (tickDelay++ % 5 != 0) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
+		RegistryKey<World> worldKey = world.getRegistryKey();
+		int tickDelay = TICK_DELAYS.getOrDefault(worldKey, 0);
+		TICK_DELAYS.put(worldKey, (tickDelay + 1) % 5);
+		if (tickDelay != 0) return;
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			FreshAirArea area = matchingArea(player);
 			if (area != null) {
@@ -108,11 +108,8 @@ public final class FreshAirAreaManager {
 	}
 
 	private static void syncAmbience(ServerPlayerEntity player, boolean playOutsideAmbience) {
-		if (player == null || !ServerPlayNetworking.canSend(player, FreshAirAmbienceStatePayload.ID)) return;
-		Boolean previous = LAST_AMBIENCE_BY_PLAYER.get(player.getUuid());
-		if (previous != null && previous == playOutsideAmbience) return;
-		LAST_AMBIENCE_BY_PLAYER.put(player.getUuid(), playOutsideAmbience);
-		ServerPlayNetworking.send(player, new FreshAirAmbienceStatePayload(playOutsideAmbience));
+		PayloadSync.sendIfChanged(player, FreshAirAmbienceStatePayload.ID,
+			new FreshAirAmbienceStatePayload(playOutsideAmbience));
 	}
 
 	private static FreshAirArea matchingArea(Entity entity) {
@@ -174,6 +171,17 @@ public final class FreshAirAreaManager {
 
 	public static void clearCache(ServerWorld world) {
 		if (world != null) CACHE.remove(world.getRegistryKey());
+	}
+
+	private static void clearRoundState(World world) {
+		if (world == null) {
+			CACHE.clear();
+			TICK_DELAYS.clear();
+		} else {
+			CACHE.remove(world.getRegistryKey());
+			TICK_DELAYS.remove(world.getRegistryKey());
+		}
+		PayloadSync.forgetAll(FreshAirAmbienceStatePayload.ID);
 	}
 
 	private static CachedArea loadArea(ServerWorld world, String mapName) {

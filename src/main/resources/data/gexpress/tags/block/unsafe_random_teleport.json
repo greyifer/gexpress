@@ -1,0 +1,27 @@
+{
+  "replace": false,
+  "values": [
+    "gexpress:gold_ledge",
+    "gexpress:anthracite_ledge",
+    "gexpress:khaki_ledge",
+    "gexpress:maroon_ledge",
+    "gexpress:muntz_ledge",
+    "gexpress:navy_ledge",
+    "wathe:gold_ledge",
+    "minecraft:fire",
+    "minecraft:soul_fire",
+    "minecraft:cactus",
+    "minecraft:magma_block",
+    "minecraft:campfire",
+    "minecraft:soul_campfire",
+    "minecraft:sweet_berry_bush",
+    "minecraft:wither_rose",
+    "minecraft:powder_snow",
+    "minecraft:pointed_dripstone",
+    "minecraft:cobweb",
+    "minecraft:lava_cauldron",
+    "minecraft:nether_portal",
+    "minecraft:end_portal",
+    "minecraft:end_gateway"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"bonus_rolls": 0.0,
+			"conditions": [
+				{ "condition": "minecraft:survives_explosion" },
+				{
+					"condition": "minecraft:block_state_property",
+					"block": "gexpress:large_wood_door",
+					"properties": { "part": "lower" }
+				}
+			],
+			"entries": [
+				{ "type": "minecraft:item", "name": "gexpress:large_wood_door" }
+			],
+			"rolls": 1.0
+		}
+	]
+}

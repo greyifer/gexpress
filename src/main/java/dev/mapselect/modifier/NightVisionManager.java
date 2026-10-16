@@ -24,7 +24,7 @@ public final class NightVisionManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean activeGame = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;

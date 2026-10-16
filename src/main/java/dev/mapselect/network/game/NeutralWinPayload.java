@@ -8,7 +8,7 @@ import net.minecraft.util.Identifier;
 
 import java.util.UUID;
 
-public record NeutralWinPayload(UUID winnerId, String translationKey, int color) implements CustomPayload {
+public record NeutralWinPayload(UUID winnerId, String translationKey, int color, String winnerName) implements CustomPayload {
 	public static final CustomPayload.Id<NeutralWinPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "neutral_win"));
 
@@ -17,8 +17,9 @@ public record NeutralWinPayload(UUID winnerId, String translationKey, int color)
 			buf.writeUuid(payload.winnerId());
 			buf.writeString(payload.translationKey());
 			buf.writeInt(payload.color());
+			buf.writeString(payload.winnerName(), 64);
 		},
-		buf -> new NeutralWinPayload(buf.readUuid(), buf.readString(128), buf.readInt())
+		buf -> new NeutralWinPayload(buf.readUuid(), buf.readString(128), buf.readInt(), buf.readString(64))
 	);
 
 	@Override

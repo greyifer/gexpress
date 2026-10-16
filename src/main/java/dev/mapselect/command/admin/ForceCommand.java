@@ -10,6 +10,7 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.WatheRoles;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.MapSelect;
+import dev.mapselect.command.CommandPlayerFormat;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
@@ -32,6 +33,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class ForceCommand {
 	private static final DynamicCommandExceptionType UNKNOWN_ROLE = new DynamicCommandExceptionType(
@@ -47,18 +49,40 @@ public final class ForceCommand {
 
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
 		return CommandManager.literal("force")
-			.requires(GexpressPermissions::canUseAdminCommands)
+			.requires(ForceCommand::canUseForceBranch)
 			.then(roleBranch())
 			.then(modifierBranch());
 	}
 
+	private static boolean canUseForceBranch(ServerCommandSource source) {
+		return GexpressPermissions.canUseAdminCommands(source)
+			|| GexpressPermissions.canUseCommandBranch(source, "admin", "force");
+	}
+
+	private static boolean canUseForceCommand(ServerCommandSource source, String... subcommand) {
+		String[] path = new String[(subcommand == null ? 0 : subcommand.length) + 2];
+		path[0] = "admin";
+		path[1] = "force";
+		if (subcommand != null) System.arraycopy(subcommand, 0, path, 2, subcommand.length);
+		return GexpressPermissions.canUseAdminCommands(source)
+			|| GexpressPermissions.canUseCommandPath(source, path);
+	}
+
 	private static LiteralArgumentBuilder<ServerCommandSource> roleBranch() {
 		return CommandManager.literal("role")
+			.requires(source -> canUseForceCommand(source, "role"))
 			.then(CommandManager.literal("clear")
+				.requires(source -> canUseForceCommand(source, "role", "clear"))
 				.executes(ctx -> runClearRole(ctx, self(ctx)))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.executes(ctx -> runClearRole(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
+			.then(CommandManager.literal("reroll")
+				.requires(source -> canUseForceCommand(source, "role", "reroll"))
+				.executes(ctx -> runRerollRole(ctx, self(ctx)))
+				.then(CommandManager.argument("players", EntityArgumentType.players())
+					.executes(ctx -> runRerollRole(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
 			.then(CommandManager.argument("role", StringArgumentType.string())
+				.requires(source -> canUseForceCommand(source, "role", "set"))
 				.suggests(suggestRoles())
 				.executes(ctx -> runSetRole(ctx, getRole(ctx, "role"), self(ctx)))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
@@ -68,34 +92,33 @@ public final class ForceCommand {
 
 	private static LiteralArgumentBuilder<ServerCommandSource> modifierBranch() {
 		return CommandManager.literal("modifier")
+			.requires(source -> canUseForceCommand(source, "modifier"))
 			.then(CommandManager.literal("add")
+				.requires(source -> canUseForceCommand(source, "modifier", "add"))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.then(CommandManager.argument("modifier", StringArgumentType.string())
 						.suggests(suggestModifiers())
 						.executes(ctx -> runAddModifier(ctx, getModifier(ctx, "modifier"),
 							EntityArgumentType.getPlayers(ctx, "players")))))
-				.then(CommandManager.argument("modifier", StringArgumentType.string())
-					.suggests(suggestModifiers())
-					.executes(ctx -> runAddModifier(ctx, getModifier(ctx, "modifier"), self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runAddModifier(ctx, getModifier(ctx, "modifier"),
-							EntityArgumentType.getPlayers(ctx, "players"))))))
+				)
 			.then(CommandManager.literal("remove")
+				.requires(source -> canUseForceCommand(source, "modifier", "remove"))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.then(CommandManager.argument("modifier", StringArgumentType.string())
 						.suggests(suggestModifiers())
 						.executes(ctx -> runRemoveModifier(ctx, getModifier(ctx, "modifier"),
 							EntityArgumentType.getPlayers(ctx, "players")))))
-				.then(CommandManager.argument("modifier", StringArgumentType.string())
-					.suggests(suggestModifiers())
-					.executes(ctx -> runRemoveModifier(ctx, getModifier(ctx, "modifier"), self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runRemoveModifier(ctx, getModifier(ctx, "modifier"),
-							EntityArgumentType.getPlayers(ctx, "players"))))))
+				)
 			.then(CommandManager.literal("clear")
+				.requires(source -> canUseForceCommand(source, "modifier", "clear"))
 				.executes(ctx -> runClearModifiers(ctx, self(ctx)))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
-					.executes(ctx -> runClearModifiers(ctx, EntityArgumentType.getPlayers(ctx, "players")))));
+					.executes(ctx -> runClearModifiers(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
+			.then(CommandManager.literal("reroll")
+				.requires(source -> canUseForceCommand(source, "modifier", "reroll"))
+				.executes(ctx -> runRerollModifier(ctx, self(ctx)))
+				.then(CommandManager.argument("players", EntityArgumentType.players())
+					.executes(ctx -> runRerollModifier(ctx, EntityArgumentType.getPlayers(ctx, "players")))));
 	}
 
 	private static Collection<ServerPlayerEntity> self(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
@@ -200,7 +223,7 @@ public final class ForceCommand {
 		}
 		game.sync();
 
-		src.sendFeedback(() -> Text.literal((running ? "Forced live role " : "Queued forced role ")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal((running ? "Forced live role " : "Queued forced role ")
 				+ id(role) + " on " + playerList(players) + ".")
 			.formatted(Formatting.GREEN), true);
 		return players.size();
@@ -225,8 +248,39 @@ public final class ForceCommand {
 		}
 		game.sync();
 
-		src.sendFeedback(() -> Text.literal("Cleared forced role for " + playerList(players) + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared forced role for " + playerList(players) + ".")
 			.formatted(Formatting.YELLOW), true);
+		return players.size();
+	}
+
+	private static int runRerollRole(CommandContext<ServerCommandSource> ctx,
+			Collection<ServerPlayerEntity> players) {
+		ServerCommandSource src = ctx.getSource();
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(src.getWorld());
+		if (game == null) {
+			src.sendError(Text.literal("WATHE game component is not available in this world."));
+			return 0;
+		}
+		List<Role> roles = availableRoles();
+		if (roles.isEmpty()) {
+			src.sendError(Text.literal("No roles are registered."));
+			return 0;
+		}
+		boolean running = game.isRunning();
+		for (ServerPlayerEntity player : players) {
+			Role role = roles.get(ThreadLocalRandom.current().nextInt(roles.size()));
+			rememberForcedRole(player, role);
+			if (running) {
+				assignRole(game, player, role);
+				player.sendMessage(Text.literal("Rerolled role: " + id(role)).formatted(Formatting.GREEN), false);
+			} else {
+				game.addRole(player, role);
+			}
+		}
+		game.sync();
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal((running ? "Rerolled live roles for " : "Queued rerolled roles for ")
+				+ CommandPlayerFormat.names(players) + ".")
+			.formatted(Formatting.GREEN), true);
 		return players.size();
 	}
 
@@ -278,7 +332,7 @@ public final class ForceCommand {
 		mods.sync();
 
 		int count = changed;
-		src.sendFeedback(() -> Text.literal((running ? "Forced live modifier " : "Queued forced modifier ")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal((running ? "Forced live modifier " : "Queued forced modifier ")
 				+ id(modifier) + " on "
 				+ count + " player(s): " + playerList(players) + ".")
 			.formatted(count > 0 ? Formatting.GREEN : Formatting.GRAY), true);
@@ -367,7 +421,7 @@ public final class ForceCommand {
 		mods.sync();
 
 		int count = changed;
-		src.sendFeedback(() -> Text.literal("Removed forced modifier " + id(modifier) + " from "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Removed forced modifier " + id(modifier) + " from "
 				+ count + " player(s): " + playerList(players) + ".")
 			.formatted(count > 0 ? Formatting.YELLOW : Formatting.GRAY), true);
 		return changed;
@@ -400,9 +454,48 @@ public final class ForceCommand {
 		mods.sync();
 
 		int count = changed;
-		src.sendFeedback(() -> Text.literal("Cleared forced modifiers from "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared forced modifiers from "
 				+ count + " player(s): " + playerList(players) + ".")
 			.formatted(count > 0 ? Formatting.YELLOW : Formatting.GRAY), true);
+		return changed;
+	}
+
+	private static int runRerollModifier(CommandContext<ServerCommandSource> ctx,
+			Collection<ServerPlayerEntity> players) {
+		ServerCommandSource src = ctx.getSource();
+		WorldModifierComponent mods = WorldModifierComponent.KEY.getNullable(src.getWorld());
+		if (mods == null) {
+			src.sendError(Text.literal("HML modifier component is not available in this world."));
+			return 0;
+		}
+		List<Modifier> modifiers = availableModifiers();
+		if (modifiers.isEmpty()) {
+			src.sendError(Text.literal("No modifiers are registered."));
+			return 0;
+		}
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(src.getWorld());
+		boolean running = game != null && game.isRunning();
+		int changed = 0;
+		for (ServerPlayerEntity player : players) {
+			ArrayList<Modifier> current = safeModifiers(mods, player);
+			List<Modifier> removed = new ArrayList<>(current);
+			current.clear();
+			for (Modifier removedModifier : removed) safeRemoveModifier(player, removedModifier);
+			forgetForcedModifiers(player);
+
+			Modifier modifier = modifiers.get(ThreadLocalRandom.current().nextInt(modifiers.size()));
+			if (!running) {
+				rememberForcedModifier(player, modifier);
+				changed++;
+			} else {
+				changed += addModifier(mods, player, modifier);
+			}
+		}
+		mods.sync();
+		int count = changed;
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal((running ? "Rerolled live modifiers for " : "Queued rerolled modifiers for ")
+				+ CommandPlayerFormat.names(players) + " (" + count + " change(s)).")
+			.formatted(count > 0 ? Formatting.GREEN : Formatting.GRAY), true);
 		return changed;
 	}
 
@@ -466,11 +559,20 @@ public final class ForceCommand {
 		return modifier == null ? "(none)" : modifier.identifier().toString();
 	}
 
+	private static List<Role> availableRoles() {
+		Harpymodloader.refreshRoles();
+		return WatheRoles.ROLES.stream()
+			.filter(role -> role != null && role.identifier() != null)
+			.toList();
+	}
+
+	private static List<Modifier> availableModifiers() {
+		return HMLModifiers.MODIFIERS.stream()
+			.filter(modifier -> modifier != null && modifier.identifier() != null)
+			.toList();
+	}
+
 	private static String playerList(Collection<ServerPlayerEntity> players) {
-		List<String> names = new ArrayList<>();
-		for (ServerPlayerEntity player : players) {
-			names.add(player.getName().getString());
-		}
-		return String.join(", ", names);
+		return CommandPlayerFormat.names(players);
 	}
 }

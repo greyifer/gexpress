@@ -14,6 +14,10 @@ import java.util.List;
 
 @Mixin(value = GameRoundEndComponent.class, remap = false)
 public abstract class GameRoundEndMafiaCategoryMixin {
+	@org.spongepowered.asm.mixin.injection.ModifyVariable(method = "setRoundEndData", at = @At("HEAD"), argsOnly = true, remap = false)
+	private List<ServerPlayerEntity> gexpress$omitTwinActors(List<ServerPlayerEntity> players) {
+		return players.stream().filter(player -> !(player instanceof dev.mapselect.entity.TwinFakePlayerEntity)).toList();
+	}
 	@Shadow
 	private World world;
 

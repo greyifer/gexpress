@@ -2,7 +2,6 @@ package dev.mapselect.role.copycat;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.WatheRoles;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
@@ -10,6 +9,8 @@ import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.copycat.CopycatActionPayload;
@@ -21,6 +22,7 @@ import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -70,10 +72,9 @@ public final class CopycatManager {
 					case CANCEL_ACTIVE -> cancelActive(context.player());
 					case STORE -> tryStore(context.player());
 				}
-			}));
+		}));
 		ServerTickEvents.END_WORLD_TICK.register(CopycatManager::tick);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearAll());
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearAll());
+		RoundLifecycleHooks.clear(CopycatManager::clearAll);
 	}
 
 	private static void tryStore(ServerPlayerEntity copycat) {
@@ -105,7 +106,9 @@ public final class CopycatManager {
 		if (requestedTargetId != null && !isValidStoreTarget(copycat, target, testing)) target = null;
 		if (target == null) {
 			copycat.sendMessage(Text.literal(requestedTargetId == null
-				? "No ability close enough to copy."
+				? AbilityTargeting.lookTargetFailure(copycat, world.getPlayers(),
+					GexpressConfig.getCopycatCopyRange(), 0.0D, true,
+					candidate -> isValidStoreTarget(copycat, candidate, testing), "copy")
 				: "That ability is not available to copy.").formatted(Formatting.GRAY), true);
 			return;
 		}
@@ -119,6 +122,7 @@ public final class CopycatManager {
 			copycat.sendMessage(Text.literal("You already copied that ability this round.").formatted(Formatting.GRAY), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(copycat, target)) return;
 		used.add(targetRole.identifier());
 		stored.add(new StoredAbility(targetRole.identifier(), target.getUuid(), target.getGameProfile().getName()));
 		selectedCopies.put(copycat.getUuid(), stored.size() - 1);
@@ -192,7 +196,7 @@ public final class CopycatManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD || activeCopies.isEmpty()) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world) || activeCopies.isEmpty()) return;
 		long now = world.getTime();
 		for (UUID playerId : Set.copyOf(activeCopies.keySet())) {
 			ActiveCopy copy = activeCopies.get(playerId);
@@ -275,7 +279,10 @@ public final class CopycatManager {
 
 	private static boolean canCopyRole(Identifier roleId) {
 		if (roleId == null) return false;
-		if (MapSelectRoles.COPYCAT_ID.equals(roleId)) return false;
+		if (MapSelectRoles.COPYCAT_ID.equals(roleId)
+				|| MapSelectRoles.LOKI_ID.equals(roleId)
+				|| MapSelectRoles.RAT_ID.equals(roleId)
+				|| MapSelectRoles.DOOMSAYER_ID.equals(roleId)) return false;
 		if (MapSelectRoles.GODFATHER_ID.equals(roleId) || MapSelectRoles.MAFIOSO_ID.equals(roleId)
 				|| MapSelectRoles.JANITOR_ID.equals(roleId) || MapSelectRoles.PICKPOCKET_ID.equals(roleId)
 				|| MapSelectRoles.BURGLAR_ID.equals(roleId)) {
@@ -306,11 +313,11 @@ public final class CopycatManager {
 	}
 
 	private static void syncState(ServerPlayerEntity player, Identifier roleId, long remainingTicks) {
-		if (player != null && ServerPlayNetworking.canSend(player, CopycatStatePayload.ID)) {
-			List<StoredAbility> stored = storedCopies.getOrDefault(player.getUuid(), List.of());
-			int selected = selectedCopies.getOrDefault(player.getUuid(), 0);
-			ServerPlayNetworking.send(player, new CopycatStatePayload(roleId != null, roleId, remainingTicks, stored, selected));
-		}
+		if (player == null) return;
+		List<StoredAbility> stored = storedCopies.getOrDefault(player.getUuid(), List.of());
+		int selected = selectedCopies.getOrDefault(player.getUuid(), 0);
+		PayloadSync.sendIfChanged(player, CopycatStatePayload.ID,
+			new CopycatStatePayload(roleId != null, roleId, remainingTicks, stored, selected));
 	}
 
 	private static void consumeStoredAbility(UUID playerId, int index) {
@@ -423,6 +430,7 @@ public final class CopycatManager {
 		storedCopies.clear();
 		selectedCopies.clear();
 		copiedRoles.clear();
+		PayloadSync.forgetAll(CopycatStatePayload.ID);
 	}
 
 	private static int clampIndex(int index, int size) {

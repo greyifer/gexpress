@@ -10,6 +10,9 @@ import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 
 public final class SpectatorMovementGuard {
+	private static final int CHECK_INTERVAL_TICKS = 5;
+	private static int ticksUntilNextCheck;
+
 	private SpectatorMovementGuard() {}
 
 	public static void register() {
@@ -17,7 +20,12 @@ public final class SpectatorMovementGuard {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
+		if (ticksUntilNextCheck > 0) {
+			ticksUntilNextCheck--;
+			return;
+		}
+		ticksUntilNextCheck = CHECK_INTERVAL_TICKS - 1;
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			if (player.interactionManager.getGameMode() != GameMode.SPECTATOR) continue;
 			if (PelicanManager.isStashed(player) || PuppetmasterManager.isControlled(player)

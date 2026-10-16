@@ -109,9 +109,6 @@ public final class ClientCupidState {
 		int x = Math.max(PANEL_MARGIN, context.getScaledWindowWidth() - PANEL_MARGIN - panelWidth);
 		int bottom = Math.max(44, context.getScaledWindowHeight() - PANEL_BOTTOM_OFFSET);
 		int y = Math.max(PANEL_MARGIN, bottom - panelHeight);
-		context.fill(x, y, x + panelWidth, y + panelHeight, 0xA8120B12);
-		context.fill(x, y, x + 2, y + panelHeight, 0xFFFF8FC1);
-		context.fill(x, y, x + panelWidth, y + 1, 0x70FFD1E4);
 		context.drawTextWithShadow(client.textRenderer, Text.literal(title), x + 8, y + 6, 0xFFFFA6D0);
 		int lineY = y + 18;
 		for (String line : lines) {

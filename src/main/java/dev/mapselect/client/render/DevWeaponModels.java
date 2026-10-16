@@ -28,7 +28,6 @@ import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 
 import java.util.UUID;
-import java.util.Arrays;
 
 public final class DevWeaponModels implements ModelLoadingPlugin {
 	public static final Identifier DEV_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_dev");
@@ -46,6 +45,11 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 	public static final Identifier PLAID_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_plaid");
 	public static final Identifier BAMBOO_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_bamboo");
 	public static final Identifier ATOMIZER_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_atomizer");
+	public static final Identifier SHOTGUN_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shotgun");
+	public static final Identifier SHOTGUN_BRONZE_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shotgun_bronze");
+	public static final Identifier SHOTGUN_CREEPER_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shotgun_creeper");
+	public static final Identifier SHOTGUN_PURPLE_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shotgun_purple");
+	public static final Identifier SILENCER_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_silencer");
 	public static final Identifier SHADOW_KNIFE_MODEL = Identifier.of(MapSelect.MOD_ID, "item/knife_shadow");
 	public static final Identifier SHADOW_REVOLVER_MODEL = Identifier.of(MapSelect.MOD_ID, "item/revolver_shadow");
 	private static final Identifier NOELLES_FAKE_KNIFE = Identifier.of("noellesroles", "fake_knife");
@@ -57,13 +61,9 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 			TRUSTED_KNIFE_MODEL, TRUSTED_REVOLVER_MODEL, PASSENGER_REVOLVER_MODEL, COLA_REVOLVER_MODEL,
 			GOLD_REVOLVER_MODEL, JEM_REVOLVER_MODEL, BLUE_REVOLVER_MODEL, PINK_REVOLVER_MODEL,
 			PLAID_REVOLVER_MODEL, BAMBOO_REVOLVER_MODEL, ATOMIZER_REVOLVER_MODEL,
+			SHOTGUN_REVOLVER_MODEL, SHOTGUN_BRONZE_REVOLVER_MODEL, SHOTGUN_CREEPER_REVOLVER_MODEL,
+			SHOTGUN_PURPLE_REVOLVER_MODEL, SILENCER_REVOLVER_MODEL,
 			SHADOW_KNIFE_MODEL, SHADOW_REVOLVER_MODEL);
-		Identifier[] imported = Arrays.stream(WeaponSkin.values())
-			.flatMap(skin -> Arrays.stream(WeaponSkinType.values()).map(skin::model))
-			.filter(java.util.Objects::nonNull)
-			.distinct()
-			.toArray(Identifier[]::new);
-		if (imported.length > 0) pluginContext.addModels(imported);
 	}
 
 	public static BakedModel resolve(BakedModelManager manager, ItemStack stack, LivingEntity entity) {
@@ -83,10 +83,6 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 			: isGunLike(stack) ? WeaponSkinType.GUN : null;
 		WeaponSkin skin = resolveSkin(stack, entity);
 		if (skin == null || !skin.supports(type)) return null;
-		Identifier importedModel = skin.model(type);
-		if (importedModel != null) {
-			return type != WeaponSkinType.GUN || GexpressConfig.use3dGunSkins() ? importedModel : null;
-		}
 		if (isKnifeLike(stack)) {
 			if (skin == WeaponSkin.DEFAULT) return null;
 			if (skin == WeaponSkin.DEV) return DEV_KNIFE_MODEL;
@@ -111,14 +107,17 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 			if (skin == WeaponSkin.PLAID) return PLAID_REVOLVER_MODEL;
 			if (skin == WeaponSkin.BAMBOO) return BAMBOO_REVOLVER_MODEL;
 			if (skin == WeaponSkin.ATOMIZER) return ATOMIZER_REVOLVER_MODEL;
+			if (skin == WeaponSkin.SHOTGUN) return SHOTGUN_REVOLVER_MODEL;
+			if (skin == WeaponSkin.SHOTGUN_BRONZE) return SHOTGUN_BRONZE_REVOLVER_MODEL;
+			if (skin == WeaponSkin.SHOTGUN_CREEPER) return SHOTGUN_CREEPER_REVOLVER_MODEL;
+			if (skin == WeaponSkin.SHOTGUN_PURPLE) return SHOTGUN_PURPLE_REVOLVER_MODEL;
+			if (skin == WeaponSkin.SILENCER) return SILENCER_REVOLVER_MODEL;
 		}
 		return null;
 	}
 
 	public static Identifier skinModelId(WeaponSkin skin, WeaponSkinType type) {
 		if (skin == null || type == null || !skin.supports(type)) return null;
-		Identifier imported = skin.model(type);
-		if (imported != null) return imported;
 		if (type == WeaponSkinType.KNIFE) {
 			if (skin == WeaponSkin.DEV) return DEV_KNIFE_MODEL;
 			if (skin == WeaponSkin.TRUSTED) return TRUSTED_KNIFE_MODEL;
@@ -135,6 +134,11 @@ public final class DevWeaponModels implements ModelLoadingPlugin {
 		if (skin == WeaponSkin.PLAID) return PLAID_REVOLVER_MODEL;
 		if (skin == WeaponSkin.BAMBOO) return BAMBOO_REVOLVER_MODEL;
 		if (skin == WeaponSkin.ATOMIZER) return ATOMIZER_REVOLVER_MODEL;
+		if (skin == WeaponSkin.SHOTGUN) return SHOTGUN_REVOLVER_MODEL;
+		if (skin == WeaponSkin.SHOTGUN_BRONZE) return SHOTGUN_BRONZE_REVOLVER_MODEL;
+		if (skin == WeaponSkin.SHOTGUN_CREEPER) return SHOTGUN_CREEPER_REVOLVER_MODEL;
+		if (skin == WeaponSkin.SHOTGUN_PURPLE) return SHOTGUN_PURPLE_REVOLVER_MODEL;
+		if (skin == WeaponSkin.SILENCER) return SILENCER_REVOLVER_MODEL;
 		return null;
 	}
 

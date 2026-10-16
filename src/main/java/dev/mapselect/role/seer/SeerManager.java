@@ -2,11 +2,12 @@ package dev.mapselect.role.seer;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.seer.SeerDeathPayload;
@@ -16,6 +17,7 @@ import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.RoleTeams;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -48,8 +50,7 @@ public final class SeerManager {
 			(payload, context) -> context.server().execute(() -> tryCompare(context.player(), payload)));
 		AllowPlayerDeath.EVENT.register(SeerManager::allowDeath);
 		ServerLivingEntityEvents.AFTER_DEATH.register(SeerManager::afterDeath);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRoundState(world));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearRoundState(world));
+		RoundLifecycleHooks.clearWorld(SeerManager::clearRoundState);
 	}
 
 	public static void reduceCooldown(ServerPlayerEntity player, long ticks) {
@@ -74,16 +75,23 @@ public final class SeerManager {
 			return;
 		}
 
-		ServerPlayerEntity target = requestedTarget(seer, world, payload == null ? null : payload.targetId());
-		if (target == null && (payload == null || payload.targetId() == null)) {
+		UUID requestedTargetId = payload == null ? null : payload.targetId();
+		ServerPlayerEntity target = requestedTarget(seer, world, requestedTargetId);
+		if (target == null && requestedTargetId == null) {
 			target = AbilityTargeting.findLookTarget(seer, world.getPlayers(),
 				GexpressConfig.getSeerCompareRange(), 0.25D, true, candidate ->
 					candidate != seer && !PelicanManager.isStashed(candidate) && isPlayable(candidate));
 		}
 		if (target == null) {
-			seer.sendMessage(Text.literal("No living player close enough to read.").formatted(Formatting.RED), true);
+			String message = requestedTargetId == null
+				? AbilityTargeting.lookTargetFailure(seer, world.getPlayers(),
+					GexpressConfig.getSeerCompareRange(), 0.25D, true, candidate ->
+						candidate != seer && !PelicanManager.isStashed(candidate) && isPlayable(candidate), "read")
+				: "Selected player is no longer readable.";
+			seer.sendMessage(Text.literal(message).formatted(Formatting.RED), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(seer, target)) return;
 
 		UUID firstId = FIRST_TARGETS.get(seer.getUuid());
 		if (firstId == null) {
@@ -126,8 +134,8 @@ public final class SeerManager {
 	}
 
 	private static void sendSelection(ServerPlayerEntity seer, ServerPlayerEntity target) {
-		if (seer == null || !ServerPlayNetworking.canSend(seer, SeerSelectionPayload.ID)) return;
-		ServerPlayNetworking.send(seer, target == null ? SeerSelectionPayload.clear()
+		if (seer == null) return;
+		PayloadSync.sendIfChanged(seer, SeerSelectionPayload.ID, target == null ? SeerSelectionPayload.clear()
 			: new SeerSelectionPayload(true, target.getUuid(), target.getName().getString()));
 	}
 
@@ -142,7 +150,7 @@ public final class SeerManager {
 	}
 
 	private static void notifySeers(ServerPlayerEntity deadPlayer) {
-		if (!(deadPlayer.getWorld() instanceof ServerWorld world) || world.getRegistryKey() != World.OVERWORLD) return;
+		if (!(deadPlayer.getWorld() instanceof ServerWorld world) || !dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		long now = world.getTime();
 		Long last = RECENT_DEATH_FLASHES.put(deadPlayer.getUuid(), now);
 		if (last != null && now - last <= 5L) return;
@@ -183,6 +191,7 @@ public final class SeerManager {
 		FIRST_TARGETS.clear();
 		DEATH_CHARGES.clear();
 		RECENT_DEATH_FLASHES.clear();
+		PayloadSync.forgetAll(SeerSelectionPayload.ID);
 		if (!(world instanceof ServerWorld serverWorld)) return;
 		for (ServerPlayerEntity player : serverWorld.getPlayers()) {
 			sendSelection(player, null);

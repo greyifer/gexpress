@@ -2,6 +2,7 @@ package dev.mapselect.role.warlock;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.role.AbilityCooldowns;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -60,14 +61,16 @@ public class WarlockComponent implements AutoSyncedComponent {
 	public boolean assignMark(UUID warlock, UUID target) {
 		if (warlock == null || target == null || warlock.equals(target)) return false;
 		warlockToMark.put(warlock, target);
-		markCooldownUntil.put(warlock, world.getTime() + (long) GexpressConfig.getWarlockMarkCooldownSeconds() * 20L);
+		AbilityCooldowns.start(markCooldownUntil, warlock, world.getTime(),
+			(long) GexpressConfig.getWarlockMarkCooldownSeconds() * 20L);
 		KEY.sync(world);
 		return true;
 	}
 
 	public void setKillCooldown(UUID warlock) {
 		if (warlock == null) return;
-		killCooldownUntil.put(warlock, world.getTime() + (long) GexpressConfig.getWarlockKillCooldownSeconds() * 20L);
+		AbilityCooldowns.start(killCooldownUntil, warlock, world.getTime(),
+			(long) GexpressConfig.getWarlockKillCooldownSeconds() * 20L);
 		KEY.sync(world);
 	}
 
@@ -129,25 +132,14 @@ public class WarlockComponent implements AutoSyncedComponent {
 	}
 
 	private long cooldownRemainingTicks(Map<UUID, Long> cooldowns, UUID warlock) {
-		if (warlock == null) return 0L;
-		Long until = cooldowns.get(warlock);
-		if (until == null) return 0L;
-		return Math.max(0L, until - world.getTime());
+		boolean hadCooldown = cooldowns != null && warlock != null && cooldowns.containsKey(warlock);
+		long remaining = AbilityCooldowns.remaining(cooldowns, warlock, world.getTime());
+		if (remaining <= 0L && hadCooldown) KEY.sync(world);
+		return remaining;
 	}
 
 	private long reduceCooldown(Map<UUID, Long> cooldowns, UUID warlock, long ticks) {
-		if (warlock == null || ticks <= 0L) return cooldownRemainingTicks(cooldowns, warlock);
-		Long until = cooldowns.get(warlock);
-		if (until == null) return 0L;
-		long remaining = until - world.getTime();
-		if (remaining <= 0L) {
-			cooldowns.remove(warlock);
-			KEY.sync(world);
-			return 0L;
-		}
-		long nextRemaining = Math.max(0L, remaining - ticks);
-		if (nextRemaining <= 0L) cooldowns.remove(warlock);
-		else cooldowns.put(warlock, world.getTime() + nextRemaining);
+		long nextRemaining = AbilityCooldowns.reduce(cooldowns, warlock, world.getTime(), ticks);
 		KEY.sync(world);
 		return nextRemaining;
 	}

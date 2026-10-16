@@ -1,0 +1,78 @@
+package dev.mapselect.mixin;
+
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import dev.doctor4t.wathe.util.KnifeStabPayload;
+import dev.mapselect.entity.TwinFakePlayerEntity;
+import dev.mapselect.role.twins.TwinsManager;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.util.Identifier;
+import org.spongepowered.asm.mixin.Dynamic;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+
+@Mixin(KnifeStabPayload.Receiver.class)
+public abstract class TwinsKnifeStabTargetMixin {
+	@WrapOperation(
+		method = "receive(Ldev/doctor4t/wathe/util/KnifeStabPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
+		at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerWorld;getEntityById(I)Lnet/minecraft/entity/Entity;")
+	)
+	private Entity gexpress$resolveTwinBodyOwner(ServerWorld world, int entityId,
+			Operation<Entity> original, KnifeStabPayload payload, ServerPlayNetworking.Context context) {
+		Entity entity = original.call(world, entityId);
+		if (entity instanceof TwinFakePlayerEntity body) {
+			PlayerEntity owner = TwinsManager.ownerFor(body);
+			if (owner != null) return owner;
+		}
+		return entity;
+	}
+
+	@WrapOperation(
+		method = "receive(Ldev/doctor4t/wathe/util/KnifeStabPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
+		at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;distanceTo(Lnet/minecraft/entity/Entity;)F")
+	)
+	private float gexpress$measureFromTwinBody(PlayerEntity target, Entity attacker,
+			Operation<Float> original, KnifeStabPayload payload, ServerPlayNetworking.Context context) {
+		Entity rawTarget = context.player().getServerWorld().getEntityById(payload.target());
+		return rawTarget instanceof TwinFakePlayerEntity body ? body.distanceTo(attacker) : original.call(target, attacker);
+	}
+
+	@Dynamic("Wathe uses intermediary Minecraft descriptors in its published bytecode")
+	@WrapOperation(
+		method = "receive(Ldev/doctor4t/wathe/util/KnifeStabPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
+		at = @At(
+			value = "INVOKE",
+			target = "Ldev/doctor4t/wathe/game/GameFunctions;killPlayer(Lnet/minecraft/class_1657;ZLnet/minecraft/class_1657;Lnet/minecraft/class_2960;)V",
+			remap = false
+		)
+	)
+	private void gexpress$killTwinBodyInsteadOfOwner(PlayerEntity victim, boolean dead,
+			PlayerEntity killer, Identifier reason, Operation<Void> original,
+			KnifeStabPayload payload, ServerPlayNetworking.Context context) {
+		Entity rawTarget = context.player().getServerWorld().getEntityById(payload.target());
+		if (rawTarget instanceof TwinFakePlayerEntity body && victim == TwinsManager.ownerFor(body)) {
+			TwinsManager.killBody(body, killer);
+			return;
+		}
+		original.call(victim, dead, killer, reason);
+	}
+
+	@WrapOperation(
+		method = "receive(Ldev/doctor4t/wathe/util/KnifeStabPayload;Lnet/fabricmc/fabric/api/networking/v1/ServerPlayNetworking$Context;)V",
+		at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;playSound(Lnet/minecraft/sound/SoundEvent;FF)V")
+	)
+	private void gexpress$playStabSoundAtTwinBody(PlayerEntity target, SoundEvent sound,
+			float volume, float pitch, Operation<Void> original,
+			KnifeStabPayload payload, ServerPlayNetworking.Context context) {
+		Entity rawTarget = context.player().getServerWorld().getEntityById(payload.target());
+		if (rawTarget instanceof TwinFakePlayerEntity body) {
+			body.playSound(sound, volume, pitch);
+			return;
+		}
+		original.call(target, sound, volume, pitch);
+	}
+}

@@ -12,6 +12,8 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -24,6 +26,8 @@ import java.util.stream.Stream;
 public class PresetStorage {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Pattern VALID_NAME = Pattern.compile("[A-Za-z0-9_\\-]{1,64}");
+	private static final Pattern BACKUP_ID = Pattern.compile("[0-9]{8}-[0-9]{6}(?:-[0-9]{1,3})?");
+	private static final DateTimeFormatter BACKUP_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
 	// Cache scoped to the current server instance. All writes update the cache;
 	// reads populate it on demand. Switching worlds drops the cache automatically.
@@ -49,6 +53,12 @@ public class PresetStorage {
 		return d;
 	}
 
+	public static Path backupDir(MinecraftServer server) throws IOException {
+		Path d = dir(server).resolve("backups").resolve("maps");
+		Files.createDirectories(d);
+		return d;
+	}
+
 	public static Path file(MinecraftServer server, String name) throws IOException {
 		if (!isValidName(name)) throw new IOException("Invalid preset name.");
 		return dir(server).resolve(name + ".json");
@@ -60,6 +70,7 @@ public class PresetStorage {
 		if (preset == null) throw new IOException("Preset is null.");
 		preset.normalize();
 		String json = GSON.toJson(preset);
+		backupExisting(server, f, name);
 		writeAtomically(f, json);
 		cachedJson.put(name, json);
 		cachedList = null;
@@ -86,7 +97,9 @@ public class PresetStorage {
 
 	public static boolean delete(MinecraftServer server, String name) throws IOException {
 		checkServer(server);
-		boolean deleted = Files.deleteIfExists(file(server, name));
+		Path f = file(server, name);
+		backupExisting(server, f, name);
+		boolean deleted = Files.deleteIfExists(f);
 		if (deleted) {
 			cachedJson.remove(name);
 			cachedList = null;
@@ -104,9 +117,83 @@ public class PresetStorage {
 		if (Files.exists(newFile)) {
 			throw new IOException("Preset '" + newName + "' already exists.");
 		}
+		backupExisting(server, oldFile, oldName);
 		Files.move(oldFile, newFile);
 		String carried = cachedJson.remove(oldName);
 		if (carried != null) cachedJson.put(newName, carried);
+		cachedList = null;
+	}
+
+	public static void duplicate(MinecraftServer server, String sourceName, String targetName) throws IOException {
+		checkServer(server);
+		if (!isValidName(sourceName) || !isValidName(targetName)) {
+			throw new IOException("Invalid preset name.");
+		}
+		if (sourceName.equals(targetName)) {
+			throw new IOException("Source and target preset names must be different.");
+		}
+		Path sourceFile = file(server, sourceName);
+		Path targetFile = file(server, targetName);
+		if (!Files.exists(sourceFile)) {
+			throw new IOException("Preset '" + sourceName + "' does not exist.");
+		}
+		if (Files.exists(targetFile)) {
+			throw new IOException("Preset '" + targetName + "' already exists.");
+		}
+		String json = Files.readString(sourceFile);
+		try {
+			MapPreset preset = GSON.fromJson(json, MapPreset.class);
+			if (preset == null) throw new JsonSyntaxException("Preset is null.");
+			preset.normalize();
+			json = GSON.toJson(preset);
+		} catch (JsonSyntaxException e) {
+			throw new IOException("Malformed preset JSON: " + e.getMessage(), e);
+		}
+		writeAtomically(targetFile, json);
+		cachedJson.put(targetName, json);
+		cachedList = null;
+	}
+
+	public static List<String> listBackups(MinecraftServer server, String name) throws IOException {
+		if (!isValidName(name)) throw new IOException("Invalid preset name.");
+		Path d = backupDir(server);
+		List<String> backups = new ArrayList<>();
+		String prefix = name + ".";
+		try (Stream<Path> stream = Files.list(d)) {
+			stream.filter(Files::isRegularFile)
+				.map(p -> p.getFileName().toString())
+				.filter(n -> n.startsWith(prefix) && n.endsWith(".json"))
+				.map(n -> n.substring(prefix.length(), n.length() - 5))
+				.filter(id -> BACKUP_ID.matcher(id).matches())
+				.sorted(Comparator.reverseOrder())
+				.forEach(backups::add);
+		}
+		return List.copyOf(backups);
+	}
+
+	public static void restoreBackup(MinecraftServer server, String name, String backupId) throws IOException {
+		checkServer(server);
+		if (!isValidName(name)) throw new IOException("Invalid preset name.");
+		if (backupId == null || !BACKUP_ID.matcher(backupId).matches()) {
+			throw new IOException("Invalid backup id.");
+		}
+		Path backup = backupDir(server).resolve(name + "." + backupId + ".json");
+		if (!Files.isRegularFile(backup)) {
+			throw new IOException("Backup '" + backupId + "' for preset '" + name + "' does not exist.");
+		}
+		String json = Files.readString(backup);
+		try {
+			MapPreset preset = GSON.fromJson(json, MapPreset.class);
+			if (preset == null) throw new JsonSyntaxException("Preset is null.");
+			preset.normalize();
+			json = GSON.toJson(preset);
+		} catch (JsonSyntaxException e) {
+			throw new IOException("Malformed backup JSON: " + e.getMessage(), e);
+		}
+		Path target = file(server, name);
+		backupExisting(server, target, name);
+		writeAtomically(target, json);
+		cachedJson.put(name, json);
 		cachedList = null;
 	}
 
@@ -148,6 +235,22 @@ public class PresetStorage {
 		} finally {
 			Files.deleteIfExists(tmp);
 		}
+	}
+
+	private static void backupExisting(MinecraftServer server, Path source, String name) throws IOException {
+		if (!Files.isRegularFile(source)) return;
+		Path backup = nextBackupPath(backupDir(server), name);
+		Files.copy(source, backup, StandardCopyOption.COPY_ATTRIBUTES);
+	}
+
+	private static Path nextBackupPath(Path backupDir, String name) throws IOException {
+		String timestamp = LocalDateTime.now().format(BACKUP_TIMESTAMP);
+		for (int attempt = 0; attempt < 1000; attempt++) {
+			String suffix = attempt == 0 ? "" : "-" + attempt;
+			Path candidate = backupDir.resolve(name + "." + timestamp + suffix + ".json");
+			if (!Files.exists(candidate)) return candidate;
+		}
+		throw new IOException("Could not allocate backup filename for preset '" + name + "'.");
 	}
 
 }

@@ -2,12 +2,14 @@ package dev.mapselect.role.puppetmaster;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
+import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterHotbarPayload;
@@ -17,9 +19,11 @@ import dev.mapselect.network.role.puppetmaster.PuppetmasterStatePayload;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterTargetsPayload;
 import dev.mapselect.network.role.puppetmaster.PuppetmasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
 import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.ExternalRoleCompat;
 import dev.mapselect.role.spy.SpyManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import dev.doctor4t.wathe.index.WatheItems;
@@ -30,6 +34,7 @@ import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.MovementType;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.s2c.play.SetCameraEntityS2CPacket;
@@ -94,6 +99,8 @@ public final class PuppetmasterManager {
 		ServerTickEvents.END_WORLD_TICK.register(PuppetmasterManager::tick);
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 			server.execute(() -> endForDisconnectedPlayer(handler.player, server)));
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRound(world.getServer()));
+		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearRound(world.getServer()));
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
 			if (entity instanceof ServerPlayerEntity player) {
 				ControlSession controllerSession = sessionsByController.get(player.getUuid());
@@ -118,7 +125,7 @@ public final class PuppetmasterManager {
 		if (!creativeBypass && cooldown > 0L) {
 			AbilityCooldownSync.send(puppetmaster, AbilityCooldownPayload.PUPPETMASTER_CONTROL, cooldown,
 				(long) GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L, false);
-			puppetmaster.sendMessage(Text.literal("Puppetmaster cooldown: " + Math.ceil(cooldown / 20.0D) + "s."), true);
+			puppetmaster.sendMessage(Text.literal("Puppetmaster cooldown: " + AbilityCooldowns.secondsCeil(cooldown) + "s."), true);
 			return;
 		}
 		if (GexpressConfig.isPuppetmasterRandomTarget()) {
@@ -132,6 +139,10 @@ public final class PuppetmasterManager {
 		List<PuppetmasterTargetsPayload.Entry> targets = eligibleTargets(puppetmaster).stream()
 			.map(player -> new PuppetmasterTargetsPayload.Entry(player.getUuid(), player.getName().getString()))
 			.toList();
+		if (!ServerPlayNetworking.canSend(puppetmaster, PuppetmasterTargetsPayload.ID)) {
+			puppetmaster.sendMessage(Text.literal("Your client cannot open the Puppetmaster target list."), true);
+			return;
+		}
 		ServerPlayNetworking.send(puppetmaster, new PuppetmasterTargetsPayload(targets));
 	}
 
@@ -165,6 +176,7 @@ public final class PuppetmasterManager {
 			puppetmaster.sendMessage(Text.literal("That puppet is no longer available."), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(puppetmaster, target)) return;
 
 		endControl(puppetmaster.getUuid(), server, false);
 		UUID oldController = controllerByTarget.get(target.getUuid());
@@ -212,6 +224,11 @@ public final class PuppetmasterManager {
 			MathHelper.clamp(payload.pitch(), -90.0F, 90.0F),
 			MathHelper.clamp(payload.selectedSlot(), 0, 8)
 		);
+		ServerPlayerEntity target = puppetmaster.getServer() == null ? null
+			: puppetmaster.getServer().getPlayerManager().getPlayer(session.targetId);
+		if (target != null && target.getWorld() == puppetmaster.getWorld()) {
+			applyTargetInputState(target, session.input);
+		}
 	}
 
 	private static float clampInput(float value) {
@@ -220,7 +237,7 @@ public final class PuppetmasterManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		if (sessionsByController.isEmpty()) return;
 		List<UUID> stale = new ArrayList<>();
 		for (ControlSession session : List.copyOf(sessionsByController.values())) {
@@ -258,6 +275,45 @@ public final class PuppetmasterManager {
 
 	private static void driveTarget(ServerPlayerEntity target, ControlSession session) {
 		PuppetInput input = session.input;
+		applyTargetInputState(target, input);
+		float sideways = input.sideways();
+		float forward = input.forward();
+		float magnitude = MathHelper.sqrt(sideways * sideways + forward * forward);
+		if (magnitude > 1.0F) {
+			sideways /= magnitude;
+			forward /= magnitude;
+		}
+		double yawRad = input.yaw() * (Math.PI / 180.0D);
+		double sin = Math.sin(yawRad);
+		double cos = Math.cos(yawRad);
+		double speed = input.sneaking() ? 0.10D : input.sprinting() ? 0.30D : 0.20D;
+		double velocityX = (sideways * cos - forward * sin) * speed;
+		double velocityZ = (forward * cos + sideways * sin) * speed;
+		double velocityY = session.verticalVelocity;
+		if (input.jumping() && target.isOnGround()) {
+			velocityY = 0.42D;
+		} else if (!target.getAbilities().flying) {
+			velocityY = (velocityY - 0.08D) * 0.98D;
+			if (target.isOnGround() && velocityY < 0.0D) velocityY = 0.0D;
+		}
+		Vec3d movement = new Vec3d(velocityX, velocityY, velocityZ);
+		target.move(MovementType.SELF, movement);
+		if (target.isOnGround() && velocityY < 0.0D) velocityY = 0.0D;
+		session.verticalVelocity = velocityY;
+		// Movement is applied directly above. Leaving the same horizontal velocity
+		// on the entity makes vanilla apply it for a second time on the next tick.
+		target.setVelocity(Vec3d.ZERO);
+		target.velocityModified = true;
+		if (input.using() && !session.wasUsing) {
+			useSelectedItem(target);
+		} else if (!input.using() && session.wasUsing) {
+			target.stopUsingItem();
+		}
+		session.wasUsing = input.using();
+	}
+
+	private static void applyTargetInputState(ServerPlayerEntity target, PuppetInput input) {
+		if (target == null || input == null) return;
 		float yaw = input.yaw();
 		target.setYaw(yaw);
 		target.setPitch(input.pitch());
@@ -266,30 +322,6 @@ public final class PuppetmasterManager {
 		target.setSneaking(input.sneaking());
 		target.setSprinting(input.sprinting() && input.forward() > 0.5F && !input.sneaking());
 		target.getInventory().selectedSlot = input.selectedSlot();
-
-		float sideways = input.sideways();
-		float forward = input.forward();
-		float magnitude = MathHelper.sqrt(sideways * sideways + forward * forward);
-		if (magnitude > 1.0F) {
-			sideways /= magnitude;
-			forward /= magnitude;
-		}
-		double yawRad = yaw * (Math.PI / 180.0D);
-		double sin = Math.sin(yawRad);
-		double cos = Math.cos(yawRad);
-		double speed = input.sneaking() ? 0.10D : input.sprinting() ? 0.30D : 0.20D;
-		double velocityX = (sideways * cos - forward * sin) * speed;
-		double velocityZ = (forward * cos + sideways * sin) * speed;
-		double velocityY = target.getVelocity().y;
-		if (input.jumping() && target.isOnGround()) {
-			velocityY = 0.42D;
-		}
-		target.setVelocity(velocityX, velocityY, velocityZ);
-		target.velocityModified = true;
-		if (input.using() && !session.wasUsing) {
-			useSelectedItem(target);
-		}
-		session.wasUsing = input.using();
 	}
 
 	private static boolean isControlledTargetValid(ServerPlayerEntity target, ServerPlayerEntity controller) {
@@ -337,6 +369,26 @@ public final class PuppetmasterManager {
 		}
 		controllerByTarget.clear();
 		cooldownUntilByController.clear();
+	}
+
+	private static void clearRound(MinecraftServer server) {
+		boolean hadSessions = !sessionsByController.isEmpty();
+		boolean hadLooseState = !controllerByTarget.isEmpty() || !cooldownUntilByController.isEmpty();
+		for (UUID controllerId : new ArrayList<>(sessionsByController.keySet())) {
+			endControl(controllerId, server, false);
+		}
+		sessionsByController.clear();
+		controllerByTarget.clear();
+		cooldownUntilByController.clear();
+		if (server != null) {
+			for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+				AbilityCooldownSync.clear(player, AbilityCooldownPayload.PUPPETMASTER_CONTROL);
+			}
+		}
+		if (!hadSessions && hadLooseState) {
+			broadcastState(server, PuppetmasterStatePayload.clear());
+		}
+		PayloadSync.forgetAll(PuppetmasterStatePayload.ID);
 	}
 
 	public static TimeState snapshotForTimeRewind() {
@@ -462,7 +514,7 @@ public final class PuppetmasterManager {
 			controller.setInvisible(session.controllerWasInvisible);
 			if (applyCooldown && !GexpressTestState.hasCreativeAbilityBypass(controller)) {
 				long cooldownTicks = (long) GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L;
-				cooldownUntilByController.put(controller.getUuid(), controller.getWorld().getTime() + cooldownTicks);
+				AbilityCooldowns.start(cooldownUntilByController, controller, cooldownTicks);
 				AbilityCooldownSync.send(controller, AbilityCooldownPayload.PUPPETMASTER_CONTROL, cooldownTicks, cooldownTicks, false);
 			} else {
 				AbilityCooldownSync.clear(controller, AbilityCooldownPayload.PUPPETMASTER_CONTROL);
@@ -487,18 +539,14 @@ public final class PuppetmasterManager {
 	private static void broadcastState(ServerWorld world, PuppetmasterStatePayload payload) {
 		if (world == null || payload == null) return;
 		for (ServerPlayerEntity player : PlayerLookup.world(world)) {
-			if (ServerPlayNetworking.canSend(player, PuppetmasterStatePayload.ID)) {
-				ServerPlayNetworking.send(player, payload);
-			}
+			PayloadSync.sendIfChanged(player, PuppetmasterStatePayload.ID, payload);
 		}
 	}
 
 	private static void broadcastState(MinecraftServer server, PuppetmasterStatePayload payload) {
 		if (server == null || payload == null) return;
 		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-			if (ServerPlayNetworking.canSend(player, PuppetmasterStatePayload.ID)) {
-				ServerPlayNetworking.send(player, payload);
-			}
+			PayloadSync.sendIfChanged(player, PuppetmasterStatePayload.ID, payload);
 		}
 	}
 
@@ -524,26 +572,14 @@ public final class PuppetmasterManager {
 
 	private static long remainingCooldownTicks(ServerPlayerEntity player) {
 		if (GexpressTestState.hasCreativeAbilityBypass(player)) return 0L;
-		Long until = cooldownUntilByController.get(player.getUuid());
-		if (until == null) return 0L;
-		long remaining = until - player.getWorld().getTime();
-		if (remaining <= 0L) {
-			cooldownUntilByController.remove(player.getUuid());
-			return 0L;
-		}
-		return remaining;
+		return AbilityCooldowns.remaining(cooldownUntilByController, player);
 	}
 
 	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
-		if (player == null || ticks <= 0L) return remainingCooldownTicks(player);
-		long remaining = remainingCooldownTicks(player);
-		if (remaining <= 0L) return 0L;
-		long next = Math.max(0L, remaining - ticks);
+		long next = AbilityCooldowns.reduce(cooldownUntilByController, player, ticks);
 		if (next <= 0L) {
-			cooldownUntilByController.remove(player.getUuid());
-			AbilityCooldownSync.clear(player, AbilityCooldownPayload.PUPPETMASTER_CONTROL);
+			if (player != null) AbilityCooldownSync.clear(player, AbilityCooldownPayload.PUPPETMASTER_CONTROL);
 		} else {
-			cooldownUntilByController.put(player.getUuid(), player.getWorld().getTime() + next);
 			AbilityCooldownSync.send(player, AbilityCooldownPayload.PUPPETMASTER_CONTROL, next,
 				(long) GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L, false);
 		}
@@ -570,7 +606,7 @@ public final class PuppetmasterManager {
 	}
 
 	private static void grantTemporaryKnife(ServerPlayerEntity target, ControlSession session) {
-		if (target == null || session == null || target.getInventory().count(WatheItems.KNIFE) > 0) return;
+		if (target == null || session == null || dev.mapselect.role.RoleItemInventory.count(target, WatheItems.KNIFE) > 0) return;
 		int slot = firstEmptyHotbarSlot(target);
 		if (slot < 0) return;
 		target.getInventory().setStack(slot, WatheItems.KNIFE.getDefaultStack());
@@ -721,6 +757,7 @@ public final class PuppetmasterManager {
 		private final GameMode targetGameMode;
 		private int temporaryKnifeSlot = -1;
 		private boolean wasUsing;
+		private double verticalVelocity;
 		private PuppetInput input = new PuppetInput(0.0F, 0.0F, false, false, false, false, 0.0F, 0.0F, 0);
 
 		private ControlSession(ServerPlayerEntity controller, ServerPlayerEntity target, long endTick) {

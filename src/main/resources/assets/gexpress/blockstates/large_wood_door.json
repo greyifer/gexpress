@@ -1,0 +1,7 @@
+{
+	"multipart": [
+		{
+			"apply": { "model": "gexpress:block/large_wood_door" }
+		}
+	]
+}

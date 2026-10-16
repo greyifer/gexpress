@@ -36,6 +36,10 @@ public abstract class VengefulSpiritCommittedDeathMixin {
 		java.util.ArrayDeque<Boolean> states = GEXPRESS_ALIVE_BEFORE.get();
 		boolean wasAlive = !states.isEmpty() && states.pop();
 		if (states.isEmpty()) GEXPRESS_ALIVE_BEFORE.remove();
-		if (wasAlive) VengefulSpiritManager.afterKillAttempt(victim, killer);
+		if (wasAlive && !GameFunctions.isPlayerAliveAndSurvival(victim)) {
+			VengefulSpiritManager.afterKillAttempt(victim, killer);
+			dev.mapselect.role.juggernaut.JuggernautManager.onCommittedDeath(victim, killer, reason);
+			if (victim instanceof net.minecraft.server.network.ServerPlayerEntity player) dev.mapselect.role.twins.TwinsManager.onOwnerDeath(player);
+		}
 	}
 }

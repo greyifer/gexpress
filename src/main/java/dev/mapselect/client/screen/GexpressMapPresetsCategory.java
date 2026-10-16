@@ -71,7 +71,6 @@ public final class GexpressMapPresetsCategory {
 
 		category.group(buildRandomSpawnActions(name, edit));
 		category.group(buildRandomSpawnsGroup(edit));
-		category.group(disabledPainterDoorwaysOption(edit));
 
 		OptionGroup.Builder features = OptionGroup.createBuilder()
 			.name(Text.translatable("gui.gexpress.config.group.map.features").formatted(Formatting.YELLOW));
@@ -243,7 +242,6 @@ public final class GexpressMapPresetsCategory {
 				if (p != null) copy.randomSpawnPositions.add(clonePos(p));
 			}
 		}
-		copy.disabledPainterDoorways = cloneBlockPositions(src.disabledPainterDoorways);
 		return copy;
 	}
 
@@ -298,20 +296,6 @@ public final class GexpressMapPresetsCategory {
 		return d;
 	}
 
-	private static List<MapPreset.BlockPosData> cloneBlockPositions(List<MapPreset.BlockPosData> positions) {
-		List<MapPreset.BlockPosData> out = new ArrayList<>();
-		if (positions == null) return out;
-		for (MapPreset.BlockPosData position : positions) {
-			if (position == null) continue;
-			MapPreset.BlockPosData copy = new MapPreset.BlockPosData();
-			copy.x = position.x;
-			copy.y = position.y;
-			copy.z = position.z;
-			out.add(copy);
-		}
-		return out;
-	}
-
 	private static void ensureNonNullShapes(MapPreset p) {
 		if (p.weather == null) p.weather = WeatherType.NONE;
 		p.roomCount = MapPreset.normalizeRoomCount(p.roomCount);
@@ -320,38 +304,7 @@ public final class GexpressMapPresetsCategory {
 			? MapPreset.TerrainMode.STATIC : MapPreset.TerrainMode.MOVING;
 		if (p.playAreaMode == null) p.playAreaMode = MapPreset.PlayAreaMode.TRAIN;
 		if (p.randomSpawnPositions == null) p.randomSpawnPositions = new ArrayList<>();
-		if (p.disabledPainterDoorways == null) p.disabledPainterDoorways = new ArrayList<>();
 		if (p.freshAirAreas == null) p.freshAirAreas = new ArrayList<>();
-	}
-
-	private static ListOption<String> disabledPainterDoorwaysOption(MapPreset edit) {
-		return ListOption.<String>createBuilder()
-			.name(Text.literal("Disabled Painter destinations").formatted(Formatting.YELLOW))
-			.description(OptionDescription.of(
-				Text.literal("Saved lower door block positions that Da Vinci's Doorway cannot choose as destinations.").formatted(Formatting.GRAY)))
-			.binding(
-				List.of(),
-				() -> {
-					List<String> out = new ArrayList<>();
-					if (edit.disabledPainterDoorways != null) {
-						for (MapPreset.BlockPosData position : edit.disabledPainterDoorways) {
-							if (position != null) out.add(blockPosToString(position));
-						}
-					}
-					return out;
-				},
-				list -> {
-					List<MapPreset.BlockPosData> parsed = new ArrayList<>();
-					for (String s : list) {
-						MapPreset.BlockPosData position = parseBlockPosData(s);
-						if (position != null) parsed.add(position);
-					}
-					edit.disabledPainterDoorways = parsed;
-				})
-			.controller(StringControllerBuilder::create)
-			.initial(GexpressMapPresetsCategory::currentPlayerBlockPosString)
-			.collapsed(true)
-			.build();
 	}
 
 	private static ListOption<String> freshAirAreasOption(MapPreset edit) {
@@ -507,12 +460,6 @@ public final class GexpressMapPresetsCategory {
 			+ fmt(player.getPitch());
 	}
 
-	private static String currentPlayerBlockPosString() {
-		ClientPlayerEntity player = MinecraftClient.getInstance().player;
-		if (player == null) return "0 0 0";
-		return player.getBlockX() + " " + player.getBlockY() + " " + player.getBlockZ();
-	}
-
 	private static MapPreset.PosData parsePos(String s) {
 		if (s == null) return null;
 		String[] parts = s.trim().split("\\s+");
@@ -524,26 +471,6 @@ public final class GexpressMapPresetsCategory {
 			d.z = Double.parseDouble(parts[2]);
 			d.yaw = Float.parseFloat(parts[3]);
 			d.pitch = Float.parseFloat(parts[4]);
-			return d;
-		} catch (NumberFormatException e) {
-			return null;
-		}
-	}
-
-	private static String blockPosToString(MapPreset.BlockPosData p) {
-		if (p == null) return "0 0 0";
-		return p.x + " " + p.y + " " + p.z;
-	}
-
-	private static MapPreset.BlockPosData parseBlockPosData(String s) {
-		if (s == null) return null;
-		String[] parts = s.trim().split("\\s+");
-		if (parts.length != 3) return null;
-		try {
-			MapPreset.BlockPosData d = new MapPreset.BlockPosData();
-			d.x = Integer.parseInt(parts[0]);
-			d.y = Integer.parseInt(parts[1]);
-			d.z = Integer.parseInt(parts[2]);
 			return d;
 		} catch (NumberFormatException e) {
 			return null;

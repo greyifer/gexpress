@@ -91,7 +91,7 @@ public class RtpCommand {
 		}
 		int id = comp(src).addTeleportationSlot(new TeleportationSlot(p.getX(), p.getY(), p.getZ(), snapYaw90(p.getYaw()), 0.0F));
 		persistActiveMapRandomSpawns(src);
-		src.sendFeedback(() -> Text.literal("Added RTP slot #" + id + " at your position.").formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Added RTP slot #" + id + " at your position.").formatted(Formatting.GREEN), true);
 		return 1;
 	}
 
@@ -102,7 +102,7 @@ public class RtpCommand {
 		float pitch = 0f;
 		int id = comp(src).addTeleportationSlot(new TeleportationSlot(x, y, z, yaw, pitch));
 		persistActiveMapRandomSpawns(src);
-		src.sendFeedback(() -> Text.literal("Added RTP slot #" + id + " at (" + fmt(x) + ", " + fmt(y) + ", " + fmt(z) + ").").formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Added RTP slot #" + id + " at (" + fmt(x) + ", " + fmt(y) + ", " + fmt(z) + ").").formatted(Formatting.GREEN), true);
 		return 1;
 	}
 
@@ -113,7 +113,7 @@ public class RtpCommand {
 			src.sendError(Text.literal("No RTP slot with id " + id + "."));
 			return 0;
 		}
-		src.sendFeedback(() -> Text.literal("Removed RTP slot #" + id + ".").formatted(Formatting.YELLOW), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Removed RTP slot #" + id + ".").formatted(Formatting.YELLOW), true);
 		persistActiveMapRandomSpawns(src);
 		return 1;
 	}
@@ -146,7 +146,7 @@ public class RtpCommand {
 		final int id = bestId;
 		final double dist = Math.sqrt(bestDist);
 		c.removeTeleportationSlot(id);
-		src.sendFeedback(() -> Text.literal("Removed nearest RTP slot #" + id + " (" + fmt(dist) + " blocks away).").formatted(Formatting.YELLOW), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Removed nearest RTP slot #" + id + " (" + fmt(dist) + " blocks away).").formatted(Formatting.YELLOW), true);
 		persistActiveMapRandomSpawns(src);
 		return 1;
 	}
@@ -156,13 +156,13 @@ public class RtpCommand {
 		WatheExtendedWorldComponent c = comp(src);
 		Map<Integer, TeleportationSlot> slots = c.getTeleportationSlots();
 		if (slots == null || slots.isEmpty()) {
-			src.sendFeedback(() -> Text.literal("No RTP slots. Use /g setup rtp add.").formatted(Formatting.GRAY), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No RTP slots. Use /g setup rtp add.").formatted(Formatting.GRAY), false);
 			return 1;
 		}
 		boolean enabled = c.isRtpEnabled();
 		Text header = Text.literal("─── RTP Slots (" + slots.size() + ", "
 			+ (enabled ? "enabled" : "disabled") + ") ───").formatted(Formatting.GOLD, Formatting.BOLD);
-		src.sendFeedback(() -> header, false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> header, false);
 		for (Map.Entry<Integer, TeleportationSlot> e : slots.entrySet()) {
 			int id = e.getKey();
 			TeleportationSlot s = e.getValue();
@@ -173,7 +173,7 @@ public class RtpCommand {
 						.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, cmd))
 						.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Teleport to slot " + id)))))
 				.append(Text.literal("  (" + fmt(s.x) + ", " + fmt(s.y) + ", " + fmt(s.z) + ")").formatted(Formatting.WHITE));
-			src.sendFeedback(() -> line, false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> line, false);
 		}
 		return 1;
 	}
@@ -183,7 +183,7 @@ public class RtpCommand {
 		WatheExtendedWorldComponent c = comp(src);
 		int n = c.getTeleportationSlots() == null ? 0 : c.getTeleportationSlots().size();
 		c.setTeleportationSlots(new LinkedHashMap<>());
-		src.sendFeedback(() -> Text.literal("Cleared " + n + " RTP slot(s).").formatted(Formatting.YELLOW), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared " + n + " RTP slot(s).").formatted(Formatting.YELLOW), true);
 		persistActiveMapRandomSpawns(src);
 		return 1;
 	}
@@ -191,7 +191,7 @@ public class RtpCommand {
 	private static int runSetEnabled(CommandContext<ServerCommandSource> ctx, boolean enabled) {
 		ServerCommandSource src = ctx.getSource();
 		comp(src).setRtpEnabled(enabled);
-		src.sendFeedback(() -> Text.literal("RTP " + (enabled ? "enabled" : "disabled") + ".").formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("RTP " + (enabled ? "enabled" : "disabled") + ".").formatted(Formatting.GREEN), true);
 		return 1;
 	}
 

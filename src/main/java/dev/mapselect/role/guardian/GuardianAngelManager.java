@@ -7,6 +7,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.role.guardian.GuardianAngelShieldStatePayload;
 import dev.mapselect.network.role.guardian.GuardianAngelShieldUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -132,7 +133,7 @@ public final class GuardianAngelManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		if (!DeadPlayerStatus.isRunningOrStopping(world)) {
 			if (guardianId != null || guardianUsed || !shieldUntilByTarget.isEmpty()) {
 				clear();
@@ -162,8 +163,8 @@ public final class GuardianAngelManager {
 	}
 
 	private static void syncTo(ServerPlayerEntity player) {
-		if (player == null || !ServerPlayNetworking.canSend(player, GuardianAngelShieldStatePayload.ID)) return;
-		ServerPlayNetworking.send(player, DeadPlayerStatus.isDeadRoundParticipant(player)
+		if (player == null) return;
+		PayloadSync.sendIfChanged(player, GuardianAngelShieldStatePayload.ID, DeadPlayerStatus.isDeadRoundParticipant(player)
 			? statePayload(player.getServerWorld())
 			: GuardianAngelShieldStatePayload.clear());
 	}

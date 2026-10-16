@@ -10,7 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Server -> client skin and voice replacement map for the Trickster's masquerade. */
+/** Server -> client skin replacement map for Masquerade. The pitch map is retained for wire compatibility. */
 public record TricksterSkinSwapPayload(Map<UUID, UUID> swaps, Map<UUID, Float> voicePitches,
 		int durationTicks) implements CustomPayload {
 	public static final CustomPayload.Id<TricksterSkinSwapPayload> ID =

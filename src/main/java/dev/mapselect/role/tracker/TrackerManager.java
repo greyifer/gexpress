@@ -1,18 +1,21 @@
 package dev.mapselect.role.tracker;
 
 import dev.doctor4t.wathe.api.Role;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.tracker.TrackerStatePayload;
 import dev.mapselect.network.role.tracker.TrackerUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -47,10 +50,10 @@ public final class TrackerManager {
 		ServerTickEvents.END_WORLD_TICK.register(TrackerManager::tick);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> sync(handler.player)));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearAll(world));
+		RoundLifecycleHooks.clearWorld(TrackerManager::clearAll);
 	}
 
-	private static void tryTrack(ServerPlayerEntity tracker) {
+	public static void tryTrack(ServerPlayerEntity tracker) {
 		if (tracker == null || !(tracker.getWorld() instanceof ServerWorld world)) return;
 		if (PelicanManager.isStashed(tracker) || !isTracker(tracker)
 				|| !canUseHere(world, tracker) || !isPlayable(tracker, tracker)) {
@@ -61,14 +64,18 @@ public final class TrackerManager {
 		if (!creativeBypass && remaining > 0L) {
 			AbilityCooldownSync.send(tracker, AbilityCooldownPayload.TRACKER_TRACK, remaining,
 				(long) GexpressConfig.getTrackerCooldownSeconds() * 20L, false);
-			tracker.sendMessage(Text.literal("Tracker ready in " + secondsCeil(remaining) + "s."), true);
+			tracker.sendMessage(Text.literal("Tracker ready in " + Math.max(1L, AbilityCooldowns.secondsCeil(remaining)) + "s."), true);
 			return;
 		}
 		ServerPlayerEntity target = findTarget(tracker);
 		if (target == null) {
-			tracker.sendMessage(Text.literal("No living player close enough to track."), true);
+			double range = GexpressConfig.getTrackerRange();
+			tracker.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(tracker,
+				tracker.getServerWorld().getPlayers(), range, 0.0D, true,
+				candidate -> !PelicanManager.isStashed(candidate) && isPlayable(candidate, tracker), "track")), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(tracker, target)) return;
 
 		LinkedHashSet<UUID> tracked = trackedByTracker.computeIfAbsent(tracker.getUuid(), id -> new LinkedHashSet<>());
 		if (!tracked.remove(target.getUuid())) {
@@ -87,14 +94,14 @@ public final class TrackerManager {
 		if (creativeBypass) {
 			AbilityCooldownSync.clear(tracker, AbilityCooldownPayload.TRACKER_TRACK);
 		} else {
-			cooldownUntil.put(tracker.getUuid(), world.getTime() + cooldown);
+			AbilityCooldowns.start(cooldownUntil, tracker, cooldown);
 			AbilityCooldownSync.send(tracker, AbilityCooldownPayload.TRACKER_TRACK, cooldown, cooldown, false);
 		}
 		sync(tracker);
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		if ((game == null || !game.isRunning()) && !GexpressTestState.hasRoleTesters()) {
 			clearAll(world);
@@ -118,9 +125,9 @@ public final class TrackerManager {
 	}
 
 	private static void sync(ServerPlayerEntity tracker) {
-		if (tracker == null || !ServerPlayNetworking.canSend(tracker, TrackerStatePayload.ID)) return;
+		if (tracker == null) return;
 		Set<UUID> tracked = trackedByTracker.getOrDefault(tracker.getUuid(), new LinkedHashSet<>());
-		ServerPlayNetworking.send(tracker, new TrackerStatePayload(new ArrayList<>(tracked)));
+		PayloadSync.sendIfChanged(tracker, TrackerStatePayload.ID, new TrackerStatePayload(new ArrayList<>(tracked)));
 	}
 
 	private static void clearAll(World world) {
@@ -128,34 +135,20 @@ public final class TrackerManager {
 		cooldownUntil.clear();
 		if (world instanceof ServerWorld serverWorld) {
 			for (ServerPlayerEntity player : serverWorld.getPlayers()) {
-				if (ServerPlayNetworking.canSend(player, TrackerStatePayload.ID)) {
-					ServerPlayNetworking.send(player, new TrackerStatePayload(List.of()));
-				}
+				PayloadSync.sendIfChanged(player, TrackerStatePayload.ID, new TrackerStatePayload(List.of()));
 			}
 		}
 	}
 
 	private static long cooldownRemaining(ServerPlayerEntity player) {
-		Long until = cooldownUntil.get(player.getUuid());
-		if (until == null) return 0L;
-		long remaining = until - player.getWorld().getTime();
-		if (remaining <= 0L) {
-			cooldownUntil.remove(player.getUuid());
-			return 0L;
-		}
-		return remaining;
+		return AbilityCooldowns.remaining(cooldownUntil, player);
 	}
 
 	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
-		if (player == null || ticks <= 0L) return cooldownRemaining(player);
-		long remaining = cooldownRemaining(player);
-		if (remaining <= 0L) return 0L;
-		long next = Math.max(0L, remaining - ticks);
+		long next = AbilityCooldowns.reduce(cooldownUntil, player, ticks);
 		if (next <= 0L) {
-			cooldownUntil.remove(player.getUuid());
-			AbilityCooldownSync.clear(player, AbilityCooldownPayload.TRACKER_TRACK);
+			if (player != null) AbilityCooldownSync.clear(player, AbilityCooldownPayload.TRACKER_TRACK);
 		} else {
-			cooldownUntil.put(player.getUuid(), player.getWorld().getTime() + next);
 			AbilityCooldownSync.send(player, AbilityCooldownPayload.TRACKER_TRACK, next,
 				(long) GexpressConfig.getTrackerCooldownSeconds() * 20L, false);
 		}
@@ -183,7 +176,4 @@ public final class TrackerManager {
 		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
-	private static long secondsCeil(long ticks) {
-		return Math.max(1L, (ticks + 19L) / 20L);
-	}
 }

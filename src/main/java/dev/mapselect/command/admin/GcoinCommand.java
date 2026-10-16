@@ -66,7 +66,7 @@ public final class GcoinCommand {
 		}
 
 		final int finalChanged = changed;
-		source.sendFeedback(() -> Text.literal(change.feedback(amount, finalChanged)).formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(source, () -> Text.literal(change.feedback(amount, finalChanged)).formatted(Formatting.GREEN), true);
 		return changed;
 	}
 

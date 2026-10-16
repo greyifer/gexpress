@@ -31,7 +31,8 @@ public abstract class ShopScreenMixin {
 		remap = false
 	)
 	private boolean gexpress$customShopRolesCanSeeShop(GameWorldComponent game, PlayerEntity player) {
-		if (GexpressRoleShop.usesExternalMutedNoteWidget(player)) return false;
+		if(dev.mapselect.client.role.loki.ClientLokiState.cloneActive())return false;
+		if (GexpressRoleShop.usesExternalShopWidgets(player)) return false;
 		return game.canUseKillerFeatures(player) || GexpressRoleShop.canUseKillerEconomy(player);
 	}
 
@@ -47,6 +48,6 @@ public abstract class ShopScreenMixin {
 	)
 	private List<ShopEntry> gexpress$bombSpecialistShop() {
 		ClientPlayerEntity player = MinecraftClient.getInstance().player;
-		return GexpressRoleShop.resolve(player);
+		return dev.mapselect.client.role.loki.ClientLokiState.cloneActive()?List.of():GexpressRoleShop.resolve(player);
 	}
 }

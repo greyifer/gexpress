@@ -23,7 +23,9 @@ public record GexpressDevTuningPayload(
 		int goldFoodPlatterPrice,
 		int goldDrinkTrayPrice,
 		String skinCaseRows,
-		int mutedNotePrice) implements CustomPayload {
+		int mutedNotePrice,
+		int lobbyPollCooldownSeconds,
+		int lobbyPollDurationSeconds) implements CustomPayload {
 	public static final CustomPayload.Id<GexpressDevTuningPayload> ID =
 		new CustomPayload.Id<>(Identifier.of(MapSelect.MOD_ID, "dev_tuning"));
 
@@ -58,6 +60,8 @@ public record GexpressDevTuningPayload(
 		buf.writeInt(payload.goldDrinkTrayPrice());
 		buf.writeString(payload.skinCaseRows());
 		buf.writeInt(payload.mutedNotePrice());
+		buf.writeInt(payload.lobbyPollCooldownSeconds());
+		buf.writeInt(payload.lobbyPollDurationSeconds());
 	}
 
 	private static GexpressDevTuningPayload decode(PacketByteBuf buf) {
@@ -77,7 +81,9 @@ public record GexpressDevTuningPayload(
 			buf.readInt(),
 			buf.readInt(),
 			buf.readableBytes() > 0 ? buf.readString() : "",
-			buf.readableBytes() > 0 ? buf.readInt() : 10
+			buf.readableBytes() > 0 ? buf.readInt() : 10,
+			buf.readableBytes() > 0 ? buf.readInt() : 600,
+			buf.readableBytes() > 0 ? buf.readInt() : 60
 		);
 	}
 

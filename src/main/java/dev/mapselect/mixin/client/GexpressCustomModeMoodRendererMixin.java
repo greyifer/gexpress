@@ -22,7 +22,7 @@ public abstract class GexpressCustomModeMoodRendererMixin {
 	private static GameMode gexpress$renderMoodHudForCustomModes(GameWorldComponent game,
 			Operation<GameMode> original) {
 		if (GexpressGameModes.isAmnesia(game) || GexpressGameModes.isTakeover(game)
-				|| GexpressGameModes.isTest(game)) {
+				|| GexpressGameModes.isTest(game) || GexpressGameModes.isDraft(game)) {
 			return WatheGameModes.MURDER;
 		}
 		return original.call(game);

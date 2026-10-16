@@ -8,10 +8,12 @@ import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.entity.PlayerBodyEntity;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.entity.TwinBodyEntity;
 import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Box;
@@ -52,6 +54,8 @@ public final class ClientAbilityTargetState {
 
 	public static boolean shouldGlow(AbstractClientPlayerEntity player) {
 		if (player == null) return false;
+		UUID twinOwner = dev.mapselect.client.role.twins.ClientTwinsBodies.owner(player);
+		if (twinOwner != null) return (targetingActive && twinOwner.equals(targetId)) || selectionColors.containsKey(twinOwner) || persistentSelectionColors.containsKey(twinOwner);
 		UUID id = player.getUuid();
 		return (targetingActive && id.equals(targetId))
 			|| selectionColors.containsKey(id)
@@ -60,6 +64,14 @@ public final class ClientAbilityTargetState {
 
 	public static boolean shouldGlow(PlayerBodyEntity body) {
 		return body != null && bodyTargetingActive && body.getUuid().equals(bodyTargetId);
+	}
+
+	public static boolean shouldGlow(TwinBodyEntity body) {
+		if (body == null) return false;
+		UUID ownerId = body.ownerId().orElse(null);
+		return ownerId != null && ((targetingActive && ownerId.equals(targetId))
+			|| selectionColors.containsKey(ownerId)
+			|| persistentSelectionColors.containsKey(ownerId));
 	}
 
 	public static int glowColor() {
@@ -80,9 +92,27 @@ public final class ClientAbilityTargetState {
 		return shouldGlow(body) ? bodyTargetColor : 0xFFFFFF;
 	}
 
+	public static int glowColor(TwinBodyEntity body) {
+		if (body != null) {
+			UUID ownerId = body.ownerId().orElse(null);
+			Integer selectionColor = ownerId == null ? null : selectionColors.get(ownerId);
+			if (selectionColor != null && !ownerId.equals(targetId)) return selectionColor;
+			Integer persistentColor = ownerId == null ? null : persistentSelectionColors.get(ownerId);
+			if (persistentColor != null && !ownerId.equals(targetId)) return persistentColor;
+		}
+		return targetColor;
+	}
+
 	public static UUID currentTargetId() {
 		return targetId;
 	}
+
+	public static void setLokiSelection(UUID id) {
+        if (lokiSelection != null) persistentSelectionColors.remove(lokiSelection);
+        lokiSelection = id;
+        if (id != null) persistentSelectionColors.put(id, 0x7BDA8F);
+    }
+    private static UUID lokiSelection;
 
 	public static void setSeerSelection(UUID targetId) {
 		if (seerSelectionId != null) selectionColors.remove(seerSelectionId);
@@ -141,12 +171,12 @@ public final class ClientAbilityTargetState {
 			specGraceTicks = SPEC_GRACE_TICKS;
 		}
 		targetingActive = true;
-		AbstractClientPlayerEntity target = findLookTarget(client, spec, isPainterTargeting(client));
+		UUID target = findLookTarget(client, spec, isPainterTargeting(client));
 		if (target == null) {
 			target = graceTarget(client, spec);
 			if (target == null) return;
 		}
-		targetId = target.getUuid();
+		targetId = target;
 		targetColor = spec.color();
 		graceTargetId = targetId;
 		graceTargetColor = targetColor;
@@ -174,10 +204,10 @@ public final class ClientAbilityTargetState {
 		return best;
 	}
 
-	private static AbstractClientPlayerEntity findLookTarget(MinecraftClient client, TargetSpec spec, boolean painter) {
+	private static UUID findLookTarget(MinecraftClient client, TargetSpec spec, boolean painter) {
 		Vec3d start = client.player.getEyePos();
 		Vec3d end = start.add(client.player.getRotationVec(1.0F).multiply(spec.range()));
-		AbstractClientPlayerEntity best = null;
+		UUID best = null;
 		double bestDistance = Double.MAX_VALUE;
 		for (AbstractClientPlayerEntity candidate : client.world.getPlayers()) {
 			if (candidate == client.player || candidate.isSpectator() || !candidate.isAlive()
@@ -188,26 +218,44 @@ public final class ClientAbilityTargetState {
 			if (hit.isEmpty() || isBlocked(client, start, hit.get())) continue;
 			double distance = start.squaredDistanceTo(hit.get());
 			if (distance < bestDistance) {
-				best = candidate;
+				best = candidate.getUuid();
+				bestDistance = distance;
+			}
+		}
+		Box search = client.player.getBoundingBox().expand(spec.range());
+		for (TwinBodyEntity body : client.world.getEntitiesByClass(TwinBodyEntity.class, search,
+				entity -> entity != null && entity.isAlive() && !entity.isRemoved())) {
+			UUID ownerId = body.ownerId().orElse(null);
+			if (ownerId == null || ownerId.equals(client.player.getUuid())) continue;
+			AbstractClientPlayerEntity owner = playerById(client, ownerId);
+			if (painter && owner != null && ClientPainterState.isPlayerPainted(owner)) continue;
+			Box box = body.getBoundingBox().expand(targetPadding(spec.padding()));
+			Optional<Vec3d> hit = box.raycast(start, end);
+			if (hit.isEmpty() || isBlocked(client, start, hit.get())) continue;
+			double distance = start.squaredDistanceTo(hit.get());
+			if (distance < bestDistance) {
+				best = ownerId;
 				bestDistance = distance;
 			}
 		}
 		return best;
 	}
 
-	private static AbstractClientPlayerEntity graceTarget(MinecraftClient client, TargetSpec spec) {
+	private static UUID graceTarget(MinecraftClient client, TargetSpec spec) {
 		if (graceTargetId == null || graceTicks <= 0) {
 			clearLookTarget();
 			return null;
 		}
 		AbstractClientPlayerEntity target = playerById(client, graceTargetId);
-		if (target == null || !canKeepGraceTarget(client, target, spec)) {
+		TwinBodyEntity body = bodyByOwner(client, graceTargetId);
+		if ((target == null || !canKeepGraceTarget(client, target, spec))
+				&& (body == null || !canKeepGraceTarget(client, body, spec))) {
 			clearLookTarget();
 			return null;
 		}
 		graceTicks--;
 		targetColor = graceTargetColor;
-		return target;
+		return graceTargetId;
 	}
 
 	private static AbstractClientPlayerEntity playerById(MinecraftClient client, UUID id) {
@@ -218,10 +266,20 @@ public final class ClientAbilityTargetState {
 		return null;
 	}
 
-	private static boolean canKeepGraceTarget(MinecraftClient client, AbstractClientPlayerEntity candidate,
+	private static TwinBodyEntity bodyByOwner(MinecraftClient client, UUID ownerId) {
+		if (client == null || client.world == null || ownerId == null || client.player == null) return null;
+		Box search = client.player.getBoundingBox().expand(64.0D);
+		for (TwinBodyEntity body : client.world.getEntitiesByClass(TwinBodyEntity.class, search,
+				entity -> entity != null && entity.isAlive() && !entity.isRemoved())) {
+			if (body.ownerId().filter(ownerId::equals).isPresent()) return body;
+		}
+		return null;
+	}
+
+	private static boolean canKeepGraceTarget(MinecraftClient client, LivingEntity candidate,
 			TargetSpec spec) {
-		if (candidate == client.player || candidate.isSpectator() || !candidate.isAlive()
-				|| candidate.isInvisible() || candidate.isRemoved()) {
+		if (candidate == client.player || !candidate.isAlive() || candidate.isInvisible() || candidate.isRemoved()
+				|| (candidate instanceof AbstractClientPlayerEntity player && player.isSpectator())) {
 			return false;
 		}
 		Vec3d start = client.player.getEyePos();
@@ -251,6 +309,7 @@ public final class ClientAbilityTargetState {
 		if (MapSelectRoles.COPYCAT_ID.equals(id)) {
 			return new TargetSpec(GexpressConfig.getCopycatCopyRange(), 0.0D, 0xC9B5FF);
 		}
+		if (MapSelectRoles.LOKI_ID.equals(id)) return new TargetSpec(4.0D, 0.25D, 0x7BDA8F);
 		if (MapSelectRoles.SEER_ID.equals(id)) return new TargetSpec(GexpressConfig.getSeerCompareRange(), 0.25D, 0xC77DFF);
 		if (MapSelectRoles.CUPID_ID.equals(id)) return new TargetSpec(GexpressConfig.getCupidRange(), 0.25D, 0xFF77AA);
 		if (MapSelectRoles.WARLOCK_ID.equals(id)) return new TargetSpec(4.0D, 0.0D, 0xB94CFF);
@@ -264,6 +323,8 @@ public final class ClientAbilityTargetState {
 		if (MapSelectRoles.DRACULA_ID.equals(id) || MapSelectRoles.VAMPIRE_ID.equals(id)) {
 			return new TargetSpec(3.0D, 0.0D, 0xB81832);
 		}
+		if (MapSelectRoles.RAT_ID.equals(id)) return new TargetSpec(3.0D, 0.15D, 0xB89A6A);
+		if (MapSelectRoles.SNIFFER_ID.equals(id)) return new TargetSpec(3.5D, 0.15D, 0x74C88A);
 		return null;
 	}
 
@@ -291,7 +352,7 @@ public final class ClientAbilityTargetState {
 	}
 
 	private static void clearSelections() {
-		seerSelectionId = null;
+		seerSelectionId = null; lokiSelection = null;
 		cupidSelectionId = null;
 		selectionColors.clear();
 		persistentSelectionColors.clear();

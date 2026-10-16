@@ -6,6 +6,7 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.config.RoleModifierTuningConfig;
+import dev.mapselect.game.GexpressGameModes;
 import dev.mapselect.role.RoleModifierTuningBridge;
 import dev.mapselect.registry.MapSelectRoles;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -41,7 +42,7 @@ public abstract class HmlRoleCountTuningMixin {
 			List<ServerPlayerEntity> players, CallbackInfoReturnable<Integer> cir) {
 		int playerCount = players == null ? 0 : players.size();
 		GEXPRESS_PLAYER_COUNT.set(playerCount);
-		RoleModifierTuningBridge.prepareForGame(playerCount);
+		RoleModifierTuningBridge.prepareForGame(world, playerCount);
 	}
 
 	@Inject(method = "assignVannilaRoles", at = @At("RETURN"))
@@ -132,6 +133,7 @@ public abstract class HmlRoleCountTuningMixin {
 	private static void gexpress$ensureSpecialFamilyStarters(ServerWorld world, GameWorldComponent game,
 			List<ServerPlayerEntity> players) {
 		if (world == null || game == null || players == null || players.isEmpty()) return;
+		if (GexpressGameModes.isDraft(game)) return;
 		if (players.size() < GexpressConfig.getMafiaMinimumPlayers()) return;
 
 		GexpressConfig.SpecialRoleOccurrence occurrence = GexpressConfig.getSpecialRoleOccurrence();

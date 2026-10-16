@@ -32,9 +32,11 @@ public abstract class PuppetmasterMouseMixin {
 			double deltaX = cursorDeltaX * multiplier;
 			double deltaY = cursorDeltaY * multiplier * (client.options.getInvertYMouse().getValue() ? -1.0D : 1.0D);
 			ClientPuppetmasterState.applyMouseLook(client, deltaX, deltaY);
+			ClientPuppetmasterState.sendImmediateInput(client);
 			cursorDeltaX = 0.0D;
 			cursorDeltaY = 0.0D;
 			ci.cancel();
+			return;
 		}
 	}
 

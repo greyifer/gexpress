@@ -38,8 +38,11 @@ public final class ClientSpectatorRoleRevealDelay {
 
 	public static boolean shouldGlow(AbstractClientPlayerEntity player) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		return player != null && player != client.player
-			&& shouldUseInstinctReveal(client);
+		if (client == null || player == null || player == client.player
+				|| GameFunctions.isPlayerSpectatingOrCreative(player)) {
+			return false;
+		}
+		return shouldUseInstinctReveal(client) || revealedRoleColor(client, player) != null;
 	}
 
 	public static boolean isWaitingForRoleReveal(MinecraftClient client) {
@@ -61,12 +64,14 @@ public final class ClientSpectatorRoleRevealDelay {
 	}
 
 	public static int glowColor(AbstractClientPlayerEntity player) {
-		return glowColor();
+		Integer revealed = revealedRoleColor(MinecraftClient.getInstance(), player);
+		return revealed == null ? glowColor() : revealed;
 	}
 
 	public static Integer revealedRoleColor(MinecraftClient client, PlayerEntity player) {
 		if (client == null || client.player == null || client.world == null || player == null
-				|| player == client.player || !shouldUseRevealedRoleInstinct(client)) {
+				|| player == client.player || GameFunctions.isPlayerSpectatingOrCreative(player)
+				|| !shouldUseRevealedRoleInstinct(client)) {
 			return null;
 		}
 		try {

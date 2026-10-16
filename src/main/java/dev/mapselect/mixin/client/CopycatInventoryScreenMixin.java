@@ -6,6 +6,7 @@ import dev.doctor4t.wathe.client.gui.screen.ingame.LimitedHandledScreen;
 import dev.doctor4t.wathe.client.gui.screen.ingame.LimitedInventoryScreen;
 import dev.mapselect.MapSelect;
 import dev.mapselect.client.role.copycat.ClientCopycatState;
+import dev.mapselect.client.role.copycat.CopycatInventoryInput;
 import dev.mapselect.network.role.copycat.CopycatStatePayload.StoredAbility;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -27,7 +28,8 @@ import java.util.Locale;
 import java.util.UUID;
 
 @Mixin(value = LimitedInventoryScreen.class, remap = false)
-public abstract class CopycatInventoryScreenMixin extends LimitedHandledScreen<PlayerScreenHandler> {
+public abstract class CopycatInventoryScreenMixin extends LimitedHandledScreen<PlayerScreenHandler>
+		implements CopycatInventoryInput {
 	@Unique private static final Identifier GEXPRESS$COPYCAT_SLOT =
 		Identifier.of(MapSelect.MOD_ID, "textures/gui/copycat_slot.png");
 	@Unique private static final int GEXPRESS$SLOT_SIZE = 32;
@@ -82,7 +84,7 @@ public abstract class CopycatInventoryScreenMixin extends LimitedHandledScreen<P
 	}
 
 	@Override
-	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+	public boolean gexpress$handleCopycatMouse(double mouseX, double mouseY, int button) {
 		for (CopycatClickTarget target : gexpress$copycatClickTargets) {
 			if (!target.contains(mouseX, mouseY)) continue;
 			if (target.storedIndex() >= 0) {
@@ -94,7 +96,7 @@ public abstract class CopycatInventoryScreenMixin extends LimitedHandledScreen<P
 				return true;
 			}
 		}
-		return super.mouseClicked(mouseX, mouseY, button);
+		return false;
 	}
 
 	@Unique

@@ -26,7 +26,7 @@ public final class PassiveMoney {
 
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(world -> {
-			if (world.getRegistryKey() == World.OVERWORLD) {
+			if (dev.mapselect.game.GexpressWorlds.isGameWorld(world)) {
 				grant(world, GameWorldComponent.KEY.getNullable(world));
 			}
 		});

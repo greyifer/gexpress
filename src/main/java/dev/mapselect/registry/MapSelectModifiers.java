@@ -38,6 +38,8 @@ public final class MapSelectModifiers {
 	public static final Identifier PARANOID_ID        = Identifier.of(MapSelect.MOD_ID, "paranoid");
 	public static final Identifier SQUEAKER_ID        = Identifier.of(MapSelect.MOD_ID, "squeaker");
 	public static final Identifier LOVERS_ID          = Identifier.of(MapSelect.MOD_ID, "lovers");
+	public static final Identifier TALL_ID            = Identifier.of(MapSelect.MOD_ID, "tall");
+	public static final Identifier PEST_CONTROL_ID    = Identifier.of(MapSelect.MOD_ID, "pest_control");
 
 	public static Modifier EOD_SPECIALIST;
 	public static Modifier SHORT_SIGHTED;
@@ -48,6 +50,8 @@ public final class MapSelectModifiers {
 	public static Modifier PARANOID;
 	public static Modifier SQUEAKER;
 	public static Modifier LOVERS;
+	public static Modifier TALL;
+	public static Modifier PEST_CONTROL;
 
 	public static void register() {
 		// Cool steely blue - reads as "tools / defusal" vs the Bomb Specialist's hot TNT-orange.
@@ -129,6 +133,24 @@ public final class MapSelectModifiers {
 			LOVERS_ID,
 			0xFF6FAF,
 			new ArrayList<>(),
+			new ArrayList<>(),
+			false,
+			false
+		));
+
+		TALL = HMLModifiers.registerModifier(new Modifier(
+			TALL_ID,
+			0x7FC8FF,
+			new ArrayList<>(java.util.List.of(MapSelectRoles.RAT)),
+			new ArrayList<>(),
+			false,
+			false
+		));
+
+		PEST_CONTROL = HMLModifiers.registerModifier(new Modifier(
+			PEST_CONTROL_ID,
+			0xD7B85C,
+			new ArrayList<>(java.util.List.of(MapSelectRoles.RAT)),
 			new ArrayList<>(),
 			false,
 			false

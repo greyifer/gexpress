@@ -2,7 +2,6 @@ package dev.mapselect.role.vengeful;
 
 import dev.doctor4t.wathe.api.Role;
 import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
-import dev.doctor4t.wathe.api.event.GameEvents;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.compat.TrainVoicePlugin;
 import dev.doctor4t.wathe.entity.PlayerBodyEntity;
@@ -12,6 +11,8 @@ import dev.doctor4t.wathe.index.WatheEntities;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.role.vengeful.VengefulSpiritStatePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.role.copycat.CopycatManager;
@@ -54,15 +55,22 @@ public final class VengefulSpiritManager {
 
 	private VengefulSpiritManager() {}
 
-	public static void register() {
-		PayloadTypeRegistry.playS2C().register(VengefulSpiritStatePayload.ID, VengefulSpiritStatePayload.CODEC);
-		AllowPlayerDeath.EVENT.register(VengefulSpiritManager::allowDeath);
-		ServerTickEvents.END_WORLD_TICK.register(VengefulSpiritManager::tick);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clear(world));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear(world));
+	public static String describeState(ServerPlayerEntity player) {
+		long now = player.getWorld().getTime();
+		PendingRevive pending = PENDING.get(player.getUuid());
+		if (pending != null) return "return in " + Math.max(0, pending.reviveAt() - now) + " ticks; killer=" + pending.killerName();
+		ActiveRevenge active = ACTIVE.get(player.getUuid());
+		if (active != null) return "revenge: " + Math.max(0, active.expiresAt() - now) + " ticks; killer=" + active.killerId();
+		return SPENT.contains(player.getUuid()) ? "return spent" : "ready";
 	}
 
-	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
+	public static void register() {
+		PayloadTypeRegistry.playS2C().register(VengefulSpiritStatePayload.ID, VengefulSpiritStatePayload.CODEC);
+		ServerTickEvents.END_WORLD_TICK.register(VengefulSpiritManager::tick);
+		RoundLifecycleHooks.clearWorld(VengefulSpiritManager::clear);
+	}
+
+	private static void onCommittedDeath(PlayerEntity victim, PlayerEntity killer) {
 		if (killer instanceof ServerPlayerEntity serverKiller) {
 			ActiveRevenge revenge = ACTIVE.get(serverKiller.getUuid());
 			if (revenge != null && victim != null && victim.getUuid().equals(revenge.killerId())) {
@@ -70,22 +78,21 @@ public final class VengefulSpiritManager {
 				removeIssuedKnife(serverKiller);
 				sendState(serverKiller, VengefulSpiritStatePayload.clear());
 				serverKiller.sendMessage(Text.literal("Your vengeance is complete.").formatted(Formatting.AQUA), true);
-				return true;
+				// A successful revenge removes the deadline; the spirit stays alive.
 			}
 		}
 
-		if (!(victim instanceof ServerPlayerEntity spirit)) return true;
-		if (FORCED_RETURN_DEATHS.contains(spirit.getUuid())) return true;
+		if (!(victim instanceof ServerPlayerEntity spirit)) return;
+		if (FORCED_RETURN_DEATHS.contains(spirit.getUuid())) return;
 		if (ACTIVE.remove(spirit.getUuid()) != null) {
 			removeIssuedKnife(spirit);
 			sendState(spirit, VengefulSpiritStatePayload.clear());
 			SPENT.add(spirit.getUuid());
-			return true;
 		}
-		return true;
 	}
 
 	public static void afterKillAttempt(PlayerEntity victim, PlayerEntity killer) {
+		onCommittedDeath(victim, killer);
 		if (!(victim instanceof ServerPlayerEntity spirit)
 				|| !(killer instanceof ServerPlayerEntity serverKiller) || spirit == serverKiller
 				|| GameFunctions.isPlayerAliveAndSurvival(spirit)
@@ -112,7 +119,7 @@ public final class VengefulSpiritManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		if (game == null || game.getGameStatus() != GameWorldComponent.GameStatus.ACTIVE) {
 			clear(world);
@@ -127,6 +134,10 @@ public final class VengefulSpiritManager {
 		Iterator<Map.Entry<UUID, PendingRevive>> iterator = PENDING.entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<UUID, PendingRevive> entry = iterator.next();
+			ServerPlayerEntity pendingPlayer = world.getServer().getPlayerManager().getPlayer(entry.getKey());
+			if (pendingPlayer != null && pendingPlayer.getWorld() == world && GameFunctions.isPlayerAliveAndSurvival(pendingPlayer)) {
+				iterator.remove(); SPENT.remove(entry.getKey()); sendState(pendingPlayer, VengefulSpiritStatePayload.clear()); continue;
+			}
 			if (now < entry.getValue().reviveAt()) continue;
 			iterator.remove();
 			ServerPlayerEntity spirit = world.getServer().getPlayerManager().getPlayer(entry.getKey());
@@ -187,6 +198,8 @@ public final class VengefulSpiritManager {
 	private static void revive(ServerWorld world, ServerPlayerEntity spirit, ServerPlayerEntity killer,
 			PendingRevive pending) {
 		discardBody(world, spirit.getUuid());
+		spirit.stopRiding(); spirit.setSneaking(false); spirit.setPose(net.minecraft.entity.EntityPose.STANDING);
+		spirit.fallDistance = 0.0F;
 		spirit.changeGameMode(GameMode.ADVENTURE);
 		Vec3d revivePos = findSafePosition(world, spirit, pending.deathPos(), killer.getPos());
 		spirit.teleport(world, revivePos.x, revivePos.y, revivePos.z, pending.yaw(), 0.0F);
@@ -270,7 +283,7 @@ public final class VengefulSpiritManager {
 		if (below.getCollisionShape(world, feet.down()).isEmpty() || isHazard(below)
 				|| isHazard(atFeet) || isHazard(atHead)) return false;
 		if (!world.getFluidState(feet).isEmpty() || !world.getFluidState(feet.up()).isEmpty()) return false;
-		Box moved = player.getBoundingBox().offset(candidate.subtract(player.getPos())).contract(1.0E-4D);
+		Box moved = player.getDimensions(net.minecraft.entity.EntityPose.STANDING).getBoxAt(candidate).contract(1.0E-4D);
 		return world.isSpaceEmpty(player, moved);
 	}
 
@@ -282,8 +295,13 @@ public final class VengefulSpiritManager {
 	}
 
 	private static void sendState(ServerPlayerEntity player, VengefulSpiritStatePayload payload) {
-		if (player != null && ServerPlayNetworking.canSend(player, VengefulSpiritStatePayload.ID)) {
-			ServerPlayNetworking.send(player, payload);
+		PayloadSync.sendIfChanged(player, VengefulSpiritStatePayload.ID, payload);
+	}
+
+	public static void onExternalRevive(ServerPlayerEntity player) {
+		if (player != null && PENDING.remove(player.getUuid()) != null) {
+			ACTIVE.remove(player.getUuid()); SPENT.remove(player.getUuid());
+			removeIssuedKnife(player); sendState(player, VengefulSpiritStatePayload.clear());
 		}
 	}
 
@@ -311,6 +329,7 @@ public final class VengefulSpiritManager {
 	}
 
 	private static boolean hasIssuedKnife(ServerPlayerEntity spirit) {
+		if (isIssuedKnife(spirit.currentScreenHandler.getCursorStack())) return true;
 		for (int slot = 0; slot < spirit.getInventory().size(); slot++) {
 			if (isIssuedKnife(spirit.getInventory().getStack(slot))) return true;
 		}
@@ -320,6 +339,7 @@ public final class VengefulSpiritManager {
 	private static void removeIssuedKnife(ServerPlayerEntity spirit) {
 		if (spirit == null) return;
 		boolean changed = false;
+		if (isIssuedKnife(spirit.currentScreenHandler.getCursorStack())) { spirit.currentScreenHandler.setCursorStack(ItemStack.EMPTY); changed = true; }
 		for (int slot = 0; slot < spirit.getInventory().size(); slot++) {
 			if (!isIssuedKnife(spirit.getInventory().getStack(slot))) continue;
 			spirit.getInventory().setStack(slot, ItemStack.EMPTY);

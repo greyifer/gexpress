@@ -7,11 +7,13 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import dev.mapselect.command.CommandPlayerFormat;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.item.DevWeaponSkinStamper;
 import dev.mapselect.permissions.GexpressPermissions;
 import dev.mapselect.skin.PlayerSkinComponent;
 import dev.mapselect.skin.SkinCaseManager;
+import dev.mapselect.skin.SkinDailyShop;
 import dev.mapselect.skin.WeaponSkin;
 import dev.mapselect.skin.WeaponSkinType;
 import net.minecraft.command.CommandSource;
@@ -116,6 +118,13 @@ public final class SkinCommand {
 						.executes(SkinCommand::runEquip))))
 			.then(CommandManager.literal("list")
 				.executes(SkinCommand::runList))
+			.then(CommandManager.literal("shop")
+				.then(CommandManager.literal("buy")
+					.then(CommandManager.argument("type", StringArgumentType.word())
+						.suggests(SkinCommand::suggestTypes)
+						.then(CommandManager.argument("skin", StringArgumentType.word())
+							.suggests(SkinCommand::suggestDailyOfferSkins)
+							.executes(SkinCommand::runBuyDailyOffer)))))
 			.then(CommandManager.literal("case")
 				.then(CommandManager.literal("open")
 					.then(CommandManager.argument("case", StringArgumentType.word())
@@ -142,6 +151,17 @@ public final class SkinCommand {
 	private static CompletableFuture<Suggestions> suggestGrantableSkins(CommandContext<ServerCommandSource> ctx,
 			SuggestionsBuilder builder) {
 		return CommandSource.suggestMatching(skinsForType(ctx, false), builder);
+	}
+
+	private static CompletableFuture<Suggestions> suggestDailyOfferSkins(CommandContext<ServerCommandSource> ctx,
+			SuggestionsBuilder builder) {
+		WeaponSkinType type = type(ctx);
+		ServerPlayerEntity player = ctx.getSource().getPlayer();
+		if (player == null) return builder.buildFuture();
+		return CommandSource.suggestMatching(SkinDailyShop.offers(player.getUuid()).stream()
+			.filter(offer -> type == null || offer.type() == type)
+			.map(offer -> offer.skin().id())
+			.toList(), builder);
 	}
 
 	private static CompletableFuture<Suggestions> suggestCases(CommandContext<ServerCommandSource> ctx,
@@ -187,16 +207,16 @@ public final class SkinCommand {
 		PlayerSkinComponent component = PlayerSkinComponent.KEY.get(ctx.getSource().getWorld());
 		Collection<GameProfile> profiles = GameProfileArgumentType.getProfileArgument(ctx, "players");
 		int changed = 0;
-		for (GameProfile profile : profiles) {
+		for (GameProfile profile : CommandPlayerFormat.validProfiles(profiles)) {
 			boolean ok = give
 				? component.give(profile.getId(), type, skin)
 				: component.remove(profile.getId(), type, skin);
 			if (ok) changed++;
-			ServerPlayerEntity online = ctx.getSource().getServer().getPlayerManager().getPlayer(profile.getId());
+			ServerPlayerEntity online = CommandPlayerFormat.online(ctx.getSource(), profile);
 			if (online != null) DevWeaponSkinStamper.stamp(online);
 		}
 		int finalChanged = changed;
-		ctx.getSource().sendFeedback(() -> Text.literal((give ? "Gave " : "Removed ")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal((give ? "Gave " : "Removed ")
 			+ skin.displayName() + " " + type.displayName() + " skin for " + finalChanged + " player(s).")
 			.formatted(Formatting.GREEN), true);
 		return changed;
@@ -224,6 +244,18 @@ public final class SkinCommand {
 		return SkinCaseManager.buy(player, StringArgumentType.getString(ctx, "case")) ? 1 : 0;
 	}
 
+	private static int runBuyDailyOffer(CommandContext<ServerCommandSource> ctx)
+			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+		ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
+		WeaponSkinType type = type(ctx);
+		WeaponSkin skin = skin(ctx);
+		if (type == null || skin == null) {
+			ctx.getSource().sendError(Text.literal("That daily skin offer is invalid."));
+			return 0;
+		}
+		return SkinDailyShop.buy(player, type, skin) ? 1 : 0;
+	}
+
 	private static int runCaseGrant(CommandContext<ServerCommandSource> ctx, boolean give)
 			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
 		String caseId = StringArgumentType.getString(ctx, "case");
@@ -236,14 +268,14 @@ public final class SkinCommand {
 		PlayerSkinComponent component = PlayerSkinComponent.KEY.get(ctx.getSource().getWorld());
 		Collection<GameProfile> profiles = GameProfileArgumentType.getProfileArgument(ctx, "players");
 		int changed = 0;
-		for (GameProfile profile : profiles) {
+		for (GameProfile profile : CommandPlayerFormat.validProfiles(profiles)) {
 			boolean ok = give
 				? component.giveCase(profile.getId(), skinCase.id(), amount)
 				: component.removeCase(profile.getId(), skinCase.id(), amount);
 			if (ok) changed++;
 		}
 		int finalChanged = changed;
-		ctx.getSource().sendFeedback(() -> Text.literal((give ? "Gave " : "Removed ")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal((give ? "Gave " : "Removed ")
 			+ amount + " " + skinCase.displayName() + " case(s) for " + finalChanged + " player(s).")
 			.formatted(Formatting.GREEN), true);
 		return changed;

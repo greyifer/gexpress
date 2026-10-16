@@ -1,6 +1,6 @@
 {
 	"credit": "JemSea plush - Minecraft skin UVs",
-	"parent": "gexpress:block/greyifer_plush",
+	"parent": "gexpress:block/greyifer_plush_slim",
 	"textures": {
 		"0": "gexpress:block/jemsea_plush",
 		"particle": "gexpress:block/jemsea_plush"

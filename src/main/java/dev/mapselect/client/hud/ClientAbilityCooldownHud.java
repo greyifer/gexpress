@@ -6,6 +6,7 @@ import dev.mapselect.client.role.covenant.ClientCovenantState;
 import dev.mapselect.client.role.harlequin.ClientTricksterState;
 import dev.mapselect.client.role.pelican.ClientVultureState;
 import dev.mapselect.client.role.spy.ClientSpyState;
+import dev.mapselect.client.role.rat.ClientRatState;
 
 
 import dev.doctor4t.wathe.api.Role;
@@ -27,6 +28,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.text.Text;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
 import org.ladysnake.cca.api.v3.component.ComponentKey;
@@ -69,13 +71,14 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_TIME_FREEZE = hudIcon("ability_time_freeze");
 	private static final Identifier ICON_PUPPET_STRINGS = hudIcon("ability_puppet_strings");
 	private static final Identifier ICON_PELICAN_SWALLOW = hudIcon("ability_pelican_swallow");
-	private static final Identifier ICON_SCATTER = hudIcon("ability_scatter");
 	private static final Identifier ICON_TRACKER = hudIcon("ability_track");
+	private static final Identifier ICON_VETERAN = ICON_MEDIC_SHIELD;
 	private static final Identifier ICON_SEER = ICON_TRACKER;
 	private static final Identifier ICON_TWINS = ICON_MASQUERADE;
 	private static final Identifier ICON_CUPID = ICON_MASQUERADE;
 	private static final Identifier ICON_COVENANT_BITE = ICON_HEX_KILL;
 	private static final Identifier ICON_COVENANT_BAT = ICON_MASQUERADE;
+	private static final Identifier ICON_COVENANT_TURN = hudIcon("ability_recruit_mafioso");
 	private static final Identifier ICON_ALTRUIST = hudIcon("ability_revive");
 	private static final Identifier ICON_BORROWED_SKIN = hudIcon("ability_borrowed_skin");
 	private static final Identifier ICON_SPY_BUG = hudIcon("ability_bug");
@@ -83,6 +86,10 @@ public final class ClientAbilityCooldownHud {
 	private static final Identifier ICON_JANITOR_CLEAN = hudIcon("ability_janitor");
 	private static final Identifier ICON_PICKPOCKET = null;
 	private static final Identifier ICON_COPYCAT = ICON_MASQUERADE;
+	private static final Identifier ICON_RAT_INFECT = ICON_COVENANT_BITE;
+	private static final Identifier ICON_RAT_INVISIBILITY = ICON_MASQUERADE;
+	private static final Identifier ICON_RAT_PLAY_DEAD = ICON_BORROWED_SKIN;
+	private static final Identifier ICON_RAT_JUMP = null;
 	private static final Map<String, SyncedCooldown> SYNCED = new HashMap<>();
 	private static final Map<String, Integer> EXTERNAL_TOTALS = new HashMap<>();
 	private static final Map<String, Float> VISUAL_PROGRESS = new HashMap<>();
@@ -143,11 +150,13 @@ public final class ClientAbilityCooldownHud {
 
 		int hotbarTop = context.getScaledWindowHeight() - HOTBAR_HEIGHT;
 		int rowHeight = hasIcons ? iconSize : barHeight;
-		int totalHeight = rowHeight + (bars.size() - 1) * barSpacing;
+		TextRenderer text = client.textRenderer;
+		String pelicanCursorHint = pelicanCursorHint(client);
+		int hintHeight = pelicanCursorHint.isBlank() ? 0 : text.fontHeight + 3;
+		int totalHeight = rowHeight + (bars.size() - 1) * barSpacing + hintHeight;
 		int startY = hotbarTop - hotbarTopGap - totalHeight + GexpressConfig.getAbilityHudOffsetY();
 		startY = clamp(startY, 2, context.getScaledWindowHeight() - totalHeight - 2);
 		int y = startY + (rowHeight - barHeight) / 2;
-		TextRenderer text = client.textRenderer;
 		List<String> activeVisualKeys = new ArrayList<>();
 		for (int i = 0; i < bars.size(); i++) {
 			String visualKey = visualKey(client, bars.get(i), i);
@@ -155,7 +164,22 @@ public final class ClientAbilityCooldownHud {
 			drawBar(context, text, bars.get(i), visualKey, x, y + i * barSpacing,
 				hasIcons ? iconSize : 0, hasIcons ? iconBarGap : 0, barWidth, barHeight);
 		}
+		if (!pelicanCursorHint.isBlank()) {
+			int hintX = clamp(x - iconSlotWidth, 2,
+				Math.max(2, context.getScaledWindowWidth() - text.getWidth(pelicanCursorHint) - 2));
+			int hintY = startY + rowHeight + (bars.size() - 1) * barSpacing + 2;
+			context.drawTextWithShadow(text, pelicanCursorHint, hintX, hintY, 0xFFB8C3A0);
+		}
 		VISUAL_PROGRESS.keySet().removeIf(key -> !activeVisualKeys.contains(key));
+	}
+
+	private static String pelicanCursorHint(MinecraftClient client) {
+		Role role = localRole(client);
+		if (role == null || !MapSelectRoles.VULTURE_ID.equals(role.identifier())) {
+			return "";
+		}
+		String key = ClientAbilityKeys.displayName(ClientAbilityKeys.tertiaryBinding());
+		return Text.translatable("hud.gexpress.pelican.popup_cursor_hint", key).getString();
 	}
 
 	private static List<AbilityBar> barsFor(MinecraftClient client) {
@@ -172,7 +196,15 @@ public final class ClientAbilityCooldownHud {
 		}
 
 		Identifier roleId = ClientCopycatState.effectiveRoleId(client, actualRoleId);
-		if (MapSelectRoles.MEDIC_ID.equals(roleId)) {
+        if(MapSelectRoles.LOKI_ID.equals(roleId)){
+            String[] icons={"ability_loki_voices","ability_loki_warp","ability_loki_fuse","ability_loki_clone"};
+            long[] totals={900,600,1200,1800};
+            for(int i=0;i<4;i++){
+                long active=i==3?dev.mapselect.client.role.loki.ClientLokiState.cloneRemaining():0;
+                AbilityBar bar=active>0?draining(hudIcon(icons[i]),active,3600,0xFF49B967,0xFF1B5D32):cooldown(hudIcon(icons[i]),dev.mapselect.client.role.loki.ClientLokiState.cooldown(i),totals[i],0xFF49B967,0xFF1B5D32);
+                bars.add(new AbilityBar(bar.icon(),bar.remainingTicks(),bar.progress(),bar.color(),bar.darkColor(),bar.draining(),bar.extraText(),false,false,false,0,0,0,0,i));
+            }
+        }else if (MapSelectRoles.MEDIC_ID.equals(roleId)) {
 			MedicShieldComponent comp = MedicShieldComponent.KEY.getNullable(client.world);
 			long remaining = creativePreview || comp == null ? 0L : comp.cooldownRemainingTicks(playerId);
 			bars.add(cooldown(ICON_MEDIC_SHIELD, remaining, GexpressConfig.getMedicShieldCooldownSeconds() * 20L,
@@ -197,12 +229,11 @@ public final class ClientAbilityCooldownHud {
 			bars.add(cooldown(ICON_HEX_KILL, kill, GexpressConfig.getWarlockKillCooldownSeconds() * 20L,
 				0xFFFF4A55, 0xFF7C151F, "", true));
 		} else if (MapSelectRoles.JUGGERNAUT_ID.equals(roleId)) {
-			bars.add(syncedOrReady(AbilityCooldownPayload.JUGGERNAUT_WEAPONS, ICON_JUGGERNAUT_WEAPONS,
-				GexpressConfig.getJuggernautInitialCooldownSeconds() * 20L, 0xFFFF7A42, 0xFF7A2418));
-			if (SYNCED.containsKey(AbilityCooldownPayload.JUGGERNAUT_SHIELD)) {
-				bars.add(syncedOrReady(AbilityCooldownPayload.JUGGERNAUT_SHIELD, ICON_MEDIC_SHIELD,
-					GexpressConfig.getJuggernautShieldRechargeSeconds() * 20L, 0xFF9DEBFF, 0xFF225B72));
-				}
+			// Weapon cooldowns are already shown directly on the knife and revolver.
+			bars.add(syncedOrReady(AbilityCooldownPayload.JUGGERNAUT_DOOR_BREAK,
+				ICON_JUGGERNAUT_WEAPONS,
+				dev.mapselect.role.juggernaut.JuggernautManager.DOOR_BREAK_COOLDOWN_TICKS,
+				0xFFE15B44, 0xFF6D1E17));
 		} else if (MapSelectRoles.TIME_MASTER_ID.equals(roleId)) {
 			TimeMasterComponent comp = TimeMasterComponent.KEY.getNullable(client.world);
 			long rewindRemaining = creativePreview || comp == null ? 0L : comp.cooldownRemainingTicks(playerId);
@@ -232,9 +263,6 @@ public final class ClientAbilityCooldownHud {
 		} else if (MapSelectRoles.PUPPETMASTER_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PUPPETMASTER_CONTROL, ICON_PUPPET_STRINGS,
 				GexpressConfig.getPuppetmasterControlCooldownSeconds() * 20L, 0xFFFF5368, 0xFF741323));
-		} else if (MapSelectRoles.SCATTER_BRAIN_ID.equals(roleId)) {
-			bars.add(syncedOrReady(AbilityCooldownPayload.SCATTER_BRAIN_SCATTER, ICON_SCATTER,
-				GexpressConfig.getScatterBrainCooldownSeconds() * 20L, 0xFFFF8A4C, 0xFF8B2E16));
 		} else if (MapSelectRoles.SKINCRAWLER_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.SKINCRAWLER_STEAL, ICON_MASQUERADE,
 				GexpressConfig.getSkincrawlerCooldownSeconds() * 20L, 0xFFB05A66, 0xFF4D161D));
@@ -242,13 +270,13 @@ public final class ClientAbilityCooldownHud {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PAINTER_BODY, ICON_BORROWED_SKIN,
 				Math.max(GexpressConfig.getPainterBodyCooldownSeconds(),
 					GexpressConfig.getPainterPlayerCooldownSeconds()) * 20L, 0xFFC65BFF, 0xFF512069));
-			bars.add(syncedOrReady(AbilityCooldownPayload.PAINTER_DOORWAY, ICON_MASQUERADE,
-				GexpressConfig.getPainterDoorwayCooldownSeconds() * 20L, 0xFFB45BFF, 0xFF3D1761, "", true));
 		} else if (MapSelectRoles.SPY_ID.equals(roleId)) {
 			long active = ClientSpyState.activeRemainingTicks();
 			if (active > 0L) {
 				bars.add(draining(ICON_TRACKER, active, GexpressConfig.getSpyBugDurationSeconds() * 20L,
 					0xFF77C7FF, 0xFF234F7A));
+				bars.add(secondaryMeter(ICON_SPY_BUG, ClientSpyState.listenEnergy(),
+					ClientSpyState.isListening() ? 0xFF8FEAFF : 0xFF68BBD8, 0xFF1E5064));
 			} else {
 				bars.add(moneyCooldown(ICON_TRACKER, 0L, 1L, 0xFF77C7FF, 0xFF234F7A,
 					GexpressConfig.getSpyBugCost(), moneyBalance(client.player)));
@@ -259,6 +287,15 @@ public final class ClientAbilityCooldownHud {
 		} else if (MapSelectRoles.TRACKER_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.TRACKER_TRACK, ICON_TRACKER,
 				GexpressConfig.getTrackerCooldownSeconds() * 20L, 0xFF58B7FF, 0xFF1F4D7A));
+		} else if (MapSelectRoles.SNIFFER_ID.equals(roleId)) {
+			bars.add(syncedOrReady(AbilityCooldownPayload.SNIFFER_SNIFF, ICON_TRACKER,
+				dev.mapselect.role.sniffer.SnifferManager.SNIFF_COOLDOWN_TICKS,
+				0xFFD8B36A, 0xFF61451E));
+		} else if (MapSelectRoles.VETERAN_ID.equals(roleId)) {
+			bars.add(syncedOrReadyUses(AbilityCooldownPayload.VETERAN_ALERT, ICON_VETERAN,
+				dev.mapselect.role.veteran.VeteranManager.ALERT_DURATION_TICKS,
+				0xFFE0A866, 0xFF6B421E,
+				GexpressConfig.getVeteranMaxUses(), false));
 		} else if (MapSelectRoles.SEER_ID.equals(roleId)) {
 			bars.add(syncedCharge(AbilityCooldownPayload.SEER_COMPARE, ICON_SEER,
 				GexpressConfig.getSeerCompareDeathsRequired(), 0xFFD94B66, 0xFF6E1D31));
@@ -282,6 +319,8 @@ public final class ClientAbilityCooldownHud {
 					bars.add(cooldown(ICON_COVENANT_BAT, Math.max(0L, batMax - batTicks), batMax,
 						0xFFB88BFF, 0xFF4A2868, "", true));
 				}
+				bars.add(meter(ICON_COVENANT_TURN, ClientCovenantState.turnReadiness(),
+					0xFFFF7185, 0xFF6C101D, true));
 			}
 		} else if (MapSelectRoles.GODFATHER_ID.equals(roleId)) {
 			if (SYNCED.containsKey(AbilityCooldownPayload.GODFATHER_RECRUIT_MAFIOSO)) {
@@ -306,6 +345,16 @@ public final class ClientAbilityCooldownHud {
 		} else if (MapSelectRoles.PICKPOCKET_ID.equals(roleId)) {
 			bars.add(syncedOrReady(AbilityCooldownPayload.PICKPOCKET_STEAL, ICON_PICKPOCKET,
 				GexpressConfig.getPickpocketMaxHoldSeconds() * 20L, 0xFFD0D0D0, 0xFF4F4F4F));
+		} else if (MapSelectRoles.RAT_ID.equals(roleId)) {
+			bars.add(syncedOrReady(AbilityCooldownPayload.RAT_INFECT, ICON_RAT_INFECT,
+				dev.mapselect.role.rat.RatManager.INFECT_COOLDOWN_TICKS,
+				0xFFD7B784, 0xFF59462E));
+			bars.add(secondaryMeter(ICON_RAT_INVISIBILITY, ClientRatState.invisibilityCharge(),
+				0xFF9A86B7, 0xFF3A2B52));
+			bars.add(tertiaryToggle(ICON_RAT_PLAY_DEAD, ClientRatState.isPlayingDead(),
+				0xFFD7B784, 0xFF59462E, "Playing dead"));
+			bars.add(passiveCooldown(ICON_RAT_JUMP, ClientRatState.jumpCooldownRemainingTicks(),
+				ClientRatState.JUMP_COOLDOWN_TICKS, 0xFFE8C47D, 0xFF5C4728, "Jump"));
 		}
 		if (bars.isEmpty()) {
 			addExternalAbilityBar(client, roleId, role, bars);
@@ -334,11 +383,11 @@ public final class ClientAbilityCooldownHud {
 		if (MapSelectRoles.TRICKSTER_ID.equals(roleId)) return ICON_MASQUERADE;
 		if (MapSelectRoles.TIME_MASTER_ID.equals(roleId)) return ICON_TIME_REWIND;
 		if (MapSelectRoles.PUPPETMASTER_ID.equals(roleId)) return ICON_PUPPET_STRINGS;
-		if (MapSelectRoles.SCATTER_BRAIN_ID.equals(roleId)) return ICON_SCATTER;
 		if (MapSelectRoles.SKINCRAWLER_ID.equals(roleId)) return ICON_BORROWED_SKIN;
 		if (MapSelectRoles.SPY_ID.equals(roleId)) return ICON_SPY_BUG;
 		if (MapSelectRoles.VULTURE_ID.equals(roleId)) return ICON_PELICAN_SWALLOW;
 		if (MapSelectRoles.TRACKER_ID.equals(roleId)) return ICON_TRACKER;
+		if (MapSelectRoles.VETERAN_ID.equals(roleId)) return ICON_VETERAN;
 		if (MapSelectRoles.SEER_ID.equals(roleId)) return ICON_SEER;
 		if (MapSelectRoles.TWINS_ID.equals(roleId)) return ICON_TWINS;
 		if (MapSelectRoles.CUPID_ID.equals(roleId)) return ICON_CUPID;
@@ -349,6 +398,7 @@ public final class ClientAbilityCooldownHud {
 		if (MapSelectRoles.GODFATHER_ID.equals(roleId)) return ICON_MAFIA;
 		if (MapSelectRoles.JANITOR_ID.equals(roleId)) return ICON_JANITOR_CLEAN;
 		if (MapSelectRoles.PICKPOCKET_ID.equals(roleId)) return ICON_PICKPOCKET;
+		if (MapSelectRoles.RAT_ID.equals(roleId)) return ICON_RAT_INFECT;
 		return ICON_COPYCAT;
 	}
 
@@ -651,8 +701,16 @@ public final class ClientAbilityCooldownHud {
 			String extraText, boolean secondaryKey) {
 		long total = Math.max(1L, totalTicks);
 		float progress = remainingTicks <= 0L ? 1.0F : 1.0F - Math.min(1.0F, remainingTicks / (float) total);
-		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, extraText == null ? "" : extraText,
-			secondaryKey, 0, 0, 0, 0);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, false, extraText == null ? "" : extraText,
+			secondaryKey, false, false, 0, 0, 0, 0);
+	}
+
+	private static AbilityBar passiveCooldown(Identifier icon, long remainingTicks, long totalTicks, int color,
+			int darkColor, String extraText) {
+		long total = Math.max(1L, totalTicks);
+		float progress = remainingTicks <= 0L ? 1.0F : 1.0F - Math.min(1.0F, remainingTicks / (float) total);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, false,
+			extraText == null ? "" : extraText, false, false, true, 0, 0, 0, 0);
 	}
 
 	private static AbilityBar moneyCooldown(Identifier icon, long remainingTicks, long totalTicks, int color,
@@ -663,8 +721,8 @@ public final class ClientAbilityCooldownHud {
 		float progress = remainingTicks <= 0L
 			? (cost > 0 ? Math.min(1.0F, balance / (float) cost) : 1.0F)
 			: 1.0F - Math.min(1.0F, remainingTicks / (float) total);
-		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, "",
-			false, 0, 0, cost, balance);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, false, "",
+			false, false, false, 0, 0, cost, balance);
 	}
 
 	private static AbilityBar draining(Identifier icon, long remainingTicks, long totalTicks, int color, int darkColor) {
@@ -675,7 +733,8 @@ public final class ClientAbilityCooldownHud {
 			boolean secondaryKey) {
 		long total = Math.max(1L, totalTicks);
 		float progress = Math.min(1.0F, remainingTicks / (float) total);
-		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, "", secondaryKey, 0, 0, 0, 0);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, true, "",
+			secondaryKey, false, false, 0, 0, 0, 0);
 	}
 
 	private static AbilityBar usesCooldown(Identifier icon, long remainingTicks, long totalTicks, int color,
@@ -689,18 +748,48 @@ public final class ClientAbilityCooldownHud {
 		float progress = remainingTicks <= 0L ? 1.0F : 1.0F - Math.min(1.0F, remainingTicks / (float) total);
 		int segments = Math.max(0, maxUses);
 		int filled = segments <= 0 ? 0 : Math.max(0, Math.min(segments, usesRemaining));
-		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, "", secondaryKey, segments, filled, 0, 0);
+		return new AbilityBar(icon, remainingTicks, progress, color, darkColor, false, "",
+			secondaryKey, false, false, segments, filled, 0, 0);
 	}
 
 	private static AbilityBar empty(Identifier icon, int color, int darkColor, boolean secondaryKey) {
-		return new AbilityBar(icon, 0L, 0.0F, color, darkColor, "", secondaryKey, 0, 0, 0, 0);
+		return new AbilityBar(icon, 0L, 0.0F, color, darkColor, false, "",
+			secondaryKey, false, false, 0, 0, 0, 0);
 	}
 
 	private static AbilityBar charge(Identifier icon, int charges, int required, int color, int darkColor) {
+		return charge(icon, charges, required, color, darkColor, false);
+	}
+
+	private static AbilityBar charge(Identifier icon, int charges, int required, int color, int darkColor,
+			boolean secondaryKey) {
 		int max = Math.max(1, required);
 		int filled = Math.max(0, Math.min(max, charges));
-		return new AbilityBar(icon, 0L, filled / (float) max, color, darkColor,
-			filled + "/" + max, false, 0, 0, 0, 0);
+		return new AbilityBar(icon, 0L, filled / (float) max, color, darkColor, false,
+			filled + "/" + max, secondaryKey, false, false, 0, 0, 0, 0);
+	}
+
+	private static AbilityBar unavailable(Identifier icon, int color, int darkColor, String text,
+			boolean secondaryKey) {
+		return new AbilityBar(icon, 0L, 0.0F, color, darkColor, false,
+			text == null ? "" : text, secondaryKey, false, false, 0, 0, 0, 0);
+	}
+
+	private static AbilityBar meter(Identifier icon, float progress, int color, int darkColor,
+			boolean tertiaryKey) {
+		return new AbilityBar(icon, 0L, Math.max(0.0F, Math.min(1.0F, progress)), color, darkColor,
+			false, "", false, tertiaryKey, false, 0, 0, 0, 0);
+	}
+
+	private static AbilityBar secondaryMeter(Identifier icon, float progress, int color, int darkColor) {
+		return new AbilityBar(icon, 0L, Math.max(0.0F, Math.min(1.0F, progress)), color, darkColor,
+			false, "", true, false, false, 0, 0, 0, 0);
+	}
+
+	private static AbilityBar tertiaryToggle(Identifier icon, boolean active, int color, int darkColor,
+			String activeText) {
+		return new AbilityBar(icon, 0L, active ? 0.0F : 1.0F, color, darkColor,
+			false, active ? activeText : "", false, true, false, 0, 0, 0, 0);
 	}
 
 	private static void drawBar(DrawContext context, TextRenderer text, AbilityBar bar, String visualKey, int x, int y,
@@ -744,6 +833,10 @@ public final class ClientAbilityCooldownHud {
 		String sideText = "";
 		if (bar.remainingTicks() > 0L) {
 			sideText = Math.max(1L, (bar.remainingTicks() + 19L) / 20L) + "s";
+		} else if (bar.segments() > 0) {
+			sideText = Math.max(0, bar.filledSegments()) + "/" + Math.max(0, bar.segments());
+		} else if (bar.moneyCost() <= 0 && bar.extraText().isBlank() && bar.progress() >= 0.99F) {
+			sideText = "Ready";
 		}
 		if (!bar.extraText().isBlank()) {
 			sideText = sideText.isEmpty() ? bar.extraText() : sideText + " " + bar.extraText();
@@ -770,7 +863,8 @@ public final class ClientAbilityCooldownHud {
 		Identifier role = localRole == null ? null : localRole.identifier();
 		return (role == null ? "unknown" : role.toString()) + ":" + index + ":"
 			+ (bar.icon() == null ? "none" : bar.icon().toString()) + ":"
-			+ bar.color() + ":" + bar.darkColor() + ":" + bar.secondaryKey();
+			+ bar.color() + ":" + bar.darkColor() + ":" + bar.secondaryKey() + ":"
+			+ bar.tertiaryKey() + ":" + bar.hideKeybind() + ":" + bar.draining();
 	}
 
 	private static float smoothedProgress(String key, float target) {
@@ -799,10 +893,11 @@ public final class ClientAbilityCooldownHud {
 	}
 
 	private static String keyTextFor(AbilityBar bar) {
-		if (bar == null) return "";
-		return ClientAbilityKeys.displayName(bar.secondaryKey()
-			? ClientAbilityKeys.secondaryBinding()
-			: ClientAbilityKeys.primaryBinding());
+		if (bar == null || bar.hideKeybind()) return "";
+        if(bar.keyIndex()>=0)return ClientAbilityKeys.displayName(switch(bar.keyIndex()){case 1->ClientAbilityKeys.secondaryBinding();case 2->ClientAbilityKeys.tertiaryBinding();case 3->ClientAbilityKeys.quaternaryBinding();default->ClientAbilityKeys.primaryBinding();});
+		return ClientAbilityKeys.displayName(bar.tertiaryKey()
+			? ClientAbilityKeys.tertiaryBinding()
+			: bar.secondaryKey() ? ClientAbilityKeys.secondaryBinding() : ClientAbilityKeys.primaryBinding());
 	}
 
 	private static int scaled(int value, float scale) {
@@ -878,8 +973,13 @@ public final class ClientAbilityCooldownHud {
 	}
 
 	private record AbilityBar(Identifier icon, long remainingTicks, float progress, int color, int darkColor,
-	                          String extraText, boolean secondaryKey, int segments, int filledSegments,
-	                          int moneyCost, int moneyBalance) {}
+	                          boolean draining, String extraText, boolean secondaryKey, boolean tertiaryKey,
+	                          boolean hideKeybind,
+	                          int segments, int filledSegments, int moneyCost, int moneyBalance, int keyIndex) {
+        AbilityBar(Identifier icon,long remainingTicks,float progress,int color,int darkColor,boolean draining,String extraText,boolean secondaryKey,boolean tertiaryKey,boolean hideKeybind,int segments,int filledSegments,int moneyCost,int moneyBalance){
+            this(icon,remainingTicks,progress,color,darkColor,draining,extraText,secondaryKey,tertiaryKey,hideKeybind,segments,filledSegments,moneyCost,moneyBalance,-1);
+        }
+    }
 
 	private record ExternalAbility(Identifier componentId, Identifier icon, long defaultTotalTicks) {}
 

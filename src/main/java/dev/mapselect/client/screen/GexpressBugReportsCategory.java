@@ -1,33 +1,21 @@
 package dev.mapselect.client.screen;
 
-import com.google.common.collect.ImmutableList;
-import dev.isxander.yacl3.api.ConfigCategory;
-import dev.isxander.yacl3.api.CustomTabProvider;
-import dev.isxander.yacl3.api.OptionGroup;
-import dev.isxander.yacl3.gui.YACLScreen;
-import dev.isxander.yacl3.gui.tab.TabExt;
+import io.github.caspe.glib.api.client.editor.GlibContentScreen;
+import io.github.caspe.glib.api.client.ui.GlibUi;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.tab.Tab;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Consumer;
 
 public final class GexpressBugReportsCategory {
 	private static BugReportStore.Category draftCategory = BugReportStore.Category.MISCELLANEOUS;
@@ -35,79 +23,20 @@ public final class GexpressBugReportsCategory {
 
 	private GexpressBugReportsCategory() {}
 
-	public static ConfigCategory build(Screen parent) {
-		return new BugReportsCategory();
-	}
-
-	private static final class BugReportsCategory implements ConfigCategory, CustomTabProvider {
-		private final Text name = Text.literal("Bug Reports");
-		private final Text tooltip = Text.literal("Submit G'Express bug reports to the Discord forum.");
-
-		@Override
-		public @NotNull Text name() {
-			return name;
-		}
-
-		@Override
-		public @NotNull ImmutableList<OptionGroup> groups() {
-			return ImmutableList.of();
-		}
-
-		@Override
-		public @NotNull Text tooltip() {
-			return tooltip;
-		}
-
-		@Override
-		public Tab createTab(YACLScreen screen, ScreenRect tabArea) {
-			return new BugReportsTab(screen, tabArea, tooltip);
-		}
-	}
-
-	private static final class BugReportsTab implements TabExt {
-		private final BugReportsWidget panel;
-		private final ButtonWidget doneButton;
-		private final Tooltip tooltip;
-
-		private BugReportsTab(YACLScreen screen, ScreenRect tabArea, Text tooltipText) {
-			this.panel = new BugReportsWidget(tabArea.getLeft(), tabArea.getTop(), tabArea.width(), tabArea.height());
-			this.doneButton = ButtonWidget.builder(ScreenTexts.DONE, button -> screen.finishOrSave())
-				.size(Math.max(90, screen.width / 6), 20)
-				.build();
-			this.tooltip = Tooltip.of(tooltipText);
-			refreshGrid(tabArea);
-		}
-
-		@Override
-		public Text getTitle() {
-			return Text.literal("Bug Reports");
-		}
-
-		@Override
-		public void forEachChild(Consumer<ClickableWidget> consumer) {
-			consumer.accept(panel);
-			consumer.accept(doneButton);
-		}
-
-		@Override
-		public void refreshGrid(ScreenRect tabArea) {
-			panel.setDimensionsAndPosition(tabArea.width(), tabArea.height() - 30, tabArea.getLeft(), tabArea.getTop());
-			doneButton.setDimensionsAndPosition(Math.max(90, tabArea.width() / 5), 20,
-				tabArea.getLeft() + tabArea.width() - Math.max(90, tabArea.width() / 5) - 12,
-				tabArea.getBottom() - 24);
-		}
-
-		@Override
-		public @Nullable Tooltip getTooltip() {
-			return tooltip;
-		}
+	public static Screen createGlibScreen(Screen parent) {
+		return GlibContentScreen.builder(parent, Text.literal("Bug Reports"))
+			.subtitle(Text.literal("Submit and review G'Express reports."))
+			.accentColor(0xFFFF718D)
+			.content((host, rect) -> new BugReportsWidget(rect.x() + 4, rect.y() + 4,
+				rect.width() - 8, rect.height() - 8))
+			.build();
 	}
 
 	private static final class BugReportsWidget extends ClickableWidget {
-		private static final int PANEL = 0xCC151B22;
-		private static final int PANEL_SOFT = 0x88232B35;
-		private static final int BORDER = 0x66586A7E;
-		private static final int FIELD = 0xDD0E1319;
+		private static final int PANEL = 0xE0161D28;
+		private static final int PANEL_SOFT = 0xC019222E;
+		private static final int BORDER = 0x80394655;
+		private static final int FIELD = 0xE8171E28;
 		private static final int GOLD = 0xFFE6C56A;
 		private static final int BLUE = 0xFF7FB6FF;
 		private static final int GREEN = 0xFF74D990;
@@ -157,7 +86,7 @@ public final class GexpressBugReportsCategory {
 		private void drawWriter(DrawContext context, TextRenderer tr, int x, int y, int w, int h,
 				int mouseX, int mouseY) {
 			fillPanel(context, x, y, w, h);
-			context.fill(x + 1, y + 1, x + w - 1, y + 44, 0x55293642);
+			context.fill(x + 1, y + 1, x + w - 1, y + 44, 0x22293642);
 			context.drawTextWithShadow(tr, Text.literal("New Bug Report").formatted(Formatting.BOLD), x + 12, y + 10, TEXT);
 			List<OrderedText> intro = tr.wrapLines(Text.literal("Sent to the configured Discord forum through the bot."), w - 24);
 			for (int i = 0; i < Math.min(2, intro.size()); i++) {
@@ -274,14 +203,14 @@ public final class GexpressBugReportsCategory {
 		private void drawReport(DrawContext context, TextRenderer tr, BugReportStore.RemoteReport report,
 				int x, int y, int w, int h, int mouseX, int mouseY) {
 			int accent = reportAccent(report.status());
-			context.fill(x, y, x + w, y + h, "open".equalsIgnoreCase(report.status()) ? 0x7732241A : PANEL_SOFT);
+			context.fill(x, y, x + w, y + h, "open".equalsIgnoreCase(report.status()) ? 0x4432241A : PANEL_SOFT);
 			context.drawBorder(x, y, w, h, BORDER);
-			context.fill(x, y, x + 3, y + h, accent);
+			context.fill(x + 10, y + h - 3, x + w - 10, y + h - 1, accent);
 			String title = report.id() + "  " + report.title();
 			context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(title, w - 18)), x + 8, y + 7, accent);
 			String meta = statusLabel(report.status()) + " | " + report.category() + " | " + reporter(report) + " | " + shortDate(report.updatedAt());
 			context.drawTextWithShadow(tr, Text.literal(tr.trimToWidth(meta, w - 16)), x + 8, y + 21, MUTED);
-			List<OrderedText> body = tr.wrapLines(Text.literal(report.description().replaceAll("\\s+", " ")), w - 16);
+			List<OrderedText> body = tr.wrapLines(Text.literal(GlibUi.singleLine(report.description())), w - 16);
 			for (int i = 0; i < Math.min(2, body.size()); i++) {
 				context.drawTextWithShadow(tr, body.get(i), x + 8, y + 36 + i * 10, i == 0 ? TEXT : MUTED);
 			}
@@ -367,17 +296,16 @@ public final class GexpressBugReportsCategory {
 		}
 
 		private void fillPanel(DrawContext context, int x, int y, int w, int h) {
-			context.fill(x, y, x + w, y + h, PANEL);
-			context.drawBorder(x, y, w, h, BORDER);
-			context.fill(x, y, x + w, y + 2, 0xAAE6C56A);
+			GlibUi.drawPanel(context, x, y, w, h, PANEL, BORDER);
+			context.fill(x, y, x + 3, y + h, 0xCCFF718D);
 		}
 
 		private void drawButton(DrawContext context, TextRenderer tr, String label, int x, int y, int w, int h,
 				int mouseX, int mouseY, int accent, Runnable action) {
 			boolean hovered = contains(mouseX, mouseY, x, y, w, h);
-			context.fill(x, y, x + w, y + h, hovered ? 0xCC2E3A46 : 0xAA202832);
-			context.drawBorder(x, y, w, h, hovered ? 0xFFE8EDF2 : BORDER);
-			context.fill(x, y, x + 3, y + h, accent);
+			context.fill(x, y, x + w, y + h, hovered ? 0xE02B3340 : 0xE01D2430);
+			context.drawBorder(x, y, w, h, hovered ? accent : BORDER);
+			context.fill(x, y + h - 2, x + w, y + h, accent);
 			context.drawCenteredTextWithShadow(tr, Text.literal(tr.trimToWidth(label, w - 10)),
 				x + w / 2, y + (h - 8) / 2, TEXT);
 			buttons.add(new HitButton(x, y, w, h, action));

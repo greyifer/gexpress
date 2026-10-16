@@ -3,28 +3,32 @@ import dev.mapselect.client.ability.ClientAbilityTargetState;
 import dev.mapselect.client.ambience.ClientFreshAirAmbienceState;
 import dev.mapselect.client.game.ClientNeutralWinState;
 import dev.mapselect.client.game.ClientRenderDistanceGuard;
+import dev.mapselect.client.game.ClientAutomaticGameHud;
+import dev.mapselect.client.game.ClientDraftState;
 import dev.mapselect.client.game.ClientRoundEndRoleRoster;
 import dev.mapselect.client.game.ClientSpectatorRoleRevealDelay;
 import dev.mapselect.client.hud.ClientAbilityCooldownHud;
 import dev.mapselect.client.hud.ClientKnifeChargeHud;
 import dev.mapselect.client.hud.ClientLevelHud;
 import dev.mapselect.client.hud.ClientStaminaBarFix;
+import dev.mapselect.client.leaderboard.ClientLeaderboardState;
 import dev.mapselect.client.input.ClientAbilityKeys;
 import dev.mapselect.client.input.ClientDeadGuidebookKey;
 import dev.mapselect.client.input.ClientSpectatorVoiceKeys;
 import dev.mapselect.client.modifier.lovers.ClientLoversState;
 import dev.mapselect.client.modifier.muted.ClientMutedPreferenceState;
 import dev.mapselect.client.modifier.shortsighted.ClientShortSightedState;
+import dev.mapselect.client.poll.ClientLobbyPollState;
 import dev.mapselect.client.render.C4BackFeatureRenderer;
 import dev.mapselect.client.render.CoinBarrierBlockEntityRenderer;
-import dev.mapselect.client.render.ClientPainterDoorwayRenderer;
 import dev.mapselect.client.render.AxiomClientRefresh;
 import dev.mapselect.client.render.DevWeaponModels;
 import dev.mapselect.client.render.DoorKeyEngravingRenderer;
 import dev.mapselect.client.render.FusedOrnamentBlockEntityRenderer;
 import dev.mapselect.client.render.GoldBeveragePlateBlockEntityRenderer;
 import dev.mapselect.client.render.GreyiferPlushBlockEntityRenderer;
-import dev.mapselect.client.render.TutorialPassengerEntityRenderer;
+import dev.mapselect.client.render.LargeWoodDoorBlockEntityRenderer;
+import dev.mapselect.client.render.LeaderboardBlockEntityRenderer;
 import dev.mapselect.client.render.TwinBodyEntityRenderer;
 import dev.mapselect.client.role.altruist.ClientAltruistState;
 import dev.mapselect.client.role.bodyguard.ClientBodyguardState;
@@ -32,9 +36,12 @@ import dev.mapselect.client.role.bountyhunter.ClientBountyHunterState;
 import dev.mapselect.client.role.copycat.ClientCopycatState;
 import dev.mapselect.client.role.covenant.ClientCovenantState;
 import dev.mapselect.client.role.cupid.ClientCupidState;
+import dev.mapselect.client.role.cataloger.ClientCatalogerState;
 import dev.mapselect.client.role.guardian.ClientGuardianAngelState;
 import dev.mapselect.client.role.harlequin.ClientTricksterState;
 import dev.mapselect.client.role.juggernaut.ClientJuggernautState;
+import dev.mapselect.client.role.juggernaut.ClientJuggernautDoorHover;
+import dev.mapselect.client.render.ClientJuggernautDoorAnimation;
 import dev.mapselect.client.role.mafia.ClientJanitorState;
 import dev.mapselect.client.role.mafia.ClientMafiaState;
 import dev.mapselect.client.role.medic.ClientMedicShieldState;
@@ -42,25 +49,25 @@ import dev.mapselect.client.role.medic.ClientMedicState;
 import dev.mapselect.client.role.painter.ClientPainterState;
 import dev.mapselect.client.role.pelican.ClientVultureState;
 import dev.mapselect.client.role.puppetmaster.ClientPuppetmasterState;
-import dev.mapselect.client.role.scatterbrain.ClientScatterBrainState;
 import dev.mapselect.client.role.seer.ClientSeerState;
 import dev.mapselect.client.role.silent.ClientSilentShadowState;
 import dev.mapselect.client.role.skincrawler.ClientSkincrawlerState;
 import dev.mapselect.client.role.snitch.ClientSnitchState;
+import dev.mapselect.client.role.sniffer.ClientSnifferState;
 import dev.mapselect.client.role.spy.ClientSpyState;
 import dev.mapselect.client.role.spy.SpyBugFeatureRenderer;
 import dev.mapselect.client.role.timemaster.ClientTimeMasterFreezeState;
 import dev.mapselect.client.role.timemaster.ClientTimeMasterRewindState;
 import dev.mapselect.client.role.timemaster.ClientTimeMasterState;
 import dev.mapselect.client.role.tracker.ClientTrackerState;
+import dev.mapselect.client.role.veteran.ClientVeteranState;
 import dev.mapselect.client.role.twins.ClientTwinsState;
 import dev.mapselect.client.role.vengeful.ClientVengefulSpiritState;
 import dev.mapselect.client.role.warlock.ClientWarlockState;
-import dev.mapselect.client.skin.BlockbenchSkinImporter;
-import dev.mapselect.client.tutorial.ClientTutorialExperience;
-import dev.mapselect.client.tutorial.ClientTutorialState;
-
-
+import dev.mapselect.client.role.rat.ClientRatState;
+import dev.mapselect.client.role.rat.ClientRatTrapGlow;
+import dev.mapselect.client.role.doomsayer.ClientDoomsayerState;
+import dev.mapselect.client.render.RatTrapEntityRenderer;
 import cat.rezelyn.watheextended.client.screen.GuidebookScreen;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.item.DevWeaponSkinStamper;
@@ -68,31 +75,36 @@ import dev.mapselect.client.effect.ClientBlackWhiteOverlay;
 import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.client.preset.ClientTrainPresetCache;
 import dev.mapselect.client.screen.GexpressSkinsCategory;
+import dev.mapselect.client.screen.GexpressOptionsScreen;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.network.config.GexpressConfigSyncPayload;
 import dev.mapselect.network.config.GexpressDevTuningPayload;
 import dev.mapselect.network.config.GexpressTaskConfigPayload;
+import dev.mapselect.network.config.SkinShopConfigPayload;
 import dev.mapselect.network.config.PuppetmasterConfigPayload;
+import dev.mapselect.network.config.DoomsayerConfigPayload;
 import dev.mapselect.network.coinbarrier.CoinBarrierEditOpenPayload;
 import dev.mapselect.network.coinbarrier.CoinBarrierPurchaseOpenPayload;
 import dev.mapselect.network.floatingtext.FloatingTextEditOpenPayload;
 import dev.mapselect.network.bugreport.BugReportListPayload;
 import dev.mapselect.network.progression.SkinCaseResultPayload;
-import dev.mapselect.network.progression.ImportedSkinCatalogPayload;
-import dev.mapselect.network.progression.ImportedSkinImportResultPayload;
 import dev.mapselect.client.screen.CoinBarrierEditScreen;
 import dev.mapselect.client.screen.CoinBarrierPurchaseScreen;
 import dev.mapselect.client.screen.FloatingTextEditScreen;
 import dev.mapselect.client.screen.BugReportStore;
+import dev.mapselect.game.GexpressWorlds;
 import dev.mapselect.role.GexpressRoleAnnouncementTexts;
 import dev.mapselect.registry.MapSelectBlockEntities;
 import dev.mapselect.registry.MapSelectBlocks;
 import dev.mapselect.registry.MapSelectEntities;
 import dev.mapselect.registry.MapSelectParticles;
 import dev.mapselect.client.particle.SandDriftParticle;
+import io.github.caspe.glib.api.client.social.GlibSocialAccess;
+import io.github.caspe.glib.api.room.GlibRoomAccess;
+import dev.mapselect.permissions.GexpressPermissions;
+import dev.mapselect.skin.SkinShopConfig;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -119,23 +131,29 @@ public class MapSelectClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		java.util.Arrays.fill(LAST_SOUND_VOLUMES, -1.0F);
-		ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
-			BlockbenchSkinImporter.refreshGeneratedModels(client).exceptionally(error -> {
-				dev.mapselect.MapSelect.LOGGER.warn("Failed to prepare imported skin models.", error);
-				return null;
-			});
+		GlibRoomAccess.setClientAccess(() -> {
+			MinecraftClient client = MinecraftClient.getInstance();
+			return client.player != null && GexpressPermissions.canUseVirtualRooms(client.player);
 		});
+		GlibSocialAccess.registerRestriction("gexpress:active_game",
+			MapSelectClient::isGexpressGameActive,
+			Text.literal("Friends & Chat is unavailable during a G'Express game."));
 		GexpressRoleAnnouncementTexts.register();
+		GexpressOptionsScreen.registerClient();
 		registerConfigReceiver();
 		ClientAbilityKeys.register();
-		ClientTutorialState.register();
-		ClientTutorialExperience.register();
 		ClientMutedPreferenceState.register();
 		ClientRenderDistanceGuard.register();
+		ClientAutomaticGameHud.register();
+		ClientDraftState.register();
+		ClientLobbyPollState.register();
 		AxiomClientRefresh.register();
 		ClientSpectatorRoleRevealDelay.register();
 		ClientSpectatorVoiceKeys.register();
+		dev.mapselect.client.replay.ClientReplay.register();
+        dev.mapselect.client.render.GrenadeTrajectoryRenderer.register();
 		ClientLevelHud.register();
+		ClientLeaderboardState.register();
 		registerPlushTooltips();
 		ClientStaminaBarFix.register();
 		ClientDeadGuidebookKey.register();
@@ -155,28 +173,37 @@ public class MapSelectClient implements ClientModInitializer {
 		ClientSilentShadowState.register();
 		ClientWarlockState.register();
 		ClientJuggernautState.register();
+		ClientJuggernautDoorAnimation.register();
+		ClientJuggernautDoorHover.register();
 		ClientTricksterState.register();
 		ClientPuppetmasterState.register();
-		ClientScatterBrainState.register();
 		ClientSkincrawlerState.register();
 		ClientPainterState.register();
 		ClientSpyState.register();
 		ClientVultureState.register();
 		ClientTrackerState.register();
+		ClientVeteranState.register();
 		ClientTwinsState.register();
 		ClientAltruistState.register();
+		ClientSnifferState.register();
 		ClientMafiaState.register();
 		ClientCopycatState.register();
 		ClientJanitorState.register();
 		ClientBountyHunterState.register();
 		ClientCovenantState.register();
+		ClientRatState.register();
+		ClientRatTrapGlow.register();
+		ClientDoomsayerState.register();
+		ClientCatalogerState.register();
+        dev.mapselect.client.role.counterfeiter.ClientCounterfeiterState.register();
+        dev.mapselect.client.role.loki.ClientLokiState.register();
 		ClientBodyguardState.register();
 		ClientGuardianAngelState.register();
 		ClientAbilityTargetState.register();
 		ClientRoundEndRoleRoster.register();
 		ClientAbilityCooldownHud.register();
 		DoorKeyEngravingRenderer.register();
-		ClientPainterDoorwayRenderer.register();
+		LeaderboardBlockEntityRenderer.register();
 		ClientPlayNetworking.registerGlobalReceiver(CoinBarrierEditOpenPayload.ID, (payload, context) ->
 			context.client().execute(() -> context.client().setScreen(new CoinBarrierEditScreen(
 				context.client().currentScreen, payload.pos(), payload.price(), payload.title()))));
@@ -188,10 +215,6 @@ public class MapSelectClient implements ClientModInitializer {
 				context.client().currentScreen, payload.pos(), payload.text()))));
 		ClientPlayNetworking.registerGlobalReceiver(BugReportListPayload.ID, (payload, context) ->
 			context.client().execute(() -> BugReportStore.applyRemoteReports(payload)));
-		ClientPlayNetworking.registerGlobalReceiver(ImportedSkinCatalogPayload.ID, (payload, context) ->
-			context.client().execute(() -> BlockbenchSkinImporter.applyRemoteCatalog(context.client(), payload)));
-		ClientPlayNetworking.registerGlobalReceiver(ImportedSkinImportResultPayload.ID, (payload, context) ->
-			context.client().execute(() -> BlockbenchSkinImporter.completeServerImport(payload)));
 		ClientKnifeChargeHud.register();
 		ClientBlackWhiteOverlay.register();
 		ClientPresetCache.registerClient();
@@ -202,8 +225,11 @@ public class MapSelectClient implements ClientModInitializer {
 		BlockEntityRendererFactories.register(MapSelectBlockEntities.GOLD_BEVERAGE_PLATE, GoldBeveragePlateBlockEntityRenderer::new);
 		BlockEntityRendererFactories.register(MapSelectBlockEntities.FUSED_ORNAMENT, FusedOrnamentBlockEntityRenderer::new);
 		BlockEntityRendererFactories.register(MapSelectBlockEntities.COIN_BARRIER, CoinBarrierBlockEntityRenderer::new);
-		EntityRendererRegistry.register(MapSelectEntities.TUTORIAL_PASSENGER, TutorialPassengerEntityRenderer::new);
+		BlockEntityRendererFactories.register(MapSelectBlockEntities.LARGE_WOOD_DOOR, LargeWoodDoorBlockEntityRenderer::new);
+		BlockEntityRendererFactories.register(MapSelectBlockEntities.LEADERBOARD, LeaderboardBlockEntityRenderer::new);
+		BlockEntityRendererFactories.register(MapSelectBlockEntities.SETTINGS_PANEL, dev.mapselect.client.render.SettingsPanelBlockEntityRenderer::new);
 		EntityRendererRegistry.register(MapSelectEntities.TWIN_BODY, TwinBodyEntityRenderer::new);
+		EntityRendererRegistry.register(MapSelectEntities.RAT_TRAP, RatTrapEntityRenderer::new);
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GREYIFER_PLUSH, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.IWY_PLUSH, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.LUX_PLUSH, RenderLayer.getCutout());
@@ -212,9 +238,17 @@ public class MapSelectClient implements ClientModInitializer {
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.JEMSEA_PLUSH, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.PARROTMARROW_PLUSH, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.EVIEEVEEE_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.ETH4N1_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.DOMEKIQN_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.SEAFOX_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.REDDISHACORN_PLUSH, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.ASTRONOMIKYU_PLUSH, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.LIV_54_PLUSH, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GOLD_FOOD_PLATTER, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.GOLD_DRINK_TRAY, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.KEYCARD_READER, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.LARGE_WOOD_DOOR, RenderLayer.getCutout());
+		BlockRenderLayerMap.INSTANCE.putBlock(MapSelectBlocks.RAT_TRAP, RenderLayer.getTranslucent());
 
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, registrationHelper, context) -> {
 			if (entityRenderer instanceof PlayerEntityRenderer per) {
@@ -248,6 +282,12 @@ public class MapSelectClient implements ClientModInitializer {
 		});
 	}
 
+	private static boolean isGexpressGameActive() {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client == null || client.world == null) return false;
+		return GexpressWorlds.isActiveGame(GameWorldComponent.KEY.getNullable(client.world));
+	}
+
 	private static void registerConfigReceiver() {
 		ClientPlayNetworking.registerGlobalReceiver(GexpressConfigSyncPayload.ID, (payload, context) ->
 			context.client().execute(() -> applyConfigPayload(payload)));
@@ -265,9 +305,17 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.levelTags(),
 				payload.grenadeLineOfSightPassThroughBlocks(),
 				payload.goldFoodPlatterPrice(), payload.goldDrinkTrayPrice(), payload.skinCaseRows(),
-				payload.mutedNotePrice())));
+				payload.mutedNotePrice(), payload.lobbyPollCooldownSeconds(),
+				payload.lobbyPollDurationSeconds())));
+		ClientPlayNetworking.registerGlobalReceiver(SkinShopConfigPayload.ID, (payload, context) ->
+			context.client().execute(() -> SkinShopConfig.applySyncedJson(payload.json())));
 		ClientPlayNetworking.registerGlobalReceiver(PuppetmasterConfigPayload.ID, (payload, context) ->
 			context.client().execute(() -> GexpressConfig.puppetmasterCanKillOwnBody = payload.canKillOwnBody()));
+		ClientPlayNetworking.registerGlobalReceiver(DoomsayerConfigPayload.ID, (payload, context) ->
+			context.client().execute(() -> {
+				GexpressConfig.doomsayerGuessesToWin = payload.guessesToWin();
+				GexpressConfig.doomsayerDiesOnWrongGuess = payload.diesOnWrongGuess();
+			}));
 		ClientPlayNetworking.registerGlobalReceiver(SkinCaseResultPayload.ID, (payload, context) ->
 			context.client().execute(() -> GexpressSkinsCategory.handleCaseResult(payload)));
 	}
@@ -289,8 +337,13 @@ public class MapSelectClient implements ClientModInitializer {
 		if (stack.isOf(MapSelectBlocks.WTFJIMJIM_PLUSH_ITEM)) return "Community Builder";
 		if (stack.isOf(MapSelectBlocks.PARROTMARROW_PLUSH_ITEM)) return "Community Builder";
 		if (stack.isOf(MapSelectBlocks.EVIEEVEEE_PLUSH_ITEM)) return "Community Builder";
+		if (stack.isOf(MapSelectBlocks.ETH4N1_PLUSH_ITEM)) return "Designer";
+		if (stack.isOf(MapSelectBlocks.DOMEKIQN_PLUSH_ITEM)) return "Designer";
+		if (stack.isOf(MapSelectBlocks.SEAFOX_PLUSH_ITEM)) return "Builder";
+		if (stack.isOf(MapSelectBlocks.REDDISHACORN_PLUSH_ITEM)) return "Builder";
 		if (stack.isOf(MapSelectBlocks.JEMSEA_PLUSH_ITEM)) return "3D Modeller";
 		if (stack.isOf(MapSelectBlocks.ASTRONOMIKYU_PLUSH_ITEM)) return "Music Composer";
+		if (stack.isOf(MapSelectBlocks.LIV_54_PLUSH_ITEM)) return "Builder";
 		return "";
 	}
 
@@ -359,8 +412,6 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.painterPaintDurationSeconds(),
 				payload.painterBodyCooldownSeconds(),
 				payload.painterPlayerCooldownSeconds(),
-				payload.painterDoorwayDurationSeconds(),
-				payload.painterDoorwayCooldownSeconds(),
 				payload.painterMaxPaintedBodies(),
 				payload.painterMaxPaintedPlayers(),
 				payload.spyBugCost(),
@@ -443,7 +494,8 @@ public class MapSelectClient implements ClientModInitializer {
 				payload.covenantBiteCooldownSeconds(),
 				payload.vengefulSpiritReviveDelaySeconds(),
 				payload.vengefulSpiritRevengeSeconds(),
-				payload.loversIndependentWin()
+				payload.loversIndependentWin(),
+				payload.veteranMaxUses()
 				);
 		GuidebookScreen.invalidateIfOpen();
 	}

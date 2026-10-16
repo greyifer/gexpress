@@ -6,8 +6,10 @@ import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.doctor4t.wathe.cca.PlayerMoodComponent;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.role.snitch.SnitchProgressPayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.GexpressRoleShop;
 import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.role.pelican.PelicanManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -53,6 +55,12 @@ public final class SnitchManager {
 		return playerId != null && revealedSnitches.contains(playerId);
 	}
 
+	/** A warned or fully revealed Snitch is already exposed to the killer team. */
+	public static boolean isExposedToKillers(UUID playerId) {
+		return playerId != null
+			&& (warnedSnitches.contains(playerId) || revealedSnitches.contains(playerId));
+	}
+
 	public static boolean hasRevealedSnitches() {
 		return !revealedSnitches.isEmpty();
 	}
@@ -69,7 +77,7 @@ public final class SnitchManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean activeGame = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
 		if (!activeGame && !GexpressTestState.hasRoleTesters()) {
@@ -239,6 +247,9 @@ public final class SnitchManager {
 	}
 
 	private static void syncKillerWarningInfo(ServerPlayerEntity killer, ServerWorld world) {
+		// Warning lines are deliberately refreshed. This avoids a client world/role sync race
+		// permanently swallowing the first otherwise-identical warning payload.
+		PayloadSync.forget(killer, SnitchProgressPayload.ID);
 		sendInfo(killer, 0, GexpressConfig.getSnitchTasksRequired(), false, warnedSnitchInfoLines(world));
 	}
 
@@ -248,8 +259,7 @@ public final class SnitchManager {
 
 	private static void sendInfo(ServerPlayerEntity player, int completed, int required, boolean showProgress,
 			List<SnitchProgressPayload.InfoLine> lines) {
-		if (player == null || !ServerPlayNetworking.canSend(player, SnitchProgressPayload.ID)) return;
-		ServerPlayNetworking.send(player, new SnitchProgressPayload(
+		PayloadSync.sendIfChanged(player, SnitchProgressPayload.ID, new SnitchProgressPayload(
 			Math.max(0, completed),
 			Math.max(1, required),
 			showProgress,
@@ -306,7 +316,8 @@ public final class SnitchManager {
 
 	private static boolean isKillerTeam(GameWorldComponent game, ServerPlayerEntity player) {
 		Role role = game.getRole(player);
-		return role != null && (role.canUseKiller() || game.canUseKillerFeatures(player));
+		return role != null && (role.canUseKiller() || game.canUseKillerFeatures(player)
+			|| GexpressRoleShop.canUseKillerEconomy(role));
 	}
 
 	private static boolean isPlayable(ServerPlayerEntity player) {
@@ -358,6 +369,7 @@ public final class SnitchManager {
 		glowViewersBySnitch.clear();
 		revealedKillerGlowsBySnitch.clear();
 		ticksUntilGlowRefresh = 0;
+		PayloadSync.forgetAll(SnitchProgressPayload.ID);
 	}
 
 	public record TimeState(Map<UUID, Integer> lastTaskCounts, Map<UUID, Integer> completedTasks,

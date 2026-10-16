@@ -2,11 +2,15 @@ package dev.mapselect.preset.map;
 
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
+import dev.mapselect.config.GexpressConfig;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.Identifier;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class MapPresetValidator {
 	private MapPresetValidator() {}
@@ -41,13 +45,37 @@ public final class MapPresetValidator {
 		}
 		if (preset.randomSpawnPositions == null || preset.randomSpawnPositions.isEmpty()) {
 			issues.add(Issue.warning("No random spawn positions are saved."));
-		} else if (preset.playArea != null) {
-			long outside = preset.randomSpawnPositions.stream().filter(pos -> !contains(preset.playArea, pos)).count();
-			if (outside > 0) issues.add(Issue.warning(outside + " random spawn(s) are outside the play area."));
+		} else {
+			if (preset.randomSpawnPositions.size() == 1) {
+				issues.add(Issue.warning("Only one random spawn position is saved; rounds may stack players."));
+			}
+			int duplicates = duplicateSpawnBlocks(preset.randomSpawnPositions);
+			if (duplicates > 0) {
+				issues.add(Issue.warning(duplicates + " random spawn(s) share a block with another spawn."));
+			}
+			if (preset.wholeMapArea != null) {
+				long outsideWholeMap = preset.randomSpawnPositions.stream().filter(pos -> !contains(preset.wholeMapArea, pos)).count();
+				if (outsideWholeMap > 0) issues.add(Issue.warning(outsideWholeMap + " random spawn(s) are outside the whole map area."));
+			}
+			if (preset.playArea != null) {
+				long outside = preset.randomSpawnPositions.stream().filter(pos -> !contains(preset.playArea, pos)).count();
+				if (outside > 0) issues.add(Issue.warning(outside + " random spawn(s) are outside the play area."));
+				long nearBoundary = preset.randomSpawnPositions.stream()
+					.filter(pos -> contains(preset.playArea, pos) && nearBoundary(preset.playArea, pos, 1.0D))
+					.count();
+				if (nearBoundary > 0) {
+					issues.add(Issue.warning(nearBoundary + " random spawn(s) are within 1 block of the play-area boundary."));
+				}
+			}
 		}
 		if (preset.freshAirAreas == null || preset.freshAirAreas.isEmpty()) {
 			issues.add(Issue.warning("No fresh-air areas are configured."));
 		}
+		validateOverrideIds("role chance override", preset.roleChanceOverrides.keySet(), issues);
+		validateOverrideIds("role max override", preset.roleMaxOverrides.keySet(), issues);
+		validateOverrideIds("modifier chance override", preset.modifierChanceOverrides.keySet(), issues);
+		validateOverrideIds("modifier max override", preset.modifierMaxOverrides.keySet(), issues);
+		validateGameSettingsPreset(server, preset, issues);
 		return List.copyOf(issues);
 	}
 
@@ -89,6 +117,23 @@ public final class MapPresetValidator {
 			&& pos.z >= box.minZ && pos.z <= box.maxZ;
 	}
 
+	private static boolean nearBoundary(MapPreset.BoxData box, MapPreset.PosData pos, double margin) {
+		return pos.x - box.minX <= margin || box.maxX - pos.x <= margin
+			|| pos.y - box.minY <= margin || box.maxY - pos.y <= margin
+			|| pos.z - box.minZ <= margin || box.maxZ - pos.z <= margin;
+	}
+
+	private static int duplicateSpawnBlocks(List<MapPreset.PosData> positions) {
+		Set<String> seen = new HashSet<>();
+		int duplicates = 0;
+		for (MapPreset.PosData pos : positions) {
+			if (pos == null) continue;
+			String key = (int) Math.floor(pos.x) + "," + (int) Math.floor(pos.y) + "," + (int) Math.floor(pos.z);
+			if (!seen.add(key)) duplicates++;
+		}
+		return duplicates;
+	}
+
 	private static boolean sameBox(MapPreset.BoxData a, MapPreset.BoxData b) {
 		return close(a.minX, b.minX) && close(a.minY, b.minY) && close(a.minZ, b.minZ)
 			&& close(a.maxX, b.maxX) && close(a.maxY, b.maxY) && close(a.maxZ, b.maxZ);
@@ -96,6 +141,30 @@ public final class MapPresetValidator {
 
 	private static boolean close(double a, double b) {
 		return Math.abs(a - b) < 1.0E-6D;
+	}
+
+	private static void validateOverrideIds(String label, Set<String> ids, List<Issue> issues) {
+		if (ids == null || ids.isEmpty()) return;
+		for (String id : ids) {
+			if (Identifier.tryParse(id) == null) {
+				issues.add(Issue.warning("Invalid " + label + " id '" + id + "'."));
+			}
+		}
+	}
+
+	private static void validateGameSettingsPreset(MinecraftServer server, MapPreset preset, List<Issue> issues) {
+		if (preset.gameSettingsPreset == null || preset.gameSettingsPreset.isBlank()) return;
+		if (!GexpressConfig.isValidExportName(preset.gameSettingsPreset)) {
+			issues.add(Issue.error("Game settings preset name '" + preset.gameSettingsPreset + "' is invalid."));
+			return;
+		}
+		try {
+			if (!GexpressConfig.listConfigExports().contains(preset.gameSettingsPreset)) {
+				issues.add(Issue.warning("Game settings preset '" + preset.gameSettingsPreset + "' does not exist."));
+			}
+		} catch (IOException error) {
+			issues.add(Issue.warning("Could not validate game settings preset: " + error.getMessage()));
+		}
 	}
 
 	public record Issue(Severity severity, String message) {

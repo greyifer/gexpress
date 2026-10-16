@@ -1,0 +1,207 @@
+package dev.mapselect.game.draft;
+
+import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.api.WatheRoles;
+import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.doctor4t.wathe.cca.PlayerShopComponent;
+import dev.doctor4t.wathe.cca.TrainWorldComponent;
+import dev.doctor4t.wathe.client.gui.RoleAnnouncementTexts;
+import dev.doctor4t.wathe.index.WatheItems;
+import dev.doctor4t.wathe.util.AnnounceWelcomePayload;
+import dev.mapselect.MapSelect;
+import dev.mapselect.network.game.DraftWelcomePayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
+import org.agmas.harpymodloader.Harpymodloader;
+import org.agmas.harpymodloader.config.HarpyModLoaderConfig;
+import org.agmas.harpymodloader.events.ModdedRoleAssigned;
+import org.agmas.harpymodloader.events.ModdedRoleRemoved;
+import org.agmas.harpymodloader.events.ResetPlayerEvent;
+import org.agmas.harpymodloader.modded_murder.ModdedMurderGameMode;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+public final class DraftGameMode extends ModdedMurderGameMode {
+	public DraftGameMode(Identifier identifier) {
+		super(identifier);
+	}
+
+	@Override
+	public void initializeGame(ServerWorld world, GameWorldComponent game, List<ServerPlayerEntity> players) {
+		try {
+			Harpymodloader.refreshRoles();
+			HarpyModLoaderConfig.HANDLER.load();
+			TrainWorldComponent.KEY.get(world).setTimeOfDay(TrainWorldComponent.TimeOfDay.NIGHT);
+			game.clearRoleMap();
+
+			Map<UUID, Role> drafted = DraftManager.assignmentsForInitialization(world);
+			boolean applyingDraft = DraftManager.hasInitializationSession(world);
+			List<ServerPlayerEntity> assignedPlayers = new ArrayList<>();
+			int killerCount = 0;
+			for (ServerPlayerEntity player : players) {
+				if (applyingDraft && !drafted.containsKey(player.getUuid())) continue;
+				ResetPlayerEvent.EVENT.invoker().resetPlayer(player);
+				Role role = drafted.getOrDefault(player.getUuid(), DraftManager.fallbackRole(world, player));
+				if (role == null) role = WatheRoles.CIVILIAN;
+				game.addRole(player, role);
+				applyVanillaRoleState(player, role);
+				assignedPlayers.add(player);
+				if (role.canUseKiller()) killerCount++;
+				if (!Harpymodloader.VANNILA_ROLES.contains(role)) safeAssign(player, role);
+			}
+			List<ServerPlayerEntity> vigilanteBackfills =
+				grantMissingVigilanteRevolvers(game, assignedPlayers);
+
+			int modifierRolls = killerCount * Math.max(0, HarpyModLoaderConfig.HANDLER.instance().modifierMultiplier);
+			assignModifiers(modifierRolls, world, game, assignedPlayers);
+			enforceDraftedAssignments(game, assignedPlayers, drafted);
+			announceRoles(game, assignedPlayers, killerCount);
+			notifyVigilanteBackfills(vigilanteBackfills);
+			Harpymodloader.FORCED_MODDED_ROLE.clear();
+			Harpymodloader.FORCED_MODDED_ROLE_FLIP.clear();
+			Harpymodloader.FORCED_MODDED_MODIFIER.clear();
+		} finally {
+			DraftManager.finishInitialization(world);
+		}
+	}
+
+	@Override
+	public void tickServerGameLoop(ServerWorld world, GameWorldComponent game) {
+		if (DraftManager.isDrafting(world)) return;
+		if (game != null && game.getRoles().isEmpty() && DraftManager.beginIfDraft(world)) return;
+		super.tickServerGameLoop(world, game);
+	}
+
+	@Override
+	public void finalizeGame(ServerWorld world, GameWorldComponent game) {
+		DraftManager.cancel(world);
+		super.finalizeGame(world, game);
+	}
+
+	private static void announceRoles(GameWorldComponent game, List<ServerPlayerEntity> players, int killerCount) {
+		int innocentCount = Math.max(0, players.size() - killerCount);
+		for (ServerPlayerEntity player : players) {
+			Role role = game.getRole(player);
+			if (role != null && role.identifier() != null
+					&& ServerPlayNetworking.canSend(player, DraftWelcomePayload.ID)) {
+				ServerPlayNetworking.send(player, new DraftWelcomePayload(
+					role.identifier(), role.color(), killerCount, innocentCount));
+				continue;
+			}
+			RoleAnnouncementTexts.RoleAnnouncementText announcement = announcement(role);
+			int index = announcement == null ? -1
+				: RoleAnnouncementTexts.ROLE_ANNOUNCEMENT_TEXTS.indexOf(announcement);
+			if (index < 0) {
+				MapSelect.LOGGER.warn("No role announcement is registered for drafted role {}.",
+					role == null ? "unknown" : role.identifier());
+				continue;
+			}
+			ServerPlayNetworking.send(player, new AnnounceWelcomePayload(index, killerCount, innocentCount));
+		}
+	}
+
+	private static RoleAnnouncementTexts.RoleAnnouncementText announcement(Role role) {
+		if (role == WatheRoles.KILLER) return RoleAnnouncementTexts.KILLER;
+		if (role == WatheRoles.VIGILANTE) return RoleAnnouncementTexts.VIGILANTE;
+		if (role == WatheRoles.CIVILIAN) return RoleAnnouncementTexts.CIVILIAN;
+		return Harpymodloader.autogeneratedAnnouncements.get(role);
+	}
+
+	private static void safeAssign(ServerPlayerEntity player, Role role) {
+		try {
+			ModdedRoleAssigned.EVENT.invoker().assignModdedRole(player, role);
+		} catch (Throwable error) {
+			MapSelect.LOGGER.warn("ModdedRoleAssigned listener failed for drafted role {} on {}.",
+				role.identifier(), player.getName().getString(), error);
+		}
+	}
+
+	private static void enforceDraftedAssignments(GameWorldComponent game,
+			List<ServerPlayerEntity> players, Map<UUID, Role> drafted) {
+		boolean corrected = false;
+		for (ServerPlayerEntity player : players) {
+			Role expected = drafted.get(player.getUuid());
+			Role actual = game.getRole(player);
+			if (expected == null || sameRole(expected, actual)) continue;
+			MapSelect.LOGGER.warn("Correcting drafted role for {} from {} to {}.",
+				player.getName().getString(), roleId(actual), roleId(expected));
+			if (actual != null && !Harpymodloader.VANNILA_ROLES.contains(actual)) {
+				try {
+					ModdedRoleRemoved.EVENT.invoker().removeModdedRole(player, actual);
+				} catch (Throwable error) {
+					MapSelect.LOGGER.warn("Could not remove incorrect drafted role {} from {}.",
+						roleId(actual), player.getName().getString(), error);
+				}
+			}
+			game.addRole(player, expected);
+			if (!Harpymodloader.VANNILA_ROLES.contains(expected)) safeAssign(player, expected);
+			corrected = true;
+		}
+		if (corrected) game.sync();
+	}
+
+	private static boolean sameRole(Role first, Role second) {
+		return first != null && second != null && first.identifier() != null
+			&& first.identifier().equals(second.identifier());
+	}
+
+	private static String roleId(Role role) {
+		return role == null || role.identifier() == null ? "unknown" : role.identifier().toString();
+	}
+
+	private static void applyVanillaRoleState(ServerPlayerEntity player, Role role) {
+		if (role.canUseKiller()) PlayerShopComponent.KEY.get(player).setBalance(100);
+		if (role == WatheRoles.VIGILANTE && dev.mapselect.role.RoleItemInventory.count(player, WatheItems.REVOLVER) <= 0) {
+			var revolver = WatheItems.REVOLVER.getDefaultStack();
+			if (!player.giveItemStack(revolver)) player.dropItem(revolver, false);
+		}
+	}
+
+	private static List<ServerPlayerEntity> grantMissingVigilanteRevolvers(
+			GameWorldComponent game, List<ServerPlayerEntity> players) {
+		if (game == null || players == null || players.isEmpty()) return List.of();
+		int intended = DraftManager.vigilanteSlotCount(players.size());
+		int drafted = 0;
+		List<ServerPlayerEntity> civilians = new ArrayList<>();
+		for (ServerPlayerEntity player : players) {
+			Role role = game.getRole(player);
+			if (role == WatheRoles.VIGILANTE) {
+				drafted++;
+			} else if (role == WatheRoles.CIVILIAN
+					&& dev.mapselect.role.RoleItemInventory.count(player, WatheItems.REVOLVER) <= 0) {
+				civilians.add(player);
+			}
+		}
+		int missing = Math.max(0, intended - drafted);
+		if (missing <= 0 || civilians.isEmpty()) return List.of();
+
+		Collections.shuffle(civilians);
+		List<ServerPlayerEntity> recipients = new ArrayList<>(Math.min(missing, civilians.size()));
+		for (int index = 0; index < missing && index < civilians.size(); index++) {
+			ServerPlayerEntity recipient = civilians.get(index);
+			var revolver = WatheItems.REVOLVER.getDefaultStack();
+			if (!recipient.giveItemStack(revolver)) recipient.dropItem(revolver, false);
+			recipients.add(recipient);
+		}
+		return List.copyOf(recipients);
+	}
+
+	private static void notifyVigilanteBackfills(List<ServerPlayerEntity> recipients) {
+		for (ServerPlayerEntity recipient : recipients) {
+			recipient.sendMessage(Text.literal(
+				"There were not enough Vigilantes drafted this round.")
+				.formatted(Formatting.YELLOW), false);
+			recipient.sendMessage(Text.literal(
+				"You received a revolver because a Vigilante slot was left unfilled.")
+				.formatted(Formatting.AQUA), false);
+		}
+	}
+}

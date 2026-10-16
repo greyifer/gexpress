@@ -52,6 +52,7 @@ public final class C4Detonation {
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(C4Detonation::tick);
 		ServerLivingEntityEvents.AFTER_DEATH.register(C4Detonation::afterDeath);
+		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearThrownCharges());
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> {
 			C4BackComponent comp = C4BackComponent.KEY.getNullable(world);
 			if (comp != null) comp.clearAll();
@@ -180,7 +181,7 @@ public final class C4Detonation {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		C4BackComponent comp = C4BackComponent.KEY.getNullable(world);
 		if (comp == null) return;
 		Map<UUID, Long> carriers = comp.getCarriers();

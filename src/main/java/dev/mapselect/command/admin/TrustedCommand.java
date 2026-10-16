@@ -3,6 +3,7 @@ package dev.mapselect.command.admin;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import dev.mapselect.command.CommandPlayerFormat;
 import dev.mapselect.host.TrustedComponent;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.command.argument.GameProfileArgumentType;
@@ -13,7 +14,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.util.Collection;
-import java.util.UUID;
 
 public class TrustedCommand {
 	public static LiteralArgumentBuilder<ServerCommandSource> buildTree() {
@@ -48,10 +48,10 @@ public class TrustedCommand {
 		TrustedComponent comp = component(src);
 		Collection<GameProfile> profiles = GameProfileArgumentType.getProfileArgument(ctx, "players");
 		int added = 0;
-		for (GameProfile profile : profiles) {
+		for (GameProfile profile : CommandPlayerFormat.validProfiles(profiles)) {
 			if (comp.addTrusted(profile.getId())) {
 				added++;
-				ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(profile.getId());
+				ServerPlayerEntity online = CommandPlayerFormat.online(src, profile);
 				if (online != null) {
 					online.sendMessage(Text.literal("You are now ").formatted(Formatting.GRAY)
 						.append(GexpressPermissions.trustedBadge()), false);
@@ -60,7 +60,7 @@ public class TrustedCommand {
 			}
 		}
 		final int f = added;
-		src.sendFeedback(() -> Text.literal("Added " + f + " trusted player(s).").formatted(Formatting.GREEN), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Added " + f + " trusted player(s).").formatted(Formatting.GREEN), true);
 		return added;
 	}
 
@@ -70,10 +70,10 @@ public class TrustedCommand {
 		TrustedComponent comp = component(src);
 		Collection<GameProfile> profiles = GameProfileArgumentType.getProfileArgument(ctx, "players");
 		int removed = 0;
-		for (GameProfile profile : profiles) {
+		for (GameProfile profile : CommandPlayerFormat.validProfiles(profiles)) {
 			if (comp.removeTrusted(profile.getId())) {
 				removed++;
-				ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(profile.getId());
+				ServerPlayerEntity online = CommandPlayerFormat.online(src, profile);
 				if (online != null) {
 					online.sendMessage(Text.literal("You are no longer Trusted.").formatted(Formatting.GRAY), false);
 					TagCommand.refreshPlayerListName(online);
@@ -81,7 +81,7 @@ public class TrustedCommand {
 			}
 		}
 		final int f = removed;
-		src.sendFeedback(() -> Text.literal("Removed " + f + " trusted player(s).").formatted(Formatting.YELLOW), true);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Removed " + f + " trusted player(s).").formatted(Formatting.YELLOW), true);
 		return removed;
 	}
 
@@ -89,27 +89,11 @@ public class TrustedCommand {
 		ServerCommandSource src = ctx.getSource();
 		TrustedComponent comp = component(src);
 		if (comp.getTrusted().isEmpty()) {
-			src.sendFeedback(() -> Text.literal("No trusted players.").formatted(Formatting.GRAY), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No trusted players.").formatted(Formatting.GRAY), false);
 			return 0;
 		}
-		StringBuilder sb = new StringBuilder();
-		for (UUID uuid : comp.getTrusted()) {
-			if (sb.length() > 0) sb.append(", ");
-			sb.append(nameFor(src, uuid));
-		}
-		String names = sb.toString();
-		src.sendFeedback(() -> Text.literal("Trusted (" + comp.getTrusted().size() + "): " + names), false);
+		String names = CommandPlayerFormat.cachedNames(src, comp.getTrusted());
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Trusted (" + comp.getTrusted().size() + "): " + names), false);
 		return comp.getTrusted().size();
-	}
-
-	private static String nameFor(ServerCommandSource src, UUID uuid) {
-		ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(uuid);
-		if (online != null) return online.getGameProfile().getName();
-		var cache = src.getServer().getUserCache();
-		if (cache != null) {
-			var profile = cache.getByUuid(uuid).orElse(null);
-			if (profile != null && profile.getName() != null) return profile.getName();
-		}
-		return uuid.toString();
 	}
 }

@@ -39,6 +39,8 @@ public abstract class MafiaRoundEndRendererMixin {
 	private static final int SECTION_HEAD_SIZE = 16;
 	private static final int SECTION_HEAD_STEP_X = 24;
 	private static final int SECTION_HEAD_STEP_Y = 22;
+	private static final int SECTION_MAX_COLUMNS = 5;
+	private static final int SECTION_CENTER_OFFSET = 60;
 	private static final int SECTION_CIVILIAN = 0;
 	private static final int SECTION_VIGILANTE = 1;
 	private static final int SECTION_NEUTRAL = 2;
@@ -101,6 +103,8 @@ public abstract class MafiaRoundEndRendererMixin {
 
 	private static Text gexpress$endText(ClientPlayerEntity player, GameWorldComponent game,
 			GameRoundEndComponent roundEnd) {
+		Text winningSide = dev.mapselect.client.game.ClientRoundWinnerText.side(roundEnd.getWinStatus());
+		if (winningSide != null) return winningSide;
 		UUID winnerId = game.getLooseEndWinner();
 		PlayerEntity winner = player.getWorld().getPlayerByUuid(winnerId == null ? UUID.randomUUID() : winnerId);
 		Text winnerText = winner == null ? Text.empty() : winner.getDisplayName();
@@ -115,6 +119,9 @@ public abstract class MafiaRoundEndRendererMixin {
 				}
 				if (MapSelectRoles.JUGGERNAUT_ID.equals(winnerRole.identifier())) {
 					return Text.translatable("announcement.win.gexpress.juggernaut").withColor(winnerRole.color());
+				}
+				if (MapSelectRoles.DOOMSAYER_ID.equals(winnerRole.identifier())) {
+					return Text.translatable("announcement.win.gexpress.doomsayer").withColor(winnerRole.color());
 				}
 			}
 		}
@@ -163,8 +170,8 @@ public abstract class MafiaRoundEndRendererMixin {
 
 		int centerX = context.getScaledWindowWidth() / 2;
 		int baseY = context.getScaledWindowHeight() / 2 - 18;
-		int leftX = centerX - 62;
-		int rightX = centerX + 48;
+		int leftX = centerX - SECTION_CENTER_OFFSET;
+		int rightX = centerX + SECTION_CENTER_OFFSET;
 		int civiliansBottom = gexpress$drawEndSection(context, renderer,
 			RoleAnnouncementTexts.CIVILIAN.titleText, civilians, leftX, baseY, 0xFF14D22A);
 		int vigilantesBottom = gexpress$drawEndSection(context, renderer,
@@ -199,6 +206,7 @@ public abstract class MafiaRoundEndRendererMixin {
 		Identifier id = normalized.isBlank() ? null : Identifier.tryParse(normalized);
 		if (id != null) {
 			if (MapSelectRoles.JUGGERNAUT_ID.equals(id) || MapSelectRoles.VULTURE_ID.equals(id)
+					|| MapSelectRoles.DOOMSAYER_ID.equals(id)
 					|| MapSelectRoles.COPYCAT_ID.equals(id)) {
 				return SECTION_NEUTRAL;
 			}
@@ -219,7 +227,7 @@ public abstract class MafiaRoundEndRendererMixin {
 	private static int gexpress$drawEndSection(DrawContext context, TextRenderer renderer, Text title,
 			List<GameRoundEndComponent.RoundEndData> profiles, int centerX, int y, int color) {
 		context.drawCenteredTextWithShadow(renderer, title, centerX, y, color);
-		int columns = Math.min(2, Math.max(1, profiles.size()));
+		int columns = Math.min(SECTION_MAX_COLUMNS, Math.max(1, profiles.size()));
 		int startX = centerX - ((columns - 1) * SECTION_HEAD_STEP_X) / 2 - (SECTION_HEAD_SIZE / 2);
 		for (int i = 0; i < profiles.size(); i++) {
 			int headX = startX + (i % columns) * SECTION_HEAD_STEP_X;

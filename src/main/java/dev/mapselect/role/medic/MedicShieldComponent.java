@@ -2,6 +2,7 @@ package dev.mapselect.role.medic;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.role.AbilityCooldowns;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -47,25 +48,11 @@ public class MedicShieldComponent implements AutoSyncedComponent {
 	}
 
 	public long cooldownRemainingTicks(UUID medic) {
-		if (medic == null) return 0L;
-		Long until = medicCooldownUntil.get(medic);
-		if (until == null) return 0L;
-		return Math.max(0L, until - world.getTime());
+		return AbilityCooldowns.remaining(medicCooldownUntil, medic, world.getTime());
 	}
 
 	public long reduceCooldown(UUID medic, long ticks) {
-		if (medic == null || ticks <= 0L) return cooldownRemainingTicks(medic);
-		Long until = medicCooldownUntil.get(medic);
-		if (until == null) return 0L;
-		long remaining = until - world.getTime();
-		if (remaining <= 0L) {
-			medicCooldownUntil.remove(medic);
-			KEY.sync(world);
-			return 0L;
-		}
-		long nextRemaining = Math.max(0L, remaining - ticks);
-		if (nextRemaining <= 0L) medicCooldownUntil.remove(medic);
-		else medicCooldownUntil.put(medic, world.getTime() + nextRemaining);
+		long nextRemaining = AbilityCooldowns.reduce(medicCooldownUntil, medic, world.getTime(), ticks);
 		KEY.sync(world);
 		return nextRemaining;
 	}
@@ -91,7 +78,8 @@ public class MedicShieldComponent implements AutoSyncedComponent {
 
 		targetToMedic.put(target, medic);
 		medicToTarget.put(medic, target);
-		medicCooldownUntil.put(medic, world.getTime() + (long) GexpressConfig.getMedicShieldCooldownSeconds() * 20L);
+		AbilityCooldowns.start(medicCooldownUntil, medic, world.getTime(),
+			(long) GexpressConfig.getMedicShieldCooldownSeconds() * 20L);
 		KEY.sync(this.world);
 		return true;
 	}

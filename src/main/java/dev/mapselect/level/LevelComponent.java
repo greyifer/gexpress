@@ -147,7 +147,7 @@ public class LevelComponent implements AutoSyncedComponent {
 	public static int level(PlayerEntity player) {
 		if (player == null || player.getWorld() == null) return 1;
 		LevelComponent levels = KEY.getNullable(player.getWorld());
-		return levels == null ? 1 : levels.level(player.getUuid());
+		return levels == null ? 1 : levels.level(dev.mapselect.role.loki.BodyDisplayIdentity.uuid(player));
 	}
 
 	@Override

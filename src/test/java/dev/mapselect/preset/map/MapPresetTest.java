@@ -138,6 +138,7 @@ class MapPresetTest {
 		preset.readyAreaSpawnPos = pos(0, 65, 0);
 		preset.randomSpawnPositions = new ArrayList<>();
 		preset.randomSpawnPositions.add(pos(0, 65, 0));
+		preset.randomSpawnPositions.add(pos(2, 65, 2));
 		preset.freshAirAreas = new ArrayList<>();
 		MapPreset.FreshAirAreaData freshAir = new MapPreset.FreshAirAreaData();
 		freshAir.area = box(-4, 64, -4, 4, 72, 4);
@@ -146,6 +147,37 @@ class MapPresetTest {
 		List<MapPresetValidator.Issue> issues = MapPresetValidator.validate(null, "static_full", preset);
 
 		assertTrue(issues.isEmpty());
+	}
+
+	@Test
+	void validatorReportsRiskyRandomSpawns() {
+		MapPreset preset = new MapPreset();
+		preset.terrainMode = MapPreset.TerrainMode.STATIC;
+		preset.playAreaMode = MapPreset.PlayAreaMode.FULL_MAP;
+		preset.wholeMapArea = box(0, 60, 0, 10, 80, 10);
+		preset.playArea = box(0, 60, 0, 10, 80, 10);
+		preset.resetTemplateArea = box(0, 60, 0, 10, 80, 10);
+		preset.spectatorSpawnPos = pos(5, 70, 5);
+		preset.readyAreaSpawnPos = pos(5, 65, 5);
+		preset.freshAirAreas = new ArrayList<>();
+		MapPreset.FreshAirAreaData freshAir = new MapPreset.FreshAirAreaData();
+		freshAir.area = box(2, 64, 2, 8, 72, 8);
+		preset.freshAirAreas.add(freshAir);
+		preset.randomSpawnPositions = new ArrayList<>();
+		preset.randomSpawnPositions.add(pos(0.5, 65, 0.5));
+		preset.randomSpawnPositions.add(pos(0.5, 65, 0.5));
+		preset.randomSpawnPositions.add(pos(20.5, 65, 20.5));
+
+		List<MapPresetValidator.Issue> issues = MapPresetValidator.validate(null, "risky", preset);
+
+		assertTrue(hasIssue(issues, MapPresetValidator.Severity.WARNING,
+			"1 random spawn(s) share a block with another spawn."));
+		assertTrue(hasIssue(issues, MapPresetValidator.Severity.WARNING,
+			"1 random spawn(s) are outside the whole map area."));
+		assertTrue(hasIssue(issues, MapPresetValidator.Severity.WARNING,
+			"1 random spawn(s) are outside the play area."));
+		assertTrue(hasIssue(issues, MapPresetValidator.Severity.WARNING,
+			"2 random spawn(s) are within 1 block of the play-area boundary."));
 	}
 
 	private static MapPreset.BoxData box(double minX, double minY, double minZ,

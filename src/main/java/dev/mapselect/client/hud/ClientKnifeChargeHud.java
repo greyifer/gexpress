@@ -2,6 +2,7 @@ package dev.mapselect.client.hud;
 
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.doctor4t.wathe.item.KnifeItem;
+import dev.mapselect.entity.TwinBodyEntity;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -47,6 +48,13 @@ public final class ClientKnifeChargeHud {
 	}
 
 	private static boolean isValidTarget(Entity entity, PlayerEntity player) {
+		java.util.UUID twinOwner = dev.mapselect.client.role.twins.ClientTwinsBodies.owner(entity);
+		if (twinOwner != null) return entity.isAlive() && !twinOwner.equals(player.getUuid()) && player.squaredDistanceTo(entity) <= 9.0D;
+		if (entity instanceof TwinBodyEntity target) {
+			return target.isAlive()
+				&& target.ownerId().map(ownerId -> !ownerId.equals(player.getUuid())).orElse(true)
+				&& player.squaredDistanceTo(target) <= 9.0D;
+		}
 		return entity instanceof PlayerEntity target
 			&& target != player
 			&& target.isAlive()

@@ -1,7 +1,6 @@
 package dev.mapselect.client.screen;
 
 import cat.rezelyn.watheextended.client.screen.config.ClientCategory;
-import dev.isxander.yacl3.api.ButtonOption;
 import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
@@ -11,7 +10,6 @@ import dev.isxander.yacl3.api.controller.BooleanControllerBuilder;
 import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.client.modifier.muted.ClientMutedPreferenceState;
-import dev.mapselect.client.tutorial.ClientTutorialExperience;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -24,16 +22,20 @@ public final class GexpressClientCategory {
 
 	public static ConfigCategory build(Screen parent, boolean isOp, BiConsumer<String, Screen> stage) {
 		ConfigCategory base = ClientCategory.build(parent, isOp, stage);
+		return extend(base);
+	}
+
+	public static ConfigCategory extend(ConfigCategory base) {
 		ConfigCategory.Builder category = ConfigCategory.createBuilder()
 			.name(base.name())
 			.tooltip(base.tooltip());
 		for (OptionGroup group : base.groups()) {
 			category.group(group);
 		}
-		category.group(tutorialGroup());
 		category.group(mutedPreferenceGroup());
 		category.group(weaponSkinsGroup());
 		category.group(abilityHudGroup());
+        category.group(OptionGroup.createBuilder().name(Text.literal("Grenade Preview")).option(Option.<Boolean>createBuilder().name(Text.literal("Show grenade trajectory")).description(OptionDescription.of(Text.literal("Show the throw path and landing point while holding a grenade."))).stateManager(StateManager.createInstant(true,()->GexpressConfig.grenadeTrajectoryPreview,value->{GexpressConfig.grenadeTrajectoryPreview=value;GexpressConfig.save();})).controller(BooleanControllerBuilder::create).build()).build());
 		return category.build();
 	}
 
@@ -49,20 +51,6 @@ public final class GexpressClientCategory {
 				.stateManager(StateManager.createInstant(false, GexpressConfig::alwaysMuted,
 					ClientMutedPreferenceState::setEnabled))
 				.controller(BooleanControllerBuilder::create)
-				.build())
-			.build();
-	}
-
-	private static OptionGroup tutorialGroup() {
-		return OptionGroup.createBuilder()
-			.name(Text.translatable("gui.gexpress.config.group.client.tutorial"))
-			.description(OptionDescription.of(Text.translatable("gui.gexpress.config.group.client.tutorial.tooltip")))
-			.collapsed(false)
-			.option(ButtonOption.createBuilder()
-				.name(Text.translatable("gui.gexpress.config.option.client.view_tutorial"))
-				.description(OptionDescription.of(Text.translatable("gui.gexpress.config.option.client.view_tutorial.tooltip")))
-				.text(Text.translatable("gui.gexpress.config.option.client.view_tutorial.open"))
-				.action((screen, option) -> ClientTutorialExperience.start())
 				.build())
 			.build();
 	}
@@ -100,6 +88,10 @@ public final class GexpressClientCategory {
 				v -> GexpressConfig.abilityHudOffsetY = v,
 				GexpressConfig.ABILITY_HUD_OFFSET_MIN, GexpressConfig.ABILITY_HUD_OFFSET_MAX, 1,
 				GexpressClientCategory::formatPixels))
+			.option(intSlider("ability_sound_volume", 100, GexpressConfig::getAbilitySoundVolumePercent,
+				v -> GexpressConfig.abilitySoundVolumePercent = v,
+				GexpressConfig.ABILITY_SOUND_VOLUME_MIN, GexpressConfig.ABILITY_SOUND_VOLUME_MAX, 5,
+				value -> value + "%"))
 			.build();
 	}
 

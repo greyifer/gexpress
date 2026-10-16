@@ -1,12 +1,7 @@
 package dev.mapselect.client.screen;
 
-import com.google.common.collect.ImmutableList;
 import dev.doctor4t.wathe.index.WatheItems;
-import dev.isxander.yacl3.api.ConfigCategory;
-import dev.isxander.yacl3.api.CustomTabProvider;
-import dev.isxander.yacl3.api.OptionGroup;
-import dev.isxander.yacl3.gui.YACLScreen;
-import dev.isxander.yacl3.gui.tab.TabExt;
+import io.github.caspe.glib.api.client.editor.GlibContentScreen;
 import dev.mapselect.MapSelect;
 import dev.mapselect.client.render.DevWeaponModels;
 import dev.mapselect.config.GexpressConfig;
@@ -14,38 +9,33 @@ import dev.mapselect.currency.GcoinComponent;
 import dev.mapselect.item.GexpressCaseItem;
 import dev.mapselect.network.progression.SkinCaseResultPayload;
 import dev.mapselect.skin.PlayerSkinComponent;
+import dev.mapselect.skin.SkinDailyShop;
+import dev.mapselect.skin.SkinShopConfig;
 import dev.mapselect.skin.WeaponSkin;
 import dev.mapselect.skin.WeaponSkinType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.tab.Tab;
 import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.screen.ScreenTexts;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.Util;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.function.Consumer;
+import java.time.Instant;
 
 public final class GexpressSkinsCategory {
 	private GexpressSkinsCategory() {}
@@ -57,72 +47,14 @@ public final class GexpressSkinsCategory {
 		if (panel != null) panel.acceptCaseResult(payload);
 	}
 
-	public static ConfigCategory build(Screen parent) {
-		return new SkinsCategory();
-	}
-
-	private static final class SkinsCategory implements ConfigCategory, CustomTabProvider {
-		private final Text name = Text.translatable("gui.gexpress.config.category.skins");
-		private final Text tooltip = Text.translatable("gui.gexpress.config.category.skins.tooltip");
-
-		@Override
-		public @NotNull Text name() {
-			return name;
-		}
-
-		@Override
-		public @NotNull ImmutableList<OptionGroup> groups() {
-			return ImmutableList.of();
-		}
-
-		@Override
-		public @NotNull Text tooltip() {
-			return tooltip;
-		}
-
-		@Override
-		public Tab createTab(YACLScreen screen, ScreenRect tabArea) {
-			return new SkinsTab(screen, tabArea, tooltip);
-		}
-	}
-
-	private static final class SkinsTab implements TabExt {
-		private final SkinsPanelWidget panel;
-		private final ButtonWidget doneButton;
-		private final Tooltip tooltip;
-
-		private SkinsTab(YACLScreen screen, ScreenRect tabArea, Text tooltipText) {
-			this.panel = new SkinsPanelWidget(screen, tabArea.getLeft(), tabArea.getTop(), tabArea.width(), tabArea.height());
-			this.doneButton = ButtonWidget.builder(ScreenTexts.DONE, button -> screen.finishOrSave())
-				.size(Math.max(90, screen.width / 6), 20)
-				.build();
-			this.tooltip = Tooltip.of(tooltipText);
-			refreshGrid(tabArea);
-		}
-
-		@Override
-		public Text getTitle() {
-			return Text.translatable("gui.gexpress.config.category.skins");
-		}
-
-		@Override
-		public void forEachChild(Consumer<ClickableWidget> consumer) {
-			consumer.accept(panel);
-			consumer.accept(doneButton);
-		}
-
-		@Override
-		public void refreshGrid(ScreenRect tabArea) {
-			panel.setDimensionsAndPosition(tabArea.width(), tabArea.height() - 30, tabArea.getLeft(), tabArea.getTop());
-			doneButton.setDimensionsAndPosition(Math.max(90, tabArea.width() / 5), 20,
-				tabArea.getLeft() + tabArea.width() - Math.max(90, tabArea.width() / 5) - 12,
-				tabArea.getBottom() - 24);
-		}
-
-		@Override
-		public @Nullable Tooltip getTooltip() {
-			return tooltip;
-		}
+	public static Screen createGlibScreen(Screen parent) {
+		return GlibContentScreen.builder(parent, Text.literal(SkinShopConfig.title()))
+			.subtitle(Text.literal(SkinShopConfig.subtitle()))
+			.accentColor(SkinShopConfig.accentArgb())
+			.content((host, rect) -> new SkinsPanelWidget(host, rect.x() + 4, rect.y() + 4,
+				rect.width() - 8, rect.height() - 8))
+			.onClose(() -> activePanel = null)
+			.build();
 	}
 
 	private static final class SkinsPanelWidget extends ClickableWidget {
@@ -135,9 +67,13 @@ public final class GexpressSkinsCategory {
 		private static final long CASE_REVEAL_MS = 3600L;
 		private final List<TypeBox> typeBoxes = new ArrayList<>();
 		private final List<CaseBox> caseBoxes = new ArrayList<>();
+		private final List<SkinTab> tabs = new ArrayList<>();
 		private final List<SkinTile> skinTiles = new ArrayList<>();
 		private final List<CaseTile> caseTiles = new ArrayList<>();
 		private final List<CaseBuyTile> caseBuyTiles = new ArrayList<>();
+		private final List<DailyOfferTile> dailyOfferTiles = new ArrayList<>();
+		private final List<CaseCarouselButton> caseCarouselButtons = new ArrayList<>();
+		private final List<CaseCarouselDot> caseCarouselDots = new ArrayList<>();
 		private final Random caseAnimationRandom = new Random();
 		private List<CaseRewardPreview> openingReel = List.of();
 		private CaseRewardPreview openingResult;
@@ -156,8 +92,10 @@ public final class GexpressSkinsCategory {
 		private BackButton backButton;
 		private CaseOpenButton caseOpenButton;
 		private GexpressConfig.SkinCaseEntry selectedCase;
-		private WeaponSkinType selectedType;
-		private boolean showingCases;
+		private WeaponSkinType selectedType = WeaponSkinType.KNIFE;
+		private boolean showingCases = true;
+		private int featuredCaseIndex;
+		private CaseCarouselArea caseCarouselArea;
 		private int scroll;
 
 		private SkinsPanelWidget(Screen parentScreen, int x, int y, int width, int height) {
@@ -173,9 +111,14 @@ public final class GexpressSkinsCategory {
 			if (client == null || client.textRenderer == null) return;
 			typeBoxes.clear();
 			caseBoxes.clear();
+			tabs.clear();
 			skinTiles.clear();
 			caseTiles.clear();
 			caseBuyTiles.clear();
+			dailyOfferTiles.clear();
+			caseCarouselButtons.clear();
+			caseCarouselDots.clear();
+			caseCarouselArea = null;
 			backButton = null;
 			caseOpenButton = null;
 
@@ -185,13 +128,42 @@ public final class GexpressSkinsCategory {
 			}
 			if (showingCases && selectedCase != null) {
 				renderCaseDetail(context, client, mouseX, mouseY);
-			} else if (showingCases) {
-				renderCases(context, client, mouseX, mouseY);
-			} else if (selectedType == null) {
-				renderOverview(context, client, mouseX, mouseY);
 			} else {
-				renderPicker(context, client, mouseX, mouseY);
+				renderWorkspaceTabs(context, client, mouseX, mouseY);
+				if (showingCases) renderCases(context, client, mouseX, mouseY);
+				else renderPicker(context, client, mouseX, mouseY);
 			}
+		}
+
+		private void renderWorkspaceTabs(DrawContext context, MinecraftClient client, int mouseX, int mouseY) {
+			int workspaceX = storefrontX();
+			int workspaceW = storefrontWidth();
+			drawGcoinBalance(context, client, workspaceX + workspaceW);
+			int x = workspaceX;
+			int y = getY() + 4;
+			int available = workspaceW - (showGcoin(client) ? 124 : 0);
+			int gap = 5;
+			int tabWidth = Math.max(64, Math.min(132, (available - gap * 2) / 3));
+			drawWorkspaceTab(context, client, x, y, tabWidth, 22, "Store",
+				showingCases, SkinTabMode.STORE, mouseX, mouseY);
+			x += tabWidth + gap;
+			drawWorkspaceTab(context, client, x, y, tabWidth, 22, "Knives",
+				!showingCases && selectedType == WeaponSkinType.KNIFE, SkinTabMode.KNIVES, mouseX, mouseY);
+			x += tabWidth + gap;
+			drawWorkspaceTab(context, client, x, y, tabWidth, 22, "Guns",
+				!showingCases && selectedType == WeaponSkinType.GUN, SkinTabMode.GUNS, mouseX, mouseY);
+		}
+
+		private void drawWorkspaceTab(DrawContext context, MinecraftClient client, int x, int y, int w, int h,
+				String label, boolean selected, SkinTabMode mode, int mouseX, int mouseY) {
+			boolean hovered = contains(mouseX, mouseY, x, y, w, h);
+			int accent = SkinShopConfig.accentArgb();
+			context.fill(x, y, x + w, y + h, selected ? 0xE02C3038 : hovered ? 0xCC252C35 : 0x991A2029);
+			context.drawBorder(x, y, w, h, selected ? accent : hovered ? withAlpha(accent, 0xAA) : 0x6655606E);
+			if (selected) context.fill(x, y + h - 2, x + w, y + h, accent);
+			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(label), x + w / 2, y + 7,
+				selected ? 0xFFFFFFFF : 0xFFB8C3CC);
+			tabs.add(new SkinTab(x, y, w, h, mode));
 		}
 
 		private void renderOverview(DrawContext context, MinecraftClient client, int mouseX, int mouseY) {
@@ -250,22 +222,10 @@ public final class GexpressSkinsCategory {
 		}
 
 		private void renderPicker(DrawContext context, MinecraftClient client, int mouseX, int mouseY) {
-			int top = getY() + 16;
-			drawGcoinBalance(context, client);
-			backButton = new BackButton(getX() + 12, top, 52, 18);
-			boolean backHovered = contains(mouseX, mouseY, backButton.x(), backButton.y(), backButton.width(), backButton.height());
-			context.fill(backButton.x(), backButton.y(), backButton.x() + backButton.width(), backButton.y() + backButton.height(),
-				backHovered ? 0x77333333 : 0x55222222);
-			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("Back"),
-				backButton.x() + backButton.width() / 2, backButton.y() + 5, 0xFFFFFFFF);
-
 			WeaponSkin equipped = equipped(selectedType);
-			context.drawCenteredTextWithShadow(client.textRenderer,
-				Text.literal(selectedType.displayName() + " Skins"),
-				getX() + width / 2, top + 4, 0xFFFFFFFF);
 
 			int listX = getX() + 14;
-			int listY = getY() + 46;
+			int listY = getY() + 52;
 			int listWidth = Math.min(260, Math.max(TILE_WIDTH, width / 3));
 			int previewX = listX + listWidth + 22;
 			int previewW = getX() + width - previewX - 14;
@@ -308,48 +268,180 @@ public final class GexpressSkinsCategory {
 		}
 
 		private void renderCases(DrawContext context, MinecraftClient client, int mouseX, int mouseY) {
-			int top = getY() + 16;
-			drawGcoinBalance(context, client);
-			backButton = new BackButton(getX() + 12, top, 52, 18);
-			boolean backHovered = contains(mouseX, mouseY, backButton.x(), backButton.y(), backButton.width(), backButton.height());
-			context.fill(backButton.x(), backButton.y(), backButton.x() + backButton.width(), backButton.y() + backButton.height(),
-				backHovered ? 0x77333333 : 0x55222222);
-			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("Back"),
-				backButton.x() + backButton.width() / 2, backButton.y() + 5, 0xFFFFFFFF);
-			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("G'Express Cases"),
-				getX() + width / 2, top + 4, 0xFFFFFFFF);
-
-			List<GexpressConfig.SkinCaseEntry> cases = GexpressConfig.getSkinCaseEntries();
-			List<GexpressConfig.SkinCaseEntry> ownedCases = ownedCaseSlots(client, cases);
-			int panelX = getX() + 18;
-			int panelY = getY() + 48;
-			int panelBottom = getY() + height - 10;
-			int panelHeight = Math.max(60, panelBottom - panelY);
-			int gap = 14;
-			boolean stacked = width < 640;
-			int ownedW = stacked ? width - 36 : Math.max(260, (width - 50) * 3 / 5);
-			int storeW = stacked ? ownedW : width - 36 - ownedW - gap;
-			int ownedColumns = Math.max(1, (ownedW - 20) / 112);
-			int ownedRows = Math.max(1, (ownedCases.size() + ownedColumns - 1) / ownedColumns);
-			int ownedRowsHeight = 44 + ownedRows * 92;
-			int storeRowsHeight = 44 + Math.max(1, cases.size()) * 84;
-			int contentHeight = stacked ? ownedRowsHeight + 18 + storeRowsHeight : Math.max(ownedRowsHeight, storeRowsHeight);
-			scroll = Math.max(0, Math.min(scroll, Math.max(0, contentHeight - panelHeight)));
-
-			if (stacked) {
-				int sectionY = panelY - scroll;
-				drawCaseSectionFrame(context, client, "Owned Cases", "Open cases from your inventory.", panelX, sectionY, ownedW, ownedRowsHeight);
-				drawOwnedCases(context, client, ownedCases, panelX, sectionY + 34, ownedW, panelY, panelBottom, mouseX, mouseY);
-				sectionY += ownedRowsHeight + 18;
-				drawCaseSectionFrame(context, client, "Case Store", "Buy a case, then open it from your inventory.", panelX, sectionY, ownedW, storeRowsHeight);
-				drawStoreCases(context, client, cases, panelX, sectionY + 34, ownedW, panelY, panelBottom, mouseX, mouseY);
-			} else {
-				int storeX = panelX + ownedW + gap;
-				drawCaseSectionFrame(context, client, "Owned Cases", "Open cases from your inventory.", panelX, panelY, ownedW, panelHeight);
-				drawCaseSectionFrame(context, client, "Case Store", "Buy a case, then open it from your inventory.", storeX, panelY, storeW, panelHeight);
-				drawOwnedCases(context, client, ownedCases, panelX, panelY + 34 - scroll, ownedW, panelY + 34, panelBottom, mouseX, mouseY);
-				drawStoreCases(context, client, cases, storeX, panelY + 34 - scroll, storeW, panelY + 34, panelBottom, mouseX, mouseY);
+			boolean showCases = SkinShopConfig.casesEnabled();
+			boolean showOffers = SkinShopConfig.dailyOffersEnabled();
+			List<GexpressConfig.SkinCaseEntry> cases = showCases
+				? GexpressConfig.getSkinCaseEntries() : List.of();
+			List<SkinDailyShop.Offer> offers = showOffers && client.player != null
+				? SkinDailyShop.offers(client.player.getUuid()) : List.of();
+			int panelX = storefrontX();
+			int panelY = getY() + 34;
+			int panelW = storefrontWidth();
+			int panelBottom = getY() + height - 6;
+			int viewportHeight = Math.max(80, panelBottom - panelY);
+			scroll = 0;
+			context.enableScissor(panelX, panelY, panelX + panelW, panelBottom);
+			if (!showCases && !showOffers) {
+				context.drawCenteredTextWithShadow(client.textRenderer,
+					Text.literal("The store is currently unavailable.").formatted(Formatting.GRAY),
+					panelX + panelW / 2, panelY + 36, 0xFFB8C3CC);
 			}
+			int cursorY = panelY;
+			if (showCases) {
+				boolean compactStyle = "compact".equals(SkinShopConfig.style());
+				int featuredHeight = showOffers
+					? Math.min(viewportHeight, Math.max(compactStyle ? 64 : 72,
+						Math.min(compactStyle ? 112 : 146, viewportHeight * (compactStyle ? 36 : 44) / 100)))
+					: viewportHeight;
+				drawFeaturedCaseCarousel(context, client, cases, panelX, cursorY, panelW,
+					featuredHeight, mouseX, mouseY);
+				cursorY += featuredHeight + (showOffers ? 7 : 0);
+			}
+			if (showOffers) {
+				int headerHeight = 19;
+				drawOffersHeader(context, client, panelX, cursorY, panelW);
+				cursorY += headerHeight;
+				drawDailyOffers(context, client, offers, panelX, cursorY, panelW,
+					Math.max(24, panelBottom - cursorY), mouseX, mouseY);
+			}
+			context.disableScissor();
+		}
+
+		private void drawFeaturedCaseCarousel(DrawContext context, MinecraftClient client,
+				List<GexpressConfig.SkinCaseEntry> cases, int x, int y, int w, int h,
+				int mouseX, int mouseY) {
+			int accent = SkinShopConfig.accentArgb();
+			context.fill(x, y, x + w, y + h, SkinShopConfig.panelArgb(0x55));
+			context.drawBorder(x, y, w, h, withAlpha(accent, 0x88));
+			context.drawTextWithShadow(client.textRenderer, Text.literal("FEATURED"), x + 11, y + 7, 0xFFFFFFFF);
+			caseCarouselArea = new CaseCarouselArea(x, y, w, h);
+			if (cases.isEmpty()) {
+				context.drawCenteredTextWithShadow(client.textRenderer,
+					Text.literal("No cases configured").formatted(Formatting.GRAY), x + w / 2, y + h / 2, 0xFFB8C3CC);
+				return;
+			}
+			featuredCaseIndex = Math.floorMod(featuredCaseIndex, cases.size());
+			GexpressConfig.SkinCaseEntry skinCase = cases.get(featuredCaseIndex);
+			boolean hovered = contains(mouseX, mouseY, x + 30, y + 20, w - 60, h - 20);
+			int previewY = y + 23 + Math.max(24, (h - 48) / 2);
+			float scale = Math.max(0.62F, Math.min(1.08F, (h - 42) / 78.0F));
+			drawCasePreview(context, x + w / 2, previewY, hovered ? scale * 1.05F : scale);
+			context.drawCenteredTextWithShadow(client.textRenderer,
+				Text.literal(textRendererTrim(client, skinCase.displayName(), Math.max(80, w - 100))),
+				x + w / 2, y + h - 16, 0xFFFFFFFF);
+			caseTiles.add(new CaseTile(x + 30, y + 20, w - 60, h - 20, skinCase.id()));
+
+			if (cases.size() > 1) {
+				int buttonY = y + Math.max(25, h / 2 - 14);
+				drawCaseCarouselArrow(context, client, x + 8, buttonY, 22, 28, -1, mouseX, mouseY);
+				drawCaseCarouselArrow(context, client, x + w - 30, buttonY, 22, 28, 1, mouseX, mouseY);
+				int dotW = 12;
+				int dotGap = 4;
+				int dotsX = x + (w - (cases.size() * dotW + (cases.size() - 1) * dotGap)) / 2;
+				for (int index = 0; index < cases.size(); index++) {
+					int dotX = dotsX + index * (dotW + dotGap);
+					boolean dotHovered = contains(mouseX, mouseY, dotX - 2, y + 5, dotW + 4, 8);
+					context.fill(dotX, y + 8, dotX + dotW, y + 10,
+						index == featuredCaseIndex ? accent : dotHovered ? withAlpha(accent, 0xAA) : 0x6655606E);
+					caseCarouselDots.add(new CaseCarouselDot(dotX - 2, y + 5, dotW + 4, 8, index));
+				}
+			}
+		}
+
+		private void drawCaseCarouselArrow(DrawContext context, MinecraftClient client,
+				int x, int y, int w, int h, int direction, int mouseX, int mouseY) {
+			boolean hovered = contains(mouseX, mouseY, x, y, w, h);
+			int accent = SkinShopConfig.accentArgb();
+			context.fill(x, y, x + w, y + h, hovered ? SkinShopConfig.panelArgb(0x99) : SkinShopConfig.panelArgb(0x66));
+			context.drawBorder(x, y, w, h, hovered ? accent : withAlpha(accent, 0x77));
+			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(direction < 0 ? "<" : ">"),
+				x + w / 2, y + 9, hovered ? 0xFFFFFFFF : 0xFFB8C3CC);
+			caseCarouselButtons.add(new CaseCarouselButton(x, y, w, h, direction));
+		}
+
+		private void drawDailyOffers(DrawContext context, MinecraftClient client,
+				List<SkinDailyShop.Offer> offers, int x, int y, int w, int h,
+				int mouseX, int mouseY) {
+			if (offers.isEmpty()) {
+				context.drawCenteredTextWithShadow(client.textRenderer,
+					Text.literal("No skins are eligible for the daily store.").formatted(Formatting.GRAY),
+					x + w / 2, y + Math.min(34, h / 2), 0xFFB8C3CC);
+				return;
+			}
+			int gap = 6;
+			int columns = Math.max(1, Math.min(offers.size(), Math.max(1, (w + gap) / 82)));
+			int rows = Math.max(1, (offers.size() + columns - 1) / columns);
+			int cardW = Math.max(42, (w - Math.max(0, columns - 1) * gap) / columns);
+			int rowGap = rows > 1 ? 5 : 0;
+			int cardH = Math.max(42, (h - Math.max(0, rows - 1) * rowGap) / rows);
+			for (int index = 0; index < offers.size(); index++) {
+				SkinDailyShop.Offer offer = offers.get(index);
+				int cardX = x + (index % columns) * (cardW + gap);
+				int cardY = y + (index / columns) * (cardH + rowGap);
+				drawDailyOffer(context, client, offer, cardX, cardY, cardW, cardH, mouseX, mouseY);
+			}
+		}
+
+		private void drawDailyOffer(DrawContext context, MinecraftClient client, SkinDailyShop.Offer offer,
+				int x, int y, int w, int h, int mouseX, int mouseY) {
+			boolean owned = isUnlocked(client, offer.type(), offer.skin());
+			boolean canBuy = !owned && gcoinBalance(client) >= offer.price();
+			boolean hovered = !owned && contains(mouseX, mouseY, x, y, w, h);
+			int accent = 0xFF000000 | offer.skin().color();
+			context.fill(x, y, x + w, y + h, SkinShopConfig.panelArgb(hovered ? 0x77 : 0x55));
+			context.drawBorder(x, y, w, h, hovered ? accent : 0x7790A0AA);
+			context.fill(x + 1, y + h - 5, x + w - 1, y + h - 1, accent);
+			boolean tight = h < 96 || "compact".equals(SkinShopConfig.style());
+			drawItemPreview(context, previewStack(offer.type(), offer.skin()), x + w / 2,
+				y + (tight ? Math.max(18, h / 2 - 4) : Math.max(34, (h - 48) / 2)),
+				Math.max(tight ? 1.8F : 2.7F, Math.min(tight ? 3.0F : 5.2F, w / 36.0F)));
+			context.drawCenteredTextWithShadow(client.textRenderer,
+				Text.literal(textRendererTrim(client, offer.skin().displayName(), w - 12)),
+				x + w / 2, y + h - (tight ? 28 : 44), 0xFFFFFFFF);
+			if (!tight) {
+				context.drawCenteredTextWithShadow(client.textRenderer,
+					Text.literal(offer.type().displayName()).formatted(Formatting.GRAY),
+					x + w / 2, y + h - 31, 0xFFB8C3CC);
+			}
+			if (owned) {
+				context.drawCenteredTextWithShadow(client.textRenderer,
+					Text.literal("OWNED").formatted(Formatting.GREEN), x + w / 2, y + h - 17, 0xFF7EE2A8);
+			} else {
+				int priceW = client.textRenderer.getWidth(Integer.toString(offer.price())) + 13;
+				drawCoinPrice(context, client, offer.price(), x + (w - priceW) / 2, y + h - 18,
+					canBuy ? 0xFFFFD56E : 0xFF8A8A8A);
+			}
+			dailyOfferTiles.add(new DailyOfferTile(x, y, w, h, offer.type(), offer.skin(), !owned));
+		}
+
+		private void drawOffersHeader(DrawContext context, MinecraftClient client, int x, int y, int w) {
+			String label = "OFFERS  |  " + dailyRotationCountdown();
+			int labelW = client.textRenderer.getWidth(label);
+			int lineY = y + 7;
+			int centerX = x + w / 2;
+			context.fill(x, lineY, Math.max(x, centerX - labelW / 2 - 10), lineY + 1, 0x6655606E);
+			context.fill(Math.min(x + w, centerX + labelW / 2 + 10), lineY, x + w, lineY + 1, 0x6655606E);
+			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(label), centerX, y + 3, 0xFFFFFFFF);
+		}
+
+		private String dailyRotationCountdown() {
+			long remaining = Math.max(0L, SkinDailyShop.nextRotationEpochSecond() - Instant.now().getEpochSecond());
+			long hours = remaining / 3600L;
+			long minutes = remaining % 3600L / 60L;
+			long seconds = remaining % 60L;
+			return "%02d:%02d:%02d".formatted(hours, minutes, seconds);
+		}
+
+		private int storefrontWidth() {
+			int available = Math.max(120, width - 28);
+			boolean compactStyle = "compact".equals(SkinShopConfig.style());
+			int heightDriven = Math.max(compactStyle ? 480 : 540,
+				Math.max(0, height - 40) * (compactStyle ? 2 : 9) / (compactStyle ? 1 : 4));
+			return Math.min(available, Math.min(compactStyle ? 840 : 1040, heightDriven));
+		}
+
+		private int storefrontX() {
+			return getX() + (width - storefrontWidth()) / 2;
 		}
 
 		private void renderCaseDetail(DrawContext context, MinecraftClient client, int mouseX, int mouseY) {
@@ -477,9 +569,12 @@ public final class GexpressSkinsCategory {
 
 		private void drawCaseSectionFrame(DrawContext context, MinecraftClient client, String title, String subtitle,
 				int x, int y, int w, int h) {
-			context.fill(x, y, x + w, y + h, 0x44272E36);
-			context.drawBorder(x, y, w, h, 0x8890A0AA);
-			context.fill(x + 1, y + 1, x + w - 1, y + 29, 0x55353D45);
+			int accent = SkinShopConfig.accentArgb();
+			context.fill(x, y, x + w, y + h, SkinShopConfig.panelArgb(
+				"compact".equals(SkinShopConfig.style()) ? 0x66 : 0x44));
+			context.drawBorder(x, y, w, h, withAlpha(accent, 0x88));
+			context.fill(x + 1, y + 1, x + w - 1, y + 29, SkinShopConfig.panelArgb(0x77));
+			context.fill(x + 1, y + 1, x + 4, y + 29, accent);
 			context.drawTextWithShadow(client.textRenderer, Text.literal(title), x + 12, y + 8, 0xFFFFFFFF);
 			context.drawTextWithShadow(client.textRenderer, Text.literal(textRendererTrim(client, subtitle, w - 24)).formatted(Formatting.GRAY),
 				x + 12, y + 20, 0xFFB8C3CC);
@@ -603,6 +698,12 @@ public final class GexpressSkinsCategory {
 			if (client == null || client.player == null || client.world == null) return WeaponSkin.DEFAULT;
 			PlayerSkinComponent component = PlayerSkinComponent.KEY.getNullable(client.world);
 			return component == null ? WeaponSkin.DEFAULT : component.equipped(client.player.getUuid(), type);
+		}
+
+		private boolean isUnlocked(MinecraftClient client, WeaponSkinType type, WeaponSkin skin) {
+			if (client == null || client.player == null || client.world == null) return false;
+			PlayerSkinComponent component = PlayerSkinComponent.KEY.getNullable(client.world);
+			return component != null && component.isUnlocked(client.player.getUuid(), type, skin);
 		}
 
 		private ItemStack previewStack(WeaponSkinType type, WeaponSkin skin) {
@@ -871,13 +972,17 @@ public final class GexpressSkinsCategory {
 		}
 
 		private void drawGcoinBalance(DrawContext context, MinecraftClient client) {
+			drawGcoinBalance(context, client, getX() + width);
+		}
+
+		private void drawGcoinBalance(DrawContext context, MinecraftClient client, int rightEdge) {
 			if (!showGcoin(client) || client.player == null || client.world == null) return;
 			GcoinComponent gcoins = GcoinComponent.KEY.getNullable(client.world);
 			int balance = gcoins == null ? 0 : gcoins.balance(client.player.getUuid());
 			String text = "G'Coin: " + balance;
 			int textWidth = client.textRenderer.getWidth(text);
-			int x = getX() + width - textWidth - 34;
-			int y = getY() + 18;
+			int x = rightEdge - textWidth - 26;
+			int y = getY() + 10;
 			context.fill(x - 6, y - 4, x + textWidth + 26, y + 15, 0x55331F08);
 			context.drawBorder(x - 6, y - 4, textWidth + 32, 19, 0x88E0B65A);
 			context.drawTexture(GCOIN_TEXTURE, x, y - 2, 12, 12, 0.0F, 0.0F, 9, 9, 9, 9);
@@ -951,13 +1056,20 @@ public final class GexpressSkinsCategory {
 		@Override
 		public boolean mouseClicked(double mouseX, double mouseY, int button) {
 			if (openingCase != null) return true;
+			if (selectedCase == null) {
+				for (SkinTab tab : tabs) {
+					if (!tab.contains(mouseX, mouseY)) continue;
+					showingCases = tab.mode() == SkinTabMode.STORE;
+					if (tab.mode() == SkinTabMode.KNIVES) selectedType = WeaponSkinType.KNIFE;
+					if (tab.mode() == SkinTabMode.GUNS) selectedType = WeaponSkinType.GUN;
+					scroll = 0;
+					return true;
+				}
+			}
 			if (backButton != null && backButton.contains(mouseX, mouseY)) {
 				if (selectedCase != null) {
 					selectedCase = null;
 					showingCases = true;
-				} else {
-					selectedType = null;
-					showingCases = false;
 				}
 				scroll = 0;
 				return true;
@@ -970,6 +1082,21 @@ public final class GexpressSkinsCategory {
 					return true;
 				}
 				return super.mouseClicked(mouseX, mouseY, button);
+			}
+			for (CaseCarouselButton carouselButton : caseCarouselButtons) {
+				if (!carouselButton.contains(mouseX, mouseY)) continue;
+				cycleFeaturedCase(carouselButton.direction());
+				return true;
+			}
+			for (CaseCarouselDot dot : caseCarouselDots) {
+				if (!dot.contains(mouseX, mouseY)) continue;
+				featuredCaseIndex = dot.index();
+				return true;
+			}
+			for (DailyOfferTile tile : dailyOfferTiles) {
+				if (!tile.enabled() || !tile.contains(mouseX, mouseY)) continue;
+				buyDailyOffer(tile.type(), tile.skin());
+				return true;
 			}
 			for (CaseBuyTile tile : caseBuyTiles) {
 				if (!tile.contains(mouseX, mouseY)) continue;
@@ -1010,12 +1137,26 @@ public final class GexpressSkinsCategory {
 
 		@Override
 		public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-			if ((!showingCases && selectedType == null) || mouseX < getX() || mouseX >= getX() + width
+			if (mouseX < getX() || mouseX >= getX() + width
 					|| mouseY < getY() || mouseY >= getY() + height) {
 				return false;
 			}
+			if (selectedCase == null && showingCases) {
+				if (caseCarouselArea != null && caseCarouselArea.contains(mouseX, mouseY)
+						&& (verticalAmount != 0.0D || horizontalAmount != 0.0D)) {
+					double amount = verticalAmount != 0.0D ? verticalAmount : -horizontalAmount;
+					cycleFeaturedCase(amount > 0.0D ? -1 : 1);
+				}
+				return true;
+			}
 			scroll = Math.max(0, scroll - (int) Math.round(verticalAmount * 20.0D));
 			return true;
+		}
+
+		private void cycleFeaturedCase(int direction) {
+			List<GexpressConfig.SkinCaseEntry> cases = GexpressConfig.getSkinCaseEntries();
+			if (cases.size() < 2) return;
+			featuredCaseIndex = Math.floorMod(featuredCaseIndex + direction, cases.size());
 		}
 
 		private void equip(WeaponSkinType type, WeaponSkin skin) {
@@ -1036,12 +1177,22 @@ public final class GexpressSkinsCategory {
 			client.player.networkHandler.sendChatCommand("g skins case buy " + caseId);
 		}
 
+		private void buyDailyOffer(WeaponSkinType type, WeaponSkin skin) {
+			MinecraftClient client = MinecraftClient.getInstance();
+			if (client == null || client.player == null || client.player.networkHandler == null) return;
+			client.player.networkHandler.sendChatCommand("g skins shop buy " + type.id() + " " + skin.id());
+		}
+
 		private String textRendererTrim(MinecraftClient client, String value, int width) {
 			return client.textRenderer.trimToWidth(value == null ? "" : value, Math.max(24, width));
 		}
 
 		private boolean contains(double mouseX, double mouseY, int x, int y, int w, int h) {
 			return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+		}
+
+		private static int withAlpha(int argb, int alpha) {
+			return (Math.max(0, Math.min(255, alpha)) << 24) | (argb & 0xFFFFFF);
 		}
 
 		@Override
@@ -1092,6 +1243,14 @@ public final class GexpressSkinsCategory {
 		}
 	}
 
+	private enum SkinTabMode { STORE, KNIVES, GUNS }
+
+	private record SkinTab(int x, int y, int width, int height, SkinTabMode mode) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
 	private record SkinTile(int x, int y, int width, int height, WeaponSkinType type, WeaponSkin skin) {
 		private boolean contains(double mouseX, double mouseY) {
 			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
@@ -1104,7 +1263,32 @@ public final class GexpressSkinsCategory {
 		}
 	}
 
+	private record CaseCarouselButton(int x, int y, int width, int height, int direction) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record CaseCarouselDot(int x, int y, int width, int height, int index) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record CaseCarouselArea(int x, int y, int width, int height) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
 	private record CaseBuyTile(int x, int y, int width, int height, String caseId) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record DailyOfferTile(int x, int y, int width, int height,
+			WeaponSkinType type, WeaponSkin skin, boolean enabled) {
 		private boolean contains(double mouseX, double mouseY) {
 			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
 		}

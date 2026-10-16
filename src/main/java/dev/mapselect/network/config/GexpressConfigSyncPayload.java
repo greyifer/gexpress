@@ -34,7 +34,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		int trackerRange, int trackerCooldownSeconds, int altruistRange,
 		int skincrawlerBodyMaxAgeSeconds, int skincrawlerCooldownSeconds, int skincrawlerStunSeconds,
 		int skincrawlerRange, int painterPaintDurationSeconds, int painterBodyCooldownSeconds,
-		int painterPlayerCooldownSeconds, int painterDoorwayDurationSeconds, int painterDoorwayCooldownSeconds,
+		int painterPlayerCooldownSeconds,
 		int painterMaxPaintedBodies, int painterMaxPaintedPlayers,
 		int spyBugCost, int spyBugDurationSeconds, int spyBugRange,
 		int squeakerPitchPercent, int masqueradePitchMinPercent, int masqueradePitchMaxPercent,
@@ -68,9 +68,9 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		boolean loversShowPartnerHud, boolean loversAllowMixedSidePairs,
 		int covenantBiteCooldownSeconds,
 		int vengefulSpiritReviveDelaySeconds, int vengefulSpiritRevengeSeconds,
-		boolean loversIndependentWin) implements CustomPayload {
+		boolean loversIndependentWin, int veteranMaxUses) implements CustomPayload {
 
-	private static final int WIRE_VERSION = 13;
+	private static final int WIRE_VERSION = 15;
 	private static final String DEFAULT_ITEM_PICKUP_POLICY = "civilians_neutrals_killers";
 	private static final String DEFAULT_SPECIAL_ROLE_OCCURRENCE = "both";
 	private static final int DEFAULT_BOMB_SPECIALIST_FIRECRACKER_PRICE = 10;
@@ -170,8 +170,6 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		buf.writeInt(payload.painterPaintDurationSeconds());
 		buf.writeInt(payload.painterBodyCooldownSeconds());
 		buf.writeInt(payload.painterPlayerCooldownSeconds());
-		buf.writeInt(payload.painterDoorwayDurationSeconds());
-		buf.writeInt(payload.painterDoorwayCooldownSeconds());
 		buf.writeInt(payload.painterMaxPaintedBodies());
 		buf.writeInt(payload.painterMaxPaintedPlayers());
 		buf.writeInt(payload.spyBugCost());
@@ -255,50 +253,53 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 		buf.writeInt(payload.vengefulSpiritReviveDelaySeconds());
 		buf.writeInt(payload.vengefulSpiritRevengeSeconds());
 		buf.writeBoolean(payload.loversIndependentWin());
+		buf.writeInt(payload.veteranMaxUses());
 	}
 
 	private static GexpressConfigSyncPayload decodeVersioned(PacketByteBuf buf) {
 		int version = buf.readVarInt();
-		if (version == 3) return decodeFields(buf, true, false, false, false, false, false, false, false, false, false, false);
-		if (version == 4) return decodeFields(buf, true, true, false, false, false, false, false, false, false, false, false);
-		if (version == 5) return decodeFields(buf, true, true, true, false, false, false, false, false, false, false, false);
-		if (version == 6) return decodeFields(buf, true, true, true, true, false, false, false, false, false, false, false);
-		if (version == 7) return decodeFields(buf, true, true, true, true, true, false, false, false, false, false, false);
-		if (version == 8) return decodeFields(buf, true, true, true, true, true, true, false, false, false, false, false);
-		if (version == 9) return decodeFields(buf, true, true, true, true, true, true, true, false, false, false, false);
-		if (version == 10) return decodeFields(buf, true, true, true, true, true, true, true, true, false, false, false);
-		if (version == 11) return decodeFields(buf, true, true, true, true, true, true, true, true, true, false, false);
-		if (version == 12) return decodeFields(buf, true, true, true, true, true, true, true, true, true, true, false);
+		if (version == 3) return decodeFields(buf, true, false, false, false, false, false, false, false, false, false, false, false);
+		if (version == 4) return decodeFields(buf, true, true, false, false, false, false, false, false, false, false, false, false);
+		if (version == 5) return decodeFields(buf, true, true, true, false, false, false, false, false, false, false, false, false);
+		if (version == 6) return decodeFields(buf, true, true, true, true, false, false, false, false, false, false, false, false);
+		if (version == 7) return decodeFields(buf, true, true, true, true, true, false, false, false, false, false, false, false);
+		if (version == 8) return decodeFields(buf, true, true, true, true, true, true, false, false, false, false, false, false);
+		if (version == 9) return decodeFields(buf, true, true, true, true, true, true, true, false, false, false, false, false);
+		if (version == 10) return decodeFields(buf, true, true, true, true, true, true, true, true, false, false, false, false);
+		if (version == 11) return decodeFields(buf, true, true, true, true, true, true, true, true, true, false, false, false);
+		if (version == 12) return decodeFields(buf, true, true, true, true, true, true, true, true, true, true, false, false);
+		if (version == 13) return decodeFields(buf, true, true, true, true, true, true, true, true, true, true, true, false);
+		if (version == 14) return decodeFields(buf, true, true, true, true, true, true, true, true, true, true, true, true);
 		if (version != WIRE_VERSION) {
 			throw new IllegalArgumentException("Unsupported G'Express config sync version " + version);
 		}
-		return decodeFields(buf, true, true, true, true, true, true, true, true, true, true, true);
+		return decodeFields(buf, true, true, true, true, true, true, true, true, true, true, false, true);
 	}
 
 	private static GexpressConfigSyncPayload decodeLegacy(PacketByteBuf buf) {
 		int start = buf.readerIndex();
 		try {
-			GexpressConfigSyncPayload payload = decodeFields(buf, true, true, true, true, true, false, false, false, false, false, false);
+			GexpressConfigSyncPayload payload = decodeFields(buf, true, true, true, true, true, false, false, false, false, false, false, false);
 			if (buf.readableBytes() == 0) return payload;
 		} catch (RuntimeException ignored) {
 			// Fall back to the previous unversioned layout.
 		}
 		buf.readerIndex(start);
 		try {
-			GexpressConfigSyncPayload payload = decodeFields(buf, true, true, true, false, false, false, false, false, false, false, false);
+			GexpressConfigSyncPayload payload = decodeFields(buf, true, true, true, false, false, false, false, false, false, false, false, false);
 			if (buf.readableBytes() == 0) return payload;
 		} catch (RuntimeException ignored) {
 			// Fall back to the pre-special-role wire layout below.
 		}
 		buf.readerIndex(start);
 		try {
-			GexpressConfigSyncPayload payload = decodeFields(buf, true, false, false, false, false, false, false, false, false, false, false);
+			GexpressConfigSyncPayload payload = decodeFields(buf, true, false, false, false, false, false, false, false, false, false, false, false);
 			if (buf.readableBytes() == 0) return payload;
 		} catch (RuntimeException ignored) {
 			// Fall back to the pre-Guardian-Angel wire layout below.
 		}
 		buf.readerIndex(start);
-		return decodeFields(buf, false, false, false, false, false, false, false, false, false, false, false);
+		return decodeFields(buf, false, false, false, false, false, false, false, false, false, false, false, false);
 	}
 
 	private static GexpressConfigSyncPayload decodeFields(PacketByteBuf buf, boolean includesGuardianAngelSetting,
@@ -306,7 +307,8 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			boolean includesRoleShopPrices, boolean includesNewRoleSettings,
 			boolean includesIndependentLoversSetting, boolean includesSeerDeathRequirement,
 			boolean includesLastStandAndPickupSettings, boolean includesTwinsSettings,
-			boolean includesPainterSettings, boolean includesPainterDoorwaySettings) {
+			boolean includesPainterSettings, boolean includesLegacyPainterExtraSettings,
+			boolean includesVeteranSettings) {
 		return new GexpressConfigSyncPayload(
 			buf.readInt(), // c4Price
 			buf.readInt(), // c4FuseSeconds
@@ -370,9 +372,7 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			buf.readInt(), // skincrawlerRange
 			includesPainterSettings ? buf.readInt() : 60, // painterPaintDurationSeconds
 			includesPainterSettings ? buf.readInt() : 30, // painterBodyCooldownSeconds
-			includesPainterSettings ? buf.readInt() : 30, // painterPlayerCooldownSeconds
-			includesPainterDoorwaySettings ? buf.readInt() : 10, // painterDoorwayDurationSeconds
-			includesPainterDoorwaySettings ? buf.readInt() : 30, // painterDoorwayCooldownSeconds
+			readPainterPlayerCooldown(buf, includesPainterSettings, includesLegacyPainterExtraSettings),
 			includesPainterSettings ? buf.readInt() : 1, // painterMaxPaintedBodies
 			includesPainterSettings ? buf.readInt() : 1, // painterMaxPaintedPlayers
 			buf.readInt(), // spyBugCost
@@ -445,18 +445,29 @@ public record GexpressConfigSyncPayload(int c4Price, int c4FuseSeconds, int c4Fi
 			includesNewRoleSettings ? buf.readInt() : 45, // seerCompareCooldownSeconds
 			includesNewRoleSettings && includesSeerDeathRequirement ? buf.readInt() : 3, // seerCompareDeathsRequired
 			includesNewRoleSettings ? buf.readInt() : 4, // seerCompareRange
-			includesTwinsSettings ? buf.readInt() : 20, // twinsSwapCooldownSeconds
+			includesTwinsSettings ? buf.readInt() : 30, // twinsSwapCooldownSeconds
 			includesTwinsSettings && buf.readBoolean(), // twinsBodyDifferentRole
 			includesNewRoleSettings ? buf.readInt() : 75, // cupidLovePercentage
 			includesNewRoleSettings ? buf.readInt() : 20, // cupidPairCooldownSeconds
 			includesNewRoleSettings ? buf.readInt() : 4, // cupidRange
 			includesNewRoleSettings ? buf.readBoolean() : true, // loversShowPartnerHud
 			includesNewRoleSettings && buf.readBoolean(), // loversAllowMixedSidePairs
-			includesNewRoleSettings ? buf.readInt() : 15, // covenantBiteCooldownSeconds
+			includesNewRoleSettings ? buf.readInt() : 45, // covenantBiteCooldownSeconds
 			includesNewRoleSettings ? buf.readInt() : 15, // vengefulSpiritReviveDelaySeconds
 			includesNewRoleSettings ? buf.readInt() : 30, // vengefulSpiritRevengeSeconds
-			includesIndependentLoversSetting && buf.readBoolean() // loversIndependentWin
+			includesIndependentLoversSetting && buf.readBoolean(), // loversIndependentWin
+			includesVeteranSettings ? buf.readInt() : 5 // veteranMaxUses
 		);
+	}
+
+	private static int readPainterPlayerCooldown(PacketByteBuf buf, boolean includesPainterSettings,
+			boolean includesLegacyPainterExtraSettings) {
+		int cooldown = includesPainterSettings ? buf.readInt() : 30;
+		if (includesLegacyPainterExtraSettings) {
+			buf.readInt();
+			buf.readInt();
+		}
+		return cooldown;
 	}
 
 	@Override

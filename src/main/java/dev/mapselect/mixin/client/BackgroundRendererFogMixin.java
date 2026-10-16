@@ -30,6 +30,7 @@ public abstract class BackgroundRendererFogMixin {
 		)
 	)
 	private static Vec3d mapselect$overrideFogColor(Vec3d pos, CubicSampler.RgbFetcher fetcher, Operation<Vec3d> original) {
+		Vec3d vanillaColor = original.call(pos, fetcher);
 		ClientWorld world = MinecraftClient.getInstance().world;
 		ClientPlayerEntity player = MinecraftClient.getInstance().player;
 		if (world != null && player != null) {
@@ -49,7 +50,7 @@ public abstract class BackgroundRendererFogMixin {
 				}
 			}
 		}
-		return original.call(pos, fetcher);
+		return vanillaColor;
 	}
 
 	@Inject(
@@ -62,7 +63,6 @@ public abstract class BackgroundRendererFogMixin {
 		ClientWorld world = MinecraftClient.getInstance().world;
 		ClientPlayerEntity player = MinecraftClient.getInstance().player;
 		if (world == null || player == null) return;
-
 		MapWeatherComponent comp = MapWeatherComponent.KEY.getNullable(world);
 		if (comp == null || comp.getWeather() != WeatherType.SANDSTORM) return;
 

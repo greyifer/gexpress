@@ -2,6 +2,9 @@ package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.game.GexpressAbilityGuards;
+import dev.mapselect.network.role.pelican.PelicanChatPopupDismissPayload;
+import dev.mapselect.network.role.rat.RatPlayDeadPayload;
+import dev.mapselect.role.rat.RatManager;
 import dev.mapselect.role.puppetmaster.PuppetmasterManager;
 import dev.mapselect.role.timemaster.TimeMasterManager;
 import dev.mapselect.role.pelican.PelicanManager;
@@ -49,7 +52,8 @@ public abstract class PuppetmasterControlledActionsMixin {
 
 	@Inject(method = "onPlayerInteractBlock", at = @At("HEAD"), cancellable = true)
 	private void gexpress$redirectInteractBlock(PlayerInteractBlockC2SPacket packet, CallbackInfo ci) {
-		if (isLocked(player)) ci.cancel();
+        boolean otherLock=PuppetmasterManager.isControlled(player)||PelicanManager.isStashed(player)||TimeMasterManager.isFrozen(player)||RatManager.isPlayingDead(player);
+        if(otherLock || dev.mapselect.role.loki.LokiManager.isControllingClone(player)&&!player.getStackInHand(packet.getHand()).isEmpty())ci.cancel();
 	}
 
 	@Inject(method = "onPlayerInteractItem", at = @At("HEAD"), cancellable = true)
@@ -101,7 +105,7 @@ public abstract class PuppetmasterControlledActionsMixin {
 
 	@Inject(method = "onClientCommand", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockClientCommand(ClientCommandC2SPacket packet, CallbackInfo ci) {
-		if (isLocked(player)) ci.cancel();
+		if (PuppetmasterManager.isControlled(player) || PelicanManager.isStashed(player) || TimeMasterManager.isFrozen(player) || RatManager.isPlayingDead(player)) ci.cancel();
 	}
 
 	@Inject(method = "onCommandExecution", at = @At("HEAD"), cancellable = true)
@@ -144,16 +148,23 @@ public abstract class PuppetmasterControlledActionsMixin {
 
 	@Inject(method = "onCustomPayload", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockCustomPayload(CustomPayloadC2SPacket packet, CallbackInfo ci) {
+		// This is a UI acknowledgement, not a role ability. The server independently verifies that
+		// only the owning Pelican can dismiss the referenced popup.
+		if (packet.payload() instanceof PelicanChatPopupDismissPayload) return;
+        if (dev.mapselect.role.loki.LokiManager.isControllingClone(player) && packet.payload() instanceof dev.mapselect.network.role.loki.LokiUsePayload loki && loki.ability() == 3) return;
 		if (GexpressAbilityGuards.shouldBlockAbilityPayload(player, packet.payload())) {
 			ci.cancel();
 			return;
 		}
+		// A Rat must be able to press the same toggle again to stand back up.
+		if (packet.payload() instanceof RatPlayDeadPayload) return;
 		if (isLocked(player)) ci.cancel();
 	}
 
 	private static boolean isLocked(ServerPlayerEntity player) {
 		return PuppetmasterManager.isControlled(player) || PelicanManager.isStashed(player)
-			|| TimeMasterManager.isFrozen(player);
+			|| TimeMasterManager.isFrozen(player) || RatManager.isPlayingDead(player)
+            || dev.mapselect.role.loki.LokiManager.isControllingClone(player);
 	}
 
 	private static boolean isAllowedLockedCommand(String command) {

@@ -2,6 +2,7 @@ package dev.mapselect.role.bombspecialist;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
+import dev.mapselect.game.RoundLifecycleHooks;
 import dev.mapselect.registry.MapSelectItems;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.ItemEntity;
@@ -33,6 +34,7 @@ public final class PliersDefuseManager {
 
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(PliersDefuseManager::tick);
+		RoundLifecycleHooks.clear(PliersDefuseManager::clear);
 	}
 
 	public static ActionResult beginPlayerDefuse(ItemStack stack, PlayerEntity user, PlayerEntity target, Hand hand) {
@@ -62,7 +64,7 @@ public final class PliersDefuseManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD || ATTEMPTS.isEmpty()) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world) || ATTEMPTS.isEmpty()) return;
 		MinecraftServer server = world.getServer();
 		Iterator<Map.Entry<UUID, DefuseAttempt>> iterator = ATTEMPTS.entrySet().iterator();
 		while (iterator.hasNext()) {
@@ -170,6 +172,10 @@ public final class PliersDefuseManager {
 	private static void consumePliers(ServerPlayerEntity player, Hand hand) {
 		if (player.getAbilities().creativeMode) return;
 		player.getStackInHand(hand).decrement(1);
+	}
+
+	private static void clear() {
+		ATTEMPTS.clear();
 	}
 
 	private record DefuseAttempt(UUID defuserId, Hand hand, UUID playerTargetId, UUID blockChargeId,

@@ -4,16 +4,17 @@ import com.mojang.authlib.GameProfile;
 import dev.mapselect.client.render.ClientModelAttachmentPreview;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.role.bombspecialist.C4PlacementPreset;
+import io.github.caspe.glib.api.client.editor.GlibWorkbenchScreen;
+import io.github.caspe.glib.api.client.ui.GlibButton;
+import io.github.caspe.glib.api.client.ui.GlibRect;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.network.OtherClientPlayerEntity;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
@@ -24,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public final class GexpressModelPlacementScreen extends Screen {
+public final class GexpressModelPlacementScreen extends GlibWorkbenchScreen {
 	private static final String[] LABELS = { "X", "Y", "Z", "Rot X", "Rot Y", "Rot Z", "Slant", "Scale" };
 	private static final int PANEL = 0xCC151A20;
 	private static final int BORDER = 0x775E6D7E;
@@ -37,16 +38,15 @@ public final class GexpressModelPlacementScreen extends Screen {
 	private static final C4PlacementPreset SPY_DEFAULT =
 		new C4PlacementPreset(0.0F, 0.16F, 0.31F, 0.0F, 0.0F, 0.0F, 0.0F, 0.28F);
 
-	private final Screen parent;
+	private GlibRect workspace;
 	private final List<TextFieldWidget> fields = new ArrayList<>();
 	private ClientModelAttachmentPreview.Kind kind = ClientModelAttachmentPreview.Kind.C4;
-	private ButtonWidget kindButton;
-	private ButtonWidget toolButton;
-	private ButtonWidget applyButton;
-	private ButtonWidget copyButton;
-	private ButtonWidget resetButton;
-	private ButtonWidget cameraButton;
-	private ButtonWidget doneButton;
+	private GlibButton kindButton;
+	private GlibButton toolButton;
+	private GlibButton applyButton;
+	private GlibButton copyButton;
+	private GlibButton resetButton;
+	private GlibButton cameraButton;
 	private boolean draggingPreview;
 	private boolean panningPreview;
 	private TransformAxis activeGizmo;
@@ -62,49 +62,43 @@ public final class GexpressModelPlacementScreen extends Screen {
 	private AbstractClientPlayerEntity previewPlayer;
 
 	public GexpressModelPlacementScreen(Screen parent) {
-		super(Text.translatable("gui.gexpress.model_placement.title"));
-		this.parent = parent;
+		super(parent, Text.translatable("gui.gexpress.model_placement.title"),
+			Text.translatable("gui.gexpress.model_placement.subtitle"), GOLD);
 	}
 
 	@Override
-	protected void init() {
+	protected void initWorkbench(GlibRect workspace) {
+		this.workspace = workspace;
 		fields.clear();
 		for (String label : LABELS) {
 			TextFieldWidget field = new TextFieldWidget(textRenderer, 0, 0, 90, 18, Text.literal(label));
 			field.setMaxLength(16);
 			fields.add(addDrawableChild(field));
 		}
-		kindButton = addDrawableChild(ButtonWidget.builder(kindText(), button -> toggleKind()).build());
-		toolButton = addDrawableChild(ButtonWidget.builder(toolText(), button -> toggleTool()).build());
-		applyButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.model_placement.apply"),
-			button -> applyAndSave()).build());
-		copyButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.model_placement.copy"),
-			button -> copyCurrentDefaults()).build());
-		resetButton = addDrawableChild(ButtonWidget.builder(Text.translatable("gui.gexpress.model_placement.reset"),
-			button -> resetCurrent()).build());
-		cameraButton = addDrawableChild(ButtonWidget.builder(Text.literal("Reset View"), button -> resetCamera()).build());
-		doneButton = addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).build());
+		kindButton = addDrawableChild(new GlibButton(0, 0, 100, 20, kindText(), BLUE, this::toggleKind));
+		toolButton = addDrawableChild(new GlibButton(0, 0, 100, 20, toolText(), BLUE, this::toggleTool));
+		applyButton = addDrawableChild(new GlibButton(0, 0, 100, 20,
+			Text.translatable("gui.gexpress.model_placement.apply"), GREEN, this::applyAndSave));
+		copyButton = addDrawableChild(new GlibButton(0, 0, 100, 20,
+			Text.translatable("gui.gexpress.model_placement.copy"), GOLD, this::copyCurrentDefaults));
+		resetButton = addDrawableChild(new GlibButton(0, 0, 100, 20,
+			Text.translatable("gui.gexpress.model_placement.reset"), RED, this::resetCurrent));
+		cameraButton = addDrawableChild(new GlibButton(0, 0, 100, 20, Text.literal("Reset View"), GOLD, this::resetCamera));
 		layoutWidgets();
 		loadFromConfig();
 		updatePreview();
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		context.fill(0, 0, width, height, 0xF00E1116);
-		drawHeader(context);
+	protected void renderWorkbench(DrawContext context, GlibRect workspace, int mouseX, int mouseY, float delta) {
 		drawPreview(context, mouseX, mouseY);
 		drawControls(context);
-		super.render(context, mouseX, mouseY, delta);
 		updatePreview();
 	}
 
 	@Override
-	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-	}
-
-	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (helpActive()) return super.mouseClicked(mouseX, mouseY, button);
 		if ((button == 0 || button == 1 || button == 2) && inPreview(mouseX, mouseY)) {
 			if (button == 0) {
 				TransformAxis gizmo = hitGizmo(mouseX, mouseY);
@@ -151,6 +145,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (helpActive()) return true;
 		if (inPreview(mouseX, mouseY)) {
 			cameraZoom = MathHelper.clamp(cameraZoom + (float) verticalAmount * 0.08F, 0.62F, 1.82F);
 			return true;
@@ -161,16 +156,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 	@Override
 	public void close() {
 		ClientModelAttachmentPreview.clear();
-		MinecraftClient.getInstance().setScreen(parent);
-	}
-
-	private void drawHeader(DrawContext context) {
-		context.fill(0, 0, width, 42, 0xEE111820);
-		context.fill(0, 40, width, 42, GOLD);
-		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 11, TEXT);
-		context.drawCenteredTextWithShadow(textRenderer,
-			Text.translatable("gui.gexpress.model_placement.subtitle").formatted(Formatting.GRAY),
-			width / 2, 24, MUTED);
+		super.close();
 	}
 
 	private void drawPreview(DrawContext context, int mouseX, int mouseY) {
@@ -178,8 +164,8 @@ public final class GexpressModelPlacementScreen extends Screen {
 		int top = previewY();
 		int w = previewW();
 		int h = previewH();
-		context.fill(left, top, left + w, top + h, PANEL);
-		context.drawBorder(left, top, w, h, inPreview(mouseX, mouseY) ? 0xFFC8D6EA : BORDER);
+		drawWorkbenchPanel(context, left, top, w, h);
+		if (inPreview(mouseX, mouseY)) context.drawBorder(left, top, w, h, 0xFFC8D6EA);
 		context.fill(left, top, left + w, top + 2, GOLD);
 		context.drawTextWithShadow(textRenderer, Text.literal("3D Placement Preview").formatted(Formatting.BOLD),
 			left + 12, top + 10, TEXT);
@@ -337,8 +323,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 		int y = previewY();
 		int w = controlsW();
 		int h = previewH();
-		context.fill(x, y, x + w, y + h, PANEL);
-		context.drawBorder(x, y, w, h, BORDER);
+		drawWorkbenchPanel(context, x, y, w, h);
 		context.fill(x, y, x + w, y + 2, GOLD);
 		context.drawTextWithShadow(textRenderer, Text.literal("Placement").formatted(Formatting.BOLD), x + 12, y + 10, TEXT);
 		context.drawTextWithShadow(textRenderer, Text.literal("Values update the preview live."), x + 12, y + 24, MUTED);
@@ -386,8 +371,6 @@ public final class GexpressModelPlacementScreen extends Screen {
 		copyButton.setDimensionsAndPosition(buttonW, 20, x + buttonW + 10, buttonY);
 		resetButton.setDimensionsAndPosition(buttonW, 20, x, buttonY + 28);
 		cameraButton.setDimensionsAndPosition(buttonW, 20, x + buttonW + 10, buttonY + 28);
-		doneButton.setDimensionsAndPosition(Math.min(112, controlsW() - 24), 20,
-			x + controlsW() - 24 - Math.min(112, controlsW() - 24), height - 32);
 	}
 
 	private boolean inPreview(double mouseX, double mouseY) {
@@ -396,19 +379,19 @@ public final class GexpressModelPlacementScreen extends Screen {
 	}
 
 	private int previewX() {
-		return 22;
+		return workspace.x() + 8;
 	}
 
 	private int previewY() {
-		return 54;
+		return workspace.y() + 8;
 	}
 
 	private int controlsW() {
-		return Math.min(328, Math.max(270, width / 4));
+		return Math.min(328, Math.max(270, workspace.width() / 4));
 	}
 
 	private int controlsX() {
-		return width - controlsW() - 22;
+		return workspace.x() + workspace.width() - controlsW() - 8;
 	}
 
 	private int previewW() {
@@ -416,7 +399,7 @@ public final class GexpressModelPlacementScreen extends Screen {
 	}
 
 	private int previewH() {
-		return Math.max(190, height - previewY() - 54);
+		return Math.max(190, workspace.height() - 16);
 	}
 
 	private void toggleKind() {

@@ -1,15 +1,23 @@
 package dev.mapselect.client.role.juggernaut;
 import dev.mapselect.client.game.ClientRoleRevealState;
 import dev.mapselect.client.hud.ClientHudVisibility;
+import dev.mapselect.client.input.ClientAbilityKeys;
+import dev.mapselect.client.role.copycat.ClientCopycatState;
+import dev.mapselect.client.role.pelican.ClientVultureState;
 
 
+import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.cca.GameWorldComponent;
+import dev.mapselect.network.role.juggernaut.JuggernautDoorBreakPayload;
 import dev.mapselect.network.role.juggernaut.JuggernautStagePayload;
+import dev.mapselect.registry.MapSelectRoles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.util.math.MathHelper;
 
@@ -26,6 +34,7 @@ public final class ClientJuggernautState {
 	private static float alpha;
 	private static float slide;
 	private static float pulse;
+	private static boolean wasPrimaryDown;
 
 	private ClientJuggernautState() {}
 
@@ -52,9 +61,32 @@ public final class ClientJuggernautState {
 		alpha = MathHelper.lerp(0.22F, alpha, visible ? 1.0F : 0.0F);
 		slide = MathHelper.lerp(0.18F, slide, visible ? 1.0F : 0.0F);
 		pulse = Math.max(0.0F, pulse - 0.08F);
+		boolean canUse = client != null && client.player != null && client.world != null
+			&& client.currentScreen == null && !ClientVultureState.isLocalStashed(client)
+			&& ClientRoleRevealState.canUseRoleAbility(client) && isLocalJuggernaut(client);
+		if (canUse) {
+			KeyBinding primary = ClientAbilityKeys.primaryBinding();
+			boolean down = primary != null && ClientAbilityKeys.isDown(client, primary);
+			if (down && !wasPrimaryDown && ClientPlayNetworking.canSend(JuggernautDoorBreakPayload.ID)) {
+				ClientPlayNetworking.send(new JuggernautDoorBreakPayload());
+			}
+			wasPrimaryDown = down;
+		} else {
+			wasPrimaryDown = false;
+		}
 		if (client == null || client.world == null) {
 			active = false;
 			stage = 0;
+		}
+	}
+
+	public static boolean isLocalJuggernaut(MinecraftClient client) {
+		try {
+			GameWorldComponent game = GameWorldComponent.KEY.getNullable(client.world);
+			Role role = game == null ? null : game.getRole(client.player);
+			return role != null && ClientCopycatState.isEffectiveRole(client, MapSelectRoles.JUGGERNAUT_ID);
+		} catch (Throwable ignored) {
+			return false;
 		}
 	}
 

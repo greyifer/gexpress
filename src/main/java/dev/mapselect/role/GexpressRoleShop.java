@@ -9,7 +9,9 @@ import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectModifiers;
+import dev.mapselect.registry.MapSelectBlocks;
 import dev.mapselect.modifier.ModifierUtils;
+import dev.mapselect.modifier.PestControlManager;
 import dev.mapselect.role.copycat.CopycatManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
@@ -33,16 +35,24 @@ public final class GexpressRoleShop {
 	private static final Identifier BURGLAR_ID = Identifier.of(MapSelect.MOD_ID, "burglar");
 	private static final Identifier SPY_ID = Identifier.of(MapSelect.MOD_ID, "spy");
 	public static final int MUTED_EXTERNAL_NOTE_INDEX = 120;
+	public static final int PEST_CONTROL_EXTERNAL_TRAP_INDEX = 121;
 
 	private GexpressRoleShop() {}
 
 	public static List<ShopEntry> resolve(PlayerEntity player) {
-		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player) ? mutedNotesList() : List.of();
+		boolean pestControl = PestControlManager.has(player);
+		if (CopycatManager.isBorrowingAbility(player)) {
+			List<ShopEntry> borrowed = pestControl ? List.of(ratTrapEntry()) : List.of();
+			return isMuted(player) ? withMutedNote(borrowed) : borrowed;
+		}
 		Role role = roleOf(player);
 		boolean muted = isMuted(player);
-		if (role == null) return muted ? mutedNotesList() : GameConstants.SHOP_ENTRIES;
+		if (role == null) {
+			List<ShopEntry> entries = pestControl ? List.of(ratTrapEntry()) : GameConstants.SHOP_ENTRIES;
+			return muted ? withMutedNote(entries) : entries;
+		}
 		Identifier id = role.identifier();
-		if (muted && isExternalRole(id)) return List.of();
+		if (muted && isExternalRole(id) && !pestControl) return List.of();
 		List<ShopEntry> entries;
 		if (BOMB_SPECIALIST_ID.equals(id)) entries = bombSpecialistList();
 		else if (GODFATHER_ID.equals(id)) entries = godfatherList();
@@ -51,19 +61,22 @@ public final class GexpressRoleShop {
 		else if (PICKPOCKET_ID.equals(id)) entries = pickpocketList();
 		else if (BURGLAR_ID.equals(id)) entries = burglarList();
 		else if (muted && !role.canUseKiller()) entries = mutedNotesList();
+		else if (pestControl && !role.canUseKiller()) entries = List.of();
 		else entries = GameConstants.SHOP_ENTRIES;
+		if (pestControl) entries = withRatTrap(entries);
 		return muted ? withMutedNote(entries) : entries;
 	}
 
 	public static boolean hasCustomShop(PlayerEntity player) {
-		if (isMuted(player)) return true;
+		if (isMuted(player) || PestControlManager.has(player)) return true;
 		Role role = roleOf(player);
 		if (role == null) return false;
 		return roleHasCustomShop(role.identifier());
 	}
 
 	public static boolean canUseKillerEconomy(PlayerEntity player) {
-		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player);
+		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player) || PestControlManager.has(player);
+		if (PestControlManager.has(player)) return true;
 		if (isMuted(player) && !usesExternalMutedNoteWidget(player)) return true;
 		return canUseKillerEconomy(roleOf(player));
 	}
@@ -74,8 +87,8 @@ public final class GexpressRoleShop {
 	}
 
 	public static boolean showsMoneyHud(PlayerEntity player) {
-		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player);
-		if (isMuted(player)) return true;
+		if (CopycatManager.isBorrowingAbility(player)) return isMuted(player) || PestControlManager.has(player);
+		if (isMuted(player) || PestControlManager.has(player)) return true;
 		Role role = roleOf(player);
 		if (role == null) return false;
 		return showsMoneyHud(role);
@@ -89,26 +102,31 @@ public final class GexpressRoleShop {
 
 	public static boolean usesExternalMutedNoteWidget(PlayerEntity player) {
 		Role role = roleOf(player);
-		return isMuted(player) && role != null && isExternalRole(role.identifier());
+		return isMuted(player)
+			&& role != null && rendersSeparateExternalShop(role.identifier());
 	}
 
-	public static int externalOverlayShopSize(PlayerEntity player) {
+	public static boolean usesExternalPestControlWidget(PlayerEntity player) {
 		Role role = roleOf(player);
-		if (role == null || role.identifier() == null) return 0;
-		Identifier id = role.identifier();
-		if ("noellesroles".equals(id.getNamespace())) {
-			return switch (id.getPath()) {
-				case "trapper", "bartender", "noisemaker" -> 1;
-				case "jester", "mimic", "executioner" -> 4;
-				default -> 0;
-			};
-		}
-		if ("starexpress".equals(id.getNamespace()) && "muzzler".equals(id.getPath())) return 1;
-		return 0;
+		return PestControlManager.has(player) && role != null
+			&& rendersSeparateExternalShop(role.identifier());
+	}
+
+	public static boolean usesExternalShopWidgets(PlayerEntity player) {
+		return usesExternalMutedNoteWidget(player) || usesExternalPestControlWidget(player);
+	}
+
+	public static boolean hasMutedModifier(PlayerEntity player) {
+		return isMuted(player);
 	}
 
 	public static ShopEntry mutedNoteEntry() {
 		return customShopEntry(mutedNoteStack(), GexpressConfig.getMutedNotePrice(), ShopEntry.Type.TOOL);
+	}
+
+	public static ShopEntry ratTrapEntry() {
+		return customShopEntry(new ItemStack(MapSelectBlocks.RAT_TRAP_ITEM),
+			PestControlManager.RAT_TRAP_PRICE, ShopEntry.Type.TOOL);
 	}
 
 	private static boolean roleHasCustomShop(Identifier id) {
@@ -122,6 +140,24 @@ public final class GexpressRoleShop {
 
 	private static boolean isExternalRole(Identifier id) {
 		return id != null && !MapSelect.MOD_ID.equals(id.getNamespace()) && !"wathe".equals(id.getNamespace());
+	}
+
+	/** External roles that draw a second shop row instead of replacing Wathe's shop list. */
+	private static boolean rendersSeparateExternalShop(Identifier id) {
+		if (id == null) return false;
+		if ("noellesroles".equals(id.getNamespace())) {
+			return switch (id.getPath()) {
+				case "trapper", "bartender", "noisemaker", "jester", "mimic", "executioner" -> true;
+				default -> false;
+			};
+		}
+		if ("kinswathe".equals(id.getNamespace())) {
+			return switch (id.getPath()) {
+				case "cook", "dreamer", "hacker", "licensed_villain", "physician" -> true;
+				default -> false;
+			};
+		}
+		return false;
 	}
 
 	public static List<ShopEntry> bombSpecialistList() {
@@ -187,6 +223,18 @@ public final class GexpressRoleShop {
 		}
 		if (replaced) return List.copyOf(out);
 		out.add(mutedNoteEntry());
+		return List.copyOf(out);
+	}
+
+	private static List<ShopEntry> withRatTrap(List<ShopEntry> entries) {
+		List<ShopEntry> out = new ArrayList<>((entries == null ? 0 : entries.size()) + 1);
+		if (entries != null) {
+			for (ShopEntry entry : entries) {
+				if (entry != null && entry.stack().isOf(MapSelectBlocks.RAT_TRAP_ITEM)) continue;
+				out.add(entry);
+			}
+		}
+		out.add(ratTrapEntry());
 		return List.copyOf(out);
 	}
 

@@ -9,10 +9,15 @@ import dev.mapselect.client.role.bodyguard.ClientBodyguardState;
 import dev.mapselect.client.role.timemaster.ClientTimeMasterFreezeState;
 import dev.mapselect.client.role.tracker.ClientTrackerState;
 import dev.mapselect.client.role.painter.ClientPainterState;
+import dev.mapselect.client.role.rat.ClientRatState;
+import dev.mapselect.client.role.rat.ClientRatTrapGlow;
+import dev.mapselect.entity.RatTrapEntity;
+import dev.mapselect.entity.TwinBodyEntity;
 import dev.mapselect.client.ability.ClientAbilityTargetState;
 import dev.mapselect.client.role.vengeful.ClientVengefulSpiritState;
 import dev.mapselect.client.game.ClientSpectatorRoleRevealDelay;
 import dev.doctor4t.wathe.entity.PlayerBodyEntity;
+import dev.doctor4t.wathe.game.GameFunctions;
 import net.minecraft.entity.Entity;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,6 +29,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MedicShieldEntityGlowMixin {
 	@Inject(method = "isGlowing", at = @At("HEAD"), cancellable = true)
 	private void gexpress$medicShieldGlow(CallbackInfoReturnable<Boolean> cir) {
+		if ((Object) this instanceof RatTrapEntity trap && ClientRatTrapGlow.shouldGlow(trap)) {
+			cir.setReturnValue(true);
+			return;
+		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientSpectatorRoleRevealDelay.shouldGlow(player)) {
 			cir.setReturnValue(true);
@@ -34,14 +43,17 @@ public abstract class MedicShieldEntityGlowMixin {
 				|| ClientJanitorState.shouldGlow((Entity) (Object) this)
 				|| ((Object) this instanceof PlayerBodyEntity paintedBody && ClientPainterState.shouldGlow(paintedBody))
 				|| ((Object) this instanceof PlayerBodyEntity targetBody && ClientAbilityTargetState.shouldGlow(targetBody))
+				|| ((Object) this instanceof TwinBodyEntity twinBody && ClientAbilityTargetState.shouldGlow(twinBody))
 				|| ((Object) this instanceof AbstractClientPlayerEntity player
 					&& (ClientTimeMasterFreezeState.shouldGlow(player)
-						|| ClientMafiaState.shouldGlow(player.getUuid())
+						|| (!GameFunctions.isPlayerSpectatingOrCreative(player)
+							&& ClientMafiaState.shouldGlow(player.getUuid()))
 						|| ClientGuardianAngelState.shouldGlow(player)
 						|| ClientBodyguardState.shouldGlow(player)
 						|| ClientPainterState.shouldGlow(player)
 						|| ClientTrackerState.isTracked(player.getUuid())
 						|| ClientVengefulSpiritState.shouldGlow(player)
+						|| ClientRatState.shouldGlow(player)
 						|| ClientAbilityTargetState.shouldGlow(player)
 						|| ClientSpectatorRoleRevealDelay.shouldGlow(player)))) {
 			cir.setReturnValue(true);
@@ -50,6 +62,10 @@ public abstract class MedicShieldEntityGlowMixin {
 
 	@Inject(method = "getTeamColorValue", at = @At("HEAD"), cancellable = true)
 	private void gexpress$medicShieldGlowColor(CallbackInfoReturnable<Integer> cir) {
+		if ((Object) this instanceof RatTrapEntity trap && ClientRatTrapGlow.shouldGlow(trap)) {
+			cir.setReturnValue(trap.getTeamColorValue());
+			return;
+		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientSpectatorRoleRevealDelay.shouldGlow(player)) {
 			cir.setReturnValue(ClientSpectatorRoleRevealDelay.glowColor(player));
@@ -76,12 +92,17 @@ public abstract class MedicShieldEntityGlowMixin {
 			cir.setReturnValue(ClientAbilityTargetState.glowColor(body));
 			return;
 		}
+		if ((Object) this instanceof TwinBodyEntity body && ClientAbilityTargetState.shouldGlow(body)) {
+			cir.setReturnValue(ClientAbilityTargetState.glowColor(body));
+			return;
+		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientTimeMasterFreezeState.shouldGlow(player)) {
 			cir.setReturnValue(ClientTimeMasterFreezeState.glowColor());
 			return;
 		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player
+				&& !GameFunctions.isPlayerSpectatingOrCreative(player)
 				&& ClientMafiaState.shouldGlow(player.getUuid())) {
 			cir.setReturnValue(ClientMafiaState.glowColor());
 			return;
@@ -109,6 +130,11 @@ public abstract class MedicShieldEntityGlowMixin {
 		if ((Object) this instanceof AbstractClientPlayerEntity player
 				&& ClientVengefulSpiritState.shouldGlow(player)) {
 			cir.setReturnValue(ClientVengefulSpiritState.KILLER_GLOW_COLOR);
+			return;
+		}
+		if ((Object) this instanceof AbstractClientPlayerEntity player
+				&& ClientRatState.shouldGlow(player)) {
+			cir.setReturnValue(ClientRatState.glowColor(player));
 			return;
 		}
 		if ((Object) this instanceof AbstractClientPlayerEntity player

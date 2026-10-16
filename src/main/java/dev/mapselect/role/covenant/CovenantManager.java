@@ -1,7 +1,7 @@
 package dev.mapselect.role.covenant;
 
 import dev.doctor4t.wathe.api.Role;
-import dev.doctor4t.wathe.api.event.GameEvents;
+import dev.doctor4t.wathe.api.event.AllowPlayerDeath;
 import dev.doctor4t.wathe.cca.GameRoundEndComponent;
 import dev.doctor4t.wathe.cca.GameTimeComponent;
 import dev.doctor4t.wathe.cca.GameWorldComponent;
@@ -9,51 +9,68 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.covenant.CovenantBatMovementPayload;
 import dev.mapselect.network.role.covenant.CovenantBatPayload;
+import dev.mapselect.network.role.covenant.CovenantBatRenderPayload;
 import dev.mapselect.network.role.covenant.CovenantBitePayload;
 import dev.mapselect.network.role.covenant.CovenantStatePayload;
+import dev.mapselect.network.role.covenant.CovenantTurnPayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
+import dev.mapselect.role.RoleAvailability;
 import dev.mapselect.role.spy.SpyManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.passive.BatEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.agmas.harpymodloader.Harpymodloader;
 import org.agmas.harpymodloader.events.ModdedRoleAssigned;
 import org.agmas.harpymodloader.events.ModdedRoleRemoved;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
 public final class CovenantManager {
 	private static final int BLOOD_MAX = 20 * 180;
 	private static final int BLOOD_FILL_PER_BITE = BLOOD_MAX / 2;
-	private static final int DRACULA_DRAIN_PER_TICK = 1;
-	private static final int VAMPIRE_DRAIN_PER_TICK = 2;
+	private static final double DRACULA_DRAIN_PER_TICK = 1.0D;
+	private static final double VAMPIRE_DRAIN_PER_TICK = 2.0D;
+	private static final double ORPHAN_VAMPIRE_DRAIN_MULTIPLIER = 2.0D;
+	private static final double DRACULA_VAMPIRE_DRAIN_MULTIPLIER = 1.05D;
+	private static final int TURN_MIN_BLOOD = (int) Math.ceil(BLOOD_MAX * 0.75D);
+	private static final int TURN_RESULT_BLOOD = (int) Math.round(BLOOD_MAX * 0.20D);
+	private static final int SUCCESSION_FEEDS_REQUIRED = 3;
 	private static final int BAT_MAX = 20 * 10;
+	private static final float BAT_FLY_SPEED = 0.10F;
+	private static final double BAT_HORIZONTAL_SPEED = 0.45D;
+	private static final double BAT_VERTICAL_SPEED = 0.34D;
 	private static final double BITE_RANGE = 3.0D;
-	private static final Random RANDOM = new Random();
 	private static final Map<UUID, Integer> bloodByPlayer = new HashMap<>();
+	private static final Map<UUID, Double> bloodDrainRemainder = new HashMap<>();
+	private static final Map<UUID, Integer> orphanFeedCounts = new HashMap<>();
 	private static final Map<UUID, Integer> batTicksByPlayer = new HashMap<>();
 	private static final Map<UUID, BatState> batStates = new HashMap<>();
 	private static final Map<UUID, BatInput> batInputs = new HashMap<>();
@@ -66,28 +83,36 @@ public final class CovenantManager {
 		PayloadTypeRegistry.playC2S().register(CovenantBitePayload.ID, CovenantBitePayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(CovenantBatPayload.ID, CovenantBatPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(CovenantBatMovementPayload.ID, CovenantBatMovementPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(CovenantTurnPayload.ID, CovenantTurnPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(CovenantStatePayload.ID, CovenantStatePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(CovenantBatRenderPayload.ID, CovenantBatRenderPayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(CovenantBitePayload.ID,
 			(payload, context) -> context.server().execute(() -> tryBite(context.player())));
 		ServerPlayNetworking.registerGlobalReceiver(CovenantBatPayload.ID,
 			(payload, context) -> context.server().execute(() -> toggleBat(context.player())));
 		ServerPlayNetworking.registerGlobalReceiver(CovenantBatMovementPayload.ID,
 			(payload, context) -> context.server().execute(() -> updateBatInput(context.player(), payload)));
+		ServerPlayNetworking.registerGlobalReceiver(CovenantTurnPayload.ID,
+			(payload, context) -> context.server().execute(() -> tryTurn(context.player())));
+		AllowPlayerDeath.EVENT.register(CovenantManager::allowCovenantDeath);
+		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, damageSource, amount) -> {
+			if (!(entity instanceof ServerPlayerEntity target)
+					|| !(damageSource.getAttacker() instanceof ServerPlayerEntity attacker)) {
+				return true;
+			}
+			return !areCovenantTeammates(target, attacker);
+		});
 		ServerTickEvents.END_WORLD_TICK.register(CovenantManager::tick);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clearRound(world));
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearRound(world));
+		RoundLifecycleHooks.clearWorld(CovenantManager::clearRound);
 	}
 
 	public static void reduceCooldown(ServerPlayerEntity player, long ticks) {
-		if (player == null || ticks <= 0L) return;
-		UUID id = player.getUuid();
-		Long until = biteCooldownUntil.get(id);
-		if (until == null) return;
-		biteCooldownUntil.put(id, Math.max(0L, until - ticks));
+		long next = AbilityCooldowns.reduce(biteCooldownUntil, player, ticks);
+		if (player != null && ticks > 0L) syncBiteCooldown(player, next);
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean active = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
 		if (!active && !GexpressTestState.hasRoleTesters()) {
@@ -95,6 +120,10 @@ public final class CovenantManager {
 			return;
 		}
 
+		boolean livingDracula = hasLivingDracula(world);
+		long livingVampires = world.getPlayers(GameFunctions::isPlayerAliveAndSurvival).stream()
+			.filter(player -> roleKind(player) == RoleKind.VAMPIRE)
+			.count();
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			RoleKind kind = roleKind(player);
 			if (kind == RoleKind.NONE || PelicanManager.isStashed(player) || !isPlayable(player, player)) {
@@ -109,7 +138,13 @@ public final class CovenantManager {
 			if (GexpressTestState.hasCreativeAbilityBypass(player)) {
 				blood = BLOOD_MAX;
 			} else {
-				blood = Math.max(0, blood - (kind == RoleKind.DRACULA ? DRACULA_DRAIN_PER_TICK : VAMPIRE_DRAIN_PER_TICK));
+				double drainRate = kind == RoleKind.DRACULA
+					? DRACULA_DRAIN_PER_TICK * Math.pow(DRACULA_VAMPIRE_DRAIN_MULTIPLIER, livingVampires)
+					: VAMPIRE_DRAIN_PER_TICK * (livingDracula ? 1.0D : ORPHAN_VAMPIRE_DRAIN_MULTIPLIER);
+				double accumulated = bloodDrainRemainder.getOrDefault(id, 0.0D) + drainRate;
+				int wholeDrain = (int) Math.floor(accumulated);
+				bloodDrainRemainder.put(id, accumulated - wholeDrain);
+				blood = Math.max(0, blood - wholeDrain);
 			}
 			bloodByPlayer.put(id, blood);
 
@@ -166,11 +201,9 @@ public final class CovenantManager {
 				|| !isPlayable(user, user)) {
 			return;
 		}
-		long now = user.getServerWorld().getTime();
-		long remaining = biteCooldownUntil.getOrDefault(user.getUuid(), 0L) - now;
+		long remaining = AbilityCooldowns.remaining(biteCooldownUntil, user);
 		if (remaining > 0L && !GexpressTestState.hasCreativeAbilityBypass(user)) {
-			AbilityCooldownSync.send(user, AbilityCooldownPayload.COVENANT_BITE, remaining,
-				GexpressConfig.getCovenantBiteCooldownSeconds() * 20L, false);
+			syncBiteCooldown(user, remaining);
 			return;
 		}
 		ServerPlayerEntity target = AbilityTargeting.findLookTarget(user, user.getServerWorld().getPlayers(),
@@ -179,30 +212,69 @@ public final class CovenantManager {
 				&& !isCovenant(candidate)
 				&& isPlayable(candidate, user));
 		if (target == null) {
-			user.sendMessage(Text.literal("No living player close enough to bite.").formatted(Formatting.RED), true);
+			user.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(user, user.getServerWorld().getPlayers(),
+				BITE_RANGE, 0.0D, true, candidate -> candidate != user
+					&& !PelicanManager.isStashed(candidate)
+					&& !isCovenant(candidate)
+					&& isPlayable(candidate, user), "bite")).formatted(Formatting.RED), true);
 			return;
 		}
 
-		boolean turned = kind == RoleKind.DRACULA && RANDOM.nextInt(100) < 10;
-		if (turned) {
-			assignVampire(target);
-			bloodByPlayer.put(target.getUuid(), BLOOD_MAX);
-			fillBlood(user);
-			user.sendMessage(Text.literal("You turned " + target.getName().getString() + " into a Vampire.")
-				.formatted(Formatting.DARK_RED), true);
-			target.sendMessage(Text.literal("Dracula turned you into a Vampire.").formatted(Formatting.DARK_RED), true);
-			SpyManager.recordInteraction(user, target);
-			setBiteCooldown(user);
-			sync(user);
-			sync(target);
-			return;
-		}
-
+		if (VeteranManager.interceptAbilityInteraction(user, target)) return;
 		GameFunctions.killPlayer(target, true, user, GameConstants.DeathReasons.KNIFE);
-		fillBlood(user);
 		SpyManager.recordInteraction(user, target);
 		setBiteCooldown(user);
+		if (!GameFunctions.isPlayerAliveAndSurvival(target)) {
+			fillBlood(user);
+			if (kind == RoleKind.VAMPIRE) recordOrphanFeed(user);
+		}
 		sync(user);
+	}
+
+	private static void tryTurn(ServerPlayerEntity dracula) {
+		if (dracula == null || !isDracula(dracula) || PelicanManager.isStashed(dracula)
+				|| !canUseHere(dracula.getWorld(), dracula) || !isPlayable(dracula, dracula)
+				|| batStates.containsKey(dracula.getUuid())) {
+			return;
+		}
+		if (!RoleAvailability.isRuntimeEnabled(MapSelectRoles.VAMPIRE)) {
+			dracula.sendMessage(Text.literal("Vampire is disabled for this game.")
+				.formatted(Formatting.RED), true);
+			return;
+		}
+		int blood = bloodByPlayer.getOrDefault(dracula.getUuid(), BLOOD_MAX);
+		if (blood < TURN_MIN_BLOOD && !GexpressTestState.hasCreativeAbilityBypass(dracula)) {
+			dracula.sendMessage(Text.literal("You need at least 75% Blood to create a Vampire.")
+				.formatted(Formatting.RED), true);
+			return;
+		}
+		ServerPlayerEntity target = AbilityTargeting.findLookTarget(dracula,
+			dracula.getServerWorld().getPlayers(), BITE_RANGE, 0.0D, true,
+			candidate -> candidate != dracula && !PelicanManager.isStashed(candidate)
+				&& !isCovenant(candidate) && isPlayable(candidate, dracula));
+		if (target == null) {
+			dracula.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(dracula,
+				dracula.getServerWorld().getPlayers(), BITE_RANGE, 0.0D, true,
+				candidate -> candidate != dracula && !PelicanManager.isStashed(candidate)
+					&& !isCovenant(candidate) && isPlayable(candidate, dracula), "turn"))
+				.formatted(Formatting.RED), true);
+			return;
+		}
+		if (VeteranManager.interceptAbilityInteraction(dracula, target)) return;
+		assignRole(target, MapSelectRoles.VAMPIRE);
+		bloodByPlayer.put(target.getUuid(), BLOOD_MAX);
+		bloodDrainRemainder.remove(target.getUuid());
+		orphanFeedCounts.remove(target.getUuid());
+		bloodByPlayer.put(dracula.getUuid(), TURN_RESULT_BLOOD);
+		bloodDrainRemainder.remove(dracula.getUuid());
+		dracula.sendMessage(Text.literal("You turned " + target.getName().getString() + " into a Vampire.")
+			.formatted(Formatting.DARK_RED), true);
+		target.sendMessage(Text.literal("Dracula turned you into a Vampire.")
+			.formatted(Formatting.DARK_RED), true);
+		SpyManager.recordInteraction(dracula, target);
+		setBiteCooldown(dracula);
+		sync(dracula);
+		sync(target);
 	}
 
 	private static void toggleBat(ServerPlayerEntity player) {
@@ -213,6 +285,7 @@ public final class CovenantManager {
 		if (batStates.containsKey(player.getUuid())) {
 			endBat(player);
 			sync(player);
+			syncBatRender(player.getServerWorld());
 			return;
 		}
 		int ticks = batTicksByPlayer.getOrDefault(player.getUuid(), BAT_MAX);
@@ -222,20 +295,37 @@ public final class CovenantManager {
 		}
 		startBat(player);
 		sync(player);
+		syncBatRender(player.getServerWorld());
 	}
 
-	private static void assignVampire(ServerPlayerEntity target) {
+	private static void assignRole(ServerPlayerEntity target, Role nextRole) {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(target.getWorld());
-		if (game == null || MapSelectRoles.VAMPIRE == null) return;
+		if (game == null || nextRole == null) return;
 		Role previous = game.getRole(target);
 		if (previous != null && !Harpymodloader.VANNILA_ROLES.contains(previous)) {
 			ModdedRoleRemoved.EVENT.invoker().removeModdedRole(target, previous);
 		}
-		game.addRole(target, MapSelectRoles.VAMPIRE);
-		if (!Harpymodloader.VANNILA_ROLES.contains(MapSelectRoles.VAMPIRE)) {
-			ModdedRoleAssigned.EVENT.invoker().assignModdedRole(target, MapSelectRoles.VAMPIRE);
+		game.addRole(target, nextRole);
+		if (!Harpymodloader.VANNILA_ROLES.contains(nextRole)) {
+			ModdedRoleAssigned.EVENT.invoker().assignModdedRole(target, nextRole);
 		}
 		game.sync();
+	}
+
+	private static void recordOrphanFeed(ServerPlayerEntity vampire) {
+		if (vampire == null || hasLivingDracula(vampire.getServerWorld())) return;
+		int feeds = orphanFeedCounts.merge(vampire.getUuid(), 1, Integer::sum);
+		if (feeds < SUCCESSION_FEEDS_REQUIRED) {
+			vampire.sendMessage(Text.literal("Dracula succession: " + feeds + "/"
+				+ SUCCESSION_FEEDS_REQUIRED + " feeds.").formatted(Formatting.DARK_RED), true);
+			return;
+		}
+		assignRole(vampire, MapSelectRoles.DRACULA);
+		orphanFeedCounts.clear();
+		bloodDrainRemainder.remove(vampire.getUuid());
+		vampire.sendMessage(Text.literal("The Covenant recognizes you as the new Dracula.")
+			.formatted(Formatting.DARK_RED), false);
+		sync(vampire);
 	}
 
 	private static void tickBat(ServerPlayerEntity player) {
@@ -250,13 +340,12 @@ public final class CovenantManager {
 				player.getAbilities().flying = true;
 				player.sendAbilitiesUpdate();
 			}
-			applyBatMovement(player);
-			updateBatEntity(player, state);
-			player.fallDistance = 0.0F;
-			if (player.isOnGround() && player.getVelocity().y < 0.08D) {
-				player.setVelocity(player.getVelocity().add(0.0D, 0.12D, 0.0D));
-				player.velocityModified = true;
+			if (Math.abs(player.getAbilities().getFlySpeed() - BAT_FLY_SPEED) > 0.0001F) {
+				player.getAbilities().setFlySpeed(BAT_FLY_SPEED);
+				player.sendAbilitiesUpdate();
 			}
+			player.fallDistance = 0.0F;
+			applyBatMovement(player);
 			if (ticks <= 0) endBat(player);
 		} else if (ticks < BAT_MAX) {
 			batTicksByPlayer.put(id, Math.min(BAT_MAX, ticks + 1));
@@ -264,16 +353,13 @@ public final class CovenantManager {
 	}
 
 	private static void startBat(ServerPlayerEntity player) {
-		UUID batEntityId = spawnBatEntity(player);
 		BatState state = new BatState(player.getAbilities().allowFlying, player.getAbilities().flying,
-			player.isInvisible(), batEntityId);
+			player.isInvisible(), player.getAbilities().getFlySpeed());
 		batStates.put(player.getUuid(), state);
-		player.setInvisible(true);
 		player.getAbilities().allowFlying = true;
 		player.getAbilities().flying = true;
+		player.getAbilities().setFlySpeed(BAT_FLY_SPEED);
 		player.fallDistance = 0.0F;
-		player.setVelocity(player.getVelocity().add(0.0D, 0.16D, 0.0D));
-		player.velocityModified = true;
 		player.sendAbilitiesUpdate();
 	}
 
@@ -282,10 +368,10 @@ public final class CovenantManager {
 		BatState state = batStates.remove(player.getUuid());
 		batInputs.remove(player.getUuid());
 		if (state == null) return;
-		discardBatEntity(player, state);
 		player.setInvisible(state.invisible());
 		player.getAbilities().allowFlying = state.allowFlying();
 		player.getAbilities().flying = state.flying();
+		player.getAbilities().setFlySpeed(state.flySpeed());
 		player.fallDistance = 0.0F;
 		player.sendAbilitiesUpdate();
 	}
@@ -303,41 +389,8 @@ public final class CovenantManager {
 			AbilityCooldownSync.clear(player, AbilityCooldownPayload.COVENANT_BITE);
 			return;
 		}
-		biteCooldownUntil.put(player.getUuid(), player.getServerWorld().getTime() + total);
-		AbilityCooldownSync.send(player, AbilityCooldownPayload.COVENANT_BITE, total, total, false);
-	}
-
-	private static void updateBatEntity(ServerPlayerEntity player, BatState state) {
-		if (player == null || state == null) return;
-		Entity entity = state.batEntityId() == null ? null : player.getServerWorld().getEntity(state.batEntityId());
-		if (!(entity instanceof BatEntity)) {
-			UUID batEntityId = spawnBatEntity(player);
-			if (batEntityId == null) return;
-			state = new BatState(state.allowFlying(), state.flying(), state.invisible(), batEntityId);
-			batStates.put(player.getUuid(), state);
-			entity = player.getServerWorld().getEntity(batEntityId);
-			if (entity == null) return;
-		}
-		entity.refreshPositionAndAngles(player.getX(), player.getY() + 0.4D, player.getZ(),
-			player.getYaw(), player.getPitch());
-		entity.setVelocity(player.getVelocity());
-		entity.setNoGravity(true);
-		if (entity instanceof BatEntity bat) bat.setRoosting(false);
-	}
-
-	private static UUID spawnBatEntity(ServerPlayerEntity player) {
-		if (player == null) return null;
-		BatEntity bat = EntityType.BAT.create(player.getWorld());
-		if (bat == null) return null;
-		bat.refreshPositionAndAngles(player.getX(), player.getY() + 0.4D, player.getZ(),
-			player.getYaw(), player.getPitch());
-		bat.setRoosting(false);
-		bat.setNoGravity(true);
-		bat.setAiDisabled(true);
-		bat.setInvulnerable(true);
-		bat.setSilent(true);
-		bat.setPersistent();
-		return player.getServerWorld().spawnEntity(bat) ? bat.getUuid() : null;
+		AbilityCooldowns.start(biteCooldownUntil, player, total);
+		syncBiteCooldown(player, total);
 	}
 
 	private static void updateBatInput(ServerPlayerEntity player, CovenantBatMovementPayload payload) {
@@ -348,34 +401,27 @@ public final class CovenantManager {
 
 	private static void applyBatMovement(ServerPlayerEntity player) {
 		BatInput input = batInputs.get(player.getUuid());
-		if (input == null) return;
-		if (player.getServerWorld().getTime() - input.updatedAt() > 5L) {
-			player.setVelocity(0.0D, 0.0D, 0.0D);
-			player.velocityModified = true;
+		if (input == null || player.getServerWorld().getTime() - input.updatedAt() > 5L) return;
+		Vec3d velocity = player.getVelocity();
+		double targetY = input.ascending() == input.descending() ? 0.0D
+			: input.ascending() ? BAT_VERTICAL_SPEED : -BAT_VERTICAL_SPEED;
+		double inputLength = Math.sqrt(input.sideways() * input.sideways() + input.forward() * input.forward());
+		if (inputLength < 0.001D) {
+			player.setVelocity(velocity.x * 0.72D,
+				MathHelper.lerp(0.58D, velocity.y, targetY), velocity.z * 0.72D);
 			return;
 		}
-		float sideways = input.sideways();
-		float forward = input.forward();
-		float magnitude = (float) Math.sqrt(sideways * sideways + forward * forward);
-		if (magnitude > 1.0F) {
-			sideways /= magnitude;
-			forward /= magnitude;
-		}
+		double normalizedSideways = input.sideways() / inputLength;
+		double normalizedForward = input.forward() / inputLength;
 		double yaw = Math.toRadians(player.getYaw());
-		double sin = Math.sin(yaw);
-		double cos = Math.cos(yaw);
-		double speed = input.sprinting() && forward > 0.0F ? 0.38D : 0.27D;
-		double velocityX = (sideways * cos - forward * sin) * speed;
-		double velocityZ = (forward * cos + sideways * sin) * speed;
-		double velocityY = input.ascending() == input.descending() ? 0.0D : input.ascending() ? 0.27D : -0.27D;
-		player.setVelocity(velocityX, velocityY, velocityZ);
-		player.velocityModified = true;
-	}
-
-	private static void discardBatEntity(ServerPlayerEntity player, BatState state) {
-		if (player == null || state == null || state.batEntityId() == null) return;
-		Entity entity = player.getServerWorld().getEntity(state.batEntityId());
-		if (entity != null) entity.discard();
+		double directionX = normalizedSideways * Math.cos(yaw) - normalizedForward * Math.sin(yaw);
+		double directionZ = normalizedForward * Math.cos(yaw) + normalizedSideways * Math.sin(yaw);
+		double speed = BAT_HORIZONTAL_SPEED * (input.sprinting() ? 1.18D : 1.0D);
+		player.setVelocity(
+			MathHelper.lerp(0.48D, velocity.x, directionX * speed),
+			MathHelper.lerp(0.58D, velocity.y, targetY),
+			MathHelper.lerp(0.48D, velocity.z, directionZ * speed)
+		);
 	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {
@@ -401,6 +447,26 @@ public final class CovenantManager {
 		return roleKind(player) == RoleKind.DRACULA;
 	}
 
+	private static boolean hasLivingDracula(ServerWorld world) {
+		return world != null && world.getPlayers(GameFunctions::isPlayerAliveAndSurvival).stream()
+			.anyMatch(CovenantManager::isDracula);
+	}
+
+	private static boolean areCovenantTeammates(PlayerEntity first, PlayerEntity second) {
+		return first != null && second != null && first != second
+			&& first.getWorld() == second.getWorld() && isCovenant(first) && isCovenant(second);
+	}
+
+	private static boolean allowCovenantDeath(PlayerEntity victim, PlayerEntity killer,
+			net.minecraft.util.Identifier reason) {
+		if (!areCovenantTeammates(victim, killer)) return true;
+		if (killer instanceof ServerPlayerEntity attacker) {
+			attacker.sendMessage(Text.literal("You cannot kill another Covenant member.")
+				.formatted(Formatting.RED), true);
+		}
+		return false;
+	}
+
 	private static RoleKind roleKind(PlayerEntity player) {
 		if (player == null || player.getWorld() == null) return RoleKind.NONE;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
@@ -420,6 +486,7 @@ public final class CovenantManager {
 
 	private static void syncAll(ServerWorld world) {
 		for (ServerPlayerEntity player : world.getPlayers()) sync(player);
+		syncBatRender(world);
 	}
 
 	private static void sync(ServerPlayerEntity player) {
@@ -429,28 +496,46 @@ public final class CovenantManager {
 			return;
 		}
 		UUID id = player.getUuid();
-		long biteRemaining = biteCooldownUntil.getOrDefault(id, 0L) - player.getServerWorld().getTime();
-		if (biteRemaining > 0L) {
-			AbilityCooldownSync.send(player, AbilityCooldownPayload.COVENANT_BITE, biteRemaining,
-				GexpressConfig.getCovenantBiteCooldownSeconds() * 20L, false);
-		} else {
-			AbilityCooldownSync.clear(player, AbilityCooldownPayload.COVENANT_BITE);
-		}
+		syncBiteCooldown(player, AbilityCooldowns.remaining(biteCooldownUntil, player));
 		sendState(player, new CovenantStatePayload(true, kind == RoleKind.DRACULA,
 			bloodByPlayer.getOrDefault(id, BLOOD_MAX), BLOOD_MAX,
 			batTicksByPlayer.getOrDefault(id, BAT_MAX), BAT_MAX, batStates.containsKey(id)));
 	}
 
-	private static void sendState(ServerPlayerEntity player, CovenantStatePayload payload) {
-		if (player != null && ServerPlayNetworking.canSend(player, CovenantStatePayload.ID)) {
-			ServerPlayNetworking.send(player, payload);
+	private static void syncBiteCooldown(ServerPlayerEntity player, long remainingTicks) {
+		if (player == null) return;
+		if (remainingTicks > 0L) {
+			AbilityCooldownSync.send(player, AbilityCooldownPayload.COVENANT_BITE, remainingTicks,
+				(long) GexpressConfig.getCovenantBiteCooldownSeconds() * 20L, false);
+		} else {
+			AbilityCooldownSync.clear(player, AbilityCooldownPayload.COVENANT_BITE);
 		}
+	}
+
+	private static void sendState(ServerPlayerEntity player, CovenantStatePayload payload) {
+		PayloadSync.sendIfChanged(player, CovenantStatePayload.ID, payload);
+	}
+
+	private static void syncBatRender(ServerWorld world) {
+		if (world == null) return;
+		CovenantBatRenderPayload payload = new CovenantBatRenderPayload(activeBatPlayers());
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			PayloadSync.sendIfChanged(player, CovenantBatRenderPayload.ID, payload);
+		}
+	}
+
+	private static List<UUID> activeBatPlayers() {
+		List<UUID> ids = new ArrayList<>(batStates.keySet());
+		ids.sort(Comparator.comparing(UUID::toString));
+		return ids;
 	}
 
 	private static void clearPlayer(ServerPlayerEntity player, boolean restoreBat) {
 		if (player == null) return;
 		if (restoreBat) endBat(player);
 		bloodByPlayer.remove(player.getUuid());
+		bloodDrainRemainder.remove(player.getUuid());
+		orphanFeedCounts.remove(player.getUuid());
 		batTicksByPlayer.remove(player.getUuid());
 		batInputs.remove(player.getUuid());
 		biteCooldownUntil.remove(player.getUuid());
@@ -470,15 +555,19 @@ public final class CovenantManager {
 			}
 		}
 		bloodByPlayer.clear();
+		bloodDrainRemainder.clear();
+		orphanFeedCounts.clear();
 		batTicksByPlayer.clear();
 		batStates.clear();
 		batInputs.clear();
 		biteCooldownUntil.clear();
 		syncTicker = 0;
+		if (world instanceof ServerWorld serverWorld) syncBatRender(serverWorld);
 	}
 
 	public static TimeState snapshotForTimeRewind() {
-		return new TimeState(Map.copyOf(bloodByPlayer), Map.copyOf(batTicksByPlayer), Set.copyOf(batStates.keySet()));
+		return new TimeState(Map.copyOf(bloodByPlayer), Map.copyOf(bloodDrainRemainder),
+			Map.copyOf(orphanFeedCounts), Map.copyOf(batTicksByPlayer), Set.copyOf(batStates.keySet()));
 	}
 
 	public static void restoreForTimeRewind(ServerWorld world, TimeState state) {
@@ -488,11 +577,15 @@ public final class CovenantManager {
 			}
 		}
 		bloodByPlayer.clear();
+		bloodDrainRemainder.clear();
+		orphanFeedCounts.clear();
 		batTicksByPlayer.clear();
 		batStates.clear();
 		biteCooldownUntil.clear();
 		if (state != null) {
 			bloodByPlayer.putAll(state.bloodByPlayer());
+			bloodDrainRemainder.putAll(state.bloodDrainRemainder());
+			orphanFeedCounts.putAll(state.orphanFeedCounts());
 			batTicksByPlayer.putAll(state.batTicksByPlayer());
 			for (UUID playerId : state.activeBatPlayers()) {
 				if (world == null) continue;
@@ -504,7 +597,8 @@ public final class CovenantManager {
 		if (world != null) syncAll(world);
 	}
 
-	public record TimeState(Map<UUID, Integer> bloodByPlayer, Map<UUID, Integer> batTicksByPlayer,
+	public record TimeState(Map<UUID, Integer> bloodByPlayer, Map<UUID, Double> bloodDrainRemainder,
+	                        Map<UUID, Integer> orphanFeedCounts, Map<UUID, Integer> batTicksByPlayer,
 	                        Set<UUID> activeBatPlayers) {}
 
 	private enum RoleKind {
@@ -513,7 +607,7 @@ public final class CovenantManager {
 		VAMPIRE
 	}
 
-	private record BatState(boolean allowFlying, boolean flying, boolean invisible, UUID batEntityId) {}
+	private record BatState(boolean allowFlying, boolean flying, boolean invisible, float flySpeed) {}
 	private record BatInput(float sideways, float forward, boolean ascending, boolean descending,
 	                        boolean sprinting, long updatedAt) {}
 }

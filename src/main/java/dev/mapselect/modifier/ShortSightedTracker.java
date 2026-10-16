@@ -2,20 +2,16 @@ package dev.mapselect.modifier;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.modifier.ShortSightedSyncPayload;
 import dev.mapselect.registry.MapSelectModifiers;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.World;
 import org.agmas.harpymodloader.component.WorldModifierComponent;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * Server-side bridge between HML's {@code WorldModifierComponent} and the client's local
@@ -47,7 +43,6 @@ import java.util.UUID;
 public final class ShortSightedTracker {
 	private ShortSightedTracker() {}
 
-	private static final Map<UUID, Boolean> lastState = new HashMap<>();
 	private static final int CHECK_INTERVAL_TICKS = 10;
 
 	private static int ticksSinceCheck = 0;
@@ -55,15 +50,11 @@ public final class ShortSightedTracker {
 	public static void register() {
 		PayloadTypeRegistry.playS2C().register(ShortSightedSyncPayload.ID, ShortSightedSyncPayload.CODEC);
 		ServerTickEvents.END_WORLD_TICK.register(ShortSightedTracker::tick);
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-			if (handler.getPlayer() != null) {
-				lastState.remove(handler.getPlayer().getUuid());
-			}
-		});
+		RoundLifecycleHooks.clear(ShortSightedTracker::reset);
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 
 		ticksSinceCheck++;
 		if (ticksSinceCheck < CHECK_INTERVAL_TICKS) return;
@@ -75,13 +66,14 @@ public final class ShortSightedTracker {
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			boolean current = DeadPlayerStatus.isLivingRoundParticipant(player)
 				&& mods.isModifier(player, MapSelectModifiers.SHORT_SIGHTED);
-			UUID id = player.getUuid();
-			Boolean prev = lastState.get(id);
-			if (prev == null || prev.booleanValue() != current) {
-				ServerPlayNetworking.send(player, new ShortSightedSyncPayload(current));
-				lastState.put(id, current);
+			if (PayloadSync.sendIfChanged(player, ShortSightedSyncPayload.ID, new ShortSightedSyncPayload(current))) {
 				MapSelect.LOGGER.debug("Short-sighted sync -> {}: {}", player.getName().getString(), current);
 			}
 		}
+	}
+
+	private static void reset() {
+		PayloadSync.forgetAll(ShortSightedSyncPayload.ID);
+		ticksSinceCheck = 0;
 	}
 }

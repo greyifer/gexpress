@@ -24,7 +24,10 @@ import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -120,7 +123,12 @@ public class TagCommand {
 				.executes(TagCommand::runList))
 			.then(CommandManager.literal("permissions")
 				.requires(source -> canUseTagCommand(source, "permissions"))
-				.executes(TagCommand::runPermissions));
+				.executes(TagCommand::runPermissions))
+			.then(CommandManager.literal("preview")
+				.requires(source -> canUseTagCommand(source, "preview"))
+				.then(CommandManager.argument("players", GameProfileArgumentType.gameProfile())
+					.executes(ctx -> runPermissionPreview(ctx,
+						GameProfileArgumentType.getProfileArgument(ctx, "players")))));
 	}
 
 	private static boolean canUseTagBranch(ServerCommandSource source) {
@@ -212,7 +220,7 @@ public class TagCommand {
 
 		final int finalChanged = changed;
 		final int finalSkippedDev = skippedDev;
-		src.sendFeedback(() -> {
+		dev.mapselect.command.GexpressFeedback.send(src, () -> {
 			Text base = Text.literal("Updated " + finalChanged + " player tag(s).").formatted(Formatting.GREEN);
 			if (finalSkippedDev > 0) {
 				return base.copy().append(Text.literal(" (" + finalSkippedDev + " dev skipped)").formatted(Formatting.GRAY));
@@ -262,10 +270,10 @@ public class TagCommand {
 			rows.add(player.getGameProfile().getName() + "=" + String.join("+", tags));
 		}
 		if (rows.isEmpty()) {
-			src.sendFeedback(() -> Text.literal("No online players.").formatted(Formatting.GRAY), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No online players.").formatted(Formatting.GRAY), false);
 			return 0;
 		}
-		src.sendFeedback(() -> Text.literal("Online tags: " + String.join(", ", rows)), false);
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Online tags: " + String.join(", ", rows)), false);
 		return rows.size();
 	}
 
@@ -273,9 +281,50 @@ public class TagCommand {
 		ServerCommandSource src = ctx.getSource();
 		for (String permission : GexpressPermissions.permissionKeys()) {
 			String description = GexpressPermissions.permissionDescription(permission);
-			src.sendFeedback(() -> Text.literal(permission + " - " + description).formatted(Formatting.GRAY), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(permission + " - " + description).formatted(Formatting.GRAY), false);
 		}
 		return GexpressPermissions.permissionKeys().size();
+	}
+
+	private static int runPermissionPreview(CommandContext<ServerCommandSource> ctx, Collection<GameProfile> profiles) {
+		ServerCommandSource src = ctx.getSource();
+		PlayerTagComponent component = PlayerTagComponent.KEY.getNullable(src.getWorld());
+		int count = 0;
+		for (GameProfile profile : profiles) {
+			if (profile == null || profile.getId() == null) continue;
+			List<GexpressPermissions.TagInfo> tags = GexpressPermissions.effectiveTagInfos(
+				src.getWorld(), profile.getId(), profile.getName());
+			Set<String> permissions = effectivePermissions(component, src.getWorld(), profile);
+			String tagText = tags.stream().map(GexpressPermissions.TagInfo::id).toList().toString();
+			String permissionText = permissions.isEmpty() ? "(none)" : String.join(", ", permissions);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(profile.getName() + ": ").formatted(Formatting.GOLD)
+				.append(Text.literal("tags=" + tagText).formatted(Formatting.GRAY)), false);
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("  permissions=" + permissionText).formatted(Formatting.GRAY), false);
+			count++;
+		}
+		return count;
+	}
+
+	private static Set<String> effectivePermissions(PlayerTagComponent component, net.minecraft.world.World world, GameProfile profile) {
+		if (component == null || profile == null || profile.getId() == null) return Set.of();
+		LinkedHashSet<String> out = new LinkedHashSet<>();
+		for (PlayerTag tag : GexpressPermissions.effectiveTags(world, profile.getId(), profile.getName())) {
+			if (tag == null) continue;
+			for (String permission : component.permissions(tag)) {
+				String canonical = GexpressPermissions.canonicalPermission(permission);
+				if (canonical != null) out.add(canonical);
+			}
+		}
+		for (String customId : component.getPlayerCustomTags(profile.getId())) {
+			PlayerTagComponent.CustomTag tag = component.getCustomTag(customId);
+			if (tag == null || tag.permissions() == null) continue;
+			for (String permission : tag.permissions()) {
+				String canonical = GexpressPermissions.canonicalPermission(permission);
+				if (canonical != null) out.add(canonical);
+			}
+		}
+		return out.stream().sorted(Comparator.naturalOrder())
+			.collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 	}
 
 	private static List<String> assignableTags(ServerCommandSource src) {
@@ -296,7 +345,7 @@ public class TagCommand {
 			return 0;
 		}
 		refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal("Created custom tag " + id + "."), true);
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Created custom tag " + id + "."), true);
 		return 1;
 	}
 
@@ -305,7 +354,7 @@ public class TagCommand {
 		String id = StringArgumentType.getString(ctx, "id");
 		boolean changed = tags.removeCustomTag(id);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Deleted custom tag " + id + "." : "No tag changed."),
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Deleted custom tag " + id + "." : "No tag changed."),
 			true);
 		return changed ? 1 : 0;
 	}
@@ -316,7 +365,7 @@ public class TagCommand {
 		String display = StringArgumentType.getString(ctx, "display").replace('_', ' ');
 		boolean changed = tags.setCustomTagName(id, display);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag name." : "No tag changed."), true);
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Updated tag name." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
 
@@ -326,7 +375,7 @@ public class TagCommand {
 		int color = parseColor(StringArgumentType.getString(ctx, "color"));
 		boolean changed = color >= 0 && tags.setCustomTagColor(id, color);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag color." : "No tag changed."), true);
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Updated tag color." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
 
@@ -336,7 +385,7 @@ public class TagCommand {
 		int priority = IntegerArgumentType.getInteger(ctx, "priority");
 		boolean changed = tags.setCustomTagPriority(id, priority);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag priority." : "No tag changed."), true);
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Updated tag priority." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
 
@@ -346,7 +395,7 @@ public class TagCommand {
 		String permission = StringArgumentType.getString(ctx, "permission");
 		boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
 		boolean changed = tags.setCustomTagPermission(id, permission, enabled);
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag permission." : "No tag changed."),
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Updated tag permission." : "No tag changed."),
 			true);
 		return changed ? 1 : 0;
 	}
@@ -364,7 +413,7 @@ public class TagCommand {
 			? tags.setBuiltinTagColor(id, color)
 			: tags.setCustomTagColor(id, color);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag color." : "No tag changed."), true);
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Updated tag color." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
 
@@ -377,7 +426,7 @@ public class TagCommand {
 			? tags.setBuiltinTagPriority(id, priority)
 			: tags.setCustomTagPriority(id, priority);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag priority." : "No tag changed."), true);
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Updated tag priority." : "No tag changed."), true);
 		return changed ? 1 : 0;
 	}
 
@@ -390,7 +439,7 @@ public class TagCommand {
 		boolean changed = builtin != null
 			? tags.setBuiltinTagPermission(id, permission, enabled)
 			: tags.setCustomTagPermission(id, permission, enabled);
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Updated tag permission." : "No tag changed."),
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Updated tag permission." : "No tag changed."),
 			true);
 		return changed ? 1 : 0;
 	}
@@ -400,7 +449,7 @@ public class TagCommand {
 		String id = StringArgumentType.getString(ctx, "id");
 		boolean changed = tags.resetBuiltinTag(id);
 		if (changed) refreshAllPlayerListNames(ctx.getSource());
-		ctx.getSource().sendFeedback(() -> Text.literal(changed ? "Reset built-in tag settings." : "No tag changed."),
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal(changed ? "Reset built-in tag settings." : "No tag changed."),
 			true);
 		return changed ? 1 : 0;
 	}

@@ -1,7 +1,9 @@
 package dev.mapselect.mixin;
 
 import dev.doctor4t.wathe.item.KnifeItem;
+import dev.mapselect.entity.TwinFakePlayerEntity;
 import dev.mapselect.role.timemaster.TimeMasterManager;
+import dev.mapselect.role.silent.SilentShadowComponent;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -20,6 +22,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 
 @Mixin(KnifeItem.class)
 public abstract class TimeMasterKnifeUseMixin {
@@ -28,6 +32,10 @@ public abstract class TimeMasterKnifeUseMixin {
 	@Inject(method = "use", at = @At("HEAD"), cancellable = true)
 	private void gexpress$blockRewindKnifeReady(World world, PlayerEntity user, Hand hand,
 			CallbackInfoReturnable<TypedActionResult<ItemStack>> cir) {
+		if (SilentShadowComponent.isShadowed(user)) {
+			cir.setReturnValue(TypedActionResult.fail(user.getStackInHand(hand)));
+			return;
+		}
 		if (!world.isClient && user instanceof ServerPlayerEntity player
 				&& (TimeMasterManager.isFrozen(player) || TimeMasterManager.isRewinding(player))) {
 			cir.setReturnValue(TypedActionResult.fail(user.getStackInHand(hand)));
@@ -50,9 +58,16 @@ public abstract class TimeMasterKnifeUseMixin {
 		Entity best = null;
 		Vec3d bestHit = null;
 		double bestDistance = GEXPRESS_KNIFE_RANGE * GEXPRESS_KNIFE_RANGE;
-		for (PlayerEntity target : user.getWorld().getPlayers()) {
-			if (target == user || !target.isAlive() || target.isSpectator()) continue;
-			Box box = target.getBoundingBox().expand(target.isSleeping() ? 0.55D : 0.2D);
+		List<Entity> candidates = new ArrayList<>(user.getWorld().getPlayers());
+		candidates.addAll(user.getWorld().getEntitiesByClass(TwinFakePlayerEntity.class,
+			user.getBoundingBox().expand(GEXPRESS_KNIFE_RANGE + 1.0D),
+			body -> body.isAlive() && !body.isRemoved()
+				&& body.ownerId().filter(ownerId -> !ownerId.equals(user.getUuid())).isPresent()));
+		for (Entity target : candidates) {
+			if (target == user || !target.isAlive()
+					|| target instanceof PlayerEntity player && player.isSpectator()) continue;
+			Box box = target.getBoundingBox().expand(
+				target instanceof PlayerEntity player && player.isSleeping() ? 0.55D : 0.2D);
 			Optional<Vec3d> hit = box.raycast(start, end);
 			if (hit.isEmpty()) continue;
 			if (gexpress$isBlocked(user, start, hit.get())) continue;

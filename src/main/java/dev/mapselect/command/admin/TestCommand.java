@@ -46,8 +46,10 @@ import org.agmas.harpymodloader.modifiers.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -56,6 +58,7 @@ public final class TestCommand {
 	private static final Predicate<ServerCommandSource> OP = GexpressPermissions::canUseAdminCommands;
 	private static final Predicate<ServerCommandSource> ROLE_TEST = GexpressPermissions::canUseRoleCommands;
 	private static final Predicate<ServerCommandSource> MODIFIER_TEST = GexpressPermissions::canUseModifierCommands;
+	private static final Map<String, TestPreset> TEST_PRESETS = new LinkedHashMap<>();
 
 	private TestCommand() {}
 
@@ -69,11 +72,15 @@ public final class TestCommand {
 			.then(pelicanTestBranch())
 			.then(cooldownTestBranch())
 			.then(overlayTestBranch())
-			.then(CommandManager.literal("clear")
+			.then(presetTestBranch())
+			.then(dev.mapselect.testing.BotTestTools.setupBranch())
+			.then(dev.mapselect.testing.BotTestTools.actionBranch())
+			.then(dev.mapselect.testing.BotTestTools.reviveBranch())
+			.then(dev.mapselect.testing.BotTestTools.stateBranch())
+			.then(CommandManager.literal("reset")
 				.requires(OP)
-				.executes(ctx -> runClearAll(ctx, self(ctx)))
-				.then(CommandManager.argument("players", EntityArgumentType.players())
-					.executes(ctx -> runClearAll(ctx, EntityArgumentType.getPlayers(ctx, "players")))));
+				.executes(ctx -> dev.mapselect.testing.BotTestTools.reset(ctx.getSource())
+					? 1 : runClearAll(ctx, ctx.getSource().getWorld().getPlayers())));
 	}
 
 	private static LiteralArgumentBuilder<ServerCommandSource> roleTestBranch() {
@@ -83,15 +90,8 @@ public final class TestCommand {
 				.executes(ctx -> runClearRole(ctx, self(ctx)))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.executes(ctx -> runClearRole(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
-			.then(CommandManager.literal("set")
+			.then(CommandManager.argument("players", EntityArgumentType.players())
 				.then(CommandManager.argument("role", RoleArgumentType.create())
-					.executes(ctx -> runSetRole(ctx, RoleArgumentType.getRole(ctx, "role"), self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runSetRole(ctx, RoleArgumentType.getRole(ctx, "role"),
-							EntityArgumentType.getPlayers(ctx, "players"))))))
-			.then(CommandManager.argument("role", RoleArgumentType.create())
-				.executes(ctx -> runSetRole(ctx, RoleArgumentType.getRole(ctx, "role"), self(ctx)))
-				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.executes(ctx -> runSetRole(ctx, RoleArgumentType.getRole(ctx, "role"),
 						EntityArgumentType.getPlayers(ctx, "players")))));
 	}
@@ -104,23 +104,11 @@ public final class TestCommand {
 					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
 						.suggests(suggestAddModifiers("players"))
 						.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
-							EntityArgumentType.getPlayers(ctx, "players")))))
-				.then(CommandManager.argument("modifier", ModifierArgumentType.create())
-					.suggests(suggestAddModifiers(null))
-					.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runAddModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
 							EntityArgumentType.getPlayers(ctx, "players"))))))
 			.then(CommandManager.literal("remove")
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.then(CommandManager.argument("modifier", ModifierArgumentType.create())
 						.suggests(suggestRemoveModifiers("players"))
-						.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
-							EntityArgumentType.getPlayers(ctx, "players")))))
-				.then(CommandManager.argument("modifier", ModifierArgumentType.create())
-					.suggests(suggestRemoveModifiers(null))
-					.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"), self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
 						.executes(ctx -> runRemoveModifier(ctx, ModifierArgumentType.getModifier(ctx, "modifier"),
 							EntityArgumentType.getPlayers(ctx, "players"))))))
 			.then(CommandManager.literal("clear")
@@ -136,13 +124,6 @@ public final class TestCommand {
 				.executes(ctx -> runClearTasks(ctx, self(ctx)))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.executes(ctx -> runClearTasks(ctx, EntityArgumentType.getPlayers(ctx, "players")))))
-			.then(CommandManager.literal("set")
-				.then(CommandManager.argument("task", StringArgumentType.word())
-					.suggests(TestCommand::suggestTasks)
-					.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"), self(ctx)))
-					.then(CommandManager.argument("players", EntityArgumentType.players())
-						.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"),
-							EntityArgumentType.getPlayers(ctx, "players"))))))
 			.then(CommandManager.argument("task", StringArgumentType.word())
 				.suggests(TestCommand::suggestTasks)
 				.executes(ctx -> runGiveTask(ctx, StringArgumentType.getString(ctx, "task"), self(ctx)))
@@ -207,6 +188,33 @@ public final class TestCommand {
 				.executes(ctx -> runUnfreezeOverlay(ctx, self(ctx)))
 				.then(CommandManager.argument("players", EntityArgumentType.players())
 					.executes(ctx -> runUnfreezeOverlay(ctx, EntityArgumentType.getPlayers(ctx, "players")))));
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> presetTestBranch() {
+		return CommandManager.literal("preset")
+			.requires(OP)
+			.then(CommandManager.literal("save")
+				.then(CommandManager.argument("name", StringArgumentType.word())
+					.executes(ctx -> runSavePreset(ctx, StringArgumentType.getString(ctx, "name"),
+						ctx.getSource().getPlayerOrThrow()))
+					.then(CommandManager.argument("player", EntityArgumentType.player())
+						.executes(ctx -> runSavePreset(ctx, StringArgumentType.getString(ctx, "name"),
+							EntityArgumentType.getPlayer(ctx, "player"))))))
+			.then(CommandManager.literal("apply")
+				.then(CommandManager.argument("name", StringArgumentType.word())
+					.suggests(TestCommand::suggestPresetNames)
+					.executes(ctx -> runApplyPreset(ctx, StringArgumentType.getString(ctx, "name"), self(ctx)))
+					.then(CommandManager.argument("players", EntityArgumentType.players())
+						.executes(ctx -> runApplyPreset(ctx, StringArgumentType.getString(ctx, "name"),
+							EntityArgumentType.getPlayers(ctx, "players"))))))
+			.then(CommandManager.literal("delete")
+				.then(CommandManager.argument("name", StringArgumentType.word())
+					.suggests(TestCommand::suggestPresetNames)
+					.executes(ctx -> runDeletePreset(ctx, StringArgumentType.getString(ctx, "name")))))
+			.then(CommandManager.literal("clear")
+				.executes(TestCommand::runClearPresets))
+			.then(CommandManager.literal("list")
+				.executes(TestCommand::runListPresets));
 	}
 
 	private static LiteralArgumentBuilder<ServerCommandSource> timedOverlayBranch(String name, int defaultSeconds,
@@ -288,9 +296,144 @@ public final class TestCommand {
 		return builder.buildFuture();
 	}
 
-	private static int runSetRole(CommandContext<ServerCommandSource> ctx, Role role,
+	private static CompletableFuture<Suggestions> suggestPresetNames(CommandContext<ServerCommandSource> ctx,
+			SuggestionsBuilder builder) {
+		String remaining = builder.getRemainingLowerCase();
+		TEST_PRESETS.keySet().stream()
+			.filter(name -> name.toLowerCase(Locale.ROOT).startsWith(remaining))
+			.forEach(builder::suggest);
+		return builder.buildFuture();
+	}
+
+	private static int runSavePreset(CommandContext<ServerCommandSource> ctx, String rawName,
+			ServerPlayerEntity player) {
+		ServerCommandSource src = ctx.getSource();
+		String name = normalizePresetName(rawName);
+		if (name.isEmpty()) {
+			src.sendError(Text.literal("Preset name cannot be empty."));
+			return 0;
+		}
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
+		Role role = game == null ? null : game.getRole(player);
+		WorldModifierComponent mods = WorldModifierComponent.KEY.getNullable(player.getWorld());
+		List<Identifier> modifierIds = safeModifiers(mods, player).stream()
+			.filter(modifier -> modifier != null && modifier.identifier() != null)
+			.map(Modifier::identifier)
+			.sorted(Comparator.comparing(Identifier::toString))
+			.toList();
+		TEST_PRESETS.put(name, new TestPreset(role == null ? null : role.identifier(), modifierIds));
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Saved test preset " + name + " from "
+			+ player.getName().getString() + ".").formatted(Formatting.GREEN), true);
+		return 1;
+	}
+
+	private static int runApplyPreset(CommandContext<ServerCommandSource> ctx, String rawName,
 			Collection<ServerPlayerEntity> players) {
 		ServerCommandSource src = ctx.getSource();
+		if (denyRoleModifierTestDuringGame(src)) return 0;
+		String name = normalizePresetName(rawName);
+		TestPreset preset = TEST_PRESETS.get(name);
+		if (preset == null) {
+			src.sendError(Text.literal("Unknown test preset '" + rawName + "'."));
+			return 0;
+		}
+		GameWorldComponent game = GameWorldComponent.KEY.getNullable(src.getWorld());
+		WorldModifierComponent mods = WorldModifierComponent.KEY.getNullable(src.getWorld());
+		if (game == null) {
+			src.sendError(Text.literal("WATHE game component is not available in this world."));
+			return 0;
+		}
+		if (mods == null) {
+			src.sendError(Text.literal("HML modifier component is not available in this world."));
+			return 0;
+		}
+		Role role = preset.roleId() == null ? null : roleById(preset.roleId());
+		if (preset.roleId() != null && role == null) {
+			src.sendError(Text.literal("Preset '" + name + "' references missing role " + preset.roleId() + "."));
+			return 0;
+		}
+		List<Modifier> modifiers = new ArrayList<>();
+		for (Identifier modifierId : preset.modifierIds()) {
+			Modifier modifier = modifierById(modifierId);
+			if (modifier == null) {
+				src.sendError(Text.literal("Preset '" + name + "' references missing modifier " + modifierId + "."));
+				return 0;
+			}
+			modifiers.add(modifier);
+		}
+
+		for (ServerPlayerEntity player : players) {
+			applyPresetToPlayer(src, game, mods, role, modifiers, player);
+		}
+		game.sync();
+		mods.sync();
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Applied test preset " + name + " to "
+			+ playerList(players) + ".").formatted(Formatting.GREEN), true);
+		return players.size();
+	}
+
+	private static void applyPresetToPlayer(ServerCommandSource src, GameWorldComponent game,
+			WorldModifierComponent mods, Role role, List<Modifier> modifiers, ServerPlayerEntity player) {
+		clearWarlockState(src, player);
+		if (role == null) {
+			game.getRoles().remove(player.getUuid());
+			GexpressTestState.unmarkRole(player.getUuid());
+		} else {
+			game.addRole(player, role);
+			GexpressTestState.markRole(player.getUuid());
+		}
+		ArrayList<Modifier> current = safeModifiers(mods, player);
+		List<Modifier> removed = new ArrayList<>(current);
+		current.clear();
+		for (Modifier modifier : removed) safeRemoveModifier(player, modifier);
+		GexpressTestState.clearModifiers(player.getUuid());
+		for (Modifier modifier : modifiers) {
+			addModifier(mods, player, modifier);
+			GexpressTestState.markModifier(player.getUuid(), modifier);
+		}
+	}
+
+	private static int runDeletePreset(CommandContext<ServerCommandSource> ctx, String rawName) {
+		String name = normalizePresetName(rawName);
+		TestPreset removed = TEST_PRESETS.remove(name);
+		if (removed == null) {
+			ctx.getSource().sendError(Text.literal("Unknown test preset '" + rawName + "'."));
+			return 0;
+		}
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Deleted test preset " + name + ".")
+			.formatted(Formatting.YELLOW), true);
+		return 1;
+	}
+
+	private static int runClearPresets(CommandContext<ServerCommandSource> ctx) {
+		int count = TEST_PRESETS.size();
+		TEST_PRESETS.clear();
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Cleared " + count + " test preset(s).")
+			.formatted(count > 0 ? Formatting.YELLOW : Formatting.GRAY), true);
+		return count;
+	}
+
+	private static int runListPresets(CommandContext<ServerCommandSource> ctx) {
+		ServerCommandSource src = ctx.getSource();
+		if (TEST_PRESETS.isEmpty()) {
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("No test presets saved.").formatted(Formatting.GRAY), false);
+			return 0;
+		}
+		for (Map.Entry<String, TestPreset> entry : TEST_PRESETS.entrySet()) {
+			TestPreset preset = entry.getValue();
+			dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal(entry.getKey() + ": role="
+				+ (preset.roleId() == null ? "none" : preset.roleId())
+				+ ", modifiers=" + preset.modifierIds()).formatted(Formatting.GRAY), false);
+		}
+		return TEST_PRESETS.size();
+	}
+
+	private static int runSetRole(CommandContext<ServerCommandSource> ctx, Role role,
+			Collection<ServerPlayerEntity> players) {
+		return setRole(ctx.getSource(), role, players);
+	}
+
+	public static int setRole(ServerCommandSource src, Role role, Collection<ServerPlayerEntity> players) {
 		if (denyRoleModifierTestDuringGame(src)) return 0;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(src.getWorld());
 		if (game == null) {
@@ -299,8 +442,19 @@ public final class TestCommand {
 		}
 
 		for (ServerPlayerEntity player : players) {
+			if (player.getWorld() != src.getWorld()) {
+				src.sendError(Text.literal("Test role targets must be in the same world."));
+				return 0;
+			}
+		}
+		for (ServerPlayerEntity player : players) {
+			Role previous = game.getRole(player);
+			if (previous != null && previous != role) {
+				org.agmas.harpymodloader.events.ModdedRoleRemoved.EVENT.invoker().removeModdedRole(player, previous);
+			}
 			clearWarlockState(src, player);
 			game.addRole(player, role);
+			org.agmas.harpymodloader.events.ModdedRoleAssigned.EVENT.invoker().assignModdedRole(player, role);
 			GexpressTestState.markRole(player.getUuid());
 		}
 		game.sync();
@@ -321,13 +475,15 @@ public final class TestCommand {
 		}
 
 		for (ServerPlayerEntity player : players) {
+			Role previous = game.getRole(player);
+			if (previous != null) org.agmas.harpymodloader.events.ModdedRoleRemoved.EVENT.invoker().removeModdedRole(player, previous);
 			game.getRoles().remove(player.getUuid());
 			GexpressTestState.unmarkRole(player.getUuid());
 			clearWarlockState(src, player);
 		}
 		game.sync();
 
-		src.sendFeedback(() -> Text.literal("Cleared test role for " + playerList(players) + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared test role for " + playerList(players) + ".")
 			.formatted(Formatting.YELLOW), true);
 		return players.size();
 	}
@@ -375,7 +531,7 @@ public final class TestCommand {
 		}
 		mods.sync();
 
-		src.sendFeedback(() -> Text.literal("Removed test modifier " + id(modifier) + " from " + playerList(players) + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Removed test modifier " + id(modifier) + " from " + playerList(players) + ".")
 			.formatted(Formatting.YELLOW), true);
 		return players.size();
 	}
@@ -401,7 +557,7 @@ public final class TestCommand {
 		}
 		mods.sync();
 
-		src.sendFeedback(() -> Text.literal("Cleared test modifiers for " + playerList(players) + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared test modifiers for " + playerList(players) + ".")
 			.formatted(Formatting.YELLOW), true);
 		return players.size();
 	}
@@ -415,7 +571,7 @@ public final class TestCommand {
 			if (owner == null ? comp.addC4(target.getUuid()) : comp.addC4(target.getUuid(), owner.getUuid())) changed++;
 		}
 		int count = changed;
-		ctx.getSource().sendFeedback(() -> Text.literal("Attached test C4 to " + count + " player(s).")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Attached test C4 to " + count + " player(s).")
 			.formatted(Formatting.GREEN), true);
 		return changed;
 	}
@@ -428,7 +584,7 @@ public final class TestCommand {
 			if (comp.removeC4(target.getUuid())) changed++;
 		}
 		int count = changed;
-		ctx.getSource().sendFeedback(() -> Text.literal("Removed test C4 from " + count + " player(s).")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Removed test C4 from " + count + " player(s).")
 			.formatted(count > 0 ? Formatting.YELLOW : Formatting.GRAY), true);
 		return changed;
 	}
@@ -437,10 +593,10 @@ public final class TestCommand {
 		C4BackComponent comp = C4BackComponent.KEY.get(ctx.getSource().getWorld());
 		int count = comp.getCarriers().size();
 		if (comp.clearAll()) {
-			ctx.getSource().sendFeedback(() -> Text.literal("Cleared test C4 from " + count + " player(s).")
+			dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Cleared test C4 from " + count + " player(s).")
 				.formatted(Formatting.YELLOW), true);
 		} else {
-			ctx.getSource().sendFeedback(() -> Text.literal("No test C4 was attached.").formatted(Formatting.GRAY), false);
+			dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("No test C4 was attached.").formatted(Formatting.GRAY), false);
 		}
 		return count;
 	}
@@ -452,7 +608,7 @@ public final class TestCommand {
 			if (PelicanManager.releaseFromBelly(player, true)) released++;
 		}
 		int count = released;
-		ctx.getSource().sendFeedback(() -> Text.literal("Released " + count + " player(s) from Pelicans.")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Released " + count + " player(s) from Pelicans.")
 			.formatted(count > 0 ? Formatting.GREEN : Formatting.GRAY), true);
 		return released;
 	}
@@ -463,7 +619,7 @@ public final class TestCommand {
 		for (ServerPlayerEntity player : players) {
 			AbilityCooldownReducers.reduce(player, ticks);
 		}
-		ctx.getSource().sendFeedback(() -> Text.literal((seconds >= Integer.MAX_VALUE / 20
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal((seconds >= Integer.MAX_VALUE / 20
 				? "Cleared ability cooldowns for "
 				: "Reduced ability cooldowns by " + seconds + "s for ")
 				+ playerList(players) + ".").formatted(Formatting.GREEN), true);
@@ -502,7 +658,7 @@ public final class TestCommand {
 			if (sendPayload(player, TimeMasterFreezeStatePayload.clear(player.getUuid()))) sent++;
 		}
 		int count = sent;
-		ctx.getSource().sendFeedback(() -> Text.literal("Cleared freeze overlay for " + count + " player(s).")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Cleared freeze overlay for " + count + " player(s).")
 			.formatted(count > 0 ? Formatting.YELLOW : Formatting.GRAY), true);
 		return sent;
 	}
@@ -539,7 +695,7 @@ public final class TestCommand {
 			sendPayload(player, TimeMasterFreezeStatePayload.clear(player.getUuid()));
 		}
 		int count = sent;
-		ctx.getSource().sendFeedback(() -> Text.literal("Cleared test overlays for " + count + " player(s).")
+		dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Cleared test overlays for " + count + " player(s).")
 			.formatted(count > 0 ? Formatting.YELLOW : Formatting.GRAY), true);
 		return sent;
 	}
@@ -557,6 +713,7 @@ public final class TestCommand {
 
 	private static int runClearAll(CommandContext<ServerCommandSource> ctx,
 			Collection<ServerPlayerEntity> players) {
+		if (denyRoleModifierTestDuringGame(ctx.getSource())) return 0;
 		runClearRole(ctx, players);
 		runClearModifiers(ctx, players);
 		runClearTasks(ctx, players);
@@ -583,7 +740,7 @@ public final class TestCommand {
 			mood.sync();
 		}
 
-		src.sendFeedback(() -> Text.literal("Forced task " + taskName(forcedTask) + " for " + playerList(players) + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Forced task " + taskName(forcedTask) + " for " + playerList(players) + ".")
 			.formatted(Formatting.GREEN), true);
 		return players.size();
 	}
@@ -598,7 +755,7 @@ public final class TestCommand {
 			mood.sync();
 		}
 
-		src.sendFeedback(() -> Text.literal("Cleared tasks for " + playerList(players) + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Cleared tasks for " + playerList(players) + ".")
 			.formatted(Formatting.YELLOW), true);
 		return players.size();
 	}
@@ -645,12 +802,12 @@ public final class TestCommand {
 
 	private static void sendApplied(ServerCommandSource src, String type, String value,
 			Collection<ServerPlayerEntity> players) {
-		src.sendFeedback(() -> Text.literal("Applied test " + type + " " + value + " to " + playerList(players) + ".")
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Applied test " + type + " " + value + " to " + playerList(players) + ".")
 			.formatted(Formatting.GREEN), true);
 	}
 
 	private static void sendOverlayFeedback(ServerCommandSource src, String overlay, int seconds, int sent) {
-		src.sendFeedback(() -> Text.literal("Sent " + overlay + " overlay for " + seconds + "s to "
+		dev.mapselect.command.GexpressFeedback.send(src, () -> Text.literal("Sent " + overlay + " overlay for " + seconds + "s to "
 				+ sent + " player(s).")
 			.formatted(sent > 0 ? Formatting.GREEN : Formatting.GRAY), true);
 	}
@@ -766,6 +923,26 @@ public final class TestCommand {
 		return modifier == null ? "(none)" : modifier.identifier().toString();
 	}
 
+	private static String normalizePresetName(String raw) {
+		return raw == null ? "" : raw.strip().toLowerCase(Locale.ROOT);
+	}
+
+	private static Role roleById(Identifier id) {
+		if (id == null) return null;
+		for (Role role : WatheRoles.ROLES) {
+			if (role != null && id.equals(role.identifier())) return role;
+		}
+		return null;
+	}
+
+	private static Modifier modifierById(Identifier id) {
+		if (id == null) return null;
+		for (Modifier modifier : HMLModifiers.MODIFIERS) {
+			if (modifier != null && id.equals(modifier.identifier())) return modifier;
+		}
+		return null;
+	}
+
 	private static String playerList(Collection<ServerPlayerEntity> players) {
 		List<String> names = new ArrayList<>();
 		for (ServerPlayerEntity player : players) {
@@ -773,4 +950,6 @@ public final class TestCommand {
 		}
 		return String.join(", ", names);
 	}
+
+	private record TestPreset(Identifier roleId, List<Identifier> modifierIds) {}
 }

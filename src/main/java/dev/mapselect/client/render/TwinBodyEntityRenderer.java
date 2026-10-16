@@ -38,4 +38,9 @@ public final class TwinBodyEntityRenderer
 		}
 		return DefaultSkinHelper.getSkinTextures(ownerId).texture();
 	}
+
+	@Override
+	protected boolean hasLabel(TwinBodyEntity entity) {
+		return false;
+	}
 }

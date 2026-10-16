@@ -2,7 +2,7 @@ package dev.mapselect.modifier;
 
 import dev.mapselect.MapSelect;
 import dev.mapselect.game.DeadPlayerStatus;
-import dev.doctor4t.wathe.api.event.GameEvents;
+import dev.mapselect.game.RoundLifecycleHooks;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -29,8 +29,7 @@ public final class ModifierDeathStateManager {
 
 	public static void register() {
 		ServerTickEvents.END_WORLD_TICK.register(ModifierDeathStateManager::tick);
-		GameEvents.ON_FINISH_INITIALIZE.register((world, game) -> clear());
-		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clear());
+		RoundLifecycleHooks.clear(ModifierDeathStateManager::clear);
 	}
 
 	private static void clear() {
@@ -39,7 +38,7 @@ public final class ModifierDeathStateManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		if (++ticks < CHECK_INTERVAL_TICKS) return;
 		ticks = 0;
 

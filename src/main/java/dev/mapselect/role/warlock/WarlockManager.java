@@ -6,11 +6,15 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheSounds;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.RoundLifecycleHooks;
 import dev.mapselect.network.role.warlock.WarlockKillPayload;
 import dev.mapselect.network.role.warlock.WarlockMarkPayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.spy.SpyManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -44,6 +48,7 @@ public final class WarlockManager {
 		ServerPlayNetworking.registerGlobalReceiver(WarlockKillPayload.ID,
 			(payload, context) -> context.server().execute(() -> tryHexKill(context.player())));
 		ServerTickEvents.END_WORLD_TICK.register(WarlockManager::tick);
+		RoundLifecycleHooks.clearWorld(WarlockManager::clear);
 	}
 
 	private static void tryMark(ServerPlayerEntity warlock) {
@@ -52,7 +57,9 @@ public final class WarlockManager {
 		if (!canUseWarlockHere(warlock.getWorld(), warlock) || !isWarlock(warlock)) return;
 		ServerPlayerEntity target = findLookTarget(warlock, MARK_RANGE);
 		if (target == null) {
-			warlock.sendMessage(Text.literal("No living player close enough to mark."), true);
+			warlock.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(warlock,
+				warlock.getServerWorld().getPlayers(), MARK_RANGE, 0.0D, true,
+				candidate -> isPlayableForWarlock(candidate, warlock), "mark")), true);
 			return;
 		}
 		if (target == warlock) return;
@@ -72,17 +79,18 @@ public final class WarlockManager {
 		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(warlock);
 		long remaining = creativeBypass ? 0L : comp.markCooldownRemainingTicks(warlock.getUuid());
 		if (!creativeBypass && remaining > 0L) {
-			warlock.sendMessage(Text.literal("Mark ready in " + secondsCeil(remaining) + "s."), true);
+			warlock.sendMessage(Text.literal("Mark ready in " + Math.max(1L, AbilityCooldowns.secondsCeil(remaining)) + "s."), true);
 			return;
 		}
 
+		if (VeteranManager.interceptAbilityInteraction(warlock, target)) return;
 		if (!comp.assignMark(warlock.getUuid(), target.getUuid())) {
 			warlock.sendMessage(Text.literal("Could not mark target."), true);
 			return;
 		}
 		if (creativeBypass) comp.reduceMarkCooldown(warlock.getUuid(), Long.MAX_VALUE);
 
-		warlock.playSoundToPlayer(SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.7F, 0.55F);
+		AbilitySounds.playTo(warlock, SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.7F, 0.55F);
 		warlock.sendMessage(Text.literal("Marked " + target.getName().getString() + "."), true);
 		SpyManager.recordInteraction(warlock, target);
 	}
@@ -105,7 +113,7 @@ public final class WarlockManager {
 		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(warlock);
 		long cooldown = creativeBypass ? 0L : comp.killCooldownRemainingTicks(warlock.getUuid());
 		if (!creativeBypass && cooldown > 0L) {
-			warlock.sendMessage(Text.literal("Hex ready in " + secondsCeil(cooldown) + "s."), true);
+			warlock.sendMessage(Text.literal("Hex ready in " + Math.max(1L, AbilityCooldowns.secondsCeil(cooldown)) + "s."), true);
 			return;
 		}
 
@@ -125,6 +133,7 @@ public final class WarlockManager {
 		}
 
 		ServerPlayerEntity victim = candidates.get(warlock.getRandom().nextInt(candidates.size()));
+		if (VeteranManager.interceptAbilityInteraction(warlock, victim)) return;
 		playShot(warlock);
 		GameFunctions.killPlayer(victim, true, warlock, GameConstants.DeathReasons.GUN);
 		SpyManager.recordInteraction(warlock, victim);
@@ -158,7 +167,7 @@ public final class WarlockManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 
 		WarlockComponent comp = WarlockComponent.KEY.getNullable(world);
 		if (comp == null) return;
@@ -183,6 +192,11 @@ public final class WarlockManager {
 				comp.removeWarlock(warlockId);
 			}
 		}
+	}
+
+	private static void clear(World world) {
+		WarlockComponent comp = WarlockComponent.KEY.getNullable(world);
+		if (comp != null) comp.clearAll();
 	}
 
 	private static boolean isWarlock(PlayerEntity player) {
@@ -211,7 +225,4 @@ public final class WarlockManager {
 		return GameFunctions.isPlayerAliveAndSurvival(player);
 	}
 
-	private static long secondsCeil(long ticks) {
-		return Math.max(1L, (ticks + 19L) / 20L);
-	}
 }

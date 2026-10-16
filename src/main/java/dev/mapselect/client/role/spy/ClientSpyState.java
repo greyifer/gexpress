@@ -1,14 +1,15 @@
 package dev.mapselect.client.role.spy;
+
+import dev.doctor4t.wathe.api.Role;
+import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.client.game.ClientRoleRevealState;
 import dev.mapselect.client.hud.ClientHudVisibility;
 import dev.mapselect.client.input.ClientAbilityKeys;
 import dev.mapselect.client.role.copycat.ClientCopycatState;
 import dev.mapselect.client.role.pelican.ClientVultureState;
-
-
-import dev.doctor4t.wathe.api.Role;
-import dev.doctor4t.wathe.cca.GameWorldComponent;
 import dev.mapselect.network.role.spy.SpyFeedPayload;
+import dev.mapselect.network.role.spy.SpyListenPayload;
+import dev.mapselect.network.role.spy.SpyListenStatePayload;
 import dev.mapselect.network.role.spy.SpyStatusPayload;
 import dev.mapselect.network.role.spy.SpyUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
@@ -26,7 +27,12 @@ import java.util.Deque;
 public final class ClientSpyState {
 	private static final Deque<FeedLine> FEED = new ArrayDeque<>();
 	private static boolean wasAbilityDown;
+	private static boolean listenRequestSent;
+	private static int listenHeartbeatTicks;
 	private static long activeBugExpiresAtTick;
+	private static int listenEnergyTicks = dev.mapselect.role.spy.SpyManager.LISTEN_ENERGY_TICKS;
+	private static int listenMaximumTicks = dev.mapselect.role.spy.SpyManager.LISTEN_ENERGY_TICKS;
+	private static boolean listening;
 
 	private ClientSpyState() {}
 
@@ -35,6 +41,8 @@ public final class ClientSpyState {
 			context.client().execute(() -> addLine(payload.line())));
 		ClientPlayNetworking.registerGlobalReceiver(SpyStatusPayload.ID, (payload, context) ->
 			context.client().execute(() -> setStatus(payload.remainingTicks(), payload.targetName())));
+		ClientPlayNetworking.registerGlobalReceiver(SpyListenStatePayload.ID, (payload, context) ->
+			context.client().execute(() -> setListenState(payload)));
 		ClientTickEvents.END_CLIENT_TICK.register(ClientSpyState::tick);
 		HudRenderCallback.EVENT.register(ClientSpyState::render);
 	}
@@ -49,15 +57,24 @@ public final class ClientSpyState {
 	private static void setStatus(int remainingTicks, String targetName) {
 		if (remainingTicks <= 0) {
 			activeBugExpiresAtTick = 0L;
+			listening = false;
 			return;
 		}
 		activeBugExpiresAtTick = now() + remainingTicks;
+	}
+
+	private static void setListenState(SpyListenStatePayload payload) {
+		if (payload == null) return;
+		listenEnergyTicks = payload.energyTicks();
+		listenMaximumTicks = payload.maximumTicks();
+		listening = payload.listening();
 	}
 
 	private static void tick(MinecraftClient client) {
 		if (client == null || client.player == null || client.world == null
 				|| client.currentScreen != null || ClientVultureState.isLocalStashed(client)
 				|| !ClientRoleRevealState.canUseRoleAbility(client) || !isLocalSpy(client)) {
+			stopListeningRequest();
 			wasAbilityDown = false;
 			return;
 		}
@@ -67,6 +84,34 @@ public final class ClientSpyState {
 			ClientPlayNetworking.send(new SpyUsePayload());
 		}
 		wasAbilityDown = down;
+
+		KeyBinding secondary = ClientAbilityKeys.secondaryBinding();
+		boolean listenDown = activeRemainingTicks() > 0L && secondary != null
+			&& ClientAbilityKeys.isDown(client, secondary);
+		if (listenDown) {
+			if (!listenRequestSent || listenHeartbeatTicks-- <= 0) {
+				sendListening(true);
+				listenHeartbeatTicks = 5;
+			}
+		} else {
+			stopListeningRequest();
+		}
+	}
+
+	private static void sendListening(boolean active) {
+		if (!ClientPlayNetworking.canSend(SpyListenPayload.ID)) {
+			listenRequestSent = false;
+			return;
+		}
+		ClientPlayNetworking.send(new SpyListenPayload(active));
+		listenRequestSent = active;
+	}
+
+	private static void stopListeningRequest() {
+		if (listenRequestSent) sendListening(false);
+		listenRequestSent = false;
+		listenHeartbeatTicks = 0;
+		listening = false;
 	}
 
 	private static void render(DrawContext context, net.minecraft.client.render.RenderTickCounter tickCounter) {
@@ -93,6 +138,15 @@ public final class ClientSpyState {
 			return 0L;
 		}
 		return remaining;
+	}
+
+	public static float listenEnergy() {
+		return listenMaximumTicks <= 0 ? 0.0F
+			: Math.max(0.0F, Math.min(1.0F, listenEnergyTicks / (float) listenMaximumTicks));
+	}
+
+	public static boolean isListening() {
+		return listening;
 	}
 
 	private static boolean isLocalSpy(MinecraftClient client) {

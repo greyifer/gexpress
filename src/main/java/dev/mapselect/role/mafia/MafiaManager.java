@@ -12,23 +12,30 @@ import dev.doctor4t.wathe.entity.PlayerBodyEntity;
 import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.doctor4t.wathe.index.WatheEntities;
+import dev.doctor4t.wathe.index.WatheDataComponentTypes;
 import dev.doctor4t.wathe.index.WatheItems;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.game.GexpressGameModes;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.mafia.MafiaActionPayload;
 import dev.mapselect.network.role.mafia.MafiaAmmoPayload;
 import dev.mapselect.network.role.mafia.MafiaIntroPayload;
+import dev.mapselect.network.role.mafia.MafiaRecruitOpenPayload;
 import dev.mapselect.network.role.mafia.MafiaStatePayload;
 import dev.mapselect.registry.MapSelectItems;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.NeutralWinManager;
 import dev.mapselect.role.PassiveMoney;
+import dev.mapselect.role.RoleAvailability;
 import dev.mapselect.role.spy.SpyManager;
 import dev.mapselect.role.pelican.PelicanManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -61,6 +68,7 @@ import java.util.function.Predicate;
 public final class MafiaManager {
 	private static final double BODY_LOOK_RADIUS_SQUARED = 2.25D;
 	private static final int INTRO_TICKS = 90;
+	private static final long RECRUIT_SELECTION_TIMEOUT_TICKS = 200L;
 	private static final int NORMAL_MEMBER_LIMIT = 1;
 	private static final int TAKEOVER_MEMBER_LIMIT = 3;
 	private static final Map<UUID, Slots> slotsByGodfather = new HashMap<>();
@@ -70,6 +78,7 @@ public final class MafiaManager {
 	private static final Map<UUID, Long> janitorCleanCooldownUntil = new HashMap<>();
 	private static final Map<UUID, Integer> pendingRevolverCooldown = new HashMap<>();
 	private static final Map<UUID, PickpocketHold> activePickpockets = new HashMap<>();
+	private static final Map<UUID, PendingRecruit> pendingRecruits = new HashMap<>();
 	private static final List<DelayedMoneyNotice> delayedMoneyNotices = new ArrayList<>();
 	private static int syncTick;
 
@@ -80,8 +89,9 @@ public final class MafiaManager {
 		PayloadTypeRegistry.playS2C().register(MafiaStatePayload.ID, MafiaStatePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(MafiaIntroPayload.ID, MafiaIntroPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(MafiaAmmoPayload.ID, MafiaAmmoPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(MafiaRecruitOpenPayload.ID, MafiaRecruitOpenPayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(MafiaActionPayload.ID,
-			(payload, context) -> context.server().execute(() -> handleAction(context.player(), payload.action())));
+			(payload, context) -> context.server().execute(() -> handleAction(context.player(), payload)));
 		ServerTickEvents.END_WORLD_TICK.register(MafiaManager::tick);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 			server.execute(() -> {
@@ -91,6 +101,12 @@ public final class MafiaManager {
 		AllowPlayerDeath.EVENT.register(MafiaManager::allowDeath);
 		GameEvents.ON_FINISH_INITIALIZE.register(MafiaManager::onFinishInitialize);
 		GameEvents.ON_FINISH_FINALIZE.register((world, game) -> clearAll(world));
+		ModdedRoleAssigned.EVENT.register((player, role) -> {
+			if (player instanceof ServerPlayerEntity serverPlayer && role != null
+					&& MapSelectRoles.GODFATHER_ID.equals(role.identifier())) {
+				initializeGodfather(serverPlayer, true);
+			}
+		});
 	}
 
 	private static void onFinishInitialize(World world, GameWorldComponent game) {
@@ -98,26 +114,34 @@ public final class MafiaManager {
 		if (!(world instanceof ServerWorld serverWorld) || game == null) return;
 		for (ServerPlayerEntity player : serverWorld.getPlayers()) {
 			if (!isGodfather(player)) continue;
-			slotsByGodfather.putIfAbsent(player.getUuid(), new Slots());
-			grantGodfatherLoadout(player);
-			loadedBulletsByGodfather.put(player.getUuid(), startingLoadedBullets());
-			setMafiaStartingBalance(player);
-			sendIntro(player);
-			sync(player);
-			syncAmmo(player);
+			initializeGodfather(player, true);
 		}
 	}
 
-	private static void handleAction(ServerPlayerEntity player, int action) {
+	private static void initializeGodfather(ServerPlayerEntity player, boolean announce) {
+		if (player == null || !isGodfather(player)) return;
+		slotsByGodfather.putIfAbsent(player.getUuid(), new Slots());
+		grantGodfatherLoadout(player);
+		loadedBulletsByGodfather.putIfAbsent(player.getUuid(), startingLoadedBullets());
+		setMafiaStartingBalance(player);
+		if (announce) sendIntro(player);
+		sync(player);
+		syncAmmo(player);
+	}
+
+	private static void handleAction(ServerPlayerEntity player, MafiaActionPayload payload) {
 		if (player == null || !(player.getWorld() instanceof ServerWorld)) return;
+		int action = payload == null ? -1 : payload.action();
 		if (action == MafiaActionPayload.RECRUIT_MAFIOSO) {
-			tryRecruit(player, SlotType.MAFIOSO);
+			tryRecruit(player, SlotType.MAFIOSO, payload.targetId());
 		} else if (action == MafiaActionPayload.RECRUIT_JANITOR) {
-			tryRecruit(player, SlotType.JANITOR);
+			tryRecruit(player, SlotType.JANITOR, payload.targetId());
 		} else if (action == MafiaActionPayload.RECRUIT_PICKPOCKET) {
-			tryRecruit(player, SlotType.PICKPOCKET);
+			tryRecruit(player, SlotType.PICKPOCKET, payload.targetId());
 		} else if (action == MafiaActionPayload.RECRUIT_BURGLAR) {
-			tryRecruit(player, SlotType.BURGLAR);
+			tryRecruit(player, SlotType.BURGLAR, payload.targetId());
+		} else if (action == MafiaActionPayload.OPEN_RECRUIT_MENU) {
+			openRecruitMenu(player, payload.targetId());
 		} else if (action == MafiaActionPayload.CLEAN_BODY) {
 			tryClean(player);
 		} else if (action == MafiaActionPayload.PICKPOCKET_START) {
@@ -127,10 +151,51 @@ public final class MafiaManager {
 		}
 	}
 
-	private static void tryRecruit(ServerPlayerEntity godfather, SlotType type) {
-		if (!canUseHere(godfather.getWorld(), godfather) || !isGodfather(godfather)
-				|| PelicanManager.isStashed(godfather)
-				|| (!GexpressTestState.isRoleTester(godfather) && !GameFunctions.isPlayerAliveAndSurvival(godfather))) {
+	private static void openRecruitMenu(ServerPlayerEntity godfather, UUID requestedTargetId) {
+		if (!canRecruit(godfather)) return;
+		ServerWorld world = godfather.getServerWorld();
+		ServerPlayerEntity target = requestedTargetId == null ? null
+			: world.getServer().getPlayerManager().getPlayer(requestedTargetId);
+		if (target == null || !AbilityTargeting.canTarget(godfather, target,
+				GexpressConfig.getMafiaRecruitRange(), 0.0D, true,
+				candidate -> candidate != godfather && !PelicanManager.isStashed(candidate)
+					&& DeadPlayerStatus.isLivingRoundParticipant(candidate))) {
+			godfather.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(godfather,
+				world.getPlayers(), GexpressConfig.getMafiaRecruitRange(), 0.0D, true,
+				candidate -> candidate != godfather && !PelicanManager.isStashed(candidate)
+					&& DeadPlayerStatus.isLivingRoundParticipant(candidate), "recruit"))
+				.formatted(Formatting.GRAY), true);
+			return;
+		}
+		if (isMafiaRole(target)) {
+			godfather.sendMessage(Text.literal("That player is already part of the family.")
+				.formatted(Formatting.GRAY), true);
+			return;
+		}
+		if (!ServerPlayNetworking.canSend(godfather, MafiaRecruitOpenPayload.ID)) {
+			godfather.sendMessage(Text.literal("Your client cannot open the recruitment inventory.")
+				.formatted(Formatting.GRAY), true);
+			return;
+		}
+		pendingRecruits.put(godfather.getUuid(), new PendingRecruit(target.getUuid(),
+			world.getTime() + RECRUIT_SELECTION_TIMEOUT_TICKS));
+		ServerPlayNetworking.send(godfather,
+			new MafiaRecruitOpenPayload(target.getUuid(), target.getName().getString()));
+	}
+
+	private static void tryRecruit(ServerPlayerEntity godfather, SlotType type, UUID requestedTargetId) {
+		if (!canRecruit(godfather)) return;
+		PendingRecruit pending = pendingRecruits.remove(godfather.getUuid());
+		if (pending == null || requestedTargetId == null || !requestedTargetId.equals(pending.targetId())
+				|| godfather.getWorld().getTime() > pending.expiresAt()) {
+			godfather.sendMessage(Text.literal("That recruitment selection expired.")
+				.formatted(Formatting.GRAY), true);
+			return;
+		}
+		Role newRole = recruitedRole(type);
+		if (!RoleAvailability.isRuntimeEnabled(newRole)) {
+			godfather.sendMessage(Text.literal(type.displayName() + " is disabled for this game.")
+				.formatted(Formatting.GRAY), true);
 			return;
 		}
 		boolean creativeBypass = GexpressTestState.hasCreativeAbilityBypass(godfather);
@@ -151,28 +216,25 @@ public final class MafiaManager {
 				+ secondsCeil(remaining) + "s.").formatted(Formatting.GRAY), true);
 			return;
 		}
-		ServerPlayerEntity target = findTarget(godfather, GexpressConfig.getMafiaRecruitRange());
-		if (target == null) {
-			godfather.sendMessage(Text.literal("No living player close enough to recruit.").formatted(Formatting.GRAY), true);
+		ServerPlayerEntity target = godfather.getServer() == null ? null
+			: godfather.getServer().getPlayerManager().getPlayer(requestedTargetId);
+		if (!isRecruitTargetStillAvailable(godfather, target)) {
+			godfather.sendMessage(Text.literal("That player is no longer close enough to recruit.")
+				.formatted(Formatting.GRAY), true);
 			return;
 		}
 		if (isMafiaRole(target)) {
 			godfather.sendMessage(Text.literal("That player is already part of the family.").formatted(Formatting.GRAY), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(godfather, target)) return;
 
 		Role oldRole = currentRole(target);
-		Role newRole = switch (type) {
-			case MAFIOSO -> MapSelectRoles.MAFIOSO;
-			case JANITOR -> MapSelectRoles.JANITOR;
-			case PICKPOCKET -> MapSelectRoles.PICKPOCKET;
-			case BURGLAR -> MapSelectRoles.BURGLAR;
-		};
-		if (newRole == null) return;
 		assignRole(target, newRole);
 		previousRoleByMember.put(target.getUuid(), oldRole == null ? WatheRoles.CIVILIAN : oldRole);
 		godfatherByMember.put(target.getUuid(), godfather.getUuid());
 		slots.add(type, target.getUuid());
+		applyQueuedReplacementCooldownAfterRecruit(slots, godfather.getWorld().getTime(), creativeBypass);
 		setMafiaStartingBalance(target);
 		sendIntro(target);
 		target.sendMessage(Text.literal("You have been recruited as the " + type.displayName() + ".")
@@ -181,6 +243,23 @@ public final class MafiaManager {
 			.formatted(Formatting.GRAY), true);
 		SpyManager.recordInteraction(godfather, target);
 		syncFamily(godfather.getServerWorld(), godfather.getUuid());
+		syncRecruitCooldowns(godfather);
+	}
+
+	private static boolean canRecruit(ServerPlayerEntity godfather) {
+		return godfather != null && canUseHere(godfather.getWorld(), godfather) && isGodfather(godfather)
+			&& !PelicanManager.isStashed(godfather)
+			&& (GexpressTestState.isRoleTester(godfather)
+				|| GameFunctions.isPlayerAliveAndSurvival(godfather));
+	}
+
+	private static boolean isRecruitTargetStillAvailable(ServerPlayerEntity godfather,
+			ServerPlayerEntity target) {
+		if (godfather == null || target == null || target == godfather
+				|| target.getWorld() != godfather.getWorld() || PelicanManager.isStashed(target)
+				|| !DeadPlayerStatus.isLivingRoundParticipant(target)) return false;
+		double range = GexpressConfig.getMafiaRecruitRange();
+		return godfather.squaredDistanceTo(target) <= range * range;
 	}
 
 	private static void tryClean(ServerPlayerEntity janitor) {
@@ -206,12 +285,12 @@ public final class MafiaManager {
 		body.discard();
 		int cleanCooldown = GexpressConfig.getJanitorCleanCooldownSeconds() * 20;
 		if (!creativeBypass && cleanCooldown > 0) {
-			janitorCleanCooldownUntil.put(janitor.getUuid(), janitor.getWorld().getTime() + cleanCooldown);
+			AbilityCooldowns.start(janitorCleanCooldownUntil, janitor, cleanCooldown);
 			AbilityCooldownSync.send(janitor, AbilityCooldownPayload.JANITOR_CLEAN, cleanCooldown, cleanCooldown, false);
 		} else {
 			AbilityCooldownSync.clear(janitor, AbilityCooldownPayload.JANITOR_CLEAN);
 		}
-		janitor.playSoundToPlayer(SoundEvents.BLOCK_WOOL_BREAK, SoundCategory.PLAYERS, 0.85F, 0.65F);
+		AbilitySounds.playTo(janitor, SoundEvents.BLOCK_WOOL_BREAK, SoundCategory.PLAYERS, 0.85F, 0.65F);
 		janitor.sendMessage(Text.literal("Body cleaned.").formatted(Formatting.DARK_GRAY), true);
 	}
 
@@ -230,9 +309,16 @@ public final class MafiaManager {
 				&& !PelicanManager.isStashed(candidate)
 				&& (testing ? !candidate.isSpectator() : DeadPlayerStatus.isLivingRoundParticipant(candidate)));
 		if (target == null) {
-			thief.sendMessage(Text.literal("No pocket close enough.").formatted(Formatting.GRAY), true);
+			thief.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(thief,
+				thief.getServerWorld().getPlayers(), GexpressConfig.getPickpocketRange(),
+				0.45D, true, candidate -> candidate != thief
+					&& !isMafiaRole(candidate)
+					&& !PelicanManager.isStashed(candidate)
+					&& (testing ? !candidate.isSpectator() : DeadPlayerStatus.isLivingRoundParticipant(candidate)),
+				"pickpocket")).formatted(Formatting.GRAY), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(thief, target)) return;
 		long now = thief.getWorld().getTime();
 		int maxTicks = GexpressConfig.getPickpocketMaxHoldSeconds() * 20;
 		activePickpockets.put(thief.getUuid(), new PickpocketHold(target.getUuid(), now, now));
@@ -331,12 +417,7 @@ public final class MafiaManager {
 	private static boolean allowDeath(PlayerEntity victim, PlayerEntity killer, Identifier reason) {
 		if (victim == null || victim.getWorld().isClient) return true;
 		if (killer instanceof ServerPlayerEntity attacker && victim instanceof ServerPlayerEntity target) {
-			if (isMafiaRole(attacker) && isMafiaRole(target) && !attacker.getUuid().equals(target.getUuid())) {
-				if (!canMafiaKillMafia(attacker, target)) {
-					attacker.sendMessage(Text.literal("You cannot kill your own family.").formatted(Formatting.GRAY), true);
-					return false;
-				}
-			}
+
 			if ((isMafioso(attacker) || isJanitor(attacker) || isPickpocket(attacker) || isBurglar(attacker))
 					&& GameConstants.DeathReasons.GUN.equals(reason)) {
 				pendingRevolverCooldown.put(attacker.getUuid(),
@@ -348,7 +429,7 @@ public final class MafiaManager {
 			if (isJanitor(attacker) && attacker != target) {
 				int ticks = GexpressConfig.getJanitorCleanCooldownAfterKillSeconds() * 20;
 				if (ticks > 0) {
-					janitorCleanCooldownUntil.put(attacker.getUuid(), attacker.getWorld().getTime() + ticks);
+					AbilityCooldowns.start(janitorCleanCooldownUntil, attacker, ticks);
 					AbilityCooldownSync.send(attacker, AbilityCooldownPayload.JANITOR_CLEAN, ticks, ticks, false);
 				}
 			}
@@ -371,7 +452,7 @@ public final class MafiaManager {
 		int loaded = loadedBulletsByGodfather.getOrDefault(shooter.getUuid(), 0);
 		if (loaded <= 0) {
 			shooter.sendMessage(Text.literal("Out of bullets.").formatted(Formatting.GRAY), true);
-			shooter.playSoundToPlayer(SoundEvents.UI_BUTTON_CLICK.value(),
+			AbilitySounds.playTo(shooter, SoundEvents.UI_BUTTON_CLICK.value(),
 				SoundCategory.PLAYERS, 0.35F, 0.65F);
 			syncAmmo(shooter);
 			return false;
@@ -398,7 +479,7 @@ public final class MafiaManager {
 		}
 		if (!player.getAbilities().creativeMode) stack.decrement(1);
 		loadedBulletsByGodfather.put(player.getUuid(), loaded + 1);
-		player.playSoundToPlayer(SoundEvents.ITEM_CROSSBOW_LOADING_END.value(),
+		AbilitySounds.playTo(player, SoundEvents.ITEM_CROSSBOW_LOADING_END.value(),
 			SoundCategory.PLAYERS, 0.75F, 0.75F);
 		player.sendMessage(Text.literal("Loaded bullet (" + (loaded + 1) + "/" + max + ").")
 			.formatted(Formatting.GRAY), true);
@@ -458,7 +539,7 @@ public final class MafiaManager {
 		GameFunctions.WinStatus winStatus = GameFunctions.WinStatus.NONE;
 		if (!GameTimeComponent.KEY.get(world).hasTime()) {
 			winStatus = GameFunctions.WinStatus.TIME;
-		} else if (alive.size() == mafia.size()) {
+		} else if (alive.size() == mafia.size() && MafiaFamilyRules.soleRoot(mafia, p -> familyRoot(p.getUuid())) != null) {
 			ServerPlayerEntity godfather = mafia.stream().filter(MafiaManager::isGodfather).findFirst().orElse(mafia.getFirst());
 			game.setLooseEndWinner(godfather.getUuid());
 			NeutralWinManager.announce(world, godfather, "announcement.win.gexpress.godfather",
@@ -520,7 +601,7 @@ public final class MafiaManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
 		boolean active = game != null && game.getGameStatus() == GameWorldComponent.GameStatus.ACTIVE;
 		if (!active && !GexpressTestState.hasRoleTesters()) {
@@ -557,35 +638,52 @@ public final class MafiaManager {
 		}
 		if (godfatherId == null) return;
 		Slots slots = slotsByGodfather.computeIfAbsent(godfatherId, id -> new Slots());
-		long ready = member.getWorld().getTime() + (long) GexpressConfig.getMafiaReplacementCooldownSeconds() * 20L;
-		if (slots.remove(SlotType.MAFIOSO, member.getUuid())) {
-			slots.mafiosoReadyTick = ready;
+		boolean removed = slots.remove(SlotType.MAFIOSO, member.getUuid())
+			|| slots.remove(SlotType.JANITOR, member.getUuid())
+			|| slots.remove(SlotType.PICKPOCKET, member.getUuid())
+			|| slots.remove(SlotType.BURGLAR, member.getUuid());
+		if (!removed) return;
+		long remaining = activeReplacementRemaining(member.getWorld(), slots);
+		boolean queued = remaining > 0L;
+		if (queued) {
+			slots.queuedReplacementCooldowns++;
+		} else {
+			startReplacementCooldown(slots,
+				member.getWorld().getTime() + (long) GexpressConfig.getMafiaReplacementCooldownSeconds() * 20L);
 		}
-		if (slots.remove(SlotType.JANITOR, member.getUuid())) {
-			slots.janitorReadyTick = ready;
-		}
-		if (slots.remove(SlotType.PICKPOCKET, member.getUuid())) {
-			slots.pickpocketReadyTick = ready;
-		}
-		if (slots.remove(SlotType.BURGLAR, member.getUuid())) {
-			slots.burglarReadyTick = ready;
-		}
-		lockAllRecruitSlots(slots, ready);
 		ServerPlayerEntity godfather = member.getServer().getPlayerManager().getPlayer(godfatherId);
 		if (godfather != null) {
-			godfather.sendMessage(Text.literal("A family slot will reopen in "
-				+ GexpressConfig.getMafiaReplacementCooldownSeconds() + "s.").formatted(Formatting.GRAY), true);
+			godfather.sendMessage(Text.literal(queued
+					? "Another family slot will cool down after your next recruit."
+					: "A family slot will reopen in " + GexpressConfig.getMafiaReplacementCooldownSeconds() + "s.")
+				.formatted(Formatting.GRAY), true);
 			syncRecruitCooldowns(godfather);
 		}
 		syncFamily(member.getServerWorld(), godfatherId);
 	}
 
-	private static void lockAllRecruitSlots(Slots slots, long readyTick) {
+	private static void startReplacementCooldown(Slots slots, long readyTick) {
 		if (slots == null || readyTick <= 0L) return;
-		slots.mafiosoReadyTick = Math.max(slots.mafiosoReadyTick, readyTick);
-		slots.janitorReadyTick = Math.max(slots.janitorReadyTick, readyTick);
-		slots.pickpocketReadyTick = Math.max(slots.pickpocketReadyTick, readyTick);
-		slots.burglarReadyTick = Math.max(slots.burglarReadyTick, readyTick);
+		slots.mafiosoReadyTick = readyTick;
+		slots.janitorReadyTick = readyTick;
+		slots.pickpocketReadyTick = readyTick;
+		slots.burglarReadyTick = readyTick;
+	}
+
+	private static void clearReplacementCooldown(Slots slots) {
+		if (slots == null) return;
+		slots.mafiosoReadyTick = 0L;
+		slots.janitorReadyTick = 0L;
+		slots.pickpocketReadyTick = 0L;
+		slots.burglarReadyTick = 0L;
+	}
+
+	private static void applyQueuedReplacementCooldownAfterRecruit(Slots slots, long now, boolean creativeBypass) {
+		if (slots == null) return;
+		clearReplacementCooldown(slots);
+		if (creativeBypass || slots.queuedReplacementCooldowns <= 0) return;
+		slots.queuedReplacementCooldowns--;
+		startReplacementCooldown(slots, now + (long) GexpressConfig.getMafiaReplacementCooldownSeconds() * 20L);
 	}
 
 	private static void onGodfatherDeath(ServerPlayerEntity godfather) {
@@ -594,9 +692,7 @@ public final class MafiaManager {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(godfather.getWorld());
 		Slots slots = slotsByGodfather.get(godfatherId);
 		if (GexpressGameModes.isTakeover(game)) {
-			if (ServerPlayNetworking.canSend(godfather, MafiaStatePayload.ID)) {
-				ServerPlayNetworking.send(godfather, new MafiaStatePayload(List.of()));
-			}
+			PayloadSync.sendIfChanged(godfather, MafiaStatePayload.ID, new MafiaStatePayload(List.of()));
 			if (slots != null) syncFamily(godfather.getServerWorld(), godfatherId);
 			return;
 		}
@@ -614,9 +710,7 @@ public final class MafiaManager {
 		for (UUID memberId : slots.members(SlotType.BURGLAR)) {
 			restoreMemberAfterGodfatherDeath(godfather.getServerWorld(), memberId);
 		}
-		if (ServerPlayNetworking.canSend(godfather, MafiaStatePayload.ID)) {
-			ServerPlayNetworking.send(godfather, new MafiaStatePayload(List.of()));
-		}
+		PayloadSync.sendIfChanged(godfather, MafiaStatePayload.ID, new MafiaStatePayload(List.of()));
 	}
 
 	private static void restoreMemberAfterGodfatherDeath(ServerWorld world, UUID memberId) {
@@ -626,9 +720,7 @@ public final class MafiaManager {
 		ServerPlayerEntity member = world.getServer().getPlayerManager().getPlayer(memberId);
 		if (member == null || member.getWorld() != world || !GameFunctions.isPlayerAliveAndSurvival(member)) return;
 		assignRole(member, previousRole == null ? WatheRoles.CIVILIAN : previousRole);
-		if (ServerPlayNetworking.canSend(member, MafiaStatePayload.ID)) {
-			ServerPlayNetworking.send(member, new MafiaStatePayload(List.of()));
-		}
+		PayloadSync.sendIfChanged(member, MafiaStatePayload.ID, new MafiaStatePayload(List.of()));
 		member.sendMessage(Text.literal("The Godfather died. Your old role has returned.")
 			.formatted(Formatting.GRAY), true);
 	}
@@ -662,9 +754,11 @@ public final class MafiaManager {
 	}
 
 	private static void ensureGodfatherRevolver(ServerPlayerEntity player) {
-		if (player.getInventory().count(WatheItems.REVOLVER) <= 0) {
-			player.getInventory().insertStack(WatheItems.REVOLVER.getDefaultStack());
-		}
+		if (player == null || dev.mapselect.role.RoleItemInventory.count(player, WatheItems.REVOLVER) > 0) return;
+		ItemStack revolver = WatheItems.REVOLVER.getDefaultStack();
+		revolver.set(WatheDataComponentTypes.OWNER, player.getUuidAsString());
+		if (!player.giveItemStack(revolver)) player.dropItem(revolver, false);
+		player.playerScreenHandler.syncState();
 	}
 
 	private static void setMafiaStartingBalance(ServerPlayerEntity player) {
@@ -696,6 +790,15 @@ public final class MafiaManager {
 	private static Role currentRole(PlayerEntity player) {
 		GameWorldComponent game = player == null ? null : GameWorldComponent.KEY.getNullable(player.getWorld());
 		return game == null ? null : game.getRole(player);
+	}
+
+	private static Role recruitedRole(SlotType type) {
+		return switch (type) {
+			case MAFIOSO -> MapSelectRoles.MAFIOSO;
+			case JANITOR -> MapSelectRoles.JANITOR;
+			case PICKPOCKET -> MapSelectRoles.PICKPOCKET;
+			case BURGLAR -> MapSelectRoles.BURGLAR;
+		};
 	}
 
 	public static boolean isMafiaRole(PlayerEntity player) {
@@ -749,17 +852,6 @@ public final class MafiaManager {
 		return firstRoot != null && firstRoot.equals(secondRoot);
 	}
 
-	private static boolean canMafiaKillMafia(ServerPlayerEntity attacker, ServerPlayerEntity target) {
-		GameWorldComponent game = GameWorldComponent.KEY.getNullable(attacker.getWorld());
-		if (!GexpressGameModes.isTakeover(game)) return false;
-		UUID attackerRoot = familyRoot(attacker.getUuid());
-		UUID targetRoot = familyRoot(target.getUuid());
-		return attackerRoot != null
-			&& targetRoot != null
-			&& !attackerRoot.equals(targetRoot)
-			&& TakeoverManager.isTrackedGodfather(attackerRoot)
-			&& TakeoverManager.isTrackedGodfather(targetRoot);
-	}
 
 	private static boolean canUseHere(World world, PlayerEntity player) {
 		GameWorldComponent game = GameWorldComponent.KEY.getNullable(world);
@@ -800,6 +892,10 @@ public final class MafiaManager {
 	}
 
 	private static long replacementRemaining(ServerPlayerEntity godfather, Slots slots, SlotType type) {
+		return replacementRemaining(godfather.getWorld(), slots, type);
+	}
+
+	private static long replacementRemaining(World world, Slots slots, SlotType type) {
 		long ready = switch (type) {
 			case MAFIOSO -> slots.mafiosoReadyTick;
 			case JANITOR -> slots.janitorReadyTick;
@@ -807,7 +903,7 @@ public final class MafiaManager {
 			case BURGLAR -> slots.burglarReadyTick;
 		};
 		if (ready <= 0L) return 0L;
-		long remaining = ready - godfather.getWorld().getTime();
+		long remaining = ready - world.getTime();
 		if (remaining <= 0L) {
 			if (type == SlotType.MAFIOSO) slots.mafiosoReadyTick = 0L;
 			else if (type == SlotType.JANITOR) slots.janitorReadyTick = 0L;
@@ -818,15 +914,17 @@ public final class MafiaManager {
 		return remaining;
 	}
 
-	private static long janitorCleanRemaining(ServerPlayerEntity janitor) {
-		Long until = janitorCleanCooldownUntil.get(janitor.getUuid());
-		if (until == null) return 0L;
-		long remaining = until - janitor.getWorld().getTime();
-		if (remaining <= 0L) {
-			janitorCleanCooldownUntil.remove(janitor.getUuid());
-			return 0L;
+	private static long activeReplacementRemaining(World world, Slots slots) {
+		if (world == null || slots == null) return 0L;
+		long remaining = 0L;
+		for (SlotType type : SlotType.values()) {
+			remaining = Math.max(remaining, replacementRemaining(world, slots, type));
 		}
 		return remaining;
+	}
+
+	private static long janitorCleanRemaining(ServerPlayerEntity janitor) {
+		return AbilityCooldowns.remaining(janitorCleanCooldownUntil, janitor);
 	}
 
 	public static void reduceCooldowns(ServerPlayerEntity player, long ticks) {
@@ -841,13 +939,8 @@ public final class MafiaManager {
 			}
 		}
 		if (isJanitor(player)) {
-			long remaining = janitorCleanRemaining(player);
-			if (remaining > 0L) {
-				long next = Math.max(0L, remaining - ticks);
-				if (next <= 0L) janitorCleanCooldownUntil.remove(player.getUuid());
-				else janitorCleanCooldownUntil.put(player.getUuid(), player.getWorld().getTime() + next);
-				syncJanitorCleanCooldown(player);
-			}
+			if (AbilityCooldowns.reduce(janitorCleanCooldownUntil, player, ticks) > 0L) syncJanitorCleanCooldown(player);
+			else AbilityCooldownSync.clear(player, AbilityCooldownPayload.JANITOR_CLEAN);
 		}
 	}
 
@@ -907,8 +1000,8 @@ public final class MafiaManager {
 	}
 
 	private static void sync(ServerPlayerEntity player, Set<UUID> members) {
-		if (!ServerPlayNetworking.canSend(player, MafiaStatePayload.ID)) return;
-		ServerPlayNetworking.send(player, new MafiaStatePayload(new ArrayList<>(members), familyColor(player)));
+		PayloadSync.sendIfChanged(player, MafiaStatePayload.ID,
+			new MafiaStatePayload(new ArrayList<>(members), familyColor(player)));
 	}
 
 	private static int familyColor(ServerPlayerEntity player) {
@@ -962,16 +1055,16 @@ public final class MafiaManager {
 		janitorCleanCooldownUntil.clear();
 		pendingRevolverCooldown.clear();
 		activePickpockets.clear();
+		pendingRecruits.clear();
 		delayedMoneyNotices.clear();
 		syncTick = 0;
+		PayloadSync.forgetAll(MafiaStatePayload.ID);
+		PayloadSync.forgetAll(MafiaAmmoPayload.ID);
 		if (world instanceof ServerWorld serverWorld) {
 			for (ServerPlayerEntity player : serverWorld.getPlayers()) {
-				if (ServerPlayNetworking.canSend(player, MafiaStatePayload.ID)) {
-					ServerPlayNetworking.send(player, new MafiaStatePayload(List.of()));
-				}
-				if (ServerPlayNetworking.canSend(player, MafiaAmmoPayload.ID)) {
-					ServerPlayNetworking.send(player, new MafiaAmmoPayload(0, GexpressConfig.getGodfatherMaxLoadedBullets()));
-				}
+				PayloadSync.sendIfChanged(player, MafiaStatePayload.ID, new MafiaStatePayload(List.of()));
+				PayloadSync.sendIfChanged(player, MafiaAmmoPayload.ID,
+					new MafiaAmmoPayload(0, GexpressConfig.getGodfatherMaxLoadedBullets()));
 			}
 		}
 	}
@@ -1017,11 +1110,11 @@ public final class MafiaManager {
 	}
 
 	private static void syncAmmo(ServerPlayerEntity player) {
-		if (player == null || !ServerPlayNetworking.canSend(player, MafiaAmmoPayload.ID)) return;
+		if (player == null) return;
 		int max = GexpressConfig.getGodfatherMaxLoadedBullets();
 		int loaded = isGodfather(player) ? Math.min(max, Math.max(0,
 			loadedBulletsByGodfather.getOrDefault(player.getUuid(), 0))) : 0;
-		ServerPlayNetworking.send(player, new MafiaAmmoPayload(loaded, max));
+		PayloadSync.sendIfChanged(player, MafiaAmmoPayload.ID, new MafiaAmmoPayload(loaded, max));
 	}
 
 	private static void restoreRemovedMembers(ServerWorld world, Set<UUID> currentMembers, Map<UUID, Role> previousRoles) {
@@ -1076,6 +1169,7 @@ public final class MafiaManager {
 		private long janitorReadyTick;
 		private long pickpocketReadyTick;
 		private long burglarReadyTick;
+		private int queuedReplacementCooldowns;
 
 		private List<UUID> members(SlotType type) {
 			return switch (type) {
@@ -1114,7 +1208,7 @@ public final class MafiaManager {
 		private SlotsSnapshot snapshot() {
 			return new SlotsSnapshot(List.copyOf(mafiosos), List.copyOf(janitors), List.copyOf(pickpockets),
 				List.copyOf(burglars), mafiosoReadyTick, janitorReadyTick, pickpocketReadyTick,
-				burglarReadyTick);
+				burglarReadyTick, queuedReplacementCooldowns);
 		}
 
 		private static Slots from(SlotsSnapshot snapshot) {
@@ -1128,6 +1222,7 @@ public final class MafiaManager {
 				slots.janitorReadyTick = snapshot.janitorReadyTick();
 				slots.pickpocketReadyTick = snapshot.pickpocketReadyTick();
 				slots.burglarReadyTick = snapshot.burglarReadyTick();
+				slots.queuedReplacementCooldowns = Math.max(0, snapshot.queuedReplacementCooldowns());
 			}
 			return slots;
 		}
@@ -1142,7 +1237,9 @@ public final class MafiaManager {
 
 	public record SlotsSnapshot(List<UUID> mafiosos, List<UUID> janitors, List<UUID> pickpockets,
 			List<UUID> burglars, long mafiosoReadyTick, long janitorReadyTick, long pickpocketReadyTick,
-			long burglarReadyTick) {}
+			long burglarReadyTick, int queuedReplacementCooldowns) {}
+
+	private record PendingRecruit(UUID targetId, long expiresAt) {}
 
 	public static final class PickpocketHold {
 		private final UUID targetId;

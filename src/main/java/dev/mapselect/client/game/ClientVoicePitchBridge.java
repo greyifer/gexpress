@@ -1,6 +1,4 @@
 package dev.mapselect.client.game;
-import dev.mapselect.client.role.harlequin.ClientTricksterState;
-
 
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.modifier.ModifierUtils;
@@ -16,7 +14,7 @@ public final class ClientVoicePitchBridge {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.world == null || playerId == null) return 1.0F;
 
-		float pitch = ClientTricksterState.voicePitchFor(playerId);
+		float pitch = 1.0F;
 		if (ModifierUtils.has(client.world, playerId, MapSelectModifiers.SQUEAKER_ID)) {
 			pitch *= GexpressConfig.getSqueakerPitchPercent() / 100.0F;
 		}

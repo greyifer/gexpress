@@ -22,13 +22,13 @@ public final class EndCommand {
 			.requires(OP_OR_HOST)
 			.executes(ctx -> {
 				GameFunctions.stopGame(ctx.getSource().getWorld());
-				ctx.getSource().sendFeedback(() -> Text.literal("Ended the current G'Express game.").formatted(Formatting.YELLOW), true);
+				dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Ended the current G'Express game.").formatted(Formatting.YELLOW), true);
 				return 1;
 			})
 			.then(CommandManager.literal("force")
 				.executes(ctx -> {
 					GameFunctions.finalizeGame(ctx.getSource().getWorld());
-					ctx.getSource().sendFeedback(() -> Text.literal("Force-finalized the current G'Express game.").formatted(Formatting.YELLOW), true);
+					dev.mapselect.command.GexpressFeedback.send(ctx.getSource(), () -> Text.literal("Force-finalized the current G'Express game.").formatted(Formatting.YELLOW), true);
 					return 1;
 				}));
 	}

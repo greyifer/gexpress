@@ -1,11 +1,7 @@
 package dev.mapselect.client.screen;
 
-import com.google.common.collect.ImmutableList;
-import dev.isxander.yacl3.api.ConfigCategory;
-import dev.isxander.yacl3.api.CustomTabProvider;
-import dev.isxander.yacl3.api.OptionGroup;
-import dev.isxander.yacl3.gui.YACLScreen;
-import dev.isxander.yacl3.gui.tab.TabExt;
+import io.github.caspe.glib.api.client.editor.GlibContentScreen;
+import io.github.caspe.glib.api.client.ui.GlibUi;
 import dev.mapselect.currency.GcoinComponent;
 import dev.mapselect.host.PlayerTag;
 import dev.mapselect.host.PlayerTagComponent;
@@ -13,22 +9,15 @@ import dev.mapselect.level.LevelComponent;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.tab.Tab;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.client.util.DefaultSkinHelper;
-import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -37,93 +26,23 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 public final class GexpressPlayersCategory {
 	private GexpressPlayersCategory() {}
 
-	public static ConfigCategory build(Screen parent, boolean canEditTags, boolean canManageProgression,
+	public static Screen createGlibScreen(Screen parent, boolean canEditTags, boolean canManageProgression,
 			boolean canManageEconomy) {
-		return new PlayersCategory(canEditTags, canManageProgression, canManageEconomy);
-	}
-
-	private static final class PlayersCategory implements ConfigCategory, CustomTabProvider {
-		private final Text name = Text.translatable("gui.gexpress.config.category.players");
-		private final Text tooltip = Text.translatable("gui.gexpress.config.category.players.tooltip");
-		private final boolean canEditTags;
-		private final boolean canManageProgression;
-		private final boolean canManageEconomy;
-
-		private PlayersCategory(boolean canEditTags, boolean canManageProgression, boolean canManageEconomy) {
-			this.canEditTags = canEditTags;
-			this.canManageProgression = canManageProgression;
-			this.canManageEconomy = canManageEconomy;
-		}
-
-		@Override
-		public @NotNull Text name() {
-			return name;
-		}
-
-		@Override
-		public @NotNull ImmutableList<OptionGroup> groups() {
-			return ImmutableList.of();
-		}
-
-		@Override
-		public @NotNull Text tooltip() {
-			return tooltip;
-		}
-
-		@Override
-		public Tab createTab(YACLScreen screen, ScreenRect tabArea) {
-			return new PlayersTab(screen, tabArea, tooltip, canEditTags, canManageProgression, canManageEconomy);
-		}
-	}
-
-	private static final class PlayersTab implements TabExt {
-		private final PlayersPanelWidget panel;
-		private final ButtonWidget doneButton;
-		private final Tooltip tooltip;
-
-		private PlayersTab(YACLScreen screen, ScreenRect tabArea, Text tooltipText, boolean canEditTags,
-				boolean canManageProgression, boolean canManageEconomy) {
-			this.panel = new PlayersPanelWidget(tabArea.getLeft(), tabArea.getTop(), tabArea.width(), tabArea.height(),
-				canEditTags, canManageProgression, canManageEconomy);
-			this.doneButton = ButtonWidget.builder(ScreenTexts.DONE, button -> screen.finishOrSave())
-				.size(Math.max(90, screen.width / 6), 20)
-				.build();
-			this.tooltip = Tooltip.of(tooltipText);
-			refreshGrid(tabArea);
-		}
-
-		@Override
-		public Text getTitle() {
-			return Text.translatable("gui.gexpress.config.category.players");
-		}
-
-		@Override
-		public void forEachChild(Consumer<ClickableWidget> consumer) {
-			consumer.accept(panel);
-			consumer.accept(doneButton);
-		}
-
-		@Override
-		public void refreshGrid(ScreenRect tabArea) {
-			panel.setDimensionsAndPosition(tabArea.width(), tabArea.height() - 30, tabArea.getLeft(), tabArea.getTop());
-			doneButton.setDimensionsAndPosition(Math.max(90, tabArea.width() / 5), 20,
-				tabArea.getLeft() + tabArea.width() - Math.max(90, tabArea.width() / 5) - 12,
-				tabArea.getBottom() - 24);
-		}
-
-		@Override
-		public @Nullable Tooltip getTooltip() {
-			return tooltip;
-		}
+		return GlibContentScreen.builder(parent, Text.translatable("gui.gexpress.config.category.players"))
+			.subtitle(Text.translatable("gui.gexpress.config.category.players.tooltip"))
+			.accentColor(0xFF67E8F9)
+			.content((host, rect) -> new PlayersPanelWidget(rect.x() + 4, rect.y() + 4,
+				rect.width() - 8, rect.height() - 8, canEditTags, canManageProgression, canManageEconomy))
+			.build();
 	}
 
 	private static final class PlayersPanelWidget extends ClickableWidget {
 		private static final int ROW_HEIGHT = 38;
+		private static final int LIBRARY_ROW_HEIGHT = 48;
 		private static final int HEAD_SIZE = 24;
 		private static final int TAG_BUTTON_WIDTH = 76;
 		private static final int TAG_BUTTON_HEIGHT = 17;
@@ -143,6 +62,7 @@ public final class GexpressPlayersCategory {
 		};
 
 		private final List<TagButton> tagButtons = new ArrayList<>();
+		private final List<PlayerRow> playerRows = new ArrayList<>();
 		private final List<ChangeButton> changeButtons = new ArrayList<>();
 		private final List<LevelFieldBox> levelFields = new ArrayList<>();
 		private final List<LevelApplyButton> levelApplyButtons = new ArrayList<>();
@@ -166,15 +86,8 @@ public final class GexpressPlayersCategory {
 		protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 			MinecraftClient client = MinecraftClient.getInstance();
 			if (client == null || client.textRenderer == null) return;
-
-			context.drawCenteredTextWithShadow(client.textRenderer,
-				Text.translatable("gui.gexpress.config.category.players"),
-				getX() + width / 2, getY() + 8, 0xFFFFFF);
-			context.drawCenteredTextWithShadow(client.textRenderer,
-				Text.translatable("gui.gexpress.config.players.subtitle").formatted(Formatting.GRAY),
-				getX() + width / 2, getY() + 21, 0xA0A0A0);
-
 			tagButtons.clear();
+			playerRows.clear();
 			changeButtons.clear();
 			levelFields.clear();
 			levelApplyButtons.clear();
@@ -187,19 +100,88 @@ public final class GexpressPlayersCategory {
 					getX() + width / 2, getY() + height / 2, 0x777777);
 				return;
 			}
+			if (expandedPlayer == null || entries.stream().noneMatch(entry -> entry.getProfile().getId().equals(expandedPlayer))) {
+				expandedPlayer = entries.getFirst().getProfile().getId();
+			}
 
-			int listX = getX() + 12;
-			int listWidth = width - 24;
-			int top = getY() + 44;
-			int bottom = getY() + height - 6;
-			scroll = clampScroll(scroll, entries, listWidth, bottom - top);
+			int gap = 10;
+			int libraryW = Math.min(330, Math.max(230, width / 3));
+			int libraryX = getX() + 6;
+			int panelY = getY() + 6;
+			int panelH = height - 12;
+			int detailX = libraryX + libraryW + gap;
+			int detailW = getX() + width - 6 - detailX;
+			GlibUi.drawPanel(context, libraryX, panelY, libraryW, panelH, 0xE0161D28, 0x80394655);
+			GlibUi.drawPanel(context, detailX, panelY, detailW, panelH, 0xE0161D28, 0x80394655);
+			context.drawTextWithShadow(client.textRenderer, Text.literal("ONLINE PLAYERS"), libraryX + 12, panelY + 14, 0xFF9EA7B3);
+			context.drawTextWithShadow(client.textRenderer, Text.literal(entries.size() + " connected"), libraryX + 12, panelY + 30, 0xFF67E8F9);
+
+			int listX = libraryX + 10;
+			int listWidth = libraryW - 20;
+			int top = panelY + 54;
+			int bottom = panelY + panelH - 10;
+			scroll = clampLibraryScroll(scroll, entries.size(), bottom - top);
 			int y = top - scroll;
+			context.enableScissor(listX, top, listX + listWidth, bottom);
 			for (PlayerListEntry entry : entries) {
-				int rowHeight = rowHeight(entry, listWidth);
-				if (y + rowHeight >= top && y <= bottom) {
-					drawPlayerRow(context, client, entry, listX, y, listWidth, rowHeight, mouseX, mouseY);
+				if (y + LIBRARY_ROW_HEIGHT >= top && y <= bottom) {
+					drawPlayerLibraryRow(context, client, entry, listX, y, listWidth, mouseX, mouseY);
 				}
-				y += rowHeight;
+				y += LIBRARY_ROW_HEIGHT;
+			}
+			context.disableScissor();
+			drawPlayerInspector(context, client, entries, detailX, panelY, detailW, panelH, mouseX, mouseY);
+		}
+
+		private void drawPlayerLibraryRow(DrawContext context, MinecraftClient client, PlayerListEntry entry,
+				int x, int y, int w, int mouseX, int mouseY) {
+			UUID id = entry.getProfile().getId();
+			boolean selected = id.equals(expandedPlayer);
+			boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + LIBRARY_ROW_HEIGHT - 5;
+			context.fill(x, y, x + w, y + LIBRARY_ROW_HEIGHT - 5,
+				selected ? 0xE0222B38 : hovered ? 0xE01D2835 : 0xC019222E);
+			context.fill(x, y, x + (selected ? 3 : 1), y + LIBRARY_ROW_HEIGHT - 5,
+				selected ? 0xFF67E8F9 : 0x80394655);
+			drawHead(context, entry, x + 9, y + 9);
+			context.drawTextWithShadow(client.textRenderer, Text.literal(entry.getProfile().getName()), x + 42, y + 8, 0xFFFFFFFF);
+			drawTagBadges(context, client, currentTags(entry), x + 42, y + 23);
+			playerRows.add(new PlayerRow(x, y, w, LIBRARY_ROW_HEIGHT - 5, id));
+		}
+
+		private void drawPlayerInspector(DrawContext context, MinecraftClient client, List<PlayerListEntry> entries,
+				int x, int y, int w, int h, int mouseX, int mouseY) {
+			PlayerListEntry entry = entries.stream()
+				.filter(candidate -> candidate.getProfile().getId().equals(expandedPlayer))
+				.findFirst().orElse(null);
+			if (entry == null) return;
+			UUID id = entry.getProfile().getId();
+			String name = entry.getProfile().getName();
+			List<GexpressPermissions.TagInfo> tags = currentTags(entry);
+			boolean locked = tags.stream().anyMatch(tag -> PlayerTag.DEV.id().equals(tag.id())) && !isSelf(client, entry);
+			drawHead(context, entry, x + 18, y + 18);
+			context.drawTextWithShadow(client.textRenderer, Text.literal(name), x + 54, y + 18, 0xFFFFFFFF);
+			drawTagBadges(context, client, tags, x + 54, y + 33);
+			context.drawTextWithShadow(client.textRenderer, Text.literal("PLAYER INSPECTOR"), x + 18, y + 60, 0xFF9EA7B3);
+			context.fill(x + 18, y + 75, x + 72, y + 77, 0xFF67E8F9);
+			if (locked) {
+				context.drawTextWithShadow(client.textRenderer,
+					Text.translatable("gui.gexpress.config.players.locked").formatted(Formatting.GRAY), x + 18, y + 96, 0xFF9EA7B3);
+				return;
+			}
+			if (!canEditAny()) {
+				context.drawTextWithShadow(client.textRenderer, Text.literal("You can view this player, but cannot edit them."),
+					x + 18, y + 96, 0xFF9EA7B3);
+				return;
+			}
+			int contentX = x + 18;
+			int contentW = w - 36;
+			int editorY = y + 88;
+			int editorHeight = editorHeight(client);
+			if (editorHeight > 0) drawLevelEditor(context, client, id, name, contentX, editorY, contentW, mouseX, mouseY);
+			if (canEditTags) {
+				int tagY = editorY + Math.max(0, editorHeight) + 8;
+				context.drawTextWithShadow(client.textRenderer, Text.literal("ACCESS & TAGS"), contentX, tagY, 0xFF9EA7B3);
+				drawTagDropdown(context, client, id, name, tags, contentX, tagY + 14, contentW, mouseX, mouseY);
 			}
 		}
 
@@ -409,6 +391,12 @@ public final class GexpressPlayersCategory {
 
 		@Override
 		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+			for (PlayerRow playerRow : playerRows) {
+				if (!playerRow.contains(mouseX, mouseY)) continue;
+				expandedPlayer = playerRow.playerId();
+				focusedLevelField = null;
+				return true;
+			}
 			for (LevelApplyButton applyButton : levelApplyButtons) {
 				if (!applyButton.contains(mouseX, mouseY)) continue;
 				submitLevelField(applyButton.playerId(), applyButton.playerName(), applyButton.kind());
@@ -423,7 +411,7 @@ public final class GexpressPlayersCategory {
 			for (TagButton tagButton : tagButtons) {
 				if (!tagButton.contains(mouseX, mouseY)) continue;
 				sendTagCommand(tagButton.playerName(), tagButton.tag(), tagButton.selected());
-				scroll = clampScroll(scroll);
+				scroll = clampLibraryScroll(scroll, onlinePlayers().size(), height - 76);
 				return true;
 			}
 			for (ChangeButton changeButton : changeButtons) {
@@ -478,11 +466,18 @@ public final class GexpressPlayersCategory {
 
 		@Override
 		public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-			if (mouseX < getX() || mouseX >= getX() + width || mouseY < getY() || mouseY >= getY() + height) {
+			int libraryW = Math.min(330, Math.max(230, width / 3));
+			if (mouseX < getX() + 6 || mouseX >= getX() + 6 + libraryW
+					|| mouseY < getY() || mouseY >= getY() + height) {
 				return false;
 			}
-			scroll = clampScroll(scroll - (int) Math.round(verticalAmount * 18.0D));
+			scroll = clampLibraryScroll(scroll - (int) Math.round(verticalAmount * 24.0D), onlinePlayers().size(), height - 76);
 			return true;
+		}
+
+		private int clampLibraryScroll(int requested, int playerCount, int viewportHeight) {
+			int maxScroll = Math.max(0, playerCount * LIBRARY_ROW_HEIGHT - Math.max(0, viewportHeight));
+			return Math.max(0, Math.min(requested, maxScroll));
 		}
 
 		private int rowHeight(PlayerListEntry entry, int rowWidth) {
@@ -646,6 +641,12 @@ public final class GexpressPlayersCategory {
 
 	private record TagButton(int x, int y, int width, int height, UUID playerId, String playerName, TagOption tag,
 			boolean selected) {
+		private boolean contains(double mouseX, double mouseY) {
+			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+		}
+	}
+
+	private record PlayerRow(int x, int y, int width, int height, UUID playerId) {
 		private boolean contains(double mouseX, double mouseY) {
 			return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
 		}

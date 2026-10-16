@@ -88,10 +88,6 @@ public final class ClientBodyguardState {
 		int height = 42;
 		int x = context.getScaledWindowWidth() - width - 9;
 		int y = 8;
-		context.fill(x + 2, y + 2, x + width + 2, y + height + 2, withAlpha(0x000000, a / 3));
-		context.fill(x, y, x + width, y + height, withAlpha(0x10222A, a));
-		context.fill(x, y, x + 3, y + height, withAlpha(GLOW_COLOR, a));
-		context.fill(x + 4, y + height - 2, x + width - 4, y + height, withAlpha(GLOW_COLOR, a));
 		drawHead(context, client, targetId, x + 9, y + 9, a);
 		context.drawTextWithShadow(text, Text.literal("Protect"), x + 41, y + 9, withAlpha(0xA8EFFF, a));
 		String name = trimToWidth(text, targetName, width - 48);
@@ -106,7 +102,6 @@ public final class ClientBodyguardState {
 		for (FeedLine line : FEED) {
 			int width = client.textRenderer.getWidth(line.text()) + 8;
 			int x = context.getScaledWindowWidth() - width - 8;
-			context.fill(x - 2, y - 2, x + width, y + 11, 0x66000000);
 			context.drawTextWithShadow(client.textRenderer, Text.literal(line.text()), x + 2, y, 0xFF9DEBFF);
 			y += 13;
 		}

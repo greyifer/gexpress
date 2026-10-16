@@ -8,6 +8,8 @@ import dev.doctor4t.wathe.game.GameConstants;
 import dev.doctor4t.wathe.game.GameFunctions;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
+import dev.mapselect.game.StandingSafeRandomTeleport;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.ability.AbilityCooldownPayload;
 import dev.mapselect.network.ability.AbilityCooldownSync;
 import dev.mapselect.network.role.harlequin.TricksterDancingCartsPayload;
@@ -15,6 +17,8 @@ import dev.mapselect.network.role.harlequin.TricksterSkinSwapPayload;
 import dev.mapselect.network.role.harlequin.TricksterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
 import dev.mapselect.registry.MapSelectSounds;
+import dev.mapselect.role.AbilityCooldowns;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -45,7 +49,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 
 public final class HarlequinManager {
 	private static final Map<net.minecraft.registry.RegistryKey<World>, ActiveSwap> activeSwaps = new ConcurrentHashMap<>();
@@ -122,28 +125,51 @@ public final class HarlequinManager {
 			trickster.sendMessage(Text.literal("Masquerade needs at least two players."), true);
 			return;
 		}
+		Map<UUID, StandingSafeRandomTeleport.Destination> destinations =
+			StandingSafeRandomTeleport.preflight(world, players);
+		boolean completeDestinations = destinations.size() == players.size();
+		if (completeDestinations) {
+			for (ServerPlayerEntity player : players) {
+				if (!destinations.containsKey(player.getUuid())) {
+					completeDestinations = false;
+					break;
+				}
+			}
+		}
+		if (!completeDestinations) {
+			trickster.sendMessage(Text.literal("Masquerade could not find safe random spots for everyone."), true);
+			return;
+		}
 
 		Map<UUID, UUID> swaps = buildDerangement(players, previousSwaps.get(world.getRegistryKey()));
-		Map<UUID, Float> voicePitches = buildPitchMap(players);
 		previousSwaps.put(world.getRegistryKey(), swaps);
 		int durationTicks = GexpressConfig.getTricksterSwapDurationSeconds() * 20;
-		activeSwaps.put(world.getRegistryKey(), new ActiveSwap(world.getTime() + durationTicks, swaps, voicePitches));
-		masqueradeReturnPoints.put(world.getRegistryKey(), ReturnPoint.from(trickster));
+		ReturnPoint returnPoint = ReturnPoint.from(trickster);
+		for (ServerPlayerEntity player : players) {
+			StandingSafeRandomTeleport.Destination destination = destinations.get(player.getUuid());
+			player.teleport(world, destination.position().x, destination.position().y, destination.position().z,
+				destination.yaw(), player.getPitch());
+			player.setVelocity(0.0D, 0.0D, 0.0D);
+			player.velocityModified = true;
+			player.fallDistance = 0.0F;
+		}
+		activeSwaps.put(world.getRegistryKey(), new ActiveSwap(world.getTime() + durationTicks, swaps));
+		masqueradeReturnPoints.put(world.getRegistryKey(), returnPoint);
 		if (creativeBypass) {
 			AbilityCooldownSync.clear(trickster, AbilityCooldownPayload.HARLEQUIN_MASQUERADE);
 		} else {
-			nextMasqueradeUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
-				.put(trickster.getUuid(), world.getTime() + durationTicks
-					+ (long) GexpressConfig.getTricksterMasqueradeCooldownSeconds() * 20L);
+			AbilityCooldowns.start(nextMasqueradeUseTicks.computeIfAbsent(world.getRegistryKey(),
+					key -> new ConcurrentHashMap<>()), trickster.getUuid(), world.getTime(),
+				durationTicks + (long) GexpressConfig.getTricksterMasqueradeCooldownSeconds() * 20L);
 		}
 
-		TricksterSkinSwapPayload payload = new TricksterSkinSwapPayload(swaps, voicePitches, durationTicks);
+		TricksterSkinSwapPayload payload = new TricksterSkinSwapPayload(swaps, Map.of(), durationTicks);
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			ServerPlayNetworking.send(player, payload);
+			PayloadSync.sendIfChanged(player, TricksterSkinSwapPayload.ID, payload);
 		}
 		refreshPlayerListNames(world);
 
-		trickster.playSoundToPlayer(SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE,
+		AbilitySounds.playTo(trickster, SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE,
 			SoundCategory.PLAYERS, 0.85F, 1.65F);
 		trickster.sendMessage(Text.literal("Masquerade."), true);
 	}
@@ -199,22 +225,6 @@ public final class HarlequinManager {
 		return swaps;
 	}
 
-	private static Map<UUID, Float> buildPitchMap(List<ServerPlayerEntity> players) {
-		int min = GexpressConfig.getMasqueradePitchMinPercent();
-		int max = GexpressConfig.getMasqueradePitchMaxPercent();
-		if (max < min) max = min;
-		Map<UUID, Float> out = new HashMap<>();
-		ThreadLocalRandom random = ThreadLocalRandom.current();
-		for (ServerPlayerEntity player : players) {
-			int percent = min == max ? min : random.nextInt(min, max + 1);
-			if (percent >= 96 && percent <= 104 && min < 100 && max > 100) {
-				percent = random.nextBoolean() ? Math.max(min, 88) : Math.min(max, 112);
-			}
-			out.put(player.getUuid(), percent / 100.0F);
-		}
-		return out;
-	}
-
 	private static void tick(ServerWorld world) {
 		clearNoellesMorphCyclesIfDue(world);
 
@@ -234,8 +244,9 @@ public final class HarlequinManager {
 
 	private static void broadcastClear(ServerWorld world) {
 		TricksterSkinSwapPayload clear = new TricksterSkinSwapPayload(Map.of(), Map.of(), 0);
+		PayloadSync.forgetAll(TricksterSkinSwapPayload.ID);
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			ServerPlayNetworking.send(player, clear);
+			PayloadSync.sendIfChanged(player, TricksterSkinSwapPayload.ID, clear);
 		}
 		refreshPlayerListNames(world);
 	}
@@ -266,21 +277,15 @@ public final class HarlequinManager {
 		if (player == null || !(player.getWorld() instanceof ServerWorld world)) return;
 		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
 		if (active == null || !active.isActive(world)) return;
-		ServerPlayNetworking.send(player, new TricksterSkinSwapPayload(active.swaps(), active.voicePitches(),
-			(int) Math.min(Integer.MAX_VALUE, active.remainingTicks(world))));
+		PayloadSync.sendIfChanged(player, TricksterSkinSwapPayload.ID,
+			new TricksterSkinSwapPayload(active.swaps(), Map.of(),
+				(int) Math.min(Integer.MAX_VALUE, active.remainingTicks(world))));
 	}
 
-	public static boolean isGlobalMuteActive(ServerWorld world) {
-		if (world == null) return false;
+	public static boolean isMasqueradeMuted(ServerWorld world, UUID playerId) {
+		if (world == null || playerId == null) return false;
 		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
-		return active != null && active.isActive(world);
-	}
-
-	public static float voicePitchFor(ServerWorld world, UUID playerId) {
-		if (world == null || playerId == null) return 1.0F;
-		ActiveSwap active = activeSwaps.get(world.getRegistryKey());
-		if (active == null || !active.isActive(world)) return 1.0F;
-		return active.voicePitches().getOrDefault(playerId, 1.0F);
+		return active != null && active.isActive(world) && active.swaps().containsKey(playerId);
 	}
 
 	public static UUID replacementFor(UUID playerId) {
@@ -323,9 +328,7 @@ public final class HarlequinManager {
 	private static long masqueradeCooldownRemainingTicks(ServerWorld world, UUID playerId) {
 		Map<UUID, Long> worldCooldowns = nextMasqueradeUseTicks.get(world.getRegistryKey());
 		if (worldCooldowns == null) return 0L;
-		long remaining = Math.max(0L, worldCooldowns.getOrDefault(playerId, 0L) - world.getTime());
-		if (remaining <= 0L) worldCooldowns.remove(playerId);
-		return remaining;
+		return AbilityCooldowns.remaining(worldCooldowns, playerId, world.getTime());
 	}
 
 	public static long reduceMasqueradeCooldown(ServerPlayerEntity player, long ticks) {
@@ -333,13 +336,9 @@ public final class HarlequinManager {
 			return player == null || !(player.getWorld() instanceof ServerWorld serverWorld)
 				? 0L : masqueradeCooldownRemainingTicks(serverWorld, player.getUuid());
 		}
-		long remaining = masqueradeCooldownRemainingTicks(world, player.getUuid());
-		if (remaining <= 0L) return 0L;
-		long next = Math.max(0L, remaining - ticks);
 		Map<UUID, Long> worldCooldowns = nextMasqueradeUseTicks.computeIfAbsent(world.getRegistryKey(),
 			key -> new ConcurrentHashMap<>());
-		if (next <= 0L) worldCooldowns.remove(player.getUuid());
-		else worldCooldowns.put(player.getUuid(), world.getTime() + next);
+		long next = AbilityCooldowns.reduce(worldCooldowns, player.getUuid(), world.getTime(), ticks);
 		syncMasqueradeCooldown(player, next);
 		return next;
 	}
@@ -361,7 +360,7 @@ public final class HarlequinManager {
 
 	private static void playJevilLaughGlobally(ServerWorld world) {
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			player.playSoundToPlayer(MapSelectSounds.JEVIL_LAUGH, SoundCategory.PLAYERS, 1.0F, 1.0F);
+			AbilitySounds.playTo(player, MapSelectSounds.JEVIL_LAUGH, SoundCategory.PLAYERS, 1.0F, 1.0F);
 		}
 	}
 
@@ -512,7 +511,7 @@ public final class HarlequinManager {
 		}
 	}
 
-	private record ActiveSwap(long untilTick, Map<UUID, UUID> swaps, Map<UUID, Float> voicePitches) {
+	private record ActiveSwap(long untilTick, Map<UUID, UUID> swaps) {
 		private boolean isActive(ServerWorld world) {
 			return world != null && world.getTime() < untilTick;
 		}

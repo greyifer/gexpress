@@ -18,15 +18,20 @@ import dev.mapselect.MapSelect;
 import dev.mapselect.config.GexpressConfig;
 import dev.mapselect.game.DeadPlayerStatus;
 import dev.mapselect.level.LevelComponent;
+import dev.mapselect.mixin.ItemCooldownEntryAccessor;
+import dev.mapselect.mixin.ItemCooldownManagerAccessor;
 import dev.mapselect.modifier.LoversManager;
+import dev.mapselect.network.PayloadSync;
 import dev.mapselect.network.role.timemaster.TimeMasterFreezeStatePayload;
 import dev.mapselect.network.role.timemaster.TimeMasterFreezeUsePayload;
 import dev.mapselect.network.role.timemaster.TimeMasterRewindPayload;
 import dev.mapselect.network.role.timemaster.TimeMasterUsePayload;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.bombspecialist.C4BackComponent;
 import dev.mapselect.role.bombspecialist.C4Detonation;
 import dev.mapselect.role.bodyguard.BodyguardManager;
+import dev.mapselect.role.altruist.AltruistManager;
 import dev.mapselect.role.bountyhunter.BountyHunterManager;
 import dev.mapselect.role.AbilityTargeting;
 import dev.mapselect.role.covenant.CovenantManager;
@@ -39,6 +44,7 @@ import dev.mapselect.role.silent.SilentShadowComponent;
 import dev.mapselect.role.skincrawler.SkincrawlerManager;
 import dev.mapselect.role.snitch.SnitchManager;
 import dev.mapselect.role.spy.SpyManager;
+import dev.mapselect.role.veteran.VeteranManager;
 import dev.mapselect.role.spy.SpyBugComponent;
 import dev.mapselect.role.harlequin.DancingCartsManager;
 import dev.mapselect.role.harlequin.HarlequinManager;
@@ -81,7 +87,6 @@ import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.Component;
 
-import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -105,11 +110,6 @@ public final class TimeMasterManager {
 	private static final Map<RegistryKey<World>, ActiveRewind> ACTIVE_REWINDS = new ConcurrentHashMap<>();
 	private static final Map<UUID, ActiveFreeze> ACTIVE_FREEZES = new ConcurrentHashMap<>();
 
-	private static Field cooldownEntriesField;
-	private static Field cooldownTickField;
-	private static Field cooldownEndTickField;
-	private static boolean lookedUpCooldownFields;
-
 	private TimeMasterManager() {}
 
 	public static void register() {
@@ -131,7 +131,7 @@ public final class TimeMasterManager {
 	}
 
 	private static void tick(ServerWorld world) {
-		if (world.getRegistryKey() != World.OVERWORLD) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world)) return;
 		RegistryKey<World> worldKey = world.getRegistryKey();
 		if (!canTrack(world)) {
 			clearTimeline(worldKey);
@@ -227,10 +227,12 @@ public final class TimeMasterManager {
 			(int) Math.max(1L, (world.getTime() - snapshot.tick() + 19L) / 20L));
 		if (!creativeBypass && !comp.consume(timeMaster.getUuid())) return;
 
-		timeMaster.playSoundToPlayer(SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
+		AbilitySounds.playTo(timeMaster, SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
 			SoundCategory.PLAYERS, 1.0F, 1.25F);
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			ServerPlayNetworking.send(player, new TimeMasterRewindPayload(REWIND_ANIMATION_TICKS));
+			if (ServerPlayNetworking.canSend(player, TimeMasterRewindPayload.ID)) {
+				ServerPlayNetworking.send(player, new TimeMasterRewindPayload(REWIND_ANIMATION_TICKS));
+			}
 			player.sendMessage(Text.literal("Time is rewinding " + rewindSeconds + "s."), true);
 		}
 
@@ -261,7 +263,10 @@ public final class TimeMasterManager {
 
 		ServerPlayerEntity target = findFreezeTarget(timeMaster);
 		if (target == null) {
-			timeMaster.sendMessage(Text.literal("No living player close enough to freeze."), true);
+			double range = GexpressConfig.getTimeMasterFreezeRange();
+			timeMaster.sendMessage(Text.literal(AbilityTargeting.lookTargetFailure(timeMaster,
+				timeMaster.getServerWorld().getPlayers(), range, 0.0D, true,
+				candidate -> !PelicanManager.isStashed(candidate) && isPlayable(candidate, timeMaster), "freeze")), true);
 			return;
 		}
 		if (target == timeMaster) return;
@@ -270,6 +275,7 @@ public final class TimeMasterManager {
 			timeMaster.sendMessage(Text.literal(target.getName().getString() + " is already frozen."), true);
 			return;
 		}
+		if (VeteranManager.interceptAbilityInteraction(timeMaster, target)) return;
 		if (!creativeBypass && !comp.consumeFreeze(timeMaster.getUuid())) return;
 
 		int durationTicks = GexpressConfig.getTimeMasterFreezeDurationSeconds() * 20;
@@ -278,8 +284,8 @@ public final class TimeMasterManager {
 		freeze.apply(target);
 		SpyManager.recordInteraction(timeMaster, target);
 		syncFreeze(world, target.getUuid(), timeMaster.getUuid(), true, durationTicks);
-		timeMaster.playSoundToPlayer(SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.75F, 0.55F);
-		target.playSoundToPlayer(SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.75F, 0.55F);
+		AbilitySounds.playTo(List.of(timeMaster, target), SoundEvents.BLOCK_GLASS_BREAK,
+			SoundCategory.PLAYERS, 0.75F, 0.55F);
 		timeMaster.sendMessage(Text.literal("Froze " + target.getName().getString() + "."), true);
 		target.sendMessage(Text.literal("You are frozen in time."), true);
 	}
@@ -343,21 +349,20 @@ public final class TimeMasterManager {
 			? new TimeMasterFreezeStatePayload(true, targetId, timeMasterId, durationTicks)
 			: TimeMasterFreezeStatePayload.clear(targetId);
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (ServerPlayNetworking.canSend(player, TimeMasterFreezeStatePayload.ID)) {
-				ServerPlayNetworking.send(player, payload);
-			}
+			PayloadSync.sendIfChanged(player, TimeMasterFreezeStatePayload.ID, payload);
 		}
 	}
 
 	private static void syncActiveFreezes(ServerPlayerEntity player) {
-		if (player == null || !World.OVERWORLD.equals(player.getWorld().getRegistryKey())) return;
+		if (player == null || !dev.mapselect.game.GexpressWorlds.isGameWorld(player.getServerWorld())) return;
 		for (Map.Entry<UUID, ActiveFreeze> entry : ACTIVE_FREEZES.entrySet()) {
 			ActiveFreeze freeze = entry.getValue();
 			if (!freeze.worldKey().equals(player.getWorld().getRegistryKey())) continue;
 			long remaining = Math.max(0L, freeze.expiresAt() - player.getWorld().getTime());
-			if (remaining <= 0L || !ServerPlayNetworking.canSend(player, TimeMasterFreezeStatePayload.ID)) continue;
-			ServerPlayNetworking.send(player, new TimeMasterFreezeStatePayload(true, entry.getKey(), freeze.timeMasterId(),
-				(int) Math.min(Integer.MAX_VALUE, remaining)));
+			if (remaining <= 0L) continue;
+			PayloadSync.sendIfChanged(player, TimeMasterFreezeStatePayload.ID,
+				new TimeMasterFreezeStatePayload(true, entry.getKey(), freeze.timeMasterId(),
+					(int) Math.min(Integer.MAX_VALUE, remaining)));
 		}
 	}
 
@@ -407,7 +412,7 @@ public final class TimeMasterManager {
 
 	public static void recordWeaponEvent(ServerPlayerEntity player, WeaponEventType type) {
 		if (player == null || type == null || !(player.getWorld() instanceof ServerWorld world)) return;
-		if (world.getRegistryKey() != World.OVERWORLD || !canTrack(world)) return;
+		if (!dev.mapselect.game.GexpressWorlds.isGameWorld(world) || !canTrack(world)) return;
 		if (!hasPlayableTimeMaster(world)) return;
 		Deque<WeaponEvent> events = WEAPON_EVENTS.computeIfAbsent(world.getRegistryKey(), key -> new ArrayDeque<>());
 		events.addLast(WeaponEvent.capture(world, player, type));
@@ -881,6 +886,7 @@ public final class TimeMasterManager {
 			GuardianAngelManager.TimeState guardianAngel,
 			C4Detonation.TimeState c4Detonation,
 			BodyguardManager.TimeState bodyguard,
+			AltruistManager.TimeState altruist,
 			CovenantManager.TimeState covenant,
 			LoversManager.TimeState lovers,
 			NbtCompound gameWorld, NbtCompound gameTime, NbtCompound timeMaster,
@@ -925,6 +931,7 @@ public final class TimeMasterManager {
 				GuardianAngelManager.snapshotForTimeRewind(),
 				C4Detonation.snapshotForTimeRewind(),
 				BodyguardManager.snapshotForTimeRewind(),
+				AltruistManager.snapshotForTimeRewind(),
 				CovenantManager.snapshotForTimeRewind(),
 				LoversManager.snapshotForTimeRewind(),
 				writeComponent(GameWorldComponent.KEY.getNullable(world), lookup),
@@ -1023,6 +1030,7 @@ public final class TimeMasterManager {
 			PelicanManager.restoreForTimeRewind(world, vulture);
 			GuardianAngelManager.restoreForTimeRewind(world, guardianAngel);
 			BodyguardManager.restoreForTimeRewind(world, bodyguard);
+			AltruistManager.restoreForTimeRewind(world, altruist);
 			CovenantManager.restoreForTimeRewind(world, covenant);
 			LoversManager.restoreForTimeRewind(world, lovers);
 
@@ -1282,16 +1290,14 @@ public final class TimeMasterManager {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	private static Map<Item, Integer> currentCooldowns(ItemCooldownManager manager) {
 		try {
-			lookupCooldownFields();
-			if (cooldownEntriesField == null || cooldownTickField == null || cooldownEndTickField == null) return null;
-			Map<Item, ?> entries = (Map<Item, ?>) cooldownEntriesField.get(manager);
-			int tick = cooldownTickField.getInt(manager);
+			ItemCooldownManagerAccessor accessor = (ItemCooldownManagerAccessor) manager;
+			Map<Item, ?> entries = accessor.gexpress$getEntries();
+			int tick = accessor.gexpress$getTick();
 			Map<Item, Integer> out = new LinkedHashMap<>();
 			for (Map.Entry<Item, ?> entry : entries.entrySet()) {
-				int endTick = cooldownEndTickField.getInt(entry.getValue());
+				int endTick = ((ItemCooldownEntryAccessor) entry.getValue()).gexpress$getEndTick();
 				int remaining = Math.max(0, endTick - tick);
 				if (remaining > 0) out.put(entry.getKey(), remaining);
 			}
@@ -1302,18 +1308,4 @@ public final class TimeMasterManager {
 		}
 	}
 
-	private static void lookupCooldownFields() throws ReflectiveOperationException {
-		if (lookedUpCooldownFields) return;
-		lookedUpCooldownFields = true;
-		cooldownEntriesField = ItemCooldownManager.class.getDeclaredField("entries");
-		cooldownEntriesField.setAccessible(true);
-		cooldownTickField = ItemCooldownManager.class.getDeclaredField("tick");
-		cooldownTickField.setAccessible(true);
-		for (Class<?> inner : ItemCooldownManager.class.getDeclaredClasses()) {
-			if (!inner.getSimpleName().equals("Entry")) continue;
-			cooldownEndTickField = inner.getDeclaredField("endTick");
-			cooldownEndTickField.setAccessible(true);
-			break;
-		}
-	}
 }

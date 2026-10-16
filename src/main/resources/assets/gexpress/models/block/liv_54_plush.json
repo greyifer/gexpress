@@ -1,0 +1,8 @@
+{
+	"credit": "Liv_54 plush - Minecraft skin UVs",
+	"parent": "gexpress:block/greyifer_plush",
+	"textures": {
+		"0": "gexpress:block/liv_54_plush",
+		"particle": "gexpress:block/liv_54_plush"
+	}
+}

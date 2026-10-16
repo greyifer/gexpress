@@ -1,8 +1,7 @@
 package dev.mapselect.client.screen;
 
 import dev.isxander.yacl3.api.ConfigCategory;
-import dev.isxander.yacl3.api.YetAnotherConfigLib;
-import dev.isxander.yacl3.gui.YACLScreen;
+import dev.isxander.yacl3.api.Option;
 import dev.mapselect.MapSelect;
 import dev.mapselect.client.preset.ClientPresetCache;
 import dev.mapselect.client.preset.ClientTrainPresetCache;
@@ -12,21 +11,33 @@ import dev.mapselect.network.config.GexpressConfigSyncPayload;
 import dev.mapselect.network.config.GexpressDevTuningPayload;
 import dev.mapselect.network.config.GexpressTaskConfigPayload;
 import dev.mapselect.network.config.PuppetmasterConfigPayload;
+import dev.mapselect.network.config.DoomsayerConfigPayload;
 import dev.mapselect.permissions.GexpressPermissions;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
+import java.util.Set;
 
 public final class GexpressOptionsScreen {
+	private static final int AUTOSAVE_DELAY_TICKS = 8;
+	private static final Set<Option<?>> pendingAutosaveOptions =
+		Collections.newSetFromMap(new IdentityHashMap<>());
+	private static int autosaveTicks = -1;
+
 	private GexpressOptionsScreen() {}
+
+	public static void registerClient() {
+		ClientTickEvents.END_CLIENT_TICK.register(client -> tickAutosave());
+	}
 
 	static final Map<String, Boolean> pendingRoleState = new LinkedHashMap<>();
 	static final Map<String, Boolean> pendingModifierState = new LinkedHashMap<>();
@@ -36,12 +47,8 @@ public final class GexpressOptionsScreen {
 	static final Map<String, Integer> pendingModifierMax = new LinkedHashMap<>();
 	static final List<String> pendingChatCommands = new ArrayList<>();
 
-	private static String selectedMapPreset = null;
-	private static int mapsTabIndex = -1;
-	private static String selectedTrainCartMap = null;
-	private static int trainCartsTabIndex = -1;
-
-	public static Screen create(Screen parent) {
+	public static void prepareForMenu() {
+		cancelScheduledAutosave();
 		pendingRoleState.clear();
 		pendingModifierState.clear();
 		pendingRoleChance.clear();
@@ -54,110 +61,83 @@ public final class GexpressOptionsScreen {
 		resetWatheExtendedState();
 		GexpressMapPresetsCategory.pendingEdits.clear();
 		GexpressTrainCartsScreen.pendingEdits.clear();
-		selectedMapPreset = null;
-		selectedTrainCartMap = null;
-		return buildScreen(parent);
+	}
+
+	public static void addWatheTabs(dev.isxander.yacl3.api.YetAnotherConfigLib.Builder builder, Screen parent) {
+		var express = ConfigCategory.createBuilder().name(net.minecraft.text.Text.literal("G'Express"));
+		if (dev.mapselect.client.replay.ClientReplay.canAccess()) express.option(menuButton("Past Matches", screen -> {
+			dev.mapselect.client.replay.ClientReplay.control("list", "");
+			return screen;
+		}));
+		express.option(menuButton("XP Roadmap", GexpressXpRoadmapCategory::createGlibScreen));
+		express.option(menuButton("Bug Reports", GexpressBugReportsCategory::createGlibScreen));
+		if (canViewGameTab()) express.option(menuButton("Gameplay", GexpressGameCategory::createGlibScreen));
+		if (canViewDevTab()) express.option(menuButton("Developer", GexpressDevCategory::createGlibScreen));
+		builder.category(express.build());
+		if (canViewMapsTab() || canViewTrainCartsTab()) {
+			var maps = ConfigCategory.createBuilder().name(net.minecraft.text.Text.literal("Maps & Trains"));
+			if (canViewMapsTab()) maps.option(menuButton("Maps", GexpressPresetLibraryScreen::maps));
+			if (canViewTrainCartsTab()) maps.option(menuButton("Train Carts", GexpressPresetLibraryScreen::trainCarts));
+			builder.category(maps.build());
+		}
+		if (canViewPlayersTab()) {
+			builder.category(ConfigCategory.createBuilder().name(net.minecraft.text.Text.literal("Players"))
+				.option(menuButton("Players", screen -> GexpressPlayersCategory.createGlibScreen(screen,
+					canEditTags(), canManageProgression(), canManageEconomy())))
+				.build());
+		}
+	}
+
+	private static dev.isxander.yacl3.api.ButtonOption menuButton(String label,
+			java.util.function.Function<Screen, Screen> destination) {
+		return dev.isxander.yacl3.api.ButtonOption.createBuilder()
+			.name(net.minecraft.text.Text.literal(label))
+			.text(net.minecraft.text.Text.literal("Open"))
+			.action((screen, option) -> MinecraftClient.getInstance().setScreen(destination.apply(screen)))
+			.build();
 	}
 
 	static void navigateMaps(Screen parent, String presetName) {
-		selectedMapPreset = presetName;
-		Screen next = buildScreen(parent);
-		MinecraftClient mc = MinecraftClient.getInstance();
-		mc.setScreen(next);
-		selectMapsTab(next);
+		if (presetName == null) {
+			io.github.caspe.glib.api.client.ui.GlibLoadingTransitionScreen.open(parent,
+				"Loading map library...", 0xFFF4B860, () -> GexpressPresetLibraryScreen.maps(parent));
+			return;
+		}
+		Map<String, dev.mapselect.preset.map.MapPreset> presets = ClientPresetCache.snapshot();
+		dev.mapselect.preset.map.MapPreset preset = presets.get(presetName);
+		if (preset == null) {
+			io.github.caspe.glib.api.client.ui.GlibLoadingTransitionScreen.open(parent,
+				"Refreshing map library...", 0xFFF4B860, () -> GexpressPresetLibraryScreen.maps(parent));
+			return;
+		}
+		ConfigCategory category = GexpressMapPresetsCategory.buildPresetCategory(presetName, preset);
+		List<dev.isxander.yacl3.api.OptionGroup> groups = category.groups().stream().toList();
+		List<GexpressGlibEditor.PageSource> pages = groups.size() >= 8 ? List.of(
+			new GexpressGlibEditor.PageSource(net.minecraft.text.Text.literal("Areas"),
+				net.minecraft.text.Text.literal("Whole-map, lobby, ready, play, reset, and fresh-air regions."), groups.subList(0, 2)),
+			new GexpressGlibEditor.PageSource(net.minecraft.text.Text.literal("Spawning"),
+				net.minecraft.text.Text.literal("Player positions and random spawns."), groups.subList(2, 5)),
+			new GexpressGlibEditor.PageSource(net.minecraft.text.Text.literal("Rules"),
+				net.minecraft.text.Text.literal("Terrain, play-area, reset, and couch behavior."), groups.subList(5, 6)),
+			new GexpressGlibEditor.PageSource(net.minecraft.text.Text.literal("Environment"),
+				net.minecraft.text.Text.literal("Weather, fog, room count, and linked train preset."), groups.subList(6, 7)),
+			new GexpressGlibEditor.PageSource(net.minecraft.text.Text.literal("Tools"),
+				net.minecraft.text.Text.literal("Import the current Wathe map state into this preset."), groups.subList(7, groups.size()))
+		) : List.of(new GexpressGlibEditor.PageSource(category.name(), category.tooltip(), groups));
+		io.github.caspe.glib.api.client.ui.GlibLoadingTransitionScreen.open(parent,
+			"Opening " + presetName + "...", 0xFFF4B860,
+			() -> GexpressGlibEditor.screen(parent, presetName,
+				"Map layout, environment, spawning, and role overrides.", 0xFFF4B860, pages));
 	}
 
 	static void navigateTrainCarts(Screen parent, String mapPresetName) {
-		selectedTrainCartMap = mapPresetName;
-		Screen next = buildScreen(parent);
-		MinecraftClient mc = MinecraftClient.getInstance();
-		mc.setScreen(next);
-		selectTrainCartsTab(next);
+		String message = mapPresetName == null ? "Loading train-cart library..." : "Opening " + mapPresetName + " carts...";
+		io.github.caspe.glib.api.client.ui.GlibLoadingTransitionScreen.open(parent, message, 0xFFD98BFF,
+			() -> mapPresetName == null ? GexpressPresetLibraryScreen.trainCarts(parent)
+				: new GexpressTrainCartEditorScreen(parent, mapPresetName));
 	}
 
-	private static Screen buildScreen(Screen parent) {
-		boolean canEditGame = canEditGameTab();
-		boolean canViewGame = canViewGameTab();
-		boolean canViewPlayers = canViewPlayersTab();
-		boolean canViewMaps = canViewMapsTab();
-		boolean canViewTrainCarts = canViewTrainCartsTab();
-		boolean canViewDev = canViewDevTab();
-		BiConsumer<String, Screen> stage = GexpressOptionsScreen::stage;
-
-		YetAnotherConfigLib.Builder builder = YetAnotherConfigLib.createBuilder()
-			.title(Text.translatable("gui.gexpress.config.title"))
-			.save(GexpressOptionsScreen::onSave);
-
-		mapsTabIndex = -1;
-		trainCartsTabIndex = -1;
-		int idx = 0;
-		builder.category(GexpressClientCategory.build(parent, canEditGame, stage));
-		idx++;
-		builder.category(GexpressSkinsCategory.build(parent));
-		idx++;
-		builder.category(GexpressXpRoadmapCategory.build(parent));
-		idx++;
-		builder.category(GexpressBugReportsCategory.build(parent));
-		idx++;
-
-		if (canViewDev) {
-			builder.category(GexpressDevCategory.build(parent));
-			idx++;
-		}
-
-		if (canViewPlayers) {
-			builder.category(GexpressPlayersCategory.build(parent, canEditTags(), canManageProgression(), canManageEconomy()));
-			idx++;
-		}
-
-		if (canViewTrainCarts) {
-			ConfigCategory trainCarts = (selectedTrainCartMap == null)
-				? GexpressTrainCartsScreen.buildListCategory(parent)
-				: GexpressTrainCartsScreen.buildDetailCategory(parent, selectedTrainCartMap);
-			builder.category(trainCarts);
-			trainCartsTabIndex = idx;
-			idx++;
-		}
-
-		if (canViewGame) {
-			builder.category(GexpressGameCategory.build(parent, stage));
-			idx++;
-		}
-
-		if (canViewMaps) {
-			ConfigCategory maps = (selectedMapPreset == null)
-				? GexpressMapScreen.buildListCategory(parent)
-				: GexpressMapDetailScreen.buildDetailCategory(parent, selectedMapPreset);
-			builder.category(maps);
-			mapsTabIndex = idx;
-		}
-
-		return builder.build().generateScreen(parent);
-	}
-
-	private static void selectMapsTab(Screen screen) {
-		if (mapsTabIndex < 0) return;
-		try {
-			if (screen instanceof YACLScreen ys && ys.tabNavigationBar != null) {
-				ys.tabNavigationBar.selectTab(mapsTabIndex, false);
-			}
-		} catch (Throwable t) {
-			MapSelect.LOGGER.debug("Failed to select Maps tab: {}", t.toString());
-		}
-	}
-
-	private static void selectTrainCartsTab(Screen screen) {
-		if (trainCartsTabIndex < 0) return;
-		try {
-			if (screen instanceof YACLScreen ys && ys.tabNavigationBar != null) {
-				ys.tabNavigationBar.selectTab(trainCartsTabIndex, false);
-			}
-		} catch (Throwable t) {
-			MapSelect.LOGGER.debug("Failed to select Train Carts tab: {}", t.toString());
-		}
-	}
-
-	private static void stage(String fullCommand, Screen parent) {
+	static void stage(String fullCommand, Screen parent) {
 		invokeWatheExtendedVoid("stageCommand", new Class<?>[]{String.class, Screen.class}, new Object[]{fullCommand, parent});
 	}
 
@@ -165,8 +145,10 @@ public final class GexpressOptionsScreen {
 		pendingChatCommands.add(command);
 	}
 
-	private static void onSave() {
+	public static void finishGlibSave() {
+		cancelScheduledAutosave();
 		GexpressConfig.save();
+		RoleModifierTuningConfig.save();
 		pushGexpressConfigToServer();
 		pushMapPresetsToServer();
 		pushTrainPresetsToServer();
@@ -179,6 +161,38 @@ public final class GexpressOptionsScreen {
 		pendingRoleMax.clear();
 		pendingModifierChance.clear();
 		pendingModifierMax.clear();
+	}
+
+	static void discardGlibChanges() {
+		cancelScheduledAutosave();
+		pendingRoleState.clear();
+		pendingModifierState.clear();
+		pendingRoleChance.clear();
+		pendingRoleMax.clear();
+		pendingModifierChance.clear();
+		pendingModifierMax.clear();
+		pendingChatCommands.clear();
+		GexpressMapPresetsCategory.pendingEdits.clear();
+		GexpressTrainCartsScreen.pendingEdits.clear();
+	}
+
+	static void requestGlibAutosave(Option<?> option) {
+		if (option == null) return;
+		pendingAutosaveOptions.add(option);
+		autosaveTicks = AUTOSAVE_DELAY_TICKS;
+	}
+
+	private static void tickAutosave() {
+		if (autosaveTicks < 0) return;
+		if (autosaveTicks-- > 0) return;
+		List<Option<?>> changed = List.copyOf(pendingAutosaveOptions);
+		for (Option<?> option : changed) option.applyValue();
+		finishGlibSave();
+	}
+
+	private static void cancelScheduledAutosave() {
+		pendingAutosaveOptions.clear();
+		autosaveTicks = -1;
 	}
 
 	static int getRoleChance(String id) {
@@ -198,19 +212,27 @@ public final class GexpressOptionsScreen {
 	}
 
 	static void setRoleChance(String id, int value) {
-		pendingRoleChance.put(id, clamp(value, RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX));
+		int clamped = clamp(value, RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX);
+		pendingRoleChance.put(id, clamped);
+		RoleModifierTuningConfig.setRoleChance(id, clamped);
 	}
 
 	static void setRoleMax(String id, int value) {
-		pendingRoleMax.put(id, clamp(value, RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX));
+		int clamped = clamp(value, RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX);
+		pendingRoleMax.put(id, clamped);
+		RoleModifierTuningConfig.setRoleMax(id, clamped);
 	}
 
 	static void setModifierChance(String id, int value) {
-		pendingModifierChance.put(id, clamp(value, RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX));
+		int clamped = clamp(value, RoleModifierTuningConfig.CHANCE_MIN, RoleModifierTuningConfig.CHANCE_MAX);
+		pendingModifierChance.put(id, clamped);
+		RoleModifierTuningConfig.setModifierChance(id, clamped);
 	}
 
 	static void setModifierMax(String id, int value) {
-		pendingModifierMax.put(id, clamp(value, RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX));
+		int clamped = clamp(value, RoleModifierTuningConfig.MAX_MIN, RoleModifierTuningConfig.MAX_MAX);
+		pendingModifierMax.put(id, clamped);
+		RoleModifierTuningConfig.setModifierMax(id, clamped);
 	}
 
 	private static void flushRoleModifierTuningCommands() {
@@ -316,8 +338,6 @@ public final class GexpressOptionsScreen {
 				GexpressConfig.getPainterPaintDurationSeconds(),
 				GexpressConfig.getPainterBodyCooldownSeconds(),
 				GexpressConfig.getPainterPlayerCooldownSeconds(),
-				GexpressConfig.getPainterDoorwayDurationSeconds(),
-				GexpressConfig.getPainterDoorwayCooldownSeconds(),
 				GexpressConfig.getPainterMaxPaintedBodies(),
 				GexpressConfig.getPainterMaxPaintedPlayers(),
 				GexpressConfig.getSpyBugCost(),
@@ -400,8 +420,14 @@ public final class GexpressOptionsScreen {
 				GexpressConfig.getCovenantBiteCooldownSeconds(),
 				GexpressConfig.getVengefulSpiritReviveDelaySeconds(),
 				GexpressConfig.getVengefulSpiritRevengeSeconds(),
-				GexpressConfig.doLoversWinIndependently()
+				GexpressConfig.doLoversWinIndependently(),
+				GexpressConfig.getVeteranMaxUses()
 			));
+		}
+		if (canEditGame && ClientPlayNetworking.canSend(DoomsayerConfigPayload.ID)) {
+			ClientPlayNetworking.send(new DoomsayerConfigPayload(
+				GexpressConfig.getDoomsayerGuessesToWin(),
+				GexpressConfig.doesDoomsayerDieOnWrongGuess()));
 		}
 		if (canEditGame && ClientPlayNetworking.canSend(GexpressTaskConfigPayload.ID)) {
 			ClientPlayNetworking.send(new GexpressTaskConfigPayload(
@@ -429,7 +455,9 @@ public final class GexpressOptionsScreen {
 				GexpressConfig.getGoldFoodPlatterPrice(),
 				GexpressConfig.getGoldDrinkTrayPrice(),
 				GexpressConfig.getSkinCaseRowsSyncString(),
-				GexpressConfig.getMutedNotePrice()
+				GexpressConfig.getMutedNotePrice(),
+				GexpressConfig.getLobbyPollCooldownSeconds(),
+				GexpressConfig.getLobbyPollDurationSeconds()
 			));
 		}
 		if (canEditGame && ClientPlayNetworking.canSend(PuppetmasterConfigPayload.ID)) {
@@ -468,22 +496,22 @@ public final class GexpressOptionsScreen {
 		}
 	}
 
-	private static boolean canViewPlayersTab() {
+	static boolean canViewPlayersTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canViewPlayersTab(mc.player);
 	}
 
-	private static boolean canViewGameTab() {
+	static boolean canViewGameTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canViewGameTab(mc.player);
 	}
 
-	private static boolean canEditGameTab() {
+	static boolean canEditGameTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canEditGameTab(mc.player);
 	}
 
-	private static boolean canViewMapsTab() {
+	static boolean canViewMapsTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canViewMapsTab(mc.player);
 	}
@@ -493,7 +521,7 @@ public final class GexpressOptionsScreen {
 		return mc.player != null && GexpressPermissions.canEditMapsTab(mc.player);
 	}
 
-	private static boolean canViewTrainCartsTab() {
+	static boolean canViewTrainCartsTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canViewTrainCartsTab(mc.player);
 	}
@@ -503,27 +531,27 @@ public final class GexpressOptionsScreen {
 		return mc.player != null && GexpressPermissions.canEditTrainCartsTab(mc.player);
 	}
 
-	private static boolean canViewDevTab() {
+	static boolean canViewDevTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canViewDevTab(mc.player);
 	}
 
-	private static boolean canEditDevTab() {
+	static boolean canEditDevTab() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canEditDevTab(mc.player);
 	}
 
-	private static boolean canEditTags() {
+	static boolean canEditTags() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canEditTags(mc.player);
 	}
 
-	private static boolean canManageProgression() {
+	static boolean canManageProgression() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canManageProgression(mc.player);
 	}
 
-	private static boolean canManageEconomy() {
+	static boolean canManageEconomy() {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		return mc.player != null && GexpressPermissions.canManageEconomy(mc.player);
 	}

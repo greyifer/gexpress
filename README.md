@@ -12,110 +12,30 @@ Using this mod outside of **The Harpy Express: Extended** may work, but it is no
 
 ## Commands
 
-All G'Express commands are under `/g`. `/gexpress` is a full alias for the same command tree.
-Legacy nested forms such as `/g admin dev ...`, `/g roles tuning role ...`, and `/g modifiers tuning modifier ...` still work.
+All G'Express commands are documented in [COMMANDS.md](COMMANDS.md).
 
-| Command | Purpose |
-|---|---|
-| `/g game start <mode> <effect> [minutes] [seconds]` | Starts a G'Express round. Modes include `modded`, `amnesia`, `discovery`, `loose_ends`, and `murder`; effects include `generic`, `day`, `lobby`, `night`, and `sundown`. |
-| `/g game end` | Ends the current round. |
-| `/g game end force` | Force-finalizes the current round. |
-| `/g setup map create <corner1> <corner2> <name>` | Creates a saved map preset from two corners. |
-| `/g setup map delete <name>` | Deletes a saved map preset. |
-| `/g setup map edit <name> corners <corner1> <corner2>` | Updates a map preset's overall corners. |
-| `/g setup map edit <name> rename <newName>` | Renames a map preset. |
-| `/g setup map edit <name> weather <type>` | Sets the map preset weather override. |
-| `/g setup map edit <name> fogcolor <hex>` | Sets or clears the map preset fog color. |
-| `/g setup map edit <name> wholemap <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the full map bounds. |
-| `/g setup map edit <name> playarea <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the playable area bounds. |
-| `/g setup map edit <name> template <minX> <minY> <minZ> <maxX> <maxY> <maxZ>` | Edits the reset template bounds. |
-| `/g setup map edit <name> freshair add <corner1> <corner2> [sanityPercent] [outsideSounds]` | Adds a Fresh Air task area with optional sanity reward and outside ambience. |
-| `/g setup map edit <name> freshair list` | Lists saved Fresh Air task areas. |
-| `/g setup map edit <name> freshair clear` | Clears saved Fresh Air task areas. |
-| `/g setup map edit <name> offset <x> <y> <z>` | Sets the play area paste offset. |
-| `/g setup map edit <name> spectator <x> <y> <z> <yaw> <pitch>` | Sets the spectator spawn position. |
-| `/g setup map edit <name> readytrain here` | Sets the ready train preview position to your current position. |
-| `/g setup map edit <name> readytrain <corner>` | Sets the ready train preview corner. |
-| `/g setup map edit <name> readytrain clear` | Clears the ready train preview position. |
-| `/g setup map edit <name> randomspawns snapshot` | Copies current RTP slots into the map preset as random spawns. |
-| `/g setup map edit <name> randomspawns clear` | Clears saved random spawns from the map preset. |
-| `/g setup map edit <name> rooms <count>` | Sets the highest Wathe room key number this map can assign, such as `15` for `Room 1` through `Room 15`. |
-| `/g setup map list` | Lists saved map presets. |
-| `/g setup map show <name>` | Shows a map preset's saved values, including fresh-air area and room key count. |
-| `/g setup map set <name> [trainPreset]` | Applies a map preset, optionally with a train preset. |
-| `/g setup map default <name> <trainPreset>` | Sets the default train preset for a map preset. |
-| `/g setup map snapshot <name>` | Snapshots active Wathe areas, spawns, and RTP slots into a preset. |
-| `/g setup train preset save <name>` | Saves the current train reset template as a train preset. |
-| `/g setup train preset delete <name>` | Deletes a train preset. |
-| `/g setup train preset list` | Lists train presets. |
-| `/g setup train preset show <name>` | Shows train preset bounds, offset, RTP slots, and cart count. |
-| `/g setup rtp add [x] [y] [z]` | Adds an RTP slot at your position or explicit coordinates. |
-| `/g setup rtp remove <id>` | Removes an RTP slot by id. |
-| `/g setup rtp removenearest` | Removes the nearest RTP slot. |
-| `/g setup rtp list` | Lists RTP slots. |
-| `/g setup rtp clear` | Clears all RTP slots. |
-| `/g setup rtp enable` / `/g setup rtp disable` | Enables or disables RTP. |
-| `/g roles c4 attach <players>` | Admin-attaches C4 to players. |
-| `/g roles c4 remove <players>` | Removes attached C4 from players. |
-| `/g roles c4 clear` | Clears all attached C4. |
-| `/g roles tuning <id> chance <value>` | Sets a role assignment chance. |
-| `/g roles tuning <id> max <value>` | Sets a role assignment maximum. |
-| `/g roles tuning <id> amount <value>` | Alias for role max. |
-| `/g roles test role <role> [players]` | Assigns a test role. |
-| `/g roles test role clear [players]` | Clears test roles. |
-| `/g modifiers tuning <id> chance <value>` | Sets a modifier assignment chance. |
-| `/g modifiers tuning <id> max <value>` | Sets a modifier assignment maximum. |
-| `/g modifiers tuning <id> amount <value>` | Alias for modifier max. |
-| `/g modifiers test add <modifier> [players]` / `/g modifiers test add <players> <modifier>` | Adds a test modifier. Suggestions hide modifiers the selected player already has. |
-| `/g modifiers test remove <modifier> [players]` / `/g modifiers test remove <players> <modifier>` | Removes a test modifier. Suggestions show only modifiers the selected player has. |
-| `/g modifiers test clear [players]` | Clears test modifiers. |
-| `/g tasks test <outside|sleep|eat|drink|conversation> [players]` | Forces a task for testing. |
-| `/g tasks test clear [players]` | Clears current tasks. |
-| `/g roles pelican leave` | Lets a swallowed player climb out of the Pelican. |
-| `/g roles pelican release <players>` | Host command that releases selected players from Pelicans. |
-| `/g group host add <players>` | Adds host permission to players. |
-| `/g group host remove <players>` | Removes host permission from players. |
-| `/g group host list` | Lists saved hosts. |
-| `/g group trusted add <players>` | Adds the Trusted tag to players. |
-| `/g group trusted remove <players>` | Removes the Trusted tag from players. |
-| `/g group trusted list` | Lists saved Trusted players. |
-| `/g group voice mute <players>` / `/g group voice mute all` | Voice-mutes players or all non-privileged players. |
-| `/g group voice unmute <players>` / `/g group voice unmute all` | Removes voice mutes. |
-| `/g group voice list` | Lists voice-muted players. |
-| `/g admin c4back offset x/y/z <value>` | Tunes the C4 back model offset. |
-| `/g admin c4back rotation x/y/z <value>` | Tunes the C4 back model rotation. |
-| `/g admin c4back slant <value>` | Tunes the C4 back model diagonal slant. |
-| `/g admin c4back scale <value>` | Tunes the C4 back model size. |
-| `/g admin c4preset add [values]` | Adds a C4 placement preset from current settings or explicit values. |
-| `/g admin c4preset list` | Lists C4 placement presets. |
-| `/g admin c4preset remove <index>` | Removes a C4 placement preset. |
-| `/g admin c4preset clear` | Clears C4 placement presets. |
-| `/g admin roledesc <role> set <description>` | Overrides a G'Express role guidebook description. |
-| `/g admin roledesc <role> clear` | Clears a role description override. |
-| `/g admin shortsighted range <value>` | Tunes Short-sighted visibility range. |
-| `/g admin medicshield blockFlashTicks <value>` | Tunes Medic shield block flash duration. |
-| `/g admin medicshield breakFlashTicks <value>` | Tunes Medic shield break flash duration. |
-| `/g admin medicshield blockFlashAlpha <value>` | Tunes Medic shield block flash opacity. |
-| `/g admin medicshield breakFlashAlpha <value>` | Tunes Medic shield break flash opacity. |
-| `/g admin silentshadow alpha <value>` | Tunes The Silent shadow opacity. |
-| `/g admin traincart <preset> <corner1> <corner2>` | Adds a Dancing Carts region to a train preset. |
-| `/g admin traincart <preset> list` | Lists Dancing Carts regions for a train preset. |
-| `/g admin traincart <preset> remove <index>` | Removes a Dancing Carts region from a train preset. |
-| `/g admin traincart <preset> clear` | Clears Dancing Carts regions from a train preset. |
+## Settings panel
+
+Use `/give @s gexpress:settings_panel` to obtain the Settings Panel. Place matching, equally facing blocks in a rectangle to form a joined wall display, up to 16 by 16 blocks. A wider panel gives setting names more room.
+
+Right-click the top arrows to switch between Game, Maps & Trains, Roles, and Modifiers; use the bottom arrows to page through settings. Each row has minus and plus controls. Only vanilla operators with permission level 2 or higher can interact, including changing pages; host or trusted tags alone do not grant access.
+
+Game and role changes are saved as you click; role assignment changes apply to subsequent rounds. Role and modifier pages include enable switches, chance percentages, and maximum counts. Maps & Trains edits the selected saved preset's room count, weather, couch sleeping, terrain mode, play-area mode, and linked train preset. Use its **Apply map & train** plus control to activate the selected preset.
 
 ---
 
 ## Roles
 
+In Draft mode, Godfather is the only Mafia role available at the start. Mafioso, Janitor, Pickpocket, and Burglar are excluded from the draft's visible choices, random picks, and fallback assignments; Godfather can still recruit them during the round.
+
 | Name | Side | Description |
 |---|---|---|
 | **Bomb Specialist** | Killer | A killer role that can attach C4 to players. Can be defused by eligible players. |
-| **The Silent** | Killer | Can move without footsteps during Shadow March, then returns to their original position when the ability ends. |
+| **The Silent** | Killer | Phases horizontally through blocks during Shadow March without footsteps or weapon use, then returns to a safe standing position near their origin. |
 | **Warlock** | Killer | Marks a player, then uses that mark to kill another player standing close to them. |
-| **Harlequin** | Killer | Can swap player skins or train carts to create confusion during rounds. |
+| **Harlequin** | Killer | Masquerade swaps skins, mutes participants, and scatters them to preflighted safe map positions; Dancing Carts rearranges the train. |
 | **Puppetmaster** | Killer | Takes control of another living player while leaving their own body vulnerable. |
 | **Bounty Hunter** | Killer | Receives a timed bounty target. Killing the bounty pays bonus gold; missing the timer applies weapon cooldowns. |
-| **Scatter Brain** | Killer | Scatters every living player, including themself, to safe random positions around the active map. |
 | **Skincrawler** | Killer | Steals the skin of a fresh dead body and leaves their previous skin on the corpse. The first gunshot stuns them; a second gunshot while stunned kills them. |
 | **Medic** | Civilian | Shields another player from danger and receives visual feedback when that shield is hit or broken. |
 | **Snitch** | Civilian | Completes tasks to expose the killers. Progress stays visible beside the mood HUD, and killers are warned/glow the Snitch once they are within the configured task threshold. |
@@ -128,7 +48,8 @@ Legacy nested forms such as `/g admin dev ...`, `/g roles tuning role ...`, and 
 | **Mafioso** | Mafia | A recruited family role that fights for the Godfather with mafia weapon rules. |
 | **Janitor** | Mafia | A recruited family role that can clean looked-at bodies and use poison vials. |
 | **Juggernaut** | Neutral | Starts with a Knife and Revolver. Weapon cooldowns become shorter after kills. Wins by being the last player alive. |
-| **Pelican** | Neutral | Can swallow living players. Eaten players see through the Pelican, communicate through a dedicated belly voice channel, and the Pelican sees a top-corner swallow counter. |
+| **Pelican** | Neutral | Can swallow living players. Eaten players see through the Pelican and share a belly voice channel. After two minutes, the Pelican can digest them from inventory slots, with a 30-second digestion cooldown. |
+| **Doomsayer** | Neutral | Guesses living players' roles from the inventory and wins after reaching the configurable correct-prophecy goal. Wrong guesses either remove progress or kill the Doomsayer. |
 
 ---
 
@@ -195,9 +116,11 @@ Legacy nested forms such as `/g admin dev ...`, `/g roles tuning role ...`, and 
 
 ## Features
 
-### G'Express Settings Screen
+### G'Express Menu
 
-A host-focused settings screen for configuring roles, modifiers, maps, and gameplay values.
+G'Express registers a workspace in G'Lib's shared animated menu. The workspace is split into Personal, Server Setup, and Developer sections, with permission-aware entries for gameplay, players, maps, train carts, and development tools.
+
+Detailed editors open from those entries and retain the existing host and server permission checks.
 
 Includes support for:
 
@@ -212,7 +135,7 @@ Includes support for:
 - Spy bug cost, duration, and range.
 - Puppetmaster range and self-body kill behavior.
 - Time Master Freeze duration, cooldown, range, and per-round uses.
-- Scatter Brain cooldown, Tracker limits, Altruist range, Hungry/Thirsty carry limits, Squeaker/Masquerade pitch, Pelican swallow percentage, and first-death shield.
+- Tracker limits, Altruist range, Hungry/Thirsty carry limits, Squeaker pitch, Pelican swallow percentage, and first-death shield.
 
 ### Ability HUD
 
@@ -222,7 +145,7 @@ G'Express adds an ability HUD for role abilities.
 - Roles with multiple active abilities can show multiple bars.
 - Ability icons appear beside the bars.
 - Time Master shows remaining rewinds beside the rewind bar.
-- Scatter Brain, Skincrawler, Spy, Tracker, Altruist, Pelican, Harlequin, Juggernaut, Puppetmaster, Warlock, The Silent, Medic, and Time Master abilities are represented when their role needs a bar.
+- Skincrawler, Spy, Tracker, Altruist, Pelican, Harlequin, Juggernaut, Puppetmaster, Warlock, The Silent, Medic, and Time Master abilities are represented when their role needs a bar.
 - Pelican swallow progress renders as a dedicated top-corner counter.
 
 ### Tags & Custom Skins
@@ -293,16 +216,12 @@ G'Express is an addon for that ecosystem, not a replacement for it.
 
 G'Express is licensed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
 
-## Third-party code notice
+Counterfeiter is a killer role with one forge per match. Forge choices are Master Key, Trapper Trap, Medical Kit, Pill and Pan, shown when their source mods are installed. The Master Key opens Wathe doors and breaks after three successful uses. The trap uses Trapper's normal collection and report behavior but gives exactly one truthful role for a captured player other than its owner; every other reported role is false. Medical Kits, Pills and Pans are inert props. Reconnecting does not reset the forge, and a full hotbar does not spend it. Revolver, Lockpick, Firecracker and Defense Vial are excluded.
 
-This project is licensed under the GNU General Public License v3.0.
+### Loki
 
-This project includes code derived from Immersive Portals Mod by qouteall / iPortalTeam, which is licensed under the Apache License 2.0.
+Loki is a killer with four abilities (default keys R, B, V and C). Approach and look at a living player to target them, as with Seer. Voices selects two distinct players and swaps where their Simple Voice Chat audio comes from for 120 seconds (45-second cooldown). Warp turns a target's view upside down, adds distortion through Veil and reverses controls for 60 seconds, with upward gravity for the first 30 seconds (30-second cooldown). Trickster's Fuse gives a nearby non-Loki player a 30-second fuse (60-second cooldown). Right-click another player to pass it without resetting its timer. You cannot pass directly back to your previous giver, or to Loki. When time runs out, Wathe's grenade explodes at the holder, using its normal nearby-player kills and protection hooks. Transfers trigger no pranks. Loki uses the shared cooldown bars and four custom 16-pixel HUD icons.
 
-The original Immersive Portals Mod copyright notice is retained where applicable:
+Fourth Ability instantly puts you in control of a clone for up to 180 seconds (90-second cooldown). Its inventory is empty; item use, pickup and buying are blocked. Your original body stays vulnerable and keeps your inventory. Press Fourth Ability again to return early. Killing the clone leaves a corpse with your appearance exactly where it died and returns you to the original body. Expiry or voluntary return does not leave a corpse. All cooldowns start immediately on use; changing the fourth key is supported in Controls.
 
-Copyright 2020 qouteall
-
-Modifications to the Immersive Portals code were made by this project's contributors.
-
-This project is an unofficial modification and is not affiliated with, endorsed by, or maintained by qouteall or the iPortalTeam.
+Operators can use `/g replay off` to stop replay recording and playback, `/g replay on` to enable them again, and `/g replay status` to check the setting. The setting survives restarts. Turning replays off deletes all saved replays and partial recordings, and clears replay caches.

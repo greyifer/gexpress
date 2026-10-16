@@ -24,6 +24,8 @@ public abstract class NeutralWinTextMixin {
 	private static Text gexpress$neutralLooseEndWinText(RoleAnnouncementTexts.RoleAnnouncementText role,
 			GameFunctions.WinStatus status, Text winner, TextRenderer renderer, ClientPlayerEntity player,
 			DrawContext context) {
+		Text winningSide = dev.mapselect.client.game.ClientRoundWinnerText.side(status);
+		if (winningSide != null) return winningSide;
 		if (status == GameFunctions.WinStatus.LOOSE_END && player != null && player.getWorld() != null) {
 			GameWorldComponent game = GameWorldComponent.KEY.getNullable(player.getWorld());
 			UUID winnerId = game == null ? null : game.getLooseEndWinner();
@@ -36,6 +38,9 @@ public abstract class NeutralWinTextMixin {
 				}
 				if (MapSelectRoles.JUGGERNAUT_ID.equals(winnerRole.identifier())) {
 					return Text.translatable("announcement.win.gexpress.juggernaut").withColor(winnerRole.color());
+				}
+				if (MapSelectRoles.DOOMSAYER_ID.equals(winnerRole.identifier())) {
+					return Text.translatable("announcement.win.gexpress.doomsayer").withColor(winnerRole.color());
 				}
 			}
 		}

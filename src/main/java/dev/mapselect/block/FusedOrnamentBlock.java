@@ -85,7 +85,7 @@ public class FusedOrnamentBlock extends BlockWithEntity {
 
 	@Override
 	protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-		if (player.shouldCancelInteraction() && player.getMainHandStack().isEmpty()) {
+		if (player.isCreative() && player.shouldCancelInteraction() && player.getMainHandStack().isEmpty()) {
 			return removeOrnament(state, world, pos, player, hit.getSide(), null);
 		}
 		BlockState baseState = getBaseState(world, pos);
@@ -95,6 +95,7 @@ public class FusedOrnamentBlock extends BlockWithEntity {
 
 	public static ActionResult removeOrnament(BlockState state, World world, BlockPos pos, @Nullable PlayerEntity player,
 			Direction hitSide, @Nullable Identifier preferredOrnamentId) {
+		if (player != null && !player.isCreative()) return ActionResult.PASS;
 		if (!(world.getBlockEntity(pos) instanceof FusedOrnamentBlockEntity entity)) return ActionResult.PASS;
 		Direction side = hitSide;
 		FusedOrnamentBlockEntity.Decoration decoration = entity.getDecoration(side);

@@ -1,7 +1,115 @@
+# G'Express 1.9.1
+
+## Changed
+
+- `/g replay off` now stops recording and playback, deletes all saved replays and partial files, and clears replay caches. The disabled setting survives restarts.
+- `/g replay on` enables replays again once deletion finishes.
+
+# G'Express 1.9.0
+
+## Added
+
+- Added Loki, a new killer role with four abilities:
+  - Voice Swap swaps two players' voice locations for 2 minutes. 45-second cooldown.
+  - Warp activates after 15 seconds, then flips the player's view, gravity and movement controls for 30 seconds. 30-second cooldown.
+  - Trickster's Fuse activates after 15 seconds, then starts its 30-second fuse. They can pass it by right-clicking someone else, but can't give it straight back to the previous player or pass it to Loki. Passing doesn't reset the timer. When it runs out, they explode using Wathe's grenade explosion. 1-minute cooldown.
+  - Clone lets you control a copy of yourself for up to 3 minutes. You can open doors, but can't buy, carry or use items. If the clone dies, it leaves a body and you return to your original body. Your original body can still be killed. 90-second cooldown.
+- Added a fourth ability keybind. Default: C.
+- Added Loki's ability icons, cooldown bars and guidebook entries. His cooldowns start when you use each ability.
+- Added Counterfeiter, a killer who can forge one item per match:
+  - Master Key: works, but breaks after 3 successful door uses.
+  - Trapper Trap: gives one real role for a caught player other than its owner. The rest of the report is fake.
+  - Medical Kit and Pill: fake items with no functionality. The fake Pan can be raised on right-click, but cannot stun anyone.
+- Counterfeiter's choices use the new inventory slot texture. Items only appear if their mod is installed. Revolver, Lockpick, Firecracker and Defense Vial aren't available.
+- Added an OP-only settings wall panel for game settings, maps, trains, roles and modifiers.
+- Added settings categories, bigger controls and hover highlights. Role cards show Enabled, Chance and Count together.
+- Added server-stored replays with player POVs, voice chat, playback controls and kill markers.
+- Added a grenade throw preview showing its path and landing point.
+- Added Eth4n1 and Domekiqn plushes with Designer credits.
+- Added Seafox__ and ReddishAcorn plushes with Builder credits.
+- Added Carpet bot testing commands under /g test.
+
+## Changed
+
+- Removed Sovereign of Adumbration, Diaphanous and Nihility.
+- Killers can kill other killers again. Mafia members can also kill their own family members.
+- Only Godfather appears as a mafia choice at the start of Draft. Recruiting still works during the match.
+- Grenades travel 20% further per tick and no longer have random throw spread.
+- Replays are now OP-only.
+- Improved replay performance with lots of players and when several people load a replay at once.
+- Previously loaded replays load faster. The two most recently loaded matches are cached.
+- Restored the Wathe Extended menu layout with Maps & Trains and Players tabs. Kept the Skins & Inventory shortcut in G'Lib.
+- Updated EvieEveee's plush skin.
+- Moved Counterfeiter's forge slots higher so they don't overlap Guesser.
+- Any role can win as the last player alive, including Doomsayer.
+- Vengeful Spirit stays alive after killing their killer during the revenge timer.
+- Rebuilt the Twins' second body as a player entity. Its hearing distance is now 16 blocks.
+- Removed the dark backgrounds and colored lines from several role displays.
+- Cleaned up duplicate commands and shortcuts.
+- Disabled /me during matches.
+
+## Fixed
+
+- Fixed Loki's sliced-up Warp view and made all Warp effects end together. Removed Fuse flame particles. Clone bodies now show the owner's level and tags. Counterfeiter keeps the forged option bright and darkens the unused choices.
+
+- Smoothed replay player movement, head turns and body rotation. Packet batches no longer shorten movement interpolation, and buffering no longer snaps players to the next position.
+
+- Fixed replay voices being heard from anywhere on the map.
+- Moved replay voice decoding off the render thread and reduced delayed audio.
+- Fixed replay selection sometimes being ignored after opening the menu.
+- Fixed viewer slots being counted incorrectly when switching replays.
+- Fixed flickering on the settings panel.
+- Fixed Loki clones being unable to open doors while still being able to buy and use items.
+- Fixed the server startup crash caused by Loki's clone interaction mixin.
+- Fixed starting items duplicating when moved between slots.
+- Fixed shielded Juggernauts getting weapon cooldowns after being shot.
+- Cataloger now keeps their list after being revived.
+- Fixed Vengeful Spirit dying when returning while crouched or getting stuck after an early revive.
+- Dead Pelicans can no longer chat. Swallowed players can no longer use instinct from other addons.
+- The Twins' second body now dies when its owner dies.
+- Multiple Godfathers now have separate families.
+- Fixed the end screen showing the wrong winner.
+
+# Grey's Express 1.8.12
+
+## Added
+
+- Added a Skins & Inventory shortcut to the G'Lib main screen, with featured cases and skin offers.
+
+## Changed
+
+- The Twins' remote-body voice relay is now an off-by-default Secondary Ability toggle.
+- The Twins' switch ability now has a 30 second cooldown.
+
+## Fixed
+
+- Fixed the Twins' camera feed system.
+- Fixed the Twins' 2nd body not working correctly. 
+
+# Grey's Express 1.8.9
+
+## Added
+
+- Added Doomsayer, a configurable neutral role that can guess living players from every alignment through an inventory interface and wins after four correct prophecies by default.
+
+## Fixed
+
+- Fixed a client startup crash caused by the Noelle Guesser compatibility mixin exposing a non-private helper method.
+- Doomsayer player portraits now reliably open the role-selection stage when clicked.
+- Sniffer inspections now have a 45-second cooldown with a visible cooldown bar.
+- Pelicans can open chat without operator permissions, allowing them to dismiss belly-chat popups.
+- Doomsayer inventory choices and Snitch warning HUDs now survive the client role-sync race that could make them disappear.
+- Revealed Snitches can no longer be targeted by Noelle's Guesser modifier.
+- Veteran Alert now cancels lethal knife, gun, and grenade hits without killing the attacker, cancels Guesser attempts, and still allows a Psycho-mode Bat to kill the Veteran.
+- Time Master rewinds no longer leave Psycho players with the five-minute cooldown when Psycho mode is restored.
+- Rat Traps now fade away over 60 seconds, use Minecraft's vanilla glowing outline for the Rat, and reliably appear alongside role-provided shop entries.
+- Added a visual Rat jump cooldown bar.
+
 # Grey's Express 1.7.3
 
 ## Added
 
+- Added dark connectable leaderboard screens with server-local rankings for kills, levels, wins by side, win streaks, and survival time.
 - Added editable three-line floating text blocks for map builders.
 - Added room-name labels to Wathe doors after a named key is assigned to them.
 - Added a two-point Red Ribbon placement tool for creating purchasable barriers between two clicked positions.
@@ -11,6 +119,8 @@
 ## Changed
 
 - Replaced the old Coin Barrier appearance with one continuous lead-style ceremonial Red Ribbon between two clicked endpoints while preserving its prices, labels, collision, and purchase behavior.
+- Rat jumps now have a three-second cooldown.
+- Leaderboard rows now show player faces and highlight rows and category arrows under the crosshair.
 - Reworked the 3D model placement controls into clear move and rotate axes.
 - Reworked the tag, level reward, and case editors to stay readable and scroll correctly at different GUI scales.
 - Tutorial targets are now player-shaped living passengers instead of armor stands, and Escape opens a proper leave option.
@@ -18,6 +128,7 @@
 
 ## Fixed
 
+- Fixed leaderboard screens rendering as blank black panels on optimized client renderers.
 - Fixed KinsWathe's stamina bar starting from the wrong capacity for roles with additional stamina.
 - Vengeful Spirit now revives at the death position when it is supported, or on the closest solid floor directly below it when it is in midair.
 - Renaming an imported skin now updates its displayed name everywhere while preserving its command ID, unlocks, equipped state, and case rewards.

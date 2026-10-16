@@ -13,6 +13,8 @@ import dev.mapselect.preset.map.PresetStorage;
 import dev.mapselect.preset.train.TrainPreset;
 import dev.mapselect.preset.train.TrainPresetStorage;
 import dev.mapselect.registry.MapSelectRoles;
+import dev.mapselect.role.AbilityCooldowns;
+import dev.mapselect.role.AbilitySounds;
 import dev.mapselect.role.pelican.PelicanManager;
 import dev.mapselect.testing.GexpressTestState;
 import dev.mapselect.weather.MapWeatherComponent;
@@ -127,7 +129,7 @@ public final class DancingCartsManager {
 			setCooldown(world, harlequin.getUuid());
 			syncCooldown(harlequin, cooldownRemainingTicks(world, harlequin.getUuid()));
 		}
-		harlequin.playSoundToPlayer(SoundEvents.ENTITY_ENDERMAN_TELEPORT,
+		AbilitySounds.playTo(harlequin, SoundEvents.ENTITY_ENDERMAN_TELEPORT,
 			SoundCategory.PLAYERS, 0.9F, 0.85F);
 		if (creativeBypass) {
 			harlequin.sendMessage(Text.literal("Dancing Carts."), true);
@@ -399,7 +401,7 @@ public final class DancingCartsManager {
 	private static long cooldownRemainingTicks(ServerWorld world, UUID playerId) {
 		Map<UUID, Long> worldCooldowns = nextUseTicks.get(world.getRegistryKey());
 		if (worldCooldowns == null) return 0L;
-		return Math.max(0L, worldCooldowns.getOrDefault(playerId, 0L) - world.getTime());
+		return AbilityCooldowns.remaining(worldCooldowns, playerId, world.getTime());
 	}
 
 	public static long reduceCooldown(ServerPlayerEntity player, long ticks) {
@@ -407,20 +409,16 @@ public final class DancingCartsManager {
 			return player == null || !(player.getWorld() instanceof ServerWorld serverWorld)
 				? 0L : cooldownRemainingTicks(serverWorld, player.getUuid());
 		}
-		long remaining = cooldownRemainingTicks(world, player.getUuid());
-		if (remaining <= 0L) return 0L;
-		long next = Math.max(0L, remaining - ticks);
 		Map<UUID, Long> worldCooldowns = nextUseTicks.computeIfAbsent(world.getRegistryKey(),
 			key -> new ConcurrentHashMap<>());
-		if (next <= 0L) worldCooldowns.remove(player.getUuid());
-		else worldCooldowns.put(player.getUuid(), world.getTime() + next);
+		long next = AbilityCooldowns.reduce(worldCooldowns, player.getUuid(), world.getTime(), ticks);
 		syncCooldown(player, next);
 		return next;
 	}
 
 	private static void setCooldown(ServerWorld world, UUID playerId) {
-		nextUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>())
-			.put(playerId, world.getTime() + GexpressConfig.getTricksterDancingCartsCooldownSeconds() * 20L);
+		AbilityCooldowns.start(nextUseTicks.computeIfAbsent(world.getRegistryKey(), key -> new ConcurrentHashMap<>()),
+			playerId, world.getTime(), GexpressConfig.getTricksterDancingCartsCooldownSeconds() * 20L);
 	}
 
 	private static int remainingUses(ServerWorld world, UUID playerId) {
