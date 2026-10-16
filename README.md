@@ -160,21 +160,24 @@ The mod should be installed on both the **client** and the **server**.
 
 ## Commands
 
-All commands are under `/g` and `/gexpress`.
+All commands are under `/g`; `/gexpress` is an alias for the same tree. `<value>` marks a required argument and `[value]` an optional argument. Rows showing a command group require a subcommand; use in-game tab completion or [COMMANDS.md](COMMANDS.md) for the available actions. Permissions determine which commands you can use.
 
 ### Game
 
 | Command                | Purpose                                   |
 | ---------------------- | ----------------------------------------- |
-| `/g game start`        | Starts a round.                           |
-| `/g game start dryrun` | Checks the round setup before starting.   |
+| `/g game start <mode> <effect> [minutes] [seconds]`        | Starts a round.                           |
+| `/g game start dryrun <mode> <effect> [minutes] [seconds]` | Checks the round setup before starting.   |
 | `/g game end`          | Ends the current round.                   |
 | `/g game end force`    | Force-finalizes the current round.        |
-| `/g game auto`         | Starts an automatic game window.          |
+| `/g game auto`         | Shows the automatic game window status.          |
+| `/g game auto <start> <end>` | Starts an automatic game window, e.g. `20:00 22:00`. |
 | `/g game auto end`     | Ends the active automatic game window.    |
 | `/g poll`              | Lets players vote on lobby/game settings. |
 | `/g open`              | Opens the server for joining.             |
 | `/g close`             | Closes the server from joining.           |
+
+Modes: `modded`, `amnesia`, `takeover`, `draft`, `test`, `discovery`, `loose_ends`, `murder`. Effects: `generic`, `day`, `lobby`, `night`, `sundown`. For example: `/g game start modded day`.
 
 ### Setup
 
@@ -189,17 +192,17 @@ All commands are under `/g` and `/gexpress`.
 
 | Command               | Purpose                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `/g roles tuning`     | Changes role chances and role amounts.                                                                             |
-| `/g modifiers tuning` | Changes modifier chances and modifier amounts.                                                                     |
+| `/g roles tuning <id> chance <value>` / `/g roles tuning <id> max <value>`     | Changes role chances and role amounts.                                                                             |
+| `/g modifiers tuning <id> chance <value>` / `/g modifiers tuning <id> max <value>` | Changes modifier chances and modifier amounts.                                                                     |
 | `/g force`            | Forces, clears, or rerolls roles and modifiers.                                                                    |
 | `/g test`             | Test tools for roles, modifiers, C4, overlays, tasks, cooldowns, Pelican states, Time Master effects, and presets. |
-| `/g pelican leave`    | Lets a swallowed player leave the Pelican when allowed.                                                            |
+| `/g roles pelican leave`    | Lets a swallowed player leave the Pelican when allowed.                                                            |
 
 ### Skins & Progression
 
 | Command   | Purpose                                                               |
 | --------- | --------------------------------------------------------------------- |
-| `/g skin` | Opens, buys, equips, lists, gives, or removes weapon skins and cases. |
+| `/g skins` | Command group for equipping and listing skins, buying shop offers, and buying, opening, or listing cases. |
 
 ### Admin
 
@@ -211,11 +214,10 @@ All commands are under `/g` and `/gexpress`.
 | `/g admin tag`         | Creates, edits, previews, assigns, removes, and resets player tags.                              |
 | `/g admin gcoin`       | Gives, removes, or sets player coins.                                                            |
 | `/g admin keycard`     | Gives keycards.                                                                                  |
-| `/g admin skin`        | Admin tools for skins and cases.                                                                 |
+| `/g admin skins`        | Admin tools for skins and cases.                                                                 |
 | `/g admin config`      | Exports, imports, diffs, applies, and lists config presets.                                      |
-| `/g admin diagnostics` | Shows diagnostics for setup, presets, round state, compatibility, localization, and performance. |
-| `/g admin debugplayer` | Shows debug information for a player.                                                            |
-| `/g admin dev`         | Developer and live-tuning tools.                                                                 |
+| `/g admin diagnostics` | Shows summary, config, compatibility, preset, round, localization, and player diagnostics. |
+| `/g admin diagnostics player <players>` | Shows debug information for a player.                                                            |
 
 ---
 

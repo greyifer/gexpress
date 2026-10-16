@@ -1,7 +1,7 @@
 # G'Express Command Reference
 
 All G'Express commands are under `/g`. `/gexpress` is a full alias for the same command tree.
-Use the command paths below. Redundant aliases have been removed; `/gexpress` still redirects to `/g`. See [Carpet testing](CARPET_TESTING.md) for bot scenarios and examples.
+Use the command paths below. Redundant aliases have been removed; `/gexpress` still redirects to `/g`.
 
 | Command | Purpose |
 |---|---|
